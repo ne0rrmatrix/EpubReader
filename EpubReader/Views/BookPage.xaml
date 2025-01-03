@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EpubReader.Views.BookPage"
+             xmlns:local="clr-namespace:EpubReader.Views"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
+             x:DataType="viewModels:BookViewModel"
+             Title="BookPage">
+    <ContentPage.Resources>
+        <Style TargetType="Slider">
+            <Setter Property="MinimumTrackColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Primary}}" />
+            <Setter Property="MaximumTrackColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+            <Setter Property="ThumbColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
+            <Setter Property="VisualStateManager.VisualStateGroups">
+                <VisualStateGroupList>
+                    <VisualStateGroup x:Name="CommonStates">
+                        <VisualState x:Name="Normal" />
+                        <VisualState x:Name="Disabled">
+                            <VisualState.Setters>
+                                <Setter Property="MinimumTrackColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                                <Setter Property="MaximumTrackColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                                <Setter Property="ThumbColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateGroupList>
+            </Setter>
+        </Style>
+    </ContentPage.Resources>
+    <Grid>
+        <Label
+            x:Name="EpubText"
+            Grid.Row="0"
+            FontSize="12"
+            FontAutoScalingEnabled="true"
+            HorizontalOptions="Center">
+            <Label.GestureRecognizers>
+                <SwipeGestureRecognizer Direction="Left,Right" Swiped="SwipeGestureRecognizer_Swiped"/>
+            </Label.GestureRecognizers>
+        </Label>
+    </Grid>
+</ContentPage>
