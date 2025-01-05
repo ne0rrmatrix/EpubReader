@@ -32,7 +32,7 @@ public partial class LibraryViewModel : BaseViewModel
             var book = EbookService.OpenEbook(item.FileName);
             books.Add(book);
         }
-        MainThread.BeginInvokeOnMainThread(() => { Books = books; OnPropertyChanged(nameof(Books)); });
+        Dispatcher.Dispatch(() => { Books = books; OnPropertyChanged(nameof(Books)); });
     }
 
     [RelayCommand]

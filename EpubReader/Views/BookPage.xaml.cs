@@ -25,16 +25,13 @@ public partial class BookPage : ContentPage
 
     private void Current_RequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
     {
-        if (e.RequestedTheme == AppTheme.Dark)
+        string html = e.RequestedTheme switch
         {
-            string html = AddColors(book.Chapters[currentChapterIndex].HtmlFile, DarkModeBackgroundColor, DarkModeTextColor);
-            MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
-        }
-        else
-        {
-            string html = AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor);
-            MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
-        }
+            AppTheme.Dark => AddColors(book.Chapters[currentChapterIndex].HtmlFile, DarkModeBackgroundColor, DarkModeTextColor),
+            AppTheme.Light => AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor),
+            _ => AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor)
+        };
+        Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
     }
 
     protected override void OnNavigatingFrom(NavigatingFromEventArgs args)
@@ -70,7 +67,7 @@ public partial class BookPage : ContentPage
                 EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = chapter.Title;
             })
         };
-        Shell.Current.ToolbarItems.Add(toolbarItem);
+        MainThread.BeginInvokeOnMainThread(() => Shell.Current.ToolbarItems.Add(toolbarItem));
     }
 
     public static string AddColors(string htmlContent, string backgroundColor, string textColor)
@@ -116,16 +113,12 @@ public partial class BookPage : ContentPage
     void ContentPage_Loaded(object sender, EventArgs e)
     {
         book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException($"Invalid Operation: {book}");
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            var (textColor, backgroundColor) = GetColors();
-            var css = book.Css[^1].Content ?? string.Empty;
-            string html = InjectCss(book.Chapters[0].HtmlFile, css);
-            html = AddColors(html, backgroundColor, textColor);
-            EpubText.Source = new HtmlWebViewSource { Html = html };
-            CreateToolBar(book);
-            ChapterLabel.Text = book.Chapters[0].Title;
-        });
+        var (textColor, backgroundColor) = GetColors();
+        var css = book.Css[^1].Content ?? string.Empty;
+        string html = InjectCss(book.Chapters[0].HtmlFile, css);
+        html = AddColors(html, backgroundColor, textColor);
+        CreateToolBar(book);
+        Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[0].Title; });
     }
 
     static (string textColor, string backgroundColor) GetColors()
@@ -150,7 +143,7 @@ public partial class BookPage : ContentPage
         var css = book.Css[^1].Content ?? string.Empty;
         string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
         html = AddColors(html, backgroundColor, textColor);
-        MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
     }
 
     void Button_Next(object sender, EventArgs e)
@@ -164,7 +157,7 @@ public partial class BookPage : ContentPage
         var css = book.Css[^1].Content ?? string.Empty;
         string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
         html = AddColors(html, backgroundColor, textColor);
-        MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
     }
 
     void EpubText_Navigating(object sender, WebNavigatingEventArgs e)

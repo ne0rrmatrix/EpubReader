@@ -8,7 +8,7 @@ namespace EpubReader.ViewModels;
 public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
 {
     [ObservableProperty]
-    public partial bool IsNavMenuVisible { get; set; } = false;
+    public partial bool IsNavMenuVisible { get; set; } = true;
 
     Book? book;
     public Book? Book
@@ -17,6 +17,7 @@ public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
         set
         {
             SetProperty(ref book, value);
+            IsNavMenuVisible = false;
         }
     }
 
