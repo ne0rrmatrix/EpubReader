@@ -1,5 +1,4 @@
 using EpubReader.Models;
-using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
 
@@ -7,138 +6,176 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage
 {
+    static readonly string DarkModeBackgroundColor = "#1E1E1E";
+    static readonly string DarkModeTextColor = "#D3D3D3";
+    static readonly string LightModeBackgroundColor = "#FFFFFF";
+    static readonly string LightModeTextColor = "#000000";
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
     Book book = new();
-    int currentPageIndex = 0;
-    int currentChapter = 0;
-    TextPaginator? paginator;
+    int currentChapterIndex = 0;
     public BookPage(BookViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;
+        ArgumentNullException.ThrowIfNull(Application.Current);
+        currentChapterIndex = 0;
+        var (textColor, backgroundColor) = GetColors();
+        Application.Current.RequestedThemeChanged += Current_RequestedThemeChanged;
+    }
+
+    private void Current_RequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+    {
+        if (e.RequestedTheme == AppTheme.Dark)
+        {
+            string html = AddColors(book.Chapters[currentChapterIndex].HtmlFile, DarkModeBackgroundColor, DarkModeTextColor);
+            MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        }
+        else
+        {
+            string html = AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor);
+            MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        }
+    }
+
+    protected override void OnNavigatingFrom(NavigatingFromEventArgs args)
+    {
+        base.OnNavigatingFrom(args);
+        Shell.Current.ToolbarItems.Clear();
     }
 
     void CreateToolBar(Book book)
     {
         Shell.Current.ToolbarItems.Clear();
         var chapters = book.Chapters;
+        
         for (var i = 0; i < chapters.Count; i++)
         {
-            int currentIndex = i;
-            var toolbarItem = new ToolbarItem
-            {
-                Text = chapters[i].Title,
-                Order = ToolbarItemOrder.Secondary,
-                Priority = i,
-                Command = new Command(() =>
-                {
-                    book = ((BookViewModel)BindingContext).Book ?? new();
-                    paginator = new TextPaginator(400, 700);
-                    LoadChapter(currentIndex);
-                    currentPageIndex = 0;
-                    UpdatePageDisplay();
-                })
-            };
-            Shell.Current.ToolbarItems.Add(toolbarItem);
+            CreateToolBarItem(i, chapters[i]);
         }
     }
-    protected override void OnSizeAllocated(double width, double height)
+    
+    void CreateToolBarItem(int index, Chapter chapter)
     {
-        base.OnSizeAllocated(width, height);
-        if (width <= 0 || height <= 0)
+        var toolbarItem = new ToolbarItem
         {
-            return;
-        }
-        book = ((BookViewModel)BindingContext).Book ?? new();
-        paginator = new TextPaginator((int)width, (int)height);
-        currentChapter = 0;
-        currentPageIndex = 0;
-        LoadChapter(currentChapter);
-        CreateToolBar(book);
-        while (paginator.Pages.Count == 0)
-        {
-            currentChapter++;
-            if (book.Chapters.Count <= currentChapter)
+            Text = chapter.Title,
+            Order = ToolbarItemOrder.Secondary,
+            Priority = index,
+            Command = new Command(() =>
             {
-                break;
-            }
-            LoadChapter(currentChapter);
-            currentPageIndex = 0;
-        }
-        UpdatePageDisplay();
+                var (textColor, backgroundColor) = GetColors();
+                var css = book.Css[^1].Content ?? string.Empty;
+                string html = InjectCss(chapter.HtmlFile, css);
+                html = AddColors(html, backgroundColor, textColor);
+                EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = chapter.Title;
+            })
+        };
+        Shell.Current.ToolbarItems.Add(toolbarItem);
     }
-    void LoadChapter(int chapterIndex)
-    {
-        currentChapter = chapterIndex;
-        var chapter = book.Chapters[currentChapter];
-        paginator?.PaginateText(chapter.PlainText, EpubText);
-    }
-    void UpdatePageDisplay()
-    {
 
-        if(paginator?.Pages.Count == 0 || currentPageIndex > paginator?.Pages.Count)
+    public static string AddColors(string htmlContent, string backgroundColor, string textColor)
+    {
+        string styleTag = $@"
+            body {{
+                background-color: {backgroundColor};
+                color: {textColor};
+            }}";
+
+       return InjectCss(htmlContent, styleTag);
+    }
+
+    static string InjectCss(string htmlContent, string cssToInject)
+    {
+        string styleStartTag = "<style type='text/css' title='override_css'>";
+        string styleEndTag = "</style>";
+        bool styleStartTagExists = htmlContent.Contains(styleStartTag);
+        bool styleEndTagExists = htmlContent.Contains(styleEndTag);
+
+        if (!styleStartTagExists || !styleEndTagExists)
         {
-            MainThread.BeginInvokeOnMainThread(() => EpubText.Text = string.Empty);
-            EpubText.Text = string.Empty;
+            // If no <style> tag exists, create one at the end of the <head> section
+            int headEndPosition = htmlContent.IndexOf("</head>");
+            if (headEndPosition == -1)
+            {
+                logger.Info("No <head> tag found in the HTML content.");
+                return htmlContent;
+            }
+
+            string styleTag = $"{styleStartTag}\n{cssToInject}\n{styleEndTag}";
+            htmlContent = htmlContent.Insert(headEndPosition, styleTag);
+        }
+        else
+        {
+            // Inject the CSS before the closing </style> tag
+            int styleEndPosition = htmlContent.IndexOf(styleEndTag);
+            htmlContent = htmlContent.Insert(styleEndPosition, cssToInject);
+        }
+        return htmlContent;
+    }
+
+    void ContentPage_Loaded(object sender, EventArgs e)
+    {
+        book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException($"Invalid Operation: {book}");
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var (textColor, backgroundColor) = GetColors();
+            var css = book.Css[^1].Content ?? string.Empty;
+            string html = InjectCss(book.Chapters[0].HtmlFile, css);
+            html = AddColors(html, backgroundColor, textColor);
+            EpubText.Source = new HtmlWebViewSource { Html = html };
+            CreateToolBar(book);
+            ChapterLabel.Text = book.Chapters[0].Title;
+        });
+    }
+
+    static (string textColor, string backgroundColor) GetColors()
+    {
+        var currentTheme = Application.Current?.RequestedTheme;
+        return currentTheme switch
+        {
+            AppTheme.Dark => (DarkModeTextColor, DarkModeBackgroundColor),
+            AppTheme.Light => (LightModeTextColor, LightModeBackgroundColor),
+            _ => (LightModeTextColor, LightModeBackgroundColor)
+        };
+    }
+
+    void Button_Previous(object sender, EventArgs e)
+    {
+        if(currentChapterIndex <= 0 || currentChapterIndex >= book.Chapters.Count - 1)
+        {
             return;
         }
-        MainThread.BeginInvokeOnMainThread(() => EpubText.Text = paginator?.Pages[currentPageIndex]);
+        currentChapterIndex--;
+        var (textColor, backgroundColor) = GetColors();
+        var css = book.Css[^1].Content ?? string.Empty;
+        string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
+        html = AddColors(html, backgroundColor, textColor);
+        MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
     }
-    void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
+
+    void Button_Next(object sender, EventArgs e)
     {
-        switch (e.Direction)
+        if(currentChapterIndex < 0 || currentChapterIndex >= book.Chapters.Count - 1)
         {
-            case SwipeDirection.Left:
-                if(paginator?.Pages.Count == 0)
-                {
-                    currentChapter++;
-                    book = ((BookViewModel)BindingContext).Book ?? new();
-                    paginator = new TextPaginator(400, 700);
-                    LoadChapter(currentChapter);
-                    currentPageIndex = 0;
-                    UpdatePageDisplay();
-                    break;
-                }
-                if (currentPageIndex < paginator?.Pages.Count - 1)
-                {
-                    currentPageIndex++;
-                    UpdatePageDisplay();
-                    break;
-                }
-                if (currentPageIndex == paginator?.Pages.Count - 1)
-                {
-                    currentChapter++;
-                    LoadChapter(currentChapter);
-                    currentPageIndex = 0;
-                    UpdatePageDisplay();
-                    break;
-                }
-                break;
-            case SwipeDirection.Right:
-                if (currentPageIndex > 0)
-                {
-                    currentPageIndex--;
-                    UpdatePageDisplay();
-                    break;
-                }
-                else if (currentPageIndex == 0 && currentChapter > 0)
-                {
-                    currentChapter--;
-                    book = ((BookViewModel)BindingContext).Book ?? new();
-                    paginator = new TextPaginator(400, 700);
-                    LoadChapter(currentChapter);
-                    if (paginator?.Pages.Count - 1 > 0)
-                    {
-                        currentPageIndex = paginator?.Pages.Count - 1 ?? 0;
-                    }
-                    else
-                    {
-                        currentPageIndex = 0;
-                    }
-                    UpdatePageDisplay();
-                    break;
-                }
-                break;
+            return;
+        }
+        currentChapterIndex++;
+        var (textColor, backgroundColor) = GetColors();
+        var css = book.Css[^1].Content ?? string.Empty;
+        string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
+        html = AddColors(html, backgroundColor, textColor);
+        MainThread.BeginInvokeOnMainThread(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+    }
+
+    void EpubText_Navigating(object sender, WebNavigatingEventArgs e)
+    {
+        if(e.Url.StartsWith("http") || e.Url.StartsWith("https"))
+        {
+            var data = e.Url.Remove(0, 15);
+            System.Diagnostics.Debug.WriteLine(data);
+            System.Diagnostics.Debug.WriteLine($"Navigating to {e.Url}");
+            var temp = book.Chapters.Find(c => c.FileName.Contains(e.Url));
+            e.Cancel = true;
         }
     }
 }

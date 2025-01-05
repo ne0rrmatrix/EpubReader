@@ -30,11 +30,11 @@ public partial class LibraryViewModel : BaseViewModel
         foreach (var item in temp)
         {
             var book = EbookService.OpenEbook(item.FileName);
-            book.CoverImageFileName = item.CoverImageFileName;
             books.Add(book);
         }
         MainThread.BeginInvokeOnMainThread(() => { Books = books; OnPropertyChanged(nameof(Books)); });
     }
+
     [RelayCommand]
     public static async Task GotoBookPage(Book Book)
     {
@@ -65,19 +65,15 @@ public partial class LibraryViewModel : BaseViewModel
         });
         if (result is not null)
         {
-            var filePath = await Service.FileService.SaveFile(result).ConfigureAwait(false);
-            var ebook = Service.EbookService.OpenEbook(filePath);
-            string tempFile = Path.GetFileNameWithoutExtension(ebook.CoverImageFileName);
-            string coverImagePath = tempFile + ".jpg";
-            string fullPath = Path.Combine(FileService.saveDirectory, coverImagePath);
-            string imagePath = await FileService.SaveFile(ebook.CoverImage, fullPath, CancellationToken.None);
+            var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
+            // Open the epub file
+            var ebook = EbookService.OpenEbook(filePath);
+ 
             FileData fileData = new()
             {
                 Title = ebook.Title,
                 FileName = filePath,
-                CoverImageFileName = imagePath
             };
-            ebook.CoverImageFileName = imagePath;
             await db.SaveFileData(fileData, cancellationToken).ConfigureAwait(false);
             Books.Add(ebook);
 
@@ -92,32 +88,7 @@ public partial class LibraryViewModel : BaseViewModel
         if (book is not null)
         {
             logger.Info("Removing book");
-            try
-            {
-                if(File.Exists(book.FilePath))
-                {
-                    FileService.DeleteFile(book.FilePath);
-                    return;
-                }
-                else
-                {
-                    logger.Error($"File? {book.FilePath} does not exist");
-                }
-                if(File.Exists(book.CoverImageFileName))
-                {
-                    FileService.DeleteFile(book.CoverImageFileName);
-                    return;
-                }
-                else
-                {
-                    logger.Error($"File? {book.CoverImageFileName} does not exist");
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Error removing book files: {ex.Message}");
-            }
-           
+            FileService.DeleteFile(book.FilePath);
             await db.RemoveFileData(book, cancellationToken).ConfigureAwait(false);
             Books.Remove(book);
             logger.Info("Book removed from library.");
@@ -130,7 +101,6 @@ public partial class LibraryViewModel : BaseViewModel
         try
         {
             return await FilePicker.PickAsync(options).WaitAsync(CancellationToken.None).ConfigureAwait(false);
-
         }
         catch (Exception ex)
         {

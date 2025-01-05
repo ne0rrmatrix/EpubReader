@@ -11,44 +11,76 @@
              x:DataType="viewModels:LibraryViewModel"
              x:Name="CurrentPage"
              Title="LibraryPage">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
     <ContentPage.ToolbarItems>
-
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add_circle.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-    <CollectionView
+    <CollectionView x:Name="collectionView"
         Grid.Row="1"
         HorizontalScrollBarVisibility="Never"
-        x:DataType="viewModels:LibraryViewModel"
         ItemsSource="{Binding Books}"
-        SelectionMode="Single"
+        SelectionMode="None"
         VerticalScrollBarVisibility="Never">
         <CollectionView.ItemsLayout>
             <GridItemsLayout Orientation="Vertical" Span="3" />
         </CollectionView.ItemsLayout>
         <CollectionView.ItemTemplate>
             <DataTemplate x:DataType="Models:Book">
-                <StackLayout HorizontalOptions="Center">
-                  
-                    <Label
-                        FontSize="Title"
-                        HorizontalTextAlignment="Center"
-                        Text="{Binding Title}" />
-                    <Image
-                        Aspect="AspectFit"
-                        HeightRequest="200"
-                        HorizontalOptions="Center"
-                        Source="{Binding CoverImageFileName}">
-                        <Image.GestureRecognizers>
-                           <TapGestureRecognizer 
-                               x:DataType="{x:Null}"
-                               Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=GotoBookPageCommand}" 
-                               CommandParameter="{Binding .}" />
-                        </Image.GestureRecognizers>
-                    </Image>
-                </StackLayout>
+                <SwipeView>
+                    <SwipeView.RightItems>
+                        <SwipeItems>
+                            <SwipeItem
+                                    BackgroundColor="LightGray"
+                                    x:DataType="{x:Null}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"
+                                    CommandParameter="{Binding .}"
+                                    IconImageSource="delete.png"
+                                    Text="Delete" />
+                        </SwipeItems>
+                    </SwipeView.RightItems>
+                    <Grid Padding="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Label
+                            Grid.Row="0"
+                            Margin="0,0,0,10"
+                            Style="{StaticResource LabelSectionText}"
+                            HorizontalTextAlignment="Center"
+                            Text="{Binding Title}" />
+                        <Image
+                            Grid.Row="1"
+                            Aspect="AspectFit"
+                            HeightRequest="200"
+                            HorizontalOptions="Center"
+                            Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">
+                            <FlyoutBase.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem
+                                         Text="Delete"
+                                         x:DataType="{x:Null}"
+                                         CommandParameter="{Binding .}"
+                                         IconImageSource="delete.png"
+                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"/>
+                                </MenuFlyout>
+                            </FlyoutBase.ContextFlyout>
+                            <Image.GestureRecognizers>
+                                <TapGestureRecognizer 
+                                    x:DataType="{x:Null}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=GotoBookPageCommand}" 
+                                    CommandParameter="{Binding .}" />
+                            </Image.GestureRecognizers>
+                        </Image>
+                    </Grid>
+                </SwipeView>
             </DataTemplate>
         </CollectionView.ItemTemplate>
     </CollectionView>

@@ -22,22 +22,12 @@ public static class FileService
         }
     }
 
-    /// <summary>
-    /// Get file name for a string <see cref="string"/>
-    /// </summary>
-    /// <param name="name">A file name <see cref="string"/></param>
-    /// <returns>Filename <see cref="string"/> with file extension</returns>
     public static string GetFileName(string name)
     {
         var filename = Path.GetFileName(name);
         return Path.Combine(saveDirectory, filename);
     }
 
-    /// <summary>
-    /// Save file to local storage
-    /// </summary>
-    /// <param name="result"></param>
-    /// <returns></returns>
     public static async Task<string> SaveFile(FileResult result)
     {
         Directory.CreateDirectory(saveDirectory);
@@ -50,29 +40,5 @@ public static class FileService
         FileStream.Synchronized(output);
         logger.Info($"File saved: {fileName}");
         return fileName;
-    }
-    public static async Task<string> SaveFile(Byte[] bytes, string fileName, CancellationToken cancellationToken)
-    {
-        logger.Info($"Saving file: {fileName}");
-        using var stream = new MemoryStream(bytes);
-        if (File.Exists(fileName))
-        {
-            logger.Info($"File already exists: {fileName}");
-            return string.Empty;
-        }
-        await File.WriteAllBytesAsync(fileName, bytes, cancellationToken).ConfigureAwait(false);
-        logger.Info($"Saved file: {fileName}");
-        return fileName;
-    }
-    public static async Task<Byte[]> ReadFileBytes(string fileName, CancellationToken cancellationToken)
-    {
-        if (!File.Exists(fileName))
-        {
-            logger.Error($"File not found: {fileName}");
-            return [];
-        }
-        var result = await File.ReadAllBytesAsync(fileName, cancellationToken).ConfigureAwait(false);
-        logger.Info($"Read file: {fileName}");
-        return result;
     }
 }

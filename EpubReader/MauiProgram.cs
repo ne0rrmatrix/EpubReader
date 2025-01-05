@@ -64,8 +64,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<BaseViewModel>();
         builder.Services.AddSingleton<LibraryPage>();
         builder.Services.AddSingleton<LibraryViewModel>();
-        builder.Services.AddSingleton<BookPage>();
-        builder.Services.AddSingleton<BookViewModel>();
+        builder.Services.AddTransient<BookPage>();
+        builder.Services.AddTransient<BookViewModel>();
         return builder.Build();
     }
 }

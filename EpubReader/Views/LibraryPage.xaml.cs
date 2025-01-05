@@ -9,4 +9,10 @@ public partial class LibraryPage : ContentPage
 		InitializeComponent();
         BindingContext = viewModel;
     }
+
+    protected override void OnNavigatedTo(NavigatedToEventArgs args)
+    {
+        base.OnNavigatedTo(args);
+        Shell.SetNavBarIsVisible(this, true);
+    }
 }

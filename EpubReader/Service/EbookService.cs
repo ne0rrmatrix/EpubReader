@@ -14,39 +14,60 @@ public partial class EbookService
     public static Book OpenEbook(string path)
     {
         var book = EpubCore.EpubReader.Read(path);
-        var chapters = book.TableOfContents;
-        Chapter[] chapter = new Chapter[chapters.Count];
-        for (int i = 0; i < chapters.Count; i++)
+        var toc = book.TableOfContents.ToList();
+        var html = book.Resources.Html.ToList();
+
+        List<Chapter> chapters = [];
+        List<Author> authors = [];
+        List<CSS> css = [];
+
+        for (int i = 0; i < toc.Count; i++)
         {
-            var html = GetChapter(i, book.Resources.Html);
-            string plainText = EpubTextExtractor.ExtractAllText(html);
-            chapter[i] = new Chapter()
+            var htmlFile = html.Find(x => x.AbsolutePath == toc[i].AbsolutePath)?.TextContent ?? string.Empty;
+            var title = toc[i].Title;
+            if(string.IsNullOrEmpty(htmlFile))
             {
-                Title = chapters[i].Title,
-                HtmlFile = html,
-                PlainText = plainText
+                logger.Info("Html file is null");
+            }
+            var chapter = new Chapter()
+            {
+                Title = title,
+                HtmlFile = htmlFile,
+                FileName = Path.GetFileName(toc[i].RelativePath),
             };
+            chapters.Add(chapter);
         }
        
-        List<Author> authors = [];
         foreach (var author in book.Authors)
         {
-            if(author is not null)
+            if (author is not null)
             {
-                authors.Add(new Author { Name = author});
+                authors.Add(new Author { Name = author });
             }
+        }
+        
+        foreach (var style in book.Resources.Css)
+        {
+            CSS cSS = new()
+            {
+                FileName = Path.GetFileName(style.FileName),
+                Content = style.TextContent
+            };
+            css.Add(cSS);
         }
 
         Book books = new()
         {
             Title = book.Title.Trim(),
             Authors = authors,
+            FilePath = path,
             CoverImage = book.CoverImage,
-            CoverImageFileName = book.CoverImageHref,
-            Chapters = [.. chapter]
+            Chapters = [.. chapters],
+            Css = css,
         };
         return books;
     }
+
     static string GetChapter(int chapterIndex, ICollection<EpubTextFile> html)
     {
         var chapter = html.ElementAt(chapterIndex);
