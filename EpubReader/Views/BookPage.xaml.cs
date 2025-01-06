@@ -35,10 +35,6 @@ public partial class BookPage : ContentPage
     {
         if (e.Url.StartsWith("http") || e.Url.StartsWith("https"))
         {
-            var data = e.Url.Remove(0, 15);
-            System.Diagnostics.Debug.WriteLine(data);
-            System.Diagnostics.Debug.WriteLine($"Navigating to {e.Url}");
-            var temp = book.Chapters.Find(c => c.FileName.Contains(e.Url));
             e.Cancel = true;
         }
     }
@@ -49,7 +45,7 @@ public partial class BookPage : ContentPage
         {
             if (book.Chapters.Count == 0)
             {
-                System.Diagnostics.Debug.WriteLine("Book has no chapters");
+                logger.Info("Book has no chapters");
                 return;
             }
             fontSize = m.FontSize;
