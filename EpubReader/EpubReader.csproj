@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
 	<PropertyGroup>
 		<TargetFrameworks>$(NetVersion)-ios;$(NetVersion)-android;$(NetVersion)-maccatalyst</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);$(NetVersion)-windows10.0.19041.0</TargetFrameworks>
@@ -39,9 +38,9 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Release' 
-                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'tizen'
-                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'
-                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
+					AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'tizen'
+					AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'
+					AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
 		<!-- Ahead-of-time compilation is not yet supported net8.0-tizen -->
 		<!-- Cross-OS native compilation is not supported net8.0-android -->
 		<!-- Only iOS + MacCatalyst support AOT in .NET 9 -->
@@ -77,7 +76,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Remove="C:\Users\james\.nuget\packages\epubcore\1.6.1\contentFiles\any\net6.0\icon\icon.png" />
+		<Content Remove="C:\Users\james\.nuget\packages\epubcore\1.6.1\contentFiles\any\net6.0\icon\icon.png" />
 	</ItemGroup>
 	
 	<ItemGroup>

@@ -1,4 +1,7 @@
+using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Messages;
 using EpubReader.Models;
+using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
 
@@ -6,10 +9,10 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage
 {
-    static readonly string DarkModeBackgroundColor = "#1E1E1E";
-    static readonly string DarkModeTextColor = "#D3D3D3";
-    static readonly string LightModeBackgroundColor = "#FFFFFF";
-    static readonly string LightModeTextColor = "#000000";
+    string backgroundColor = string.Empty;
+    string textColor = string.Empty;
+    string fontFamily = string.Empty;
+    int fontSize = 0;
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
     Book book = new();
     int currentChapterIndex = 0;
@@ -18,118 +21,71 @@ public partial class BookPage : ContentPage
         InitializeComponent();
         BindingContext = viewModel;
         ArgumentNullException.ThrowIfNull(Application.Current);
-        currentChapterIndex = 0;
-        var (textColor, backgroundColor) = GetColors();
-        Application.Current.RequestedThemeChanged += Current_RequestedThemeChanged;
-    }
-
-    private void Current_RequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
-    {
-        string html = e.RequestedTheme switch
-        {
-            AppTheme.Dark => AddColors(book.Chapters[currentChapterIndex].HtmlFile, DarkModeBackgroundColor, DarkModeTextColor),
-            AppTheme.Light => AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor),
-            _ => AddColors(book.Chapters[currentChapterIndex].HtmlFile, LightModeBackgroundColor, LightModeTextColor)
-        };
-        Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
+        RegisterWeakReferences();
     }
 
     protected override void OnNavigatingFrom(NavigatingFromEventArgs args)
     {
         base.OnNavigatingFrom(args);
         Shell.Current.ToolbarItems.Clear();
+        WeakReferenceMessenger.Default.UnregisterAll(this);
     }
 
-    void CreateToolBar(Book book)
+    void EpubText_Navigating(object sender, WebNavigatingEventArgs e)
     {
-        Shell.Current.ToolbarItems.Clear();
-        var chapters = book.Chapters;
-        
-        for (var i = 0; i < chapters.Count; i++)
+        if (e.Url.StartsWith("http") || e.Url.StartsWith("https"))
         {
-            CreateToolBarItem(i, chapters[i]);
+            var data = e.Url.Remove(0, 15);
+            System.Diagnostics.Debug.WriteLine(data);
+            System.Diagnostics.Debug.WriteLine($"Navigating to {e.Url}");
+            var temp = book.Chapters.Find(c => c.FileName.Contains(e.Url));
+            e.Cancel = true;
         }
     }
-    
-    void CreateToolBarItem(int index, Chapter chapter)
+
+    void RegisterWeakReferences()
     {
-        var toolbarItem = new ToolbarItem
+        WeakReferenceMessenger.Default.Register<FontSizeMessage>(this, (r, m) =>
         {
-            Text = chapter.Title,
-            Order = ToolbarItemOrder.Secondary,
-            Priority = index,
-            Command = new Command(() =>
+            if (book.Chapters.Count == 0)
             {
-                var (textColor, backgroundColor) = GetColors();
-                var css = book.Css[^1].Content ?? string.Empty;
-                string html = InjectCss(chapter.HtmlFile, css);
-                html = AddColors(html, backgroundColor, textColor);
-                EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = chapter.Title;
-            })
-        };
-        MainThread.BeginInvokeOnMainThread(() => Shell.Current.ToolbarItems.Add(toolbarItem));
-    }
-
-    public static string AddColors(string htmlContent, string backgroundColor, string textColor)
-    {
-        string styleTag = $@"
-            body {{
-                background-color: {backgroundColor};
-                color: {textColor};
-            }}";
-
-       return InjectCss(htmlContent, styleTag);
-    }
-
-    static string InjectCss(string htmlContent, string cssToInject)
-    {
-        string styleStartTag = "<style type='text/css' title='override_css'>";
-        string styleEndTag = "</style>";
-        bool styleStartTagExists = htmlContent.Contains(styleStartTag);
-        bool styleEndTagExists = htmlContent.Contains(styleEndTag);
-
-        if (!styleStartTagExists || !styleEndTagExists)
-        {
-            // If no <style> tag exists, create one at the end of the <head> section
-            int headEndPosition = htmlContent.IndexOf("</head>");
-            if (headEndPosition == -1)
-            {
-                logger.Info("No <head> tag found in the HTML content.");
-                return htmlContent;
+                System.Diagnostics.Debug.WriteLine("Book has no chapters");
+                return;
             }
-
-            string styleTag = $"{styleStartTag}\n{cssToInject}\n{styleEndTag}";
-            htmlContent = htmlContent.Insert(headEndPosition, styleTag);
-        }
-        else
+            fontSize = m.FontSize;
+            var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
+            Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        });
+        WeakReferenceMessenger.Default.Register<FontMessage>(this, (r, m) =>
         {
-            // Inject the CSS before the closing </style> tag
-            int styleEndPosition = htmlContent.IndexOf(styleEndTag);
-            htmlContent = htmlContent.Insert(styleEndPosition, cssToInject);
-        }
-        return htmlContent;
-    }
+            if (book.Chapters.Count == 0)
+            {
+                return;
+            }
+            fontFamily = m.FontFamily;
 
+            var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
+            Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        });
+        WeakReferenceMessenger.Default.Register<ColorMessage>(this, (r, m) =>
+        {
+            if (book.Chapters.Count == 0)
+            {
+                return;
+            }
+            textColor = m.TextColor;
+            backgroundColor = m.BackgroundColor;
+            var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
+            Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+        });
+    }
+   
     void ContentPage_Loaded(object sender, EventArgs e)
     {
         book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException($"Invalid Operation: {book}");
-        var (textColor, backgroundColor) = GetColors();
-        var css = book.Css[^1].Content ?? string.Empty;
-        string html = InjectCss(book.Chapters[0].HtmlFile, css);
-        html = AddColors(html, backgroundColor, textColor);
         CreateToolBar(book);
+        var html = GetHtmlWithCss(book.Chapters[0].HtmlFile);
         Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[0].Title; });
-    }
-
-    static (string textColor, string backgroundColor) GetColors()
-    {
-        var currentTheme = Application.Current?.RequestedTheme;
-        return currentTheme switch
-        {
-            AppTheme.Dark => (DarkModeTextColor, DarkModeBackgroundColor),
-            AppTheme.Light => (LightModeTextColor, LightModeBackgroundColor),
-            _ => (LightModeTextColor, LightModeBackgroundColor)
-        };
     }
 
     void Button_Previous(object sender, EventArgs e)
@@ -139,10 +95,7 @@ public partial class BookPage : ContentPage
             return;
         }
         currentChapterIndex--;
-        var (textColor, backgroundColor) = GetColors();
-        var css = book.Css[^1].Content ?? string.Empty;
-        string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
-        html = AddColors(html, backgroundColor, textColor);
+        var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
         Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
     }
 
@@ -153,22 +106,44 @@ public partial class BookPage : ContentPage
             return;
         }
         currentChapterIndex++;
-        var (textColor, backgroundColor) = GetColors();
-        var css = book.Css[^1].Content ?? string.Empty;
-        string html = InjectCss(book.Chapters[currentChapterIndex].HtmlFile, css);
-        html = AddColors(html, backgroundColor, textColor);
+        var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
         Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
     }
 
-    void EpubText_Navigating(object sender, WebNavigatingEventArgs e)
+   
+    void CreateToolBar(Book book)
     {
-        if(e.Url.StartsWith("http") || e.Url.StartsWith("https"))
+        Shell.Current.ToolbarItems.Clear();
+        var chapters = book.Chapters;
+
+        for (var i = 0; i < chapters.Count; i++)
         {
-            var data = e.Url.Remove(0, 15);
-            System.Diagnostics.Debug.WriteLine(data);
-            System.Diagnostics.Debug.WriteLine($"Navigating to {e.Url}");
-            var temp = book.Chapters.Find(c => c.FileName.Contains(e.Url));
-            e.Cancel = true;
+            CreateToolBarItem(i, chapters[i]);
         }
+    }
+
+    void CreateToolBarItem(int index, Chapter chapter)
+    {
+        var toolbarItem = new ToolbarItem
+        {
+            Text = chapter.Title,
+            Order = ToolbarItemOrder.Secondary,
+            Priority = index,
+            Command = new Command(() =>
+            {
+               var html = GetHtmlWithCss(chapter.HtmlFile);
+                EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = chapter.Title;
+                
+            })
+        };
+        MainThread.BeginInvokeOnMainThread(() => Shell.Current.ToolbarItems.Add(toolbarItem));
+    }
+
+    string GetHtmlWithCss(string html)
+    {
+        var css = book.Css[^1].Content ?? string.Empty;
+        var cSSInject = new CssInjector(backgroundColor, textColor, fontSize, fontFamily, css);
+        var temp = cSSInject.InjectAllCss(html);
+        return temp;
     }
 }

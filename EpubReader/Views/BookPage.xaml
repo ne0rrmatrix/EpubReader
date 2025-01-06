@@ -9,6 +9,13 @@
              x:Name="CurrentPage"
              Shell.NavBarIsVisible="{Binding IsNavMenuVisible}"
              Loaded="ContentPage_Loaded">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+          BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
+          Command="{Binding ShowPopupCommand}"
+          IconImageSource="add_circle.png"
+          Order="Primary" />
+    </ContentPage.ToolbarItems>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>

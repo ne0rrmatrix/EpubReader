@@ -66,7 +66,7 @@
                                 <MenuFlyout>
                                     <MenuFlyoutItem
                                          Text="Delete"
-                                         x:DataType="{x:Null}"
+                                          x:DataType="{x:Null}"
                                          CommandParameter="{Binding .}"
                                          IconImageSource="delete.png"
                                          Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"/>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<mct:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+           xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+           xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+           xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+           xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+           xmlns:local="clr-namespace:EpubReader.Converters"
+           x:Class="EpubReader.Views.SettingsPage"
+           Size="400,600">
+
+    <mct:Popup.Resources>
+        <ResourceDictionary>
+            <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        </ResourceDictionary>
+    </mct:Popup.Resources>
+    
+    <Grid Padding="20" RowSpacing="20" ColumnSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Font Size Section -->
+        <Label Text="Select Font Size" 
+               Grid.Row="0"
+               FontAttributes="Bold"
+               FontSize="Medium"
+               HorizontalOptions="Center" />
+
+        <Slider x:Name="FontSizeSlider"
+                Grid.Row="1"
+                Minimum="8"
+                Maximum="36"
+                ValueChanged="OnFontSizeSliderChanged" />
+
+        <Label x:Name="FontSizeLabel"
+               Grid.Row="2"
+               Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}"
+               HorizontalOptions="Center" />
+
+        <!-- Font Selection Section -->
+        <Label Text="Select Font"
+               Grid.Row="3"
+               FontAttributes="Bold"
+               FontSize="Medium"
+               HorizontalOptions="Center" />
+
+        <Picker x:Name="FontPicker" 
+                Grid.Row="4"
+                HeightRequest="40"
+                SelectedIndexChanged="OnFontChange">
+
+            <Picker.ItemsSource>
+                <x:Array Type="{x:Type x:String}">
+                    <x:String>Arial</x:String>
+                    <x:String>Times New Roman</x:String>
+                    <x:String>Courier New</x:String>
+                    <x:String>Verdana</x:String>
+                    <x:String>Georgia</x:String>
+                    <x:String>Tahoma</x:String>
+                    <x:String>Trebuchet MS</x:String>
+                    <x:String>Comic Sans MS</x:String>
+                    <x:String>Lucida Sans Unicode</x:String>
+                    <x:String>Helvetica</x:String>
+                </x:Array>
+            </Picker.ItemsSource>
+        </Picker>
+
+        <!-- Theme Control Section -->
+        <Label Text="Use System Theme"
+               Grid.Row="5"
+               FontAttributes="Bold"
+               FontSize="Medium"
+               HorizontalOptions="Center" />
+
+        <Switch x:Name="SystemThemeSwitch"
+                Grid.Row="6"
+                Toggled="OnSystemThemeSwitchToggled" />
+
+        <Label Text="Theme"
+               Grid.Row="7"
+               FontAttributes="Bold"
+               FontSize="Medium"
+               HorizontalOptions="Center" />
+
+        <Picker x:Name="ThemePicker" 
+                Grid.Row="8"
+                HeightRequest="70"
+            Title="Choose a theme"
+                SelectedIndexChanged="OnApplyColorChanged"
+                IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, Converter={StaticResource InverseBooleanConverter}}">
+            <Picker.ItemsSource>
+                <x:Array Type="{x:Type x:String}">
+                    <x:String>Dark</x:String>
+                    <x:String>Light</x:String>
+                    <x:String>Sepia</x:String>
+                    <x:String>Night Mode</x:String>
+                    <x:String>Daylight</x:String>
+                    <x:String>Forest</x:String>
+                    <x:String>Ocean</x:String>
+                    <x:String>Sand</x:String>
+                    <x:String>Charcoal</x:String>
+                    <x:String>Vintage</x:String>
+                </x:Array>
+            </Picker.ItemsSource>
+        </Picker>
+    </Grid>
+</mct:Popup>

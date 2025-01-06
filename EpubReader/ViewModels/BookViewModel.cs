@@ -1,7 +1,9 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Database;
 using EpubReader.Models;
+using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
@@ -29,6 +31,13 @@ public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
         {
             Book = bookObj as Book;
         }
+    }
+
+    [RelayCommand]
+    static void ShowPopup()
+    {
+        SettingsPage popup = new();
+        Shell.Current.ShowPopup(popup);
     }
 
     [RelayCommand]
