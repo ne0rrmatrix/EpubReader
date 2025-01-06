@@ -1,26 +1,33 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EpubReader.Database;
+using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Service;
-using System.Collections.ObjectModel;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
-public partial class LibraryViewModel : BaseViewModel
+public partial class LibraryViewModel : BaseViewModel, IDisposable
 {
-    static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
+	readonly Task loadTask;
+	readonly CancellationTokenSource? cancellationtokensource;
+	bool disposedValue;
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
     [ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; } = new();
    
-    readonly Db db;
-    public LibraryViewModel(Db dataBase)
+    IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	public LibraryViewModel()
     {
-        this.db = dataBase;
-        _ = LoadBooks();
+		cancellationtokensource = new CancellationTokenSource();
+		loadTask = LoadBooks(cancellationtokensource.Token);
+		if(loadTask.IsFaulted)
+		{
+			logger.Error("Error loading books");
+		}
     }
 
     async Task LoadBooks(CancellationToken cancellationToken = default)
@@ -108,4 +115,24 @@ public partial class LibraryViewModel : BaseViewModel
             return null;
         }
     }
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				cancellationtokensource?.Dispose();
+				loadTask.Dispose();
+			}
+
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
 }

@@ -1,39 +1,60 @@
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Interfaces;
 using EpubReader.Messages;
+using EpubReader.Models;
+using MetroLog;
 
 namespace EpubReader.Views;
 
-public partial class SettingsPage : Popup
+public partial class SettingsPage : Popup, IDisposable
 {
-    int fontSize = 0;
-    public SettingsPage()
+	bool isSystemThemEnabled = false;
+
+	int fontSize = 0;
+	readonly CancellationTokenSource cancellationTokenSource;
+	readonly Task loadTask;
+	bool disposedValue;
+	IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	public SettingsPage()
     {
-        InitializeComponent(); ;
+        InitializeComponent();
         BindingContext = this;
-    }
- 
-    void OnApplyColorChanged(object sender, EventArgs e)
+		cancellationTokenSource = new CancellationTokenSource();
+		loadTask = LoadSettings(cancellationTokenSource.Token);
+		if (loadTask.IsFaulted)
+		{
+			System.Diagnostics.Trace.TraceInformation("Error loading settings");
+		}
+	}
+	async Task LoadSettings(CancellationToken cancellationToken = default)
+	{
+		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+	}
+	async void OnApplyColorChanged(object sender, EventArgs e)
     {
-        string backgroundColorArgb;
+		string backgroundColorArgb;
         string textColorArgb;
-        var selectedTheme = ThemePicker.SelectedItem.ToString();
-        switch (selectedTheme)
+		var selectedTheme = ThemePicker.SelectedItem.ToString();
+		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		
+		switch (selectedTheme)
         {
             case "Dark":
                 backgroundColorArgb = "#1E1E1E"; // Soft warm background
                 textColorArgb = "#D3D3D3"; // Dark text
-                break;
+				break;
 
             case "Light":
                 backgroundColorArgb = "#FFFFFF"; // Light gray background
                 textColorArgb = "#000000"; // Black text
-                break;
+				break;
 
             case "Sepia":
                 backgroundColorArgb = "#f4ecd8"; // Sepia background
                 textColorArgb = "#5b4636"; // Dark brown text
-                break;
+				break;
 
             case "Night Mode":
                 backgroundColorArgb = "#000000"; // Dark background
@@ -81,53 +102,81 @@ public partial class SettingsPage : Popup
         {
             return;
         }
-        var message = new ColorMessage(backgroundColorArgb, textColorArgb);
-        WeakReferenceMessenger.Default.Send(message);
-    }
+		settings.BackgroundColor = backgroundColorArgb;
+		settings.TextColor = textColorArgb;
+		await db.SaveSettings(settings).ConfigureAwait(true);
+		var message = new SettingsMessage(true);
+		WeakReferenceMessenger.Default.Send(message);
+	}
 
-    void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
+    async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
     {
-        if(fontSize == (int)e.NewValue)
+		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		if (fontSize == (int)e.NewValue)
         {
             return;
         }
         fontSize = (int)e.NewValue;
-        WeakReferenceMessenger.Default.Send(new FontSizeMessage(fontSize));
-    }
+		settings.FontSize = fontSize;
+		await db.SaveSettings(settings).ConfigureAwait(true);
+		var message = new SettingsMessage(true);
+		WeakReferenceMessenger.Default.Send(message);
+	}
 
-    void OnFontChange(object sender, EventArgs e)
+    async void OnFontChange(object sender, EventArgs e)
     {
-        if (FontPicker.SelectedItem is not string selectedFont)
-        {
-            return;
-        }
-        var font = $"'{selectedFont}', sans-serif";
-        WeakReferenceMessenger.Default.Send(new FontMessage(font));
-    }
+		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var selectedTheme = FontPicker.SelectedItem.ToString();
 
-    void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
+        var font = $"'{selectedTheme}'";
+		settings.FontFamily = font;
+		System.Diagnostics.Trace.TraceInformation($"Font: {font}");
+		await db.SaveSettings(settings).ConfigureAwait(true);
+		var message = new SettingsMessage(true);
+		WeakReferenceMessenger.Default.Send(message);
+	}
+
+    async void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
     {
-        string backgroundColorArgb;
-        string textColorArgb;
-        if (e.Value)
-        {
-            ArgumentNullException.ThrowIfNull(Application.Current);
-            if (Application.Current.RequestedTheme == AppTheme.Dark)
-            {
-                backgroundColorArgb = "#1E1E1E";
-                textColorArgb = "#D3D3D3";
-            }
-            else
-            {
-                backgroundColorArgb = "#FFFFFF";
-                textColorArgb = "#000000";
-            }
-            if (string.IsNullOrEmpty(backgroundColorArgb) || string.IsNullOrEmpty(textColorArgb))
-            {
-                return;
-            }
-            var message = new ColorMessage(backgroundColorArgb, textColorArgb);
-            WeakReferenceMessenger.Default.Send(message);
-        }
-    }
+		var settings = await db.GetSettings().ConfigureAwait(true);
+		settings.IsSystemMode = e.Value;
+		await db.SaveSettings(settings).ConfigureAwait(true);
+		if (!settings.IsSystemMode)
+		{
+			return;
+		}
+		ArgumentNullException.ThrowIfNull(Application.Current);
+		if (Application.Current.RequestedTheme == AppTheme.Dark)
+		{
+			settings.BackgroundColor = "#1E1E1E";
+			settings.TextColor = "#D3D3D3";
+		}
+		else
+		{
+			settings.BackgroundColor = "#FFFFFF";
+			settings.TextColor = "#000000";
+		}
+		await db.SaveSettings(settings).ConfigureAwait(true);
+		var message = new SettingsMessage(true);
+		WeakReferenceMessenger.Default.Send(message);
+	}
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				cancellationTokenSource?.Dispose();
+				loadTask?.Dispose();
+			}
+
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
 }

@@ -1,13 +1,13 @@
 ﻿using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EpubReader.Database;
+using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
-public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
+public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 {
     [ObservableProperty]
     public partial bool IsNavMenuVisible { get; set; } = true;
@@ -23,9 +23,9 @@ public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
         }
     }
 
-    public readonly Db Db = db;
+    public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 
-    public void ApplyQueryAttributes(IDictionary<string, object> query)
+	public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         if (query.TryGetValue("Book", out var bookObj))
         {

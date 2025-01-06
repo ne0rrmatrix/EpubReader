@@ -1,10 +1,11 @@
-﻿using EpubReader.Models;
+﻿using EpubReader.Interfaces;
+using EpubReader.Models;
 using MetroLog;
 using SQLite;
 
 namespace EpubReader.Database;
 
-public partial class Db
+public partial class Db : IDb
 {
     public static string DbPath => Path.Combine(Service.FileService.SaveDirectory, "MyData.db");
     SQLiteAsyncConnection? db;
@@ -30,10 +31,23 @@ public partial class Db
         db = new SQLiteAsyncConnection(DbPath, Flags);
         logger.Info("Database created");
         await db.CreateTableAsync<FileData>().WaitAsync(cancellationToken);
-        logger.Info("Table created");
-        logger.Info("DB Tables Created.");
+		logger.Info("FileData Table created");
+		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
+		logger.Info("Settings Table created");
     }
-    public async Task<List<FileData>> GetFileData(CancellationToken cancellationToken = default)
+
+	public async Task<Settings> GetSettings(CancellationToken cancellationToken = default)
+	{
+		await Init(cancellationToken);
+		if (db is null)
+		{
+			logger.Error("DB is null");
+			return new Settings();
+		}
+		return await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken) ?? new Settings();
+	}
+
+	public async Task<List<FileData>> GetFileData(CancellationToken cancellationToken = default)
     {
         await Init(cancellationToken);
         if (db is null)
@@ -55,7 +69,28 @@ public partial class Db
         return await db.FindAsync<FileData>(id).WaitAsync(cancellationToken);
     }
 
-    public async Task SaveFileData(FileData fileData, CancellationToken cancellationToken = default)
+	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
+	{
+		await Init(cancellationToken);
+		if (db is null)
+		{
+			logger.Error("DB is null");
+			return;
+		}
+		var item = await db.FindAsync<Settings>(settings.Id).WaitAsync(cancellationToken);
+		if (item is not null)
+		{
+			logger.Info("Updating settings");
+			await db.DeleteAsync(item).WaitAsync(cancellationToken);
+			await db.InsertAsync(settings).WaitAsync(cancellationToken);
+			return;
+		}
+		logger.Info("Inserting settings");
+		logger.Info($"SystemMode: {settings.IsSystemMode}");
+		await db.InsertAsync(settings).WaitAsync(cancellationToken);
+	}
+
+	public async Task SaveFileData(FileData fileData, CancellationToken cancellationToken = default)
     {
         await Init(cancellationToken);
         if (db is null)
@@ -75,7 +110,23 @@ public partial class Db
         logger.Info("Inserting fileData");
     }
 
-    public async Task RemoveFileData(Book book, CancellationToken cancellationToken = default)
+	public async Task RemoveSettingsData(int id, CancellationToken cancellationToken = default)
+	{
+		await Init(cancellationToken);
+		if (db is null)
+		{
+			logger.Error("DB is null");
+			return;
+		}
+		var item = await db.FindAsync<Settings>(id).WaitAsync(cancellationToken);
+		if (item is null)
+		{
+			logger.Error("settings Data is null");
+			return;
+		}
+		await db.DeleteAsync(item).WaitAsync(cancellationToken);
+	}
+	public async Task RemoveFileData(Book book, CancellationToken cancellationToken = default)
     {
         await Init(cancellationToken);
         if (db is null)

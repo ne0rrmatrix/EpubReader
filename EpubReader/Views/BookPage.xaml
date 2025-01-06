@@ -13,7 +13,7 @@
         <ToolbarItem
           BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
           Command="{Binding ShowPopupCommand}"
-          IconImageSource="add_circle.png"
+          IconImageSource="settings.png"
           Order="Primary" />
     </ContentPage.ToolbarItems>
     <Grid>

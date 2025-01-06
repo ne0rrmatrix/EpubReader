@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Storage;
 using EpubReader.Database;
+using EpubReader.Interfaces;
 using EpubReader.ViewModels;
 using EpubReader.Views;
 using MetroLog;
@@ -52,8 +53,7 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-        builder.Services.AddSingleton<Db>();
-        
+        builder.Services.AddSingleton<IDb, Db>();
         LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 
