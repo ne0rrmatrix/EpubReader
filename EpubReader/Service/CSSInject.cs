@@ -62,7 +62,7 @@ public partial class CssInjector(string backgroundColor, string textColor, int f
     [GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase)]
     private static partial Regex FontFamilyRegex();
 
-    private static string RemoveStyleTags(string html)
+    static string RemoveStyleTags(string html)
     {
         return StyleTagRegex().Replace(html, string.Empty);
     }

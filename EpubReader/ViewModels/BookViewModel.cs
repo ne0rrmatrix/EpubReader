@@ -23,7 +23,7 @@ public partial class BookViewModel(Db db) : BaseViewModel, IQueryAttributable
         }
     }
 
-    public readonly Db db = db;
+    public readonly Db Db = db;
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {

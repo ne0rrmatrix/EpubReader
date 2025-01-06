@@ -5,7 +5,7 @@ namespace EpubReader.Service;
 public static class FileService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
-    public static readonly string saveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
+    public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
     public static void DeleteFile(string fileName)
     {
         try
@@ -25,12 +25,12 @@ public static class FileService
     public static string GetFileName(string name)
     {
         var filename = Path.GetFileName(name);
-        return Path.Combine(saveDirectory, filename);
+        return Path.Combine(SaveDirectory, filename);
     }
 
     public static async Task<string> SaveFile(FileResult result)
     {
-        Directory.CreateDirectory(saveDirectory);
+        Directory.CreateDirectory(SaveDirectory);
         using Stream fileStream = await result.OpenReadAsync();
         using StreamReader reader = new(fileStream);
         string fileName = GetFileName(result.FileName);

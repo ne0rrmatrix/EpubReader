@@ -6,7 +6,7 @@ namespace EpubReader.Database;
 
 public partial class Db
 {
-    public static string DbPath => Path.Combine(Service.FileService.saveDirectory, "MyData.db");
+    public static string DbPath => Path.Combine(Service.FileService.SaveDirectory, "MyData.db");
     SQLiteAsyncConnection? db;
 
     public const SQLiteOpenFlags Flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache;
@@ -25,7 +25,7 @@ public partial class Db
         }
         if(!File.Exists(DbPath))
         {
-            Directory.CreateDirectory(Service.FileService.saveDirectory);
+            Directory.CreateDirectory(Service.FileService.SaveDirectory);
         }
         db = new SQLiteAsyncConnection(DbPath, Flags);
         logger.Info("Database created");
