@@ -1,9 +1,12 @@
 ﻿using System.Collections.ObjectModel;
+using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Service;
+using Font = Microsoft.Maui.Font;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
@@ -70,9 +73,18 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
         });
-        if (result is not null)
+		
+		if (result is not null)
         {
-            var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
+			var currentFileData = await db.GetFileData(cancellationToken).ConfigureAwait(false);
+			var exists = currentFileData.Any(x => x.FileName == FileService.GetFileName(result.FileName));
+			if(exists)
+			{
+				ShowSnackBar("Book already exists in library", "OK");
+				logger.Info("Book already exists in library");
+				return;
+			}
+			var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
             // Open the epub file
             var ebook = EbookService.OpenEbook(filePath);
  
@@ -89,6 +101,27 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         logger.Error("Error saving book");
     }
 
+	async void ShowSnackBar(string text, string actionButtonText)
+	{
+		CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+
+		var snackbarOptions = new SnackbarOptions
+		{
+			BackgroundColor = Colors.Red,
+			TextColor = Colors.Green,
+			ActionButtonTextColor = Colors.Yellow,
+			CornerRadius = new CornerRadius(10),
+			Font = Font.SystemFontOfSize(14),
+			ActionButtonFont = Font.SystemFontOfSize(14),
+			CharacterSpacing = 0.5
+		};
+
+		TimeSpan duration = TimeSpan.FromSeconds(3);
+
+		var snackbar = Snackbar.Make(text, null, actionButtonText, duration, snackbarOptions);
+
+		await snackbar.Show(cancellationTokenSource.Token);
+	}
     [RelayCommand]
     public async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
     {
