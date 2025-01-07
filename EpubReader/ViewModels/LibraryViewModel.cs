@@ -28,7 +28,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		{
 			logger.Error("Error loading books");
 		}
-    }
+	}
 
     async Task LoadBooks(CancellationToken cancellationToken = default)
     {

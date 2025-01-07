@@ -4,8 +4,8 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <Color x:Key="AppBackgroundLightColor">#FAFAFA</Color>
-    <Color x:Key="AppBackgroundDarkColor">#050505</Color>
+    <Color x:Key="AppBackgroundLightColor">#FFFBF5</Color>
+    <Color x:Key="AppBackgroundDarkColor">#121212</Color>
     <Color x:Key="PrimaryColor">#FAFAFA</Color>
     <Color x:Key="NavigationBarTextColor">#5D5D5D</Color>
     <Color x:Key="NormalButtonBackgroundColor">#1976D2</Color>
@@ -51,5 +51,26 @@
     <Color x:Key="Blue100Accent">#3E8EED</Color>
     <Color x:Key="Blue200Accent">#72ACF1</Color>
     <Color x:Key="Blue300Accent">#A7CBF6</Color>
+    <Color x:Key="Green100Accent">#4CAF50</Color>
+    <Color x:Key="Green200Accent">#7CC47F</Color>
+    <Color x:Key="Green300Accent">#B0D1B0</Color>
+    <Color x:Key="Red100Accent">#F44336</Color>
+    <Color x:Key="Red200Accent">#F77A6A</Color>
+    <Color x:Key="Red300Accent">#FAB9B9</Color>
+    <Color x:Key="Purple100Accent">#9C27B0</Color>
+    <Color x:Key="Purple200Accent">#C17DC2</Color>
+    <Color x:Key="Purple300Accent">#E1B3E1</Color>
+    <Color x:Key="Orange100Accent">#FF9800</Color>
+    <Color x:Key="Orange200Accent">#FFB74D</Color>
+    <Color x:Key="Orange300Accent">#FFD699</Color>
+    
+    <Color x:Key="P-Dark">#3F51B5</Color>
+    <Color x:Key="P-Light">#757DE8</Color>
+    <Color x:Key="Reset">#F44336</Color>
+    <Color x:Key="Reset-Light">#FF7961</Color>
+    <Color x:Key="Reset-Dark">#BA000D</Color>
 
+    <Color x:Key="Primary">#1769AA</Color>
+    <Color x:Key="Primary-Light">#4DABF5</Color>
+    <Color x:Key="Primary-Dark">#004BA0</Color>
 </ResourceDictionary>

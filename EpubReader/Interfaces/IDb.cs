@@ -13,7 +13,7 @@ public interface IDb
 	public Task SaveSettings(Settings settings, CancellationToken cancellationToken = default);
 
 	public Task SaveFileData(FileData fileData, CancellationToken cancellationToken = default);
-	public Task RemoveSettingsData(int id, CancellationToken cancellationToken = default);
+	public Task RemoveAllSettings(CancellationToken cancellationToken = default);
 	public Task RemoveFileData(Book book, CancellationToken cancellationToken = default);
 
 	public Task UpdateBook(FileData fileData, CancellationToken cancellationToken = default);

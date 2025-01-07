@@ -1,6 +1,4 @@
-using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
-using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
@@ -19,21 +17,20 @@ public partial class BookPage : ContentPage
     {
         InitializeComponent();
         BindingContext = viewModel;
-        ArgumentNullException.ThrowIfNull(Application.Current);
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) =>
-		{
-			settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(true);
-			var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
-
-		});
+		SettingsPageHelpers.SettingsPropertyChanged += OnSettingsClicked;
 	}
 
-    protected override void OnNavigatingFrom(NavigatingFromEventArgs args)
+	async void OnSettingsClicked(object? sender, EventArgs e)
+	{
+		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(true);
+		var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
+		Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; ChapterLabel.Text = book.Chapters[currentChapterIndex].Title; });
+	}
+
+	protected override void OnNavigatingFrom(NavigatingFromEventArgs args)
     {
         base.OnNavigatingFrom(args);
         Shell.Current.ToolbarItems.Clear();
-        WeakReferenceMessenger.Default.UnregisterAll(this);
     }
 
     void EpubText_Navigating(object sender, WebNavigatingEventArgs e)

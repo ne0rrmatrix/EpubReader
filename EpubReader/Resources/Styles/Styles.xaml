@@ -355,13 +355,13 @@
     </Style>
 
     <Style TargetType="Shell" ApplyToDerivedTypes="True">
-        <Setter Property="Shell.BackgroundColor" Value="{OnPlatform WinUI=Transparent, Default={AppThemeBinding Light={StaticResource NavBarColor}, Dark={StaticResource Gray950}}}" />
+        <Setter Property="Shell.BackgroundColor" Value="{OnPlatform WinUI=Transparent, Default={AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource AppBackgroundDarkColor}}}" />
         <Setter Property="Shell.ForegroundColor" Value="{AppThemeBinding Light={OnPlatform WinUI={StaticResource Black}, Default={StaticResource White}}, Dark={StaticResource White}}" />
         <Setter Property="Shell.TitleColor" Value="{AppThemeBinding Light={OnPlatform WinUI={StaticResource Black}, Default={StaticResource White}}, Dark={StaticResource White}}" />
         <Setter Property="Shell.DisabledColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray950}}" />
         <Setter Property="Shell.UnselectedColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray200}}" />
         <Setter Property="Shell.NavBarHasShadow" Value="True" />
-        <Setter Property="Shell.TabBarBackgroundColor" Value="{OnPlatform WinUI=Transparent, Default={AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}}" />
+        <Setter Property="Shell.TabBarBackgroundColor" Value="{OnPlatform WinUI=Transparent, Default={AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource AppBackgroundDarkColor}}}" />
         <Setter Property="Shell.TabBarForegroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryColor}, Dark={StaticResource White}}" />
         <Setter Property="Shell.TabBarTitleColor" Value="{AppThemeBinding Light={StaticResource PrimaryColor}, Dark={StaticResource White}}" />
         <Setter Property="Shell.TabBarUnselectedColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray200}}" />
@@ -406,6 +406,63 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+   <Style TargetType="Border" x:Key="EbookCardStyle">
+        <Setter Property="StrokeShape" Value="RoundRectangle 8,8,8,8" />
+        <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="Margin" Value="4"/>
+        <Setter Property="BackgroundColor">
+            <Setter.Value>
+                <AppThemeBinding Light="{StaticResource AppBackgroundLightColor}" 
+                                Dark="{StaticResource AppBackgroundDarkColor}" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Stroke">
+        <Setter.Value>
+            <AppThemeBinding Light="#E0E0E0" 
+                            Dark="#2D2D2D" />
+        </Setter.Value>
+    </Setter>
+        <Setter Property="Shadow">
+            <Shadow Brush="#80000000"
+                    Offset="0,2"
+                    Radius="4" />
+        </Setter>
+    </Style>
+
+    <Style x:Key="EbookLabelText" TargetType="Label">
+        <Setter Property="FontFamily" Value="Roboto"/>
+        <Setter Property="Margin" Value="8,8,8,4"/>
+        <Setter Property="FontSize">
+            <OnIdiom x:TypeArguments="x:Double"
+                 Phone="14"
+                 Tablet="16"
+                 Desktop="18"/>
+        </Setter>
+        <Setter Property="LineBreakMode" Value="TailTruncation"/>
+        <Setter Property="MaxLines" Value="2"/>
+    </Style>
+
+    <OnIdiom x:Key="GridSpan" x:TypeArguments="x:Int32">
+        <OnIdiom.Default>2</OnIdiom.Default>
+        <OnIdiom.Phone>2</OnIdiom.Phone>
+        <OnIdiom.Tablet>4</OnIdiom.Tablet>
+        <OnIdiom.Desktop>6</OnIdiom.Desktop>
+    </OnIdiom>
+
+    <OnIdiom x:Key="CollectionMargin" x:TypeArguments="Thickness">
+        <OnIdiom.Default>8</OnIdiom.Default>
+        <OnIdiom.Phone>8</OnIdiom.Phone>
+        <OnIdiom.Tablet>16</OnIdiom.Tablet>
+        <OnIdiom.Desktop>24</OnIdiom.Desktop>
+    </OnIdiom>
+
+    <OnIdiom x:Key="CardHeight" x:TypeArguments="x:Double">
+        <OnIdiom.Default>280</OnIdiom.Default>
+        <OnIdiom.Phone>280</OnIdiom.Phone>
+        <OnIdiom.Tablet>320</OnIdiom.Tablet>
+        <OnIdiom.Desktop>360</OnIdiom.Desktop>
+    </OnIdiom>
 
     <!--  Values  -->
     <Thickness x:Key="ContentPadding">20, 0</Thickness>

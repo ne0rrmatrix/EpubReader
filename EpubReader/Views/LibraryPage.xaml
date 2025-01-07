@@ -3,39 +3,50 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="EpubReader.Views.LibraryPage"
              xmlns:Models="clr-namespace:EpubReader.Models;assembly=EpubReader"
-             xmlns:d="http://schemas.microsoft.com/dotnet/2021/maui/design"
-             xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             xmlns:local="clr-namespace:EpubReader.Views"
              xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
              x:DataType="viewModels:LibraryViewModel"
-             x:Name="CurrentPage"
-             Title="LibraryPage">
+             BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
+             x:Name="CurrentPage">
+
+    <Page.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource Blue100Accent}, Dark={StaticResource AppBackgroundDarkColor}}" StatusBarStyle="LightContent" />
+    </Page.Behaviors>
+    
     <ContentPage.Resources>
         <ResourceDictionary>
             <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
+    
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add_circle.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
+   
     <CollectionView x:Name="collectionView"
         Grid.Row="1"
+        Margin="{StaticResource CollectionMargin}"
         HorizontalScrollBarVisibility="Never"
         ItemsSource="{Binding Books}"
         SelectionMode="None"
         VerticalScrollBarVisibility="Never">
+        
         <CollectionView.ItemsLayout>
-            <GridItemsLayout Orientation="Vertical" Span="3" />
+            <GridItemsLayout Orientation="Vertical" 
+                        Span="{StaticResource GridSpan}"
+                        HorizontalItemSpacing="8"
+                        VerticalItemSpacing="8" />
         </CollectionView.ItemsLayout>
+
         <CollectionView.ItemTemplate>
             <DataTemplate x:DataType="Models:Book">
                 <SwipeView>
                     <SwipeView.RightItems>
                         <SwipeItems>
+
                             <SwipeItem
                                     BackgroundColor="LightGray"
                                     x:DataType="{x:Null}"
@@ -43,43 +54,51 @@
                                     CommandParameter="{Binding .}"
                                     IconImageSource="delete.png"
                                     Text="Delete" />
+
                         </SwipeItems>
                     </SwipeView.RightItems>
-                    <Grid Padding="10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Label
-                            Grid.Row="0"
-                            Margin="0,0,0,10"
-                            Style="{StaticResource LabelSectionText}"
-                            HorizontalTextAlignment="Center"
-                            Text="{Binding Title}" />
-                        <Image
-                            Grid.Row="1"
-                            Aspect="AspectFit"
-                            HeightRequest="200"
-                            HorizontalOptions="Center"
-                            Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">
-                            <FlyoutBase.ContextFlyout>
-                                <MenuFlyout>
-                                    <MenuFlyoutItem
+
+                    <Border Style="{x:StaticResource EbookCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Label
+                                Grid.Row="0"
+                                Style="{StaticResource EbookLabelText}"
+                                HorizontalTextAlignment="Center"
+                                Text="{Binding Title}" />
+
+                            <Image Grid.Row="1"
+                                Aspect="AspectFit"
+                                HeightRequest="{StaticResource CardHeight}"
+                                Margin="8,4,8,8"
+                                HorizontalOptions="Center"
+                                Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">
+
+                                <FlyoutBase.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem
                                          Text="Delete"
-                                          x:DataType="{x:Null}"
+                                         x:DataType="{x:Null}"
                                          CommandParameter="{Binding .}"
                                          IconImageSource="delete.png"
                                          Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"/>
-                                </MenuFlyout>
-                            </FlyoutBase.ContextFlyout>
-                            <Image.GestureRecognizers>
-                                <TapGestureRecognizer 
+                                    </MenuFlyout>
+                                </FlyoutBase.ContextFlyout>
+
+                                <Image.GestureRecognizers>
+                                    <TapGestureRecognizer 
                                     x:DataType="{x:Null}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=GotoBookPageCommand}" 
                                     CommandParameter="{Binding .}" />
-                            </Image.GestureRecognizers>
-                        </Image>
-                    </Grid>
+                                </Image.GestureRecognizers>
+                            </Image>
+
+                        </Grid>
+                    </Border>
                 </SwipeView>
             </DataTemplate>
         </CollectionView.ItemTemplate>

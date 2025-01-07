@@ -13,8 +13,12 @@
             <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         </ResourceDictionary>
     </mct:Popup.Resources>
-    
-    <Grid Padding="20" RowSpacing="20" ColumnSpacing="10">
+
+    <Grid BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}" 
+          Padding="20" 
+          RowSpacing="20" 
+          ColumnSpacing="10">
+        
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -24,8 +28,11 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
@@ -48,7 +55,6 @@
                Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}"
                HorizontalOptions="Center" />
 
-        <!-- Font Selection Section -->
         <Label Text="Select Font"
                Grid.Row="3"
                FontAttributes="Bold"
@@ -76,7 +82,6 @@
             </Picker.ItemsSource>
         </Picker>
 
-        <!-- Theme Control Section -->
         <Label Text="Use System Theme"
                Grid.Row="5"
                FontAttributes="Bold"
@@ -114,5 +119,19 @@
                 </x:Array>
             </Picker.ItemsSource>
         </Picker>
+ 
+        <Label Text="Reset Settings"
+               Grid.Row="9"
+               FontAttributes="Bold"
+               FontSize="Small"
+               HorizontalOptions="Center"/>
+        <Button Text="Reset" 
+                Grid.Row="10"
+                HeightRequest="45"
+                WidthRequest="120"
+                Clicked="Button_Clicked"
+                />
+    
     </Grid>
+    
 </mct:Popup>

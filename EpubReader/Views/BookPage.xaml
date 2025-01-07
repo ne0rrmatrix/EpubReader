@@ -7,8 +7,10 @@
              xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
              x:DataType="viewModels:BookViewModel"
              x:Name="CurrentPage"
+             BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
              Shell.NavBarIsVisible="{Binding IsNavMenuVisible}"
              Loaded="ContentPage_Loaded">
+    
     <ContentPage.ToolbarItems>
         <ToolbarItem
           BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
@@ -16,22 +18,46 @@
           IconImageSource="settings.png"
           Order="Primary" />
     </ContentPage.ToolbarItems>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
-        <WebView Grid.Row="0" x:Name="EpubText" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" Navigating="EpubText_Navigating">
+        
+        <WebView Grid.Row="0" 
+                 x:Name="EpubText" 
+                 VerticalOptions="FillAndExpand" 
+                 HorizontalOptions="FillAndExpand" 
+                 Navigating="EpubText_Navigating">
             <WebView.Behaviors>
                 <toolkit:TouchBehavior 
                     BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
                     LongPressCommand="{Binding LongPressCommand}"/>
             </WebView.Behaviors>
         </WebView>
-        <StackLayout IsVisible="{Binding IsNavMenuVisible}" HorizontalOptions="Center" Grid.Row="1" Spacing="50" Orientation="Horizontal" Padding="10,10,10,10">
-            <ImageButton Source="arrow_back.png" Clicked="Button_Previous" WidthRequest="40"/>
-            <Label x:Name="ChapterLabel" FontSize="20" HorizontalOptions="Center"/>
-            <ImageButton Source="arrow_forward.png" Clicked="Button_Next" WidthRequest="40"/>
+        
+        <StackLayout IsVisible="{Binding IsNavMenuVisible}" 
+                     HorizontalOptions="Center" 
+                     BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
+                     Grid.Row="1" 
+                     Spacing="50" 
+                     Orientation="Horizontal" 
+                     Padding="10,10,10,10">
+            
+            <ImageButton Source="arrow_back.png" 
+                         BackgroundColor="Transparent"
+                         Clicked="Button_Previous" 
+                         WidthRequest="40"/>
+            
+            <Label x:Name="ChapterLabel" 
+                   FontSize="20" 
+                   HorizontalOptions="Center"/>
+            
+            <ImageButton Source="arrow_forward.png" 
+                         BackgroundColor="Transparent"
+                         Clicked="Button_Next" 
+                         WidthRequest="40"/>
         </StackLayout>
     </Grid>
 </ContentPage>

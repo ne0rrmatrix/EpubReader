@@ -109,8 +109,7 @@ public partial class Db : IDb
         await db.InsertAsync(fileData).WaitAsync(cancellationToken);
         logger.Info("Inserting fileData");
     }
-
-	public async Task RemoveSettingsData(int id, CancellationToken cancellationToken = default)
+	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)
 	{
 		await Init(cancellationToken);
 		if (db is null)
@@ -118,13 +117,8 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
-		var item = await db.FindAsync<Settings>(id).WaitAsync(cancellationToken);
-		if (item is null)
-		{
-			logger.Error("settings Data is null");
-			return;
-		}
-		await db.DeleteAsync(item).WaitAsync(cancellationToken);
+		await db.DropTableAsync<Settings>().WaitAsync(cancellationToken);
+		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 	}
 	public async Task RemoveFileData(Book book, CancellationToken cancellationToken = default)
     {

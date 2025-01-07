@@ -6,9 +6,11 @@
     xmlns:local="clr-namespace:EpubReader"
     xmlns:views="clr-namespace:EpubReader.Views"
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     Shell.FlyoutBehavior="Disabled"
-    Title="EpubReader">
-    
+     Padding="4,0,0,0"
+    Title="">
+
     <ShellContent
         Title="Library"
         ContentTemplate="{DataTemplate views:LibraryPage}"
