@@ -80,7 +80,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			var exists = currentFileData.Any(x => x.FileName == FileService.GetFileName(result.FileName));
 			if(exists)
 			{
-				ShowSnackBar("Book already exists in library", "OK");
+				await ShowSnackBar("Book already exists in library", "OK").ConfigureAwait(false);
 				logger.Info("Book already exists in library");
 				return;
 			}
@@ -101,14 +101,14 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         logger.Error("Error saving book");
     }
 
-	async void ShowSnackBar(string text, string actionButtonText)
+	static async Task ShowSnackBar(string text, string actionButtonText)
 	{
-		CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+		CancellationTokenSource cancellationTokenSource = new();
 
 		var snackbarOptions = new SnackbarOptions
 		{
 			BackgroundColor = Colors.Red,
-			TextColor = Colors.Green,
+			TextColor = Colors.White,
 			ActionButtonTextColor = Colors.Yellow,
 			CornerRadius = new CornerRadius(10),
 			Font = Font.SystemFontOfSize(14),
