@@ -80,7 +80,7 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="EpubCore" Version="1.6.1" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />

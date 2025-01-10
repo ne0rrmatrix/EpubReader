@@ -8,5 +8,7 @@ public partial class Book
     public Byte[] CoverImage { get; set; } = [];
     public List<CSS> Css { get; set; } = [];
     public List<Chapter> Chapters { get; set; } = [];
+	public List<Image> Images { get; set; } = [];
 	public int CurrentPage { get; set; } = 0;
+	public string CoverUrl { get; set; } = string.Empty;
 }

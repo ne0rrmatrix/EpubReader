@@ -26,10 +26,16 @@ public static class MauiProgram
 		}).UseMauiCommunityToolkit(options =>
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);
+		})
+		.ConfigureMauiHandlers(handlers =>
+		{
+#if IOS || MACCATALYST
+			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
+			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
+#endif
 		});
-
-
-		var config = new LoggingConfiguration();
+	
+	var config = new LoggingConfiguration();
 #if RELEASE
         config.AddTarget(
             LogLevel.Info,
@@ -61,7 +67,7 @@ public static class MauiProgram
         LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 
-        builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
+		builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
         builder.Services.AddSingleton<IFilePicker>(FilePicker.Default);
         builder.Services.AddSingleton<AppShell>();
 

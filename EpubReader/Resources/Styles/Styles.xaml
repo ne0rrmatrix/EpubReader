@@ -431,7 +431,6 @@
     </Style>
 
     <Style x:Key="EbookLabelText" TargetType="Label">
-        <Setter Property="FontFamily" Value="Roboto"/>
         <Setter Property="Margin" Value="8,8,8,4"/>
         <Setter Property="FontSize">
             <OnIdiom x:TypeArguments="x:Double"
