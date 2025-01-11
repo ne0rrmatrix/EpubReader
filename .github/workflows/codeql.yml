@@ -21,7 +21,7 @@ on:
 
 permissions:
       actions: write
-      contents: read
+      contents: write
       security-events: write
       pull-requests: read
 
