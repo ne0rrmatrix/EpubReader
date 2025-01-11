@@ -62,7 +62,7 @@
                    WidthRequest="40"/>
             <Label x:Name="PageLabel"
                    FontSize="20"
-                   IsVisible="{Binding IsNavMenuVisible}"
+                   IsVisible="{OnPlatform WinUI=true, Default={Binding IsNavMenuVisible}}"
                    HorizontalOptions="Center"/>
             <ImageButton Source="arrow_forward.png"
                          IsEnabled="{OnPlatform WinUI=true, Default=false}"
