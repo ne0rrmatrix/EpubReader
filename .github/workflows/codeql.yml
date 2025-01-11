@@ -19,6 +19,11 @@ on:
   schedule:
     - cron: '29 0 * * 4'
 
+permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
 env:
   PROJECT_PATH: "EpubReader/EpubReader.csproj"
   DOTNET_NOLOGO: true                     # Disable the .NET logo
