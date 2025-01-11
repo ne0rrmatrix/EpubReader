@@ -9,15 +9,6 @@ namespace EpubReader.Service;
 
 public partial class CssInjector(Settings settings, string otherCss)
 {
-	readonly string safeAreaCss = @"
-string cssCode = @"":root {
-  --sait: var(--android-safe-area-inset-top, env(safe-area-inset-top));
-  --saib: var(--android-safe-area-inset-bottom, env(safe-area-inset-bottom));
-  --sail: var(--android-safe-area-inset-left, env(safe-area-inset-left));
-  --sair: var(--android-safe-area-inset-right, env(safe-area-inset-right));
-}"";
-";
-
 	readonly string disableScrollBars = @"
 function disableScrollBars() {
 document.querySelector('body').style.overflow = 'scroll';
@@ -112,7 +103,7 @@ if (window.pageYOffset === 0) {
                 otherCss = FontFamilyRegex().Replace(otherCss, string.Empty);
             }
 
-            styleTag += otherCss + safeAreaCss;
+            styleTag += otherCss;
         }
 
 		// Inject the combined CSS into the HTML

@@ -11,16 +11,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Interfaces;
 using EpubReader.Models;
+using EpubReader.Service;
 using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
 public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 {
-#if ANDROID
-	int platformColor;
-#endif
-
 	[ObservableProperty]
     public partial bool IsNavMenuVisible { get; set; } = true;
 
@@ -55,23 +52,12 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
     [RelayCommand]
     void LongPress()
     {
-        if (IsNavMenuVisible)
+		if (IsNavMenuVisible)
         {
-			
             IsNavMenuVisible = false;
             Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
-
 #if ANDROID
-			var activity = Platform.CurrentActivity ?? throw new InvalidOperationException();
-			var decorView = activity.Window?.DecorView ?? throw new InvalidOperationException();
-			var window = activity.Window ?? throw new InvalidOperationException();
-
-			window.SetStatusBarColor(Android.Graphics.Color.ParseColor("#000000"));
-			window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
-			platformColor = window.StatusBarColor;
-			window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
-			var insets = WindowCompat.GetInsetsController(window, activity.Window.DecorView) ?? throw new InvalidOperationException();
-			insets.Hide(WindowInsets.Type.NavigationBars());
+			StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
 
 		}
@@ -80,15 +66,8 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
             IsNavMenuVisible = true;
             Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #if ANDROID
-			StatusBar.SetColor(Color.FromInt(platformColor));
-			var activity = Platform.CurrentActivity ?? throw new InvalidOperationException();
-			var window = activity.Window ?? throw new InvalidOperationException();
-			var insets = WindowCompat.GetInsetsController(window, activity.Window.DecorView) ?? throw new InvalidOperationException();
-			insets.Show(WindowInsets.Type.NavigationBars());
-			window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
-			window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);	
+			StatusBarExtensions.SetStatusBarsHidden(false);
 #endif
-
 		}
 	}
 }

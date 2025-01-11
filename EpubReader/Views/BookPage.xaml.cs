@@ -16,7 +16,6 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage
 {
-	readonly int platformColor;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Book book = new();
@@ -28,21 +27,23 @@ public partial class BookPage : ContentPage
         BindingContext = viewModel;
 		EpubText.Navigated += OnEpubText_Navigating;
 		SettingsPageHelpers.SettingsPropertyChanged += OnSettingsClicked;
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
-
 #if ANDROID
-		var activity = Platform.CurrentActivity ?? throw new InvalidOperationException();
-			var decorView = activity.Window?.DecorView ?? throw new InvalidOperationException();
-			var window = activity.Window ?? throw new InvalidOperationException();
-		
-		window.SetStatusBarColor(Android.Graphics.Color.ParseColor("#000000"));
-			window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
-			platformColor = window.StatusBarColor;
-			window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
-			var insets = WindowCompat.GetInsetsController(window, activity.Window.DecorView) ?? throw new InvalidOperationException();
-			insets.Hide(WindowInsets.Type.NavigationBars());
+		/*
+		//window.SetDecorFitsSystemWindows(false);
+		window.SetStatusBarColor(Android.Graphics.Color.White);
+		window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
+		window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
+		var insets = WindowCompat.GetInsetsController(Platform.CurrentActivity?.Window
+			?? throw new InvalidOperationException(), Platform.CurrentActivity?.Window?.DecorView
+			?? throw new InvalidOperationException()) ?? throw new InvalidOperationException();
+		insets.Hide(WindowInsets.Type.NavigationBars());
+		//insets.AppearanceLightStatusBars = true;
+		*/
+		StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
 	}
+	
+
 	protected override void OnAppearing()
 	{
 		base.OnAppearing();
@@ -53,13 +54,7 @@ public partial class BookPage : ContentPage
 		SettingsPageHelpers.SettingsPropertyChanged -= OnSettingsClicked;
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #if ANDROID
-		StatusBar.SetColor(Color.FromInt(platformColor));
-		var activity = Platform.CurrentActivity ?? throw new InvalidOperationException();
-		var window = activity.Window ?? throw new InvalidOperationException();
-		var insets = WindowCompat.GetInsetsController(window, activity.Window.DecorView) ?? throw new InvalidOperationException();
-		insets.Show(WindowInsets.Type.NavigationBars());
-		window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
-		window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
+		StatusBarExtensions.SetStatusBarsHidden(false);
 #endif
 	}
 
@@ -67,37 +62,6 @@ public partial class BookPage : ContentPage
 
 	void EpubText_Navigating(object sender, WebNavigatingEventArgs e)
 	{
-#if ANDROID
-		if (DeviceInfo.Platform == DevicePlatform.Android)
-		{
-			var app = Platform.CurrentActivity ?? throw new InvalidOperationException();
-			var density = DeviceDisplay.Current.MainDisplayInfo.Density;
-			var currentWindow = app.Window ?? throw new InvalidOperationException();
-
-			//var insets = Microsoft.Maui?.ApplicationModel?.WindowStateManager?.Default.GetCurrentUIWindow().SafeAreaInsets;
-			var insets = currentWindow.DecorView.RootWindowInsets ?? throw new InvalidOperationException();
-
-			// Convert to pixels and adjust for density
-			var safeInsetLeft = (int)(insets.StableInsetLeft / density);
-			var safeInsetRight = (int)(insets.StableInsetRight / density);
-			var safeInsetTop = (int)(insets.StableInsetTop / density);
-			var safeInsetBottom = (int)(insets.StableInsetBottom / density);
-
-			var safeAreaJs = @$"
-                document.documentElement.style.setProperty('--android-safe-area-inset-left', '{safeInsetLeft}px');
-                document.documentElement.style.setProperty('--android-safe-area-inset-right', '{safeInsetRight}px');
-                document.documentElement.style.setProperty('--android-safe-area-inset-top', '{safeInsetTop}px');
-                document.documentElement.style.setProperty('--android-safe-area-inset-bottom', '{safeInsetBottom}px');
-            ";
-
-			EpubText.Eval(safeAreaJs);
-			
-			if (e.Url.StartsWith("http") || e.Url.StartsWith("https"))
-			{
-				e.Cancel = true;
-			}
-		}
-#endif
 		if (e.NavigationEvent == WebNavigationEvent.NewPage)
 		{
 			EpubText.Eval("disableScrollBars()");
@@ -186,9 +150,7 @@ public partial class BookPage : ContentPage
 
 	async Task NextPage()
 	{
-		EpubText.Eval("window.scrollBy(0, window.innerHeight)");
 		var result = await EpubText.EvaluateJavaScriptAsync("scrolledToBottom()");
-
 		if (result is not null && result.Equals("Yes"))
 		{
 			if (currentChapterIndex < 0 || currentChapterIndex >= book.Chapters.Count - 1)
@@ -200,6 +162,7 @@ public partial class BookPage : ContentPage
 			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
 			return;
 		}
+		EpubText.Eval("window.scrollBy(0, window.innerHeight)");
 		await SetLabelText();
 	}
 

@@ -8,7 +8,6 @@
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     Shell.FlyoutBehavior="Disabled"
-     Padding="4,0,0,0"
     Title="">
 
     <ShellContent

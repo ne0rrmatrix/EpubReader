@@ -7,8 +7,8 @@
              xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
              x:DataType="viewModels:BookViewModel"
              x:Name="CurrentPage"
+             BackgroundColor="White"
              Shell.NavBarIsVisible="{Binding IsNavMenuVisible}"
-             BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
              Loaded="ContentPage_Loaded">
     
     <ContentPage.ToolbarItems>
@@ -19,7 +19,7 @@
           Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <Grid>
+    <Grid  BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
