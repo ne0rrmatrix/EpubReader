@@ -19,9 +19,6 @@ on:
   schedule:
     - cron: '29 0 * * 4'
 
-   
-permissions:
-  contents: write
 env:
   PROJECT_PATH: "EpubReader/EpubReader.csproj"
   DOTNET_NOLOGO: true                     # Disable the .NET logo
@@ -59,7 +56,7 @@ jobs:
 
     - name: Install MAUI workloads (required for GitHub-hosted runners)
       shell: pwsh
-      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources
+      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources  --source https://api.nuget.org/v3/index.json
 
     - name: Restore NuGet packages
       shell: pwsh
@@ -97,7 +94,7 @@ jobs:
 
     - name: Install MAUI workloads (required for GitHub-hosted runners)
       shell: pwsh
-      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources
+      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources  --source https://api.nuget.org/v3/index.json
 
     - name: Restore NuGet packages
       shell: pwsh
@@ -139,7 +136,7 @@ jobs:
 
     - name: Install MAUI workloads (required for GitHub-hosted runners)
       shell: pwsh
-      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources
+      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources  --source https://api.nuget.org/v3/index.json
 
     - name: Restore NuGet packages
       shell: bash
@@ -180,7 +177,7 @@ jobs:
 
     - name: Install MAUI workloads (required for GitHub-hosted runners)
       shell: pwsh
-      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources
+      run: dotnet workload install maui --source https://api.nuget.org/v3/index.json  --ignore-failed-sources  --source https://api.nuget.org/v3/index.json
 
     - name: Restore NuGet packages
       shell: bash
