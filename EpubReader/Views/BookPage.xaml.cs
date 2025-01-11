@@ -2,8 +2,6 @@
 using Android.Views;
 using AndroidX.Core.View;
 using CommunityToolkit.Maui.Core.Platform;
-
-
 #endif
 
 using EpubReader.Interfaces;
@@ -20,18 +18,31 @@ public partial class BookPage : ContentPage
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Book book = new();
     int currentChapterIndex = 0;
+	bool isPreviousPage = false;
 	Settings settings = new();
 	public BookPage(BookViewModel viewModel)
     {
         InitializeComponent();
-        BindingContext = viewModel;
-		EpubText.Navigated += OnEpubText_Navigating;
+		BindingContext = viewModel;
+		EpubText.Navigating += EpubText_Navigating;
 		SettingsPageHelpers.SettingsPropertyChanged += OnSettingsClicked;
+		EpubText.Navigated += OnEpubText_Navigating;
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
 	}
-	
+
+	async void OnEpubText_Navigating(object? sender, WebNavigatedEventArgs e)
+	{
+		if (isPreviousPage)
+		{
+			isPreviousPage = false;
+			EpubText.Eval("window.scrollTo(0, document.body.scrollHeight)");
+			await SetLabelText();
+			return;
+		}
+		await SetLabelText();
+	}
 
 	protected override void OnAppearing()
 	{
@@ -47,14 +58,11 @@ public partial class BookPage : ContentPage
 #endif
 	}
 
-	async void OnEpubText_Navigating(object? sender, WebNavigatedEventArgs e) => await SetLabelText();
-
-	void EpubText_Navigating(object sender, WebNavigatingEventArgs e)
+	void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
-		if (e.NavigationEvent == WebNavigationEvent.NewPage)
+		if (e.Url.Contains("http://") || e.Url.Contains("https://") || e.Url.Contains("file:"))
 		{
-			EpubText.Eval("disableScrollBars()");
-			
+			e.Cancel = true;
 		}
 	}
 
@@ -63,13 +71,6 @@ public partial class BookPage : ContentPage
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(true);
 		var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
 		Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-	}
-
-	async void NavigatedToPreviousChapter(object? sender, WebNavigatedEventArgs e)
-	{
-		EpubText.Navigated -= NavigatedToPreviousChapter;
-		EpubText.Eval("window.scrollTo(0, document.body.scrollHeight);");
-		await SetLabelText();
 	}
 	
 	async void ContentPage_Loaded(object sender, EventArgs e)
@@ -110,7 +111,6 @@ public partial class BookPage : ContentPage
 
 	async Task PreviousPage()
 	{
-		EpubText.Eval("window.scrollBy(0, -window.innerHeight)");
 		var result = await EpubText.EvaluateJavaScriptAsync("ScrolledToTop()");
 		if (result is not null && result.Equals("Yes"))
 		{
@@ -120,9 +120,10 @@ public partial class BookPage : ContentPage
 			}
 			currentChapterIndex--;
 			var html = GetHtmlWithCss(book.Chapters[currentChapterIndex].HtmlFile);
-			Dispatcher.Dispatch(() => { EpubText.Navigated += NavigatedToPreviousChapter; EpubText.Source = new HtmlWebViewSource { Html = html }; });
+			Dispatcher.Dispatch(() => { isPreviousPage = true; EpubText.Source = new HtmlWebViewSource { Html = html }; });
 			return;
 		}
+		EpubText.Eval("window.scrollBy(0, -window.innerHeight)");
 		await SetLabelText();
 	}
 	
@@ -160,10 +161,10 @@ public partial class BookPage : ContentPage
 		var current = await EpubText.EvaluateJavaScriptAsync("getCurrentPage()");
 		if (current is not null && !current.Contains("null") && !string.IsNullOrEmpty(current) && !current.Equals("0"))
 		{
-			PageLabel.Text = $"{book.Chapters[currentChapterIndex].Title} - Page {current}";
+			Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[currentChapterIndex].Title} - Page {current}");
 			return;
 		}
-		PageLabel.Text = $"{book.Chapters[currentChapterIndex].Title}";
+		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[currentChapterIndex].Title}");
 	}
 
 	string GetHtmlWithCss(string html)

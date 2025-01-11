@@ -1,14 +1,10 @@
-﻿using System.Buffers.Text;
-using System.Net.Http;
-using System.Text.RegularExpressions;
-using System.Xml;
+﻿using System.Text.RegularExpressions;
 using EpubReader.Models;
-using Image = EpubReader.Models.Image;
 
 namespace EpubReader.Service;
 
 public partial class CssInjector(Settings settings, string otherCss)
-{
+{	
 	readonly string disableScrollBars = @"
 function disableScrollBars() {
 document.querySelector('body').style.overflow = 'scroll';
@@ -39,7 +35,7 @@ function getCurrentPage() {
             currentPage = pageNum;
         }
     });
-    
+    console.log('Current page: ' + currentPage);
     return currentPage;
 }";
 
@@ -56,15 +52,9 @@ function scrolledToBottom() {
 
 	readonly string scrolledToTop = @"
 function ScrolledToTop() {
-	// Handle the previous page navigation
-	console.log('Navigating to the previous page');
-	
 if (window.pageYOffset === 0) {
-	// The user is at the top of the page
-	console.log('You are at the top of the page.');
 	return 'Yes';
 }
-	window.scrollBy(0, -window.innerHeight)
 }";
 	public string InjectAllCss(string html, Book book)
     {
