@@ -21,7 +21,7 @@ on:
 
    
 permissions:
-  contents: write, read
+  contents: write
 env:
   PROJECT_PATH: "EpubReader/EpubReader.csproj"
   DOTNET_NOLOGO: true                     # Disable the .NET logo
