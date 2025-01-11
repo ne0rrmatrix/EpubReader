@@ -1,6 +1,7 @@
 ﻿using Android.Views;
 using AndroidX.Core.View;
 using CommunityToolkit.Maui.Core.Platform;
+using Microsoft.Maui.Controls.PlatformConfiguration;
 
 namespace EpubReader.Service;
 public static class StatusBarExtensions
@@ -16,17 +17,20 @@ public static class StatusBarExtensions
 			{
 				StatusBar.SetColor(Colors.Transparent);
 
-				
+
 				window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
+				window.SetFlags(WindowManagerFlags.TranslucentStatus, WindowManagerFlags.TranslucentStatus);
+				window.SetFlags(WindowManagerFlags.TranslucentNavigation, WindowManagerFlags.TranslucentNavigation);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
-				if(OperatingSystem.IsAndroidVersionAtLeast((34)))
+				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
 					insets.Hide(WindowInsets.Type.NavigationBars());
 				}
 			}
 			else
-			{	window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
+			{	
+				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))

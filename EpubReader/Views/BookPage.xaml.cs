@@ -28,17 +28,6 @@ public partial class BookPage : ContentPage
 		EpubText.Navigated += OnEpubText_Navigating;
 		SettingsPageHelpers.SettingsPropertyChanged += OnSettingsClicked;
 #if ANDROID
-		/*
-		//window.SetDecorFitsSystemWindows(false);
-		window.SetStatusBarColor(Android.Graphics.Color.White);
-		window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
-		window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
-		var insets = WindowCompat.GetInsetsController(Platform.CurrentActivity?.Window
-			?? throw new InvalidOperationException(), Platform.CurrentActivity?.Window?.DecorView
-			?? throw new InvalidOperationException()) ?? throw new InvalidOperationException();
-		insets.Hide(WindowInsets.Type.NavigationBars());
-		//insets.AppearanceLightStatusBars = true;
-		*/
 		StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
 	}
