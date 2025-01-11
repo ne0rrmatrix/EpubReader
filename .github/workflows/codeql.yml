@@ -24,7 +24,6 @@ permissions:
   contents: write
 env:
   PROJECT_PATH: "EpubReader/EpubReader.csproj"
-  NUGETCONFIG_PATH: "nuget.config"
   DOTNET_NOLOGO: true                     # Disable the .NET logo
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true # Disable the .NET first time experience
   DOTNET_CLI_TELEMETRY_OPTOUT: true       # Disable sending .NET CLI telemetry
@@ -64,7 +63,7 @@ jobs:
 
     - name: Restore NuGet packages
       shell: pwsh
-      run: dotnet restore ${{ env.PROJECT_PATH }} --configfile ${{ env.NUGETCONFIG_PATH }}
+      run: dotnet restore ${{ env.PROJECT_PATH }}
 
     - name: Build Maui Android project
       shell: pwsh
@@ -102,7 +101,7 @@ jobs:
 
     - name: Restore NuGet packages
       shell: pwsh
-      run: dotnet restore ${{ env.PROJECT_PATH }} --configfile ${{ env.NUGETCONFIG_PATH }}
+      run: dotnet restore ${{ env.PROJECT_PATH }}
 
     - name: Build Maui WinUI project
       shell: pwsh
@@ -116,7 +115,7 @@ jobs:
 # >>>>>>> iOS Build <<<<<<< #
 # ************************* #
  maui-ios:
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -131,7 +130,7 @@ jobs:
         
     - uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '16.1.x'
+        xcode-version: latest
 
     - name: Setup .NET Core SDK
       uses: actions/setup-dotnet@v4
@@ -144,7 +143,7 @@ jobs:
 
     - name: Restore NuGet packages
       shell: bash
-      run: dotnet restore ${{ env.PROJECT_PATH }} --configfile ${{ env.NUGETCONFIG_PATH }}
+      run: dotnet restore ${{ env.PROJECT_PATH }}
 
     - name: Build MAUI iOS project
       shell: bash
@@ -157,7 +156,7 @@ jobs:
 # >>>>>>> MacCatalyst Build <<<<<<< #
 # ********************************* #
  maui-macos:
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -172,7 +171,7 @@ jobs:
         
     - uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '16.1.x'
+        xcode-version: latest
 
     - name: Setup .NET Core SDK
       uses: actions/setup-dotnet@v4
@@ -185,7 +184,7 @@ jobs:
 
     - name: Restore NuGet packages
       shell: bash
-      run: dotnet restore ${{ env.PROJECT_PATH }} --configfile ${{ env.NUGETCONFIG_PATH }}
+      run: dotnet restore ${{ env.PROJECT_PATH }}
     
     - name: Build MAUI MacCatalyst project
       shell: bash
