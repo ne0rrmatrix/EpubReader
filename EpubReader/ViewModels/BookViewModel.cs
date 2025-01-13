@@ -20,27 +20,46 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
     public partial bool IsNavMenuVisible { get; set; } = true;
+	[ObservableProperty]
+	public partial string Source { get; set; }
+	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 
-    Book? book;
-    public Book? Book
+	Settings settings = new();
+	public Settings Settings
+	{
+		get => settings;
+		set => SetProperty(ref settings, value);
+	}
+
+	Book book = new();
+	public Book Book
     {
         get => book;
         set
         {
             SetProperty(ref book, value);
-            IsNavMenuVisible = false;
-        }
+            //IsNavMenuVisible = false;
+		}
     }
-
-    public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
-
-	public void ApplyQueryAttributes(IDictionary<string, object> query)
+	
+    public async void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        if (query.TryGetValue("Book", out var bookObj))
+        if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
         {
-            Book = bookObj as Book;
-        }
-    }
+			settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(true);
+			var temp = await db.GetBook(book.Title, CancellationToken.None).ConfigureAwait(true);
+			book.CurrentChapter = temp.CurrentChapter;
+			book.CurrentPage = temp.CurrentPage;
+			Book = book;
+
+			System.Diagnostics.Debug.WriteLine(Book.Title);
+			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[Book.CurrentChapter].HtmlFile, book, settings);
+		}
+		else
+		{
+			throw new InvalidOperationException("Book not found");
+		}
+	}
 
     [RelayCommand]
     static void ShowPopup()
@@ -54,16 +73,17 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
     {
 		if (IsNavMenuVisible)
         {
-            IsNavMenuVisible = false;
+			System.Diagnostics.Debug.WriteLine("Long press");
+			IsNavMenuVisible = false;
             Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
 #if ANDROID
 			StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
-
 		}
 		else
         {
-            IsNavMenuVisible = true;
+			System.Diagnostics.Debug.WriteLine("Long press");
+			IsNavMenuVisible = true;
             Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #if ANDROID
 			StatusBarExtensions.SetStatusBarsHidden(false);

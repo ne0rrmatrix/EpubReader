@@ -1,14 +1,32 @@
-﻿namespace EpubReader.Models;
+﻿using SQLite;
+using SQLiteNetExtensions.Attributes;
 
+namespace EpubReader.Models;
+
+[Table("Book")]
 public partial class Book
 {
-    public string Title { get; set; } = string.Empty;
+	[PrimaryKey, AutoIncrement, Column("Id")]
+	public int Id { get; set; }
+	public string Title { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
-    public List<Author> Authors { get; set; } = [];
-    public Byte[] CoverImage { get; set; } = [];
-    public List<CSS> Css { get; set; } = [];
-    public List<Chapter> Chapters { get; set; } = [];
-	public List<Image> Images { get; set; } = [];
 	public int CurrentPage { get; set; } = 0;
+	public int TotalPages { get; set; } = 0;
+	public int CurrentChapter { get; set; } = 0;
 	public string CoverUrl { get; set; } = string.Empty;
+
+	[Ignore]
+	public List<Chapter> Chapters { get; set; } = [];
+
+	[Ignore]
+	public List<CSS> Css { get; set; } = [];
+
+	[Ignore]
+	public Byte[] CoverImage { get; set; } = [];
+
+	[Ignore]
+	public List<Author> Authors { get; set; } = [];
+
+	[Ignore]
+	public List<Image> Images { get; set; } = [];
 }

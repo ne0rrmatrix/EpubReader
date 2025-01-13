@@ -3,9 +3,17 @@ using EpubReader.Models;
 
 namespace EpubReader.Service;
 
-public partial class CssInjector(Settings settings, string otherCss)
-{	
-	readonly string disableScrollBars = @"
+public partial class InjectIntoHtml
+{
+	static readonly string scrollToPageFunction = @"
+function scrollToPage(pageNumber) {
+    const targetElement = document.getElementById(`page_${pageNumber}`);
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}";
+
+	static readonly string disableScrollBars = @"
 function disableScrollBars() {
 document.querySelector('body').style.overflow = 'scroll';
 var style = document.createElement('style');
@@ -14,7 +22,7 @@ style.innerHTML = '::-webkit-scrollbar { display: none }';
 document.getElementsByTagName('body')[0].appendChild(style);
 }";
 
-	readonly string disableScroll = @"
+	static readonly string disableScroll = @"
 window.addEventListener('wheel', function(event) {
     event.preventDefault();
 }, { passive: false });
@@ -23,7 +31,7 @@ window.addEventListener('touchmove', function(event) {
     event.preventDefault();
 }, { passive: false });";
 
-	readonly string getCurrentPageFunction = @"
+	static readonly string getCurrentPageFunction = @"
 function getCurrentPage() {
     const pageElements = document.querySelectorAll('[id^=""page_""]');
     let currentPage = 0;
@@ -39,7 +47,7 @@ function getCurrentPage() {
     return currentPage;
 }";
 
-	readonly string scrollCheck = @"
+	static readonly string scrollCheck = @"
 function scrolledToBottom() {
     const scrollPosition = Math.ceil(window.scrollY);
     const viewportHeight = window.innerHeight;
@@ -50,15 +58,17 @@ function scrolledToBottom() {
 }
 ";
 
-	readonly string scrolledToTop = @"
+	static readonly string scrolledToTop = @"
 function ScrolledToTop() {
 if (window.pageYOffset === 0) {
 	return 'Yes';
 }
 }";
-	public string InjectAllCss(string html, Book book)
+
+	public static string InjectAllCss(string html, Book book, Settings settings)
     {
-        if (string.IsNullOrWhiteSpace(html))
+		var otherCss = book.Css[^1].Content ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(html))
         {
             throw new ArgumentException("HTML content cannot be null or empty.", nameof(html));
         }
@@ -71,14 +81,14 @@ if (window.pageYOffset === 0) {
 
         if (!string.IsNullOrEmpty(settings.BackgroundColor) || !string.IsNullOrEmpty(settings.TextColor) || settings.FontSize > 0 || !string.IsNullOrEmpty(settings.FontFamily))
         {
-            styleTag = $@"
-    body {{
-        {(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
-        {(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
-        {(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
-        {(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
-    }}";
-        }
+			styleTag = $@"
+				body {{
+					{(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
+					{(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
+					{(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
+					{(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
+				}}";
+		}
 
         // Combine the style tag with other CSS
         if (!string.IsNullOrEmpty(otherCss))
@@ -102,7 +112,7 @@ if (window.pageYOffset === 0) {
             html = InjectCss(html, styleTag);
         }
 
-		var js = scrollCheck + disableScroll + scrolledToTop + getCurrentPageFunction + disableScrollBars;
+		var js = scrollCheck + disableScroll + scrolledToTop + getCurrentPageFunction + disableScrollBars + scrollToPageFunction;
 		html = InjectJavascript(html, js);
 		foreach (var image in book.Images)
 		{

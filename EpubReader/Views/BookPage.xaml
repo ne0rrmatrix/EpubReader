@@ -8,8 +8,7 @@
              x:DataType="viewModels:BookViewModel"
              x:Name="CurrentPage"
              BackgroundColor="White"
-             Shell.NavBarIsVisible="{Binding IsNavMenuVisible}"
-             Loaded="ContentPage_Loaded">
+             Shell.NavBarIsVisible="{Binding IsNavMenuVisible}">
     
     <ContentPage.ToolbarItems>
         <ToolbarItem
@@ -31,6 +30,9 @@
                  VerticalOptions="FillAndExpand" 
                  HorizontalOptions="FillAndExpand" 
                  Navigating="EpubText_Navigating">
+            <WebView.Source>
+                <HtmlWebViewSource Html="{Binding Source}"/>
+            </WebView.Source>
             <WebView.GestureRecognizers>
                 <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                     <On Platform="iOS">

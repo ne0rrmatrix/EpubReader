@@ -24,7 +24,7 @@ public partial class SettingsPage : Popup, IDisposable
 	}
 	async Task LoadSettings(CancellationToken cancellationToken = default)
 	{
-		var settings = await db.GetSettings(cancellationToken).ConfigureAwait(true);
+		var settings = await db.GetSettings(cancellationToken);
 		Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
 	}
 	async void OnApplyColorChanged(object sender, EventArgs e)
@@ -32,7 +32,7 @@ public partial class SettingsPage : Popup, IDisposable
 		string backgroundColorArgb;
         string textColorArgb;
 		var selectedTheme = ThemePicker.SelectedItem.ToString();
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(cancellationTokenSource.Token);
 
 		switch (selectedTheme)
         {
@@ -99,40 +99,40 @@ public partial class SettingsPage : Popup, IDisposable
         }
 		settings.BackgroundColor = backgroundColorArgb;
 		settings.TextColor = textColorArgb;
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings, CancellationToken.None);
 		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
 	}
 
     async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
     {
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		if (fontSize == (int)e.NewValue)
         {
             return;
         }
         fontSize = (int)e.NewValue;
 		settings.FontSize = fontSize;
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings);
 		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
 	}
 
     async void OnFontChange(object sender, EventArgs e)
     {
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		var selectedTheme = FontPicker.SelectedItem.ToString();
 
         var font = $"'{selectedTheme}'";
 		settings.FontFamily = font;
 		System.Diagnostics.Trace.TraceInformation($"Font: {font}");
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings);
 		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
 	}
 
     async void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
     {
-		var settings = await db.GetSettings().ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		settings.IsSystemMode = e.Value;
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings);
 		if (!settings.IsSystemMode)
 		{
 			return;
@@ -148,7 +148,7 @@ public partial class SettingsPage : Popup, IDisposable
 			settings.BackgroundColor = "#FFFBF5";
 			settings.TextColor = "#2B2B2B";
 		}
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings);
 		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
 	}
 	protected virtual void Dispose(bool disposing)
@@ -173,9 +173,9 @@ public partial class SettingsPage : Popup, IDisposable
 
 	async void Button_Clicked(object sender, EventArgs e)
 	{
-		await db.RemoveAllSettings(CancellationToken.None).ConfigureAwait(true);
+		await db.RemoveAllSettings(CancellationToken.None);
 		var settings = new Models.Settings();
-		await db.SaveSettings(settings, CancellationToken.None).ConfigureAwait(true);
+		await db.SaveSettings(settings, CancellationToken.None);
 		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
 	}
 }

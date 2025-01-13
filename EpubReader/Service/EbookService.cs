@@ -3,7 +3,6 @@ using EpubCore;
 using EpubReader.Models;
 using MetroLog;
 using Image = EpubReader.Models.Image;
-using Page = EpubReader.Models.Page;
 
 namespace EpubReader.Service;
 
@@ -25,24 +24,11 @@ public partial class EbookService
 		List<Chapter> chapters = [];
         List<Author> authors = [];
         List<CSS> css = [];
-		List<Page> pages = [];
 		List<Image> images = [];
 
-		foreach (var item in pageNav)
-		{
-			Page page = new()
-			{
-				Id = Int32.Parse(item.Value),
-				NavPoint = item.Id ?? string.Empty,
-				FileName = StringCleaner.GetPageNumberInfo(item.ContentSrc.Remove(0, 6)) ?? string.Empty,
-			};
-			pages.Add(page);
-		}
 		for (int i = 0; i < toc.Count; i++)
         {
             var htmlFile = html.Find(x => x.AbsolutePath == toc[i].AbsolutePath)?.TextContent ?? string.Empty;
-			var page = pages.FindAll(x => x.FileName == toc[i].AbsolutePath.Remove(0, 7));
-			
 			var title = toc[i].Title;
             if(string.IsNullOrEmpty(htmlFile))
             {
@@ -51,7 +37,6 @@ public partial class EbookService
             var chapter = new Chapter()
             {
                 Title = title,
-				Pages = page,
 				HtmlFile = htmlFile,
                 FileName = Path.GetFileName(toc[i].RelativePath),
             };
@@ -83,7 +68,7 @@ public partial class EbookService
         }
 		var coverImage = BytesToWebSafeString(book.CoverImage);
 		var mimeType = GetMimeType(book.CoverImageHref);
-		
+
 		Book books = new()
         {
             Title = book.Title.Trim(),
@@ -94,7 +79,7 @@ public partial class EbookService
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
-        };
+		};
 		return books;
     }
 
@@ -111,7 +96,6 @@ public partial class EbookService
 	public static string GetMimeType(string fileName)
 	{
 		var fileExtension = Path.GetExtension(fileName);
-		System.Diagnostics.Debug.WriteLine(fileExtension);
 		return fileExtension switch
 		{
 			".jpg" => "image/jpeg",
