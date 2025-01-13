@@ -11,18 +11,16 @@ using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
-public partial class LibraryViewModel : BaseViewModel, IDisposable
+public partial class LibraryViewModel : BaseViewModel
 {
 	readonly Task loadTask;
 	readonly CancellationTokenSource? cancellationtokensource;
-	bool disposedValue;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
     [ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; } = new();
    
-    IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	public LibraryViewModel()
     {
 		cancellationtokensource = new CancellationTokenSource();
@@ -47,9 +45,14 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
     }
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book Book)
+    public async Task GotoBookPage(Book Book)
     {
-        var navigationParams = new Dictionary<string, object>
+		if(Book is null)
+		{
+			logger.Error("Book is null");
+			return;
+		}
+			var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
         };
@@ -57,7 +60,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
     }
 
     [RelayCommand]
-    public async Task Add(CancellationToken cancellationToken = default)
+    async Task Add(CancellationToken cancellationToken = default)
     {
         var customFileType = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
@@ -124,7 +127,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		await snackbar.Show(cancellationTokenSource.Token).ConfigureAwait(false);
 	}
     [RelayCommand]
-    public async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
+    async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
     {
         if (book is not null)
         {
@@ -153,23 +156,11 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         }
     }
 
-	protected virtual void Dispose(bool disposing)
-	{
-		if (!disposedValue)
-		{
-			if (disposing)
-			{
-				cancellationtokensource?.Dispose();
-				loadTask.Dispose();
-			}
 
-			disposedValue = true;
-		}
-	}
-
-	public void Dispose()
+	protected override void Dispose(bool disposing)
 	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
+		base.Dispose(disposing);
+		cancellationtokensource?.Dispose();
+		loadTask.Dispose();
 	}
 }

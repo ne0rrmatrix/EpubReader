@@ -12,20 +12,20 @@
     <Page.Behaviors>
         <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource Blue100Accent}, Dark={StaticResource AppBackgroundDarkColor}}" StatusBarStyle="LightContent" />
     </Page.Behaviors>
-    
+
     <ContentPage.Resources>
         <ResourceDictionary>
             <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
-    
+
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add_circle.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-   
+
     <CollectionView x:Name="collectionView"
         Grid.Row="1"
         Margin="{StaticResource CollectionMargin}"
@@ -33,7 +33,7 @@
         ItemsSource="{Binding Books}"
         SelectionMode="None"
         VerticalScrollBarVisibility="Never">
-        
+
         <CollectionView.ItemsLayout>
             <GridItemsLayout Orientation="Vertical" 
                         Span="{StaticResource GridSpan}"
@@ -77,7 +77,7 @@
                                 Margin="8,4,8,8"
                                 HorizontalOptions="Center"
                                 Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">
-
+                                
                                 <FlyoutBase.ContextFlyout>
                                     <MenuFlyout>
                                         <MenuFlyoutItem
@@ -90,7 +90,7 @@
                                 </FlyoutBase.ContextFlyout>
 
                                 <Image.GestureRecognizers>
-                                    <TapGestureRecognizer 
+                                    <TapGestureRecognizer
                                     x:DataType="{x:Null}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=GotoBookPageCommand}" 
                                     CommandParameter="{Binding .}" />

@@ -33,11 +33,12 @@ public partial class BookPage : ContentPage
 #endif
 	}
 
-	protected override async void OnAppearing()
+	protected override void OnAppearing()
 	{
 		base.OnAppearing();
-		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException();
+		//settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
+		//settings = ((BookViewModel)BindingContext).Settings ?? throw new InvalidOperationException();
+		//book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException();
 	}
 	async void OnEpubText_Navigating(object? sender, WebNavigatedEventArgs e)
 	{
@@ -58,7 +59,8 @@ public partial class BookPage : ContentPage
 	protected override async void OnNavigatedTo(NavigatedToEventArgs args)
 	{
 		base.OnNavigatedTo(args);
-		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
+		//settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
+		settings = ((BookViewModel)BindingContext).Settings ?? throw new InvalidOperationException();
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException();
 		await CreateToolBar(book).ConfigureAwait(false);
 	}
@@ -92,6 +94,9 @@ public partial class BookPage : ContentPage
 	{
 		base.OnNavigatedFrom(args);
 		SettingsPageHelpers.SettingsPropertyChanged -= OnSettingsClicked;
+		EpubText.Navigating -= EpubText_Navigating;
+		SettingsPageHelpers.SettingsPropertyChanged -= OnSettingsClicked;
+		EpubText.Navigated -= OnEpubText_Navigating;
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(false);

@@ -22,38 +22,19 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
     public partial bool IsNavMenuVisible { get; set; } = true;
 	[ObservableProperty]
 	public partial string Source { get; set; }
-	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
-
-	Settings settings = new();
-	public Settings Settings
-	{
-		get => settings;
-		set => SetProperty(ref settings, value);
-	}
-
-	Book book = new();
-	public Book Book
-    {
-        get => book;
-        set
-        {
-            SetProperty(ref book, value);
-            //IsNavMenuVisible = false;
-		}
-    }
 	
     public async void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
         {
-			settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(true);
+			
 			var temp = await db.GetBook(book.Title, CancellationToken.None).ConfigureAwait(true);
 			book.CurrentChapter = temp.CurrentChapter;
 			book.CurrentPage = temp.CurrentPage;
 			Book = book;
 
 			System.Diagnostics.Debug.WriteLine(Book.Title);
-			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[Book.CurrentChapter].HtmlFile, book, settings);
+			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[Book.CurrentChapter].HtmlFile, book, Settings);
 		}
 		else
 		{
