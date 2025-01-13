@@ -7,8 +7,14 @@
              xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
              x:DataType="viewModels:BookViewModel"
              x:Name="CurrentPage"
-             BackgroundColor="White"
-             Shell.NavBarIsVisible="{Binding IsNavMenuVisible}">
+             BackgroundColor="White">
+
+    <ContentPage.Behaviors>
+        <toolkit:TouchBehavior 
+         BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+        LongPressDuration="750"
+        LongPressCommand="{Binding LongPressCommand}"/>
+    </ContentPage.Behaviors>
     
     <ContentPage.ToolbarItems>
         <ToolbarItem
@@ -43,11 +49,6 @@
                     </On>
                 </OnPlatform>
             </WebView.GestureRecognizers>
-            <WebView.Behaviors>
-                <toolkit:TouchBehavior 
-                    BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
-                    LongPressCommand="{Binding LongPressCommand}"/>
-            </WebView.Behaviors>
         </WebView>
         <StackLayout
               HorizontalOptions="Center"

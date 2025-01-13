@@ -49,23 +49,23 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
         Shell.Current.ShowPopup(popup);
     }
 
-    [RelayCommand]
-    void LongPress()
-    {
+	[RelayCommand]
+	void LongPress()
+	{
 		if (IsNavMenuVisible)
-        {
+		{
 			System.Diagnostics.Debug.WriteLine("Long press");
 			IsNavMenuVisible = false;
-            Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
 #if ANDROID
 			StatusBarExtensions.SetStatusBarsHidden(true);
 #endif
 		}
 		else
-        {
+		{
 			System.Diagnostics.Debug.WriteLine("Long press");
 			IsNavMenuVisible = true;
-            Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #if ANDROID
 			StatusBarExtensions.SetStatusBarsHidden(false);
 #endif
