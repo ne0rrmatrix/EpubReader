@@ -5,16 +5,12 @@
              xmlns:local="clr-namespace:EpubReader.Views"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
+             xmlns:views="clr-namespace:EpubReader.Views"
              x:DataType="viewModels:BookViewModel"
-             x:Name="CurrentPage"
-             BackgroundColor="White">
-
-    <ContentPage.Behaviors>
-        <toolkit:TouchBehavior 
-         BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-        LongPressDuration="750"
-        LongPressCommand="{Binding LongPressCommand}"/>
-    </ContentPage.Behaviors>
+             x:Name="CurrentPage">
+    <ContentPage.BindingContext>
+        <viewModels:BookViewModel/>
+    </ContentPage.BindingContext>
     
     <ContentPage.ToolbarItems>
         <ToolbarItem
@@ -42,13 +38,19 @@
             <WebView.GestureRecognizers>
                 <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                     <On Platform="iOS">
-                        <SwipeGestureRecognizer Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
+                        <SwipeGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
                     </On>
                     <On Platform="Android">
-                        <SwipeGestureRecognizer Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
+                        <SwipeGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
                     </On>
                 </OnPlatform>
             </WebView.GestureRecognizers>
+            <WebView.Behaviors>
+                <toolkit:TouchBehavior 
+                    BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                    LongPressDuration="750"
+                    LongPressCommand="{Binding LongPressCommand}"/>
+            </WebView.Behaviors>
         </WebView>
         <StackLayout
               HorizontalOptions="Center"

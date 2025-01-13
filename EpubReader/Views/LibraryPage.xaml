@@ -49,8 +49,7 @@
 
                             <SwipeItem
                                     BackgroundColor="LightGray"
-                                    x:DataType="{x:Null}"
-                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"
+                                    Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
                                     CommandParameter="{Binding .}"
                                     IconImageSource="delete.png"
                                     Text="Delete" />
@@ -82,18 +81,16 @@
                                     <MenuFlyout>
                                         <MenuFlyoutItem
                                          Text="Delete"
-                                         x:DataType="{x:Null}"
                                          CommandParameter="{Binding .}"
                                          IconImageSource="delete.png"
-                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=RemoveBookCommand}"/>
+                                         Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"/>
                                     </MenuFlyout>
                                 </FlyoutBase.ContextFlyout>
 
                                 <Image.GestureRecognizers>
                                     <TapGestureRecognizer
-                                    x:DataType="{x:Null}"
-                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=GotoBookPageCommand}" 
-                                    CommandParameter="{Binding .}" />
+                                        Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                        CommandParameter="{Binding .}" />
                                 </Image.GestureRecognizers>
                             </Image>
 
