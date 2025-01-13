@@ -113,6 +113,7 @@ public partial class BookPage : ContentPage
 	
 	async void OnSettingsClicked(object? sender, EventArgs e)
 	{
+		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		await Dispatcher.DispatchAsync(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; }).ConfigureAwait(false);
 	}

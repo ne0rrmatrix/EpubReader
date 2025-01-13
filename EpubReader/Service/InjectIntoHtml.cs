@@ -121,16 +121,16 @@ if (window.pageYOffset === 0) {
 		return html;
     }
 
-    [GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline)]
-    private static partial Regex StyleTagRegex();
+	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 2000)]
+	private static partial Regex StyleTagRegex();
 
-    [GeneratedRegex("font-size:\\s*\\d+px\\s*;", RegexOptions.IgnoreCase)]
-    private static partial Regex FontSizeRegex();
+	[GeneratedRegex("font-size:\\s*\\d+px\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 2000)]
+	private static partial Regex FontSizeRegex();
 
-    [GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase)]
-    private static partial Regex FontFamilyRegex();
+	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 2000)]
+	private static partial Regex FontFamilyRegex();
 
-    static string RemoveStyleTags(string html)
+	static string RemoveStyleTags(string html)
     {
         return StyleTagRegex().Replace(html, string.Empty);
     }
