@@ -1,80 +1,108 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="EpubReader.Views.BookPage"
-             xmlns:local="clr-namespace:EpubReader.Views"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
-             xmlns:views="clr-namespace:EpubReader.Views"
-             x:DataType="viewModels:BookViewModel"
-             x:Name="CurrentPage">
+<ContentPage
+    x:Class="EpubReader.Views.BookPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:EpubReader.Views"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
+    xmlns:views="clr-namespace:EpubReader.Views"
+    x:Name="CurrentPage"
+    x:DataType="viewModels:BookViewModel"
+    Loaded="CurrentPage_Loaded"
+    Shell.NavBarIsVisible="{Binding IsNavMenuVisible}">
     <ContentPage.BindingContext>
-        <viewModels:BookViewModel/>
+        <viewModels:BookViewModel />
     </ContentPage.BindingContext>
-    
+
     <ContentPage.ToolbarItems>
         <ToolbarItem
-          BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
-          Command="{Binding ShowPopupCommand}"
-          IconImageSource="settings.png"
-          Order="Primary" />
+            BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
+            Command="{Binding ShowPopupCommand}"
+            IconImageSource="settings.png"
+            Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <Grid  BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
+    <Grid BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
+        <Grid.GestureRecognizers>
+            <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                <On Platform="WinUI">
+                    <TapGestureRecognizer
+                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                        Command="{Binding DoubleTappedCommand}"
+                        NumberOfTapsRequired="2" />
+                </On>
+            </OnPlatform>
+        </Grid.GestureRecognizers>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
         <WebView
-                 Grid.Row="0"
-                 Scale="1"
-                 x:Name="EpubText"
-                 VerticalOptions="FillAndExpand" 
-                 HorizontalOptions="FillAndExpand" 
-                 Navigating="EpubText_Navigating">
+            x:Name="EpubText"
+            Grid.Row="0"
+            HorizontalOptions="FillAndExpand"
+            Scale="1"
+            VerticalOptions="FillAndExpand">
             <WebView.Source>
-                <HtmlWebViewSource Html="{Binding Source}"/>
+                <HtmlWebViewSource Html="{Binding Source}" />
             </WebView.Source>
             <WebView.GestureRecognizers>
                 <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                     <On Platform="iOS">
-                        <SwipeGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
+                        <SwipeGestureRecognizer
+                            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                            Direction="Right,Left"
+                            Swiped="SwipeGestureRecognizer_Swiped" />
                     </On>
                     <On Platform="Android">
-                        <SwipeGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Direction="Right,Left" Swiped="SwipeGestureRecognizer_Swiped"/>
+                        <SwipeGestureRecognizer
+                            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                            Direction="Right,Left"
+                            Swiped="SwipeGestureRecognizer_Swiped" />
                     </On>
                 </OnPlatform>
             </WebView.GestureRecognizers>
             <WebView.Behaviors>
-                <toolkit:TouchBehavior 
-                    BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                    LongPressDuration="750"
-                    LongPressCommand="{Binding LongPressCommand}"/>
+                <OnPlatform x:TypeArguments="Behavior">
+                    <On Platform="Android">
+                        <toolkit:TouchBehavior BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" LongPressCommand="{Binding LongPressCommand}" />
+                    </On>
+                </OnPlatform>
             </WebView.Behaviors>
         </WebView>
         <StackLayout
-              HorizontalOptions="Center"
-              BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
-              Grid.Row="1"
-              Spacing="50"
-              Orientation="Horizontal"
-              Padding="10,10,10,10">
-            <ImageButton Source="arrow_back.png"
-                         IsEnabled="{OnPlatform WinUI=true, Default=false}"
-                            IsVisible="{OnPlatform WinUI=true, Default=false}"
-                   BackgroundColor="Transparent"
-                   Clicked="PreviousPage"
-                   WidthRequest="40"/>
-            <Label x:Name="PageLabel"
-                   FontSize="20"
-                   IsVisible="{OnPlatform WinUI=true, Default={Binding IsNavMenuVisible}}"
-                   HorizontalOptions="Center"/>
-            <ImageButton Source="arrow_forward.png"
-                         IsEnabled="{OnPlatform WinUI=true, Default=false}"
-                         IsVisible="{OnPlatform WinUI=true, Default=false}"
-                   BackgroundColor="Transparent"
-                   Clicked="NextPage"
-                   WidthRequest="40"/>
+            Grid.Row="1"
+            Padding="10,10,10,10"
+            BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
+                                              Dark={StaticResource AppBackgroundDarkColor}}"
+            HorizontalOptions="Center"
+            IsVisible="{OnPlatform WinUI=true,
+                                   Android={Binding IsNavMenuVisible}}"
+            Orientation="Horizontal"
+            Spacing="50">
+            <ImageButton
+                BackgroundColor="Transparent"
+                Clicked="PreviousPage"
+                IsEnabled="{OnPlatform WinUI=true,
+                                       Default=false}"
+                IsVisible="{OnPlatform WinUI=true,
+                                       Default=false}"
+                Source="arrow_back.png"
+                WidthRequest="40" />
+            <Label
+                x:Name="PageLabel"
+                FontSize="20"
+                HorizontalOptions="Center" />
+            <ImageButton
+                BackgroundColor="Transparent"
+                Clicked="NextPage"
+                IsEnabled="{OnPlatform WinUI=true,
+                                       Default=false}"
+                IsVisible="{OnPlatform WinUI=true,
+                                       Default=false}"
+                Source="arrow_forward.png"
+                WidthRequest="40" />
         </StackLayout>
     </Grid>
 </ContentPage>

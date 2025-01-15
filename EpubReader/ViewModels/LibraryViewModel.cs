@@ -11,14 +11,16 @@ using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
-public partial class LibraryViewModel : BaseViewModel
+public partial class LibraryViewModel : BaseViewModel, IDisposable
 {
 	readonly Task loadTask;
 	readonly CancellationTokenSource? cancellationtokensource;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
-    [ObservableProperty]
+	bool disposedValue;
+
+	[ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; } = new();
    
 	public LibraryViewModel()
@@ -39,13 +41,20 @@ public partial class LibraryViewModel : BaseViewModel
         foreach (var item in temp)
         {
             var book = EbookService.OpenEbook(item.FileName);
+			var savedBook = bookData.Find(x => x.Title == book.Title);
+			if(savedBook is null)
+			{
+				logger.Error("Book not found in database");
+			}
+			book.CurrentChapter = savedBook?.CurrentChapter ?? 0;
+			book.CurrentPage = savedBook?.CurrentPage ?? 0;
 			books.Add(book);
         }
         Dispatcher.Dispatch(() => { Books = books; OnPropertyChanged(nameof(Books)); });
     }
 
     [RelayCommand]
-    public async Task GotoBookPage(Book Book)
+    public static async Task GotoBookPage(Book Book)
     {
 		if(Book is null)
 		{
@@ -84,7 +93,7 @@ public partial class LibraryViewModel : BaseViewModel
 			var exists = currentFileData.Any(x => x.FileName == FileService.GetFileName(result.FileName));
 			if(exists)
 			{
-				await ShowSnackBar("Book already exists in library", "OK").ConfigureAwait(false);
+				await ShowSnackBar("Book already exists in library", "OK", cancellationToken).ConfigureAwait(false);
 				logger.Info("Book already exists in library");
 				return;
 			}
@@ -105,10 +114,8 @@ public partial class LibraryViewModel : BaseViewModel
         logger.Error("Error saving book");
     }
 
-	static async Task ShowSnackBar(string text, string actionButtonText)
+	static async Task ShowSnackBar(string text, string actionButtonText, CancellationToken cancellationToken = default)
 	{
-		CancellationTokenSource cancellationTokenSource = new();
-
 		var snackbarOptions = new SnackbarOptions
 		{
 			BackgroundColor = Colors.Red,
@@ -124,7 +131,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 		var snackbar = Snackbar.Make(text, null, actionButtonText, duration, snackbarOptions);
 
-		await snackbar.Show(cancellationTokenSource.Token).ConfigureAwait(false);
+		await snackbar.Show(cancellationToken).ConfigureAwait(false);
 	}
     [RelayCommand]
     async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
@@ -157,10 +164,23 @@ public partial class LibraryViewModel : BaseViewModel
     }
 
 
-	protected override void Dispose(bool disposing)
+
+	protected virtual void Dispose(bool disposing)
 	{
-		base.Dispose(disposing);
-		cancellationtokensource?.Dispose();
-		loadTask.Dispose();
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				cancellationtokensource?.Dispose();
+				loadTask.Dispose();
+			}
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

@@ -1,5 +1,4 @@
 ﻿using System.Text.Encodings.Web;
-using EpubCore;
 using EpubReader.Models;
 using MetroLog;
 using Image = EpubReader.Models.Image;
@@ -9,7 +8,7 @@ namespace EpubReader.Service;
 public partial class EbookService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
-    public EbookService()
+    protected EbookService()
     {
     }
 
@@ -18,12 +17,11 @@ public partial class EbookService
         var book = EpubCore.EpubReader.Read(path);
         var toc = book.TableOfContents.ToList();
         var html = book.Resources.Html.ToList();
-		var pageNav = book.Format.Ncx.PageList?.PageTargets.ToList() ?? [];
 		var imageList = book.Resources.Images.ToList();
 
 		List<Chapter> chapters = [];
         List<Author> authors = [];
-        List<CSS> css = [];
+        List<Css> css = [];
 		List<Image> images = [];
 
 		for (int i = 0; i < toc.Count; i++)
@@ -42,15 +40,7 @@ public partial class EbookService
             };
             chapters.Add(chapter);
         }
-       
-        foreach (var author in book.Authors)
-        {
-            if (author is not null)
-            {
-                authors.Add(new Author { Name = author });
-            }
-        }
-
+		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
 		foreach (var item in imageList)
 		{
 			var image = GetImage(item.Content, item.Href);
@@ -59,7 +49,7 @@ public partial class EbookService
 		
 		foreach (var style in book.Resources.Css)
         {
-            CSS cSS = new()
+            Css cSS = new()
             {
                 FileName = Path.GetFileName(style.FileName),
                 Content = style.TextContent
@@ -68,7 +58,7 @@ public partial class EbookService
         }
 		var coverImage = BytesToWebSafeString(book.CoverImage);
 		var mimeType = GetMimeType(book.CoverImageHref);
-
+		
 		Book books = new()
         {
             Title = book.Title.Trim(),
@@ -79,6 +69,7 @@ public partial class EbookService
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
+			HasPages = book.Format.Ncx.PageList?.PageTargets is not null && book.Format.Ncx.PageList.PageTargets.Count > 0
 		};
 		return books;
     }
@@ -110,10 +101,4 @@ public partial class EbookService
 		string base64 = Convert.ToBase64String(data);
 		return HtmlEncoder.Default.Encode(base64);
 	}
-
-	static string GetChapter(int chapterIndex, ICollection<EpubTextFile> html)
-    {
-        var chapter = html.ElementAt(chapterIndex);
-        return chapter.TextContent;
-    }
 }

@@ -11,7 +11,7 @@ public partial class Book
 	public string Title { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
 	public int CurrentPage { get; set; } = 0;
-	public int TotalPages { get; set; } = 0;
+	public bool HasPages { get; set; } = false;
 	public int CurrentChapter { get; set; } = 0;
 	public string CoverUrl { get; set; } = string.Empty;
 
@@ -19,7 +19,7 @@ public partial class Book
 	public List<Chapter> Chapters { get; set; } = [];
 
 	[Ignore]
-	public List<CSS> Css { get; set; } = [];
+	public List<Css> Css { get; set; } = [];
 
 	[Ignore]
 	public Byte[] CoverImage { get; set; } = [];

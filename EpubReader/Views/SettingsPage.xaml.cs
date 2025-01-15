@@ -1,6 +1,7 @@
 using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
-using EpubReader.Service;
+using EpubReader.Messages;
 
 namespace EpubReader.Views;
 
@@ -39,11 +40,6 @@ public partial class SettingsPage : Popup, IDisposable
             case "Dark":
 				backgroundColorArgb = "#121212";
 				textColorArgb = "#E1E1E1";
-				break;
-
-            case "Light":
-				backgroundColorArgb = "#FFFBF5";
-				textColorArgb = "#2B2B2B";
 				break;
 
             case "Sepia":
@@ -87,7 +83,7 @@ public partial class SettingsPage : Popup, IDisposable
                 break;
 
             default:
-				// Default color scheme if none match
+				// Default color scheme if none match. Is the a default light theme.
 				backgroundColorArgb = "#FFFBF5"; // Light gray background
 				textColorArgb = "#2B2B2B"; // Black text
 				break;
@@ -100,7 +96,7 @@ public partial class SettingsPage : Popup, IDisposable
 		settings.BackgroundColor = backgroundColorArgb;
 		settings.TextColor = textColorArgb;
 		await db.SaveSettings(settings, CancellationToken.None);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
@@ -113,7 +109,7 @@ public partial class SettingsPage : Popup, IDisposable
         fontSize = (int)e.NewValue;
 		settings.FontSize = fontSize;
 		await db.SaveSettings(settings);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnFontChange(object sender, EventArgs e)
@@ -125,7 +121,7 @@ public partial class SettingsPage : Popup, IDisposable
 		settings.FontFamily = font;
 		System.Diagnostics.Trace.TraceInformation($"Font: {font}");
 		await db.SaveSettings(settings);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
@@ -149,7 +145,7 @@ public partial class SettingsPage : Popup, IDisposable
 			settings.TextColor = "#2B2B2B";
 		}
 		await db.SaveSettings(settings);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 	protected virtual void Dispose(bool disposing)
 	{
@@ -176,6 +172,6 @@ public partial class SettingsPage : Popup, IDisposable
 		await db.RemoveAllSettings(CancellationToken.None);
 		var settings = new Models.Settings();
 		await db.SaveSettings(settings, CancellationToken.None);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 }

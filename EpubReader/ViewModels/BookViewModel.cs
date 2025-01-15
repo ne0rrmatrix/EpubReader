@@ -9,7 +9,6 @@ using CommunityToolkit.Maui.PlatformConfiguration.AndroidSpecific;
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Views;
@@ -22,19 +21,20 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
     public partial bool IsNavMenuVisible { get; set; } = true;
 	[ObservableProperty]
 	public partial string Source { get; set; }
-	
-    public async void ApplyQueryAttributes(IDictionary<string, object> query)
+	[ObservableProperty]
+	public partial Settings Settings { get; set; }
+
+	public async void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
         {
-			
-			var temp = await db.GetBook(book.Title, CancellationToken.None).ConfigureAwait(true);
-			book.CurrentChapter = temp.CurrentChapter;
-			book.CurrentPage = temp.CurrentPage;
 			Book = book;
-
-			System.Diagnostics.Debug.WriteLine(Book.Title);
-			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[Book.CurrentChapter].HtmlFile, book, Settings);
+			Settings = await db.GetSettings(CancellationToken.None);
+			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
+			if(OperatingSystem.IsAndroid())
+			{
+				IsNavMenuVisible = false;
+			}
 		}
 		else
 		{
@@ -50,7 +50,18 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
     }
 
 	[RelayCommand]
+	public void DoubleTapped()
+	{
+		HandleMenuCommand();
+	}
+
+	[RelayCommand]
 	void LongPress()
+	{
+		HandleMenuCommand();
+	}
+
+	void HandleMenuCommand()
 	{
 		if (IsNavMenuVisible)
 		{
