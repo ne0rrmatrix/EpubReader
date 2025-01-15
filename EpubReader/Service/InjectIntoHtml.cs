@@ -166,26 +166,29 @@ if (window.pageYOffset === 0) {
 		}
 		return html;
 	}
-	static string ReplaceImageUrls(string htmlContent, string sourcePattern, string newImageSource)
-	{
-		// Handle standard img tags
-		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
-		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
-		{
-			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, newImageSource);
-		});
+    static string ReplaceImageUrls(string htmlContent, string sourcePattern, string newImageSource)
+    {
+        // Define a timeout for the regex operations
+        TimeSpan regexTimeout = TimeSpan.FromSeconds(2);
 
-		// Handle SVG image tags
-		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
-		htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
-		{
-			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, newImageSource);
-		});
+        // Handle standard img tags
+        string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+        htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
+        {
+            string originalTag = match.Value;
+            return originalTag.Replace(match.Groups[1].Value, newImageSource);
+        }, RegexOptions.None, regexTimeout);
 
-		return htmlContent;
-	}
+        // Handle SVG image tags
+        string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+        htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
+        {
+            string originalTag = match.Value;
+            return originalTag.Replace(match.Groups[1].Value, newImageSource);
+        }, RegexOptions.None, regexTimeout);
+
+        return htmlContent;
+    }
 
 	static string InjectJavascript(string html, string javascript)
 	{
