@@ -25,7 +25,9 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
    
 	public LibraryViewModel()
     {
+#if ANDROID
 		StatusBar.SetColor(Color.FromArgb("#3E8EED"));
+#endif
 		cancellationtokensource = new CancellationTokenSource();
 		loadTask = LoadBooks(cancellationtokensource.Token);
 		
