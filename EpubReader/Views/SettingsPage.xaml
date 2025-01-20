@@ -1,24 +1,31 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<mct:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-           xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-           xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-           xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
-           xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
-           xmlns:local="clr-namespace:EpubReader.Converters"
-           x:Class="EpubReader.Views.SettingsPage"
-           Size="400,600">
+<mct:Popup
+    x:Class="EpubReader.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:EpubReader.Converters"
+    xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
+    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:Name="CurrentPage"
+    Size="400,600">
 
+    <mct:Popup.BindingContext>
+        <BindingCondition Binding="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}" />
+    </mct:Popup.BindingContext>
     <mct:Popup.Resources>
         <ResourceDictionary>
             <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         </ResourceDictionary>
     </mct:Popup.Resources>
 
-    <Grid BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}" 
-          Padding="20" 
-          RowSpacing="20" 
-          ColumnSpacing="10">
-        
+    <Grid
+        Padding="20"
+        BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
+                                          Dark={StaticResource AppBackgroundDarkColor}}"
+        ColumnSpacing="10"
+        RowSpacing="20">
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -28,43 +35,49 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        
+
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Font Size Section -->
-        <Label Text="Select Font Size" 
-               Grid.Row="0"
-               FontAttributes="Bold"
-               FontSize="Medium"
-               HorizontalOptions="Center" />
+        <!--  Font Size Section  -->
+        <Label
+            Grid.Row="0"
+            FontAttributes="Bold"
+            FontSize="Medium"
+            HorizontalOptions="Center"
+            Text="Select Font Size" />
 
-        <Slider x:Name="FontSizeSlider"
-                Grid.Row="1"
-                Minimum="8"
-                Maximum="36"
-                ValueChanged="OnFontSizeSliderChanged" />
+        <Slider
+            x:Name="FontSizeSlider"
+            Grid.Row="1"
+            Maximum="36"
+            Minimum="8"
+            ValueChanged="OnFontSizeSliderChanged" />
 
-        <Label x:Name="FontSizeLabel"
-               Grid.Row="2"
-               Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}"
-               HorizontalOptions="Center" />
+        <Label
+            x:Name="FontSizeLabel"
+            Grid.Row="2"
+            x:DataType="{x:Type Slider}"
+            HorizontalOptions="Center"
+            Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}" />
 
-        <Label Text="Select Font"
-               Grid.Row="3"
-               FontAttributes="Bold"
-               FontSize="Medium"
-               HorizontalOptions="Center" />
+        <Label
+            Grid.Row="3"
+            FontAttributes="Bold"
+            FontSize="Medium"
+            HorizontalOptions="Center"
+            Text="Select Font" />
 
-        <Picker x:Name="FontPicker" 
-                Grid.Row="4"
-                HeightRequest="40"
-                SelectedIndexChanged="OnFontChange">
+        <Picker
+            x:Name="FontPicker"
+            Grid.Row="4"
+            HeightRequest="40"
+            SelectedIndexChanged="OnFontChange">
 
             <Picker.ItemsSource>
                 <x:Array Type="{x:Type x:String}">
@@ -82,28 +95,33 @@
             </Picker.ItemsSource>
         </Picker>
 
-        <Label Text="Use System Theme"
-               Grid.Row="5"
-               FontAttributes="Bold"
-               FontSize="Medium"
-               HorizontalOptions="Center" />
+        <Label
+            Grid.Row="5"
+            FontAttributes="Bold"
+            FontSize="Medium"
+            HorizontalOptions="Center"
+            Text="Use System Theme" />
 
-        <Switch x:Name="SystemThemeSwitch"
-                Grid.Row="6"
-                Toggled="OnSystemThemeSwitchToggled" />
+        <Switch
+            x:Name="SystemThemeSwitch"
+            Grid.Row="6"
+            Toggled="OnSystemThemeSwitchToggled" />
 
-        <Label Text="Theme"
-               Grid.Row="7"
-               FontAttributes="Bold"
-               FontSize="Medium"
-               HorizontalOptions="Center" />
+        <Label
+            Grid.Row="7"
+            FontAttributes="Bold"
+            FontSize="Medium"
+            HorizontalOptions="Center"
+            Text="Theme" />
 
-        <Picker x:Name="ThemePicker" 
-                Grid.Row="8"
-                HeightRequest="70"
+        <Picker
+            x:Name="ThemePicker"
             Title="Choose a theme"
-                SelectedIndexChanged="OnApplyColorChanged"
-                IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, Converter={StaticResource InverseBooleanConverter}}">
+            Grid.Row="8"
+            x:DataType="{x:Type Switch}"
+            HeightRequest="70"
+            IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, Converter={StaticResource InverseBooleanConverter}}"
+            SelectedIndexChanged="OnApplyColorChanged">
             <Picker.ItemsSource>
                 <x:Array Type="{x:Type x:String}">
                     <x:String>Dark</x:String>
@@ -119,19 +137,20 @@
                 </x:Array>
             </Picker.ItemsSource>
         </Picker>
- 
-        <Label Text="Reset Settings"
-               Grid.Row="9"
-               FontAttributes="Bold"
-               FontSize="Small"
-               HorizontalOptions="Center"/>
-        <Button Text="Reset" 
-                Grid.Row="10"
-                HeightRequest="45"
-                WidthRequest="120"
-                Clicked="Button_Clicked"
-                />
-    
+
+        <Label
+            Grid.Row="9"
+            FontAttributes="Bold"
+            FontSize="Small"
+            HorizontalOptions="Center"
+            Text="Reset Settings" />
+        <Button
+            Grid.Row="10"
+            Clicked="RemoveAllSettings"
+            HeightRequest="45"
+            Text="Reset"
+            WidthRequest="120" />
+
     </Grid>
-    
+
 </mct:Popup>

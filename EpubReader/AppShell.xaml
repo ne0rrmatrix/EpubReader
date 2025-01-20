@@ -4,12 +4,12 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:EpubReader"
-    xmlns:views="clr-namespace:EpubReader.Views"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    Shell.FlyoutBehavior="Disabled"
-    Title="">
-
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    xmlns:views="clr-namespace:EpubReader.Views"
+    x:Name="Page"
+    Title=""
+    Shell.FlyoutBehavior="Disabled">
     <ShellContent
         Title="Library"
         ContentTemplate="{DataTemplate views:LibraryPage}"

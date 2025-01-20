@@ -34,8 +34,8 @@ public static class MauiProgram
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
 		});
-	
-	var config = new LoggingConfiguration();
+
+		var config = new LoggingConfiguration();
 #if RELEASE
         config.AddTarget(
             LogLevel.Info,

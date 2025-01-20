@@ -1,6 +1,8 @@
 using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
-using EpubReader.Service;
+using EpubReader.Messages;
+using MetroLog;
 
 namespace EpubReader.Views;
 
@@ -11,39 +13,43 @@ public partial class SettingsPage : Popup, IDisposable
 	readonly Task loadTask;
 	bool disposedValue;
 	IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	public SettingsPage()
-    {
+	{
         InitializeComponent();
-        BindingContext = this;
+		BindingContext = this;
 		cancellationTokenSource = new CancellationTokenSource();
 		loadTask = LoadSettings(cancellationTokenSource.Token);
 		if (loadTask.IsFaulted)
 		{
-			System.Diagnostics.Trace.TraceInformation("Error loading settings");
+			logger.Info("Error loading settings");
 		}
 	}
 	async Task LoadSettings(CancellationToken cancellationToken = default)
 	{
-		var settings = await db.GetSettings(cancellationToken).ConfigureAwait(true);
-		Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+		var settings = await db.GetSettings(cancellationToken);
+		if (Dispatcher.IsDispatchRequired)
+		{
+			Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+		}
+		else
+		{
+			SystemThemeSwitch.IsToggled = settings.IsSystemMode;
+		}
 	}
+
 	async void OnApplyColorChanged(object sender, EventArgs e)
     {
 		string backgroundColorArgb;
         string textColorArgb;
 		var selectedTheme = ThemePicker.SelectedItem.ToString();
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(cancellationTokenSource.Token);
 
 		switch (selectedTheme)
         {
             case "Dark":
 				backgroundColorArgb = "#121212";
 				textColorArgb = "#E1E1E1";
-				break;
-
-            case "Light":
-				backgroundColorArgb = "#FFFBF5";
-				textColorArgb = "#2B2B2B";
 				break;
 
             case "Sepia":
@@ -87,7 +93,7 @@ public partial class SettingsPage : Popup, IDisposable
                 break;
 
             default:
-				// Default color scheme if none match
+				// Default color scheme if none match. Is the a default light theme.
 				backgroundColorArgb = "#FFFBF5"; // Light gray background
 				textColorArgb = "#2B2B2B"; // Black text
 				break;
@@ -99,40 +105,40 @@ public partial class SettingsPage : Popup, IDisposable
         }
 		settings.BackgroundColor = backgroundColorArgb;
 		settings.TextColor = textColorArgb;
-		await db.SaveSettings(settings).ConfigureAwait(true);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		await db.SaveSettings(settings, CancellationToken.None);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
     {
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		if (fontSize == (int)e.NewValue)
         {
             return;
         }
         fontSize = (int)e.NewValue;
 		settings.FontSize = fontSize;
-		await db.SaveSettings(settings).ConfigureAwait(true);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnFontChange(object sender, EventArgs e)
     {
-		var settings = await db.GetSettings(cancellationTokenSource.Token).ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		var selectedTheme = FontPicker.SelectedItem.ToString();
 
         var font = $"'{selectedTheme}'";
 		settings.FontFamily = font;
-		System.Diagnostics.Trace.TraceInformation($"Font: {font}");
-		await db.SaveSettings(settings).ConfigureAwait(true);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		logger.Info($"Chaging Font to: {font}");
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
     async void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
     {
-		var settings = await db.GetSettings().ConfigureAwait(true);
+		var settings = await db.GetSettings(CancellationToken.None);
 		settings.IsSystemMode = e.Value;
-		await db.SaveSettings(settings).ConfigureAwait(true);
+		await db.SaveSettings(settings);
 		if (!settings.IsSystemMode)
 		{
 			return;
@@ -148,8 +154,9 @@ public partial class SettingsPage : Popup, IDisposable
 			settings.BackgroundColor = "#FFFBF5";
 			settings.TextColor = "#2B2B2B";
 		}
-		await db.SaveSettings(settings).ConfigureAwait(true);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		await db.SaveSettings(settings);
+		logger.Info("System theme changed");
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 	protected virtual void Dispose(bool disposing)
 	{
@@ -171,11 +178,12 @@ public partial class SettingsPage : Popup, IDisposable
 		GC.SuppressFinalize(this);
 	}
 
-	async void Button_Clicked(object sender, EventArgs e)
+	async void RemoveAllSettings(object sender, EventArgs e)
 	{
-		await db.RemoveAllSettings(CancellationToken.None).ConfigureAwait(true);
+		await db.RemoveAllSettings(CancellationToken.None);
 		var settings = new Models.Settings();
-		await db.SaveSettings(settings, CancellationToken.None).ConfigureAwait(true);
-		SettingsPageHelpers.SettingsPropertyChanged?.Invoke(this, EventArgs.Empty);
+		await db.SaveSettings(settings, CancellationToken.None);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		logger.Info("Settings removed");
 	}
 }

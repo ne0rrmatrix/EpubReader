@@ -30,15 +30,33 @@ public static class FileService
 
     public static async Task<string> SaveFile(FileResult result)
     {
-        Directory.CreateDirectory(SaveDirectory);
-        using Stream fileStream = await result.OpenReadAsync();
-        using StreamReader reader = new(fileStream);
-        string fileName = GetFileName(result.FileName);
-        using FileStream output = File.Create(fileName);
-        await fileStream.CopyToAsync(output);
-        fileStream.Seek(0, SeekOrigin.Begin);
-        FileStream.Synchronized(output);
-        logger.Info($"File saved: {fileName}");
+		string fileName = string.Empty;
+		try
+		{
+			if (Directory.Exists(SaveDirectory))
+			{
+				logger.Info("Directory exists");
+			}
+			else
+			{
+				logger.Info("Directory does not exist");
+				Directory.CreateDirectory(SaveDirectory);
+			}
+
+			using Stream fileStream = await result.OpenReadAsync();
+			using StreamReader reader = new(fileStream);
+			fileName = GetFileName(result.FileName);
+			using FileStream output = File.Create(fileName);
+			await fileStream.CopyToAsync(output);
+			fileStream.Seek(0, SeekOrigin.Begin);
+			FileStream.Synchronized(output);
+			logger.Info($"File saved: {fileName}");
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error saving file: {ex.Message}");
+			return string.Empty;
+		}
         return fileName;
     }
 }

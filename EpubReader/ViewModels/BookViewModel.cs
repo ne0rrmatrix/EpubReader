@@ -9,65 +9,71 @@ using CommunityToolkit.Maui.PlatformConfiguration.AndroidSpecific;
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Views;
+using MetroLog;
 
 namespace EpubReader.ViewModels;
 
-public partial class BookViewModel() : BaseViewModel, IQueryAttributable
+public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
-    public partial bool IsNavMenuVisible { get; set; } = true;
+	public partial bool IsNavMenuVisible { get; set; } = true;
+	[ObservableProperty]
+	public partial string Source { get; set; }
+	[ObservableProperty]
+	public partial Settings Settings { get; set; }
 
-    Book? book;
-    public Book? Book
-    {
-        get => book;
-        set
-        {
-            SetProperty(ref book, value);
-            IsNavMenuVisible = false;
-        }
-    }
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookViewModel));
 
-    public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
-
-	public void ApplyQueryAttributes(IDictionary<string, object> query)
-    {
-        if (query.TryGetValue("Book", out var bookObj))
-        {
-            Book = bookObj as Book;
-        }
-    }
-
-    [RelayCommand]
-    static void ShowPopup()
-    {
-        SettingsPage popup = new();
-        Shell.Current.ShowPopup(popup);
-    }
-
-    [RelayCommand]
-    void LongPress()
-    {
-		if (IsNavMenuVisible)
-        {
-            IsNavMenuVisible = false;
-            Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
+	public BookViewModel()
+	{
+		Settings = new();
+		Source = string.Empty;
 #if ANDROID
-			StatusBarExtensions.SetStatusBarsHidden(true);
+		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
-
+		IsNavMenuVisible = !IsNavMenuVisible;
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+	}
+	public async void ApplyQueryAttributes(IDictionary<string, object> query)
+	{
+		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
+		{
+			Book = book;
+			Settings = await db.GetSettings(CancellationToken.None) ?? new Settings();
+			var result = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
+			if(!string.IsNullOrEmpty(result))
+			{
+				logger.Info("Setting source");
+				Source = result;
+			}
+			else
+			{
+				logger.Info("html is null or empty");
+			}
 		}
 		else
-        {
-            IsNavMenuVisible = true;
-            Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-#if ANDROID
-			StatusBarExtensions.SetStatusBarsHidden(false);
-#endif
+		{
+			logger.Info("Book is null");
 		}
+	}
+
+	[RelayCommand]
+	static void ShowPopup()
+	{
+		SettingsPage popup = new();
+		Shell.Current.ShowPopup(popup);
+	}
+
+	[RelayCommand]
+	void Press()
+	{
+#if ANDROID
+		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
+#endif
+		IsNavMenuVisible = !IsNavMenuVisible;
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
 	}
 }

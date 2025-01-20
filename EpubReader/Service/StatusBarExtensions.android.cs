@@ -1,11 +1,22 @@
 ﻿using Android.Views;
 using AndroidX.Core.View;
 using CommunityToolkit.Maui.Core.Platform;
-using Microsoft.Maui.Controls.PlatformConfiguration;
 
 namespace EpubReader.Service;
 public static class StatusBarExtensions
 {
+	public static void SetStatusBarTransparent()
+	{
+		if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
+		{
+			StatusBar.SetStyle(CommunityToolkit.Maui.Core.StatusBarStyle.LightContent);
+		}
+		else
+		{
+			StatusBar.SetStyle(CommunityToolkit.Maui.Core.StatusBarStyle.DarkContent);
+		}
+	}
+
 	public static void SetStatusBarsHidden(bool hidden)
 	{
 		var window = Platform.CurrentActivity?.Window ?? throw new InvalidOperationException();
@@ -15,13 +26,14 @@ public static class StatusBarExtensions
 		{
 			if (hidden)
 			{
-				StatusBar.SetColor(Colors.Transparent);
-
-
+				SetStatusBarTransparent();
+				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
+				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
 				window.SetFlags(WindowManagerFlags.TranslucentStatus, WindowManagerFlags.TranslucentStatus);
 				window.SetFlags(WindowManagerFlags.TranslucentNavigation, WindowManagerFlags.TranslucentNavigation);
+				
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
@@ -29,8 +41,8 @@ public static class StatusBarExtensions
 				}
 			}
 			else
-			{	
-				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
+			{
+				SetStatusBarTransparent();
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
