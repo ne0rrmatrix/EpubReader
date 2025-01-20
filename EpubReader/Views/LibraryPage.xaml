@@ -8,12 +8,11 @@
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
     x:Name="CurrentPage"
     x:DataType="viewModels:LibraryViewModel"
-    BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
-                                      Dark={StaticResource AppBackgroundDarkColor}}">
+    BackgroundColor="{AppThemeBinding Light={StaticResource Blue100Accent},
+                                      Dark={StaticResource AppBackgroundDarkColor}}"
+    Shell.BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent},
+                                            Dark={StaticResource AppBackgroundDarkColor}}">
 
-    <Page.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource Blue100Accent}, Dark={StaticResource AppBackgroundDarkColor}}" StatusBarStyle="LightContent" />
-    </Page.Behaviors>
 
     <ContentPage.Resources>
         <ResourceDictionary>

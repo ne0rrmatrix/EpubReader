@@ -43,9 +43,9 @@
 		<!-- Cross-OS native compilation is not supported net8.0-android -->
 		<!-- Only iOS + MacCatalyst support AOT in .NET 9 -->
 		<PublishAot>true</PublishAot>
-	</PropertyGroup>
+  </PropertyGroup>
 
-	<ItemGroup>
+  <ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
 
@@ -71,22 +71,20 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</TargetPlatformMinVersion>
 	</PropertyGroup>
-
-	<ItemGroup>
-		<Content Remove="C:\Users\james\.nuget\packages\epubcore\1.6.1\contentFiles\any\net6.0\icon\icon.png" />
-	</ItemGroup>
 	
 	<ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="9.0.30" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="9.0.30" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="EpubCore" Version="1.6.1" />
+		<PackageReference Include="EpubCore" Version="1.6.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
-		<PackageReference Include="CommunityToolkit.Maui" Version="10.0.0" />
-		<PackageReference Include="CommunityToolkit.Maui.Core" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.1" />
+		<PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
+		<PackageReference Include="CommunityToolkit.Maui.Core" Version="11.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-		<PackageReference Include="System.ServiceModel.Syndication" Version="9.0.0" />
+		<PackageReference Include="System.ServiceModel.Syndication" Version="9.0.1" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.10" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />

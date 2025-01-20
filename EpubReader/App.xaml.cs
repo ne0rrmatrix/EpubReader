@@ -9,6 +9,6 @@ public partial class App : Application
     {
         InitializeComponent();
         this.appShell = appShell;
-    }
+	}
    protected override Window CreateWindow(IActivationState? activationState) => new(appShell);
 }

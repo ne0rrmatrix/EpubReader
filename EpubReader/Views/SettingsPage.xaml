@@ -146,7 +146,7 @@
             Text="Reset Settings" />
         <Button
             Grid.Row="10"
-            Clicked="Button_Clicked"
+            Clicked="RemoveAllSettings"
             HeightRequest="45"
             Text="Reset"
             WidthRequest="120" />

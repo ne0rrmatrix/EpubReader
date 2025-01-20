@@ -5,71 +5,6 @@ namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
-	static readonly string getScrollPosition = @"
-function getVerticalScroll() {
-    return window.scrollY || window.pageYOffset;
-}
-";
-	static readonly string scrollToPageFunction = @"
-function scrollToPage(pageNumber) {
-    const targetElement = document.getElementById(`page_${pageNumber}`);
-    if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-}";
-
-	static readonly string disableScrollBars = @"
-function disableScrollBars() {
-document.querySelector('body').style.overflow = 'scroll';
-var style = document.createElement('style');
-style.type = 'text/css';
-style.innerHTML = '::-webkit-scrollbar { display: none }';
-document.getElementsByTagName('body')[0].appendChild(style);
-}";
-
-	static readonly string disableScroll = @"
-window.addEventListener('wheel', function(event) {
-    event.preventDefault();
-}, { passive: false });
-
-window.addEventListener('touchmove', function(event) {
-    event.preventDefault();
-}, { passive: false });";
-
-	static readonly string getCurrentPageFunction = @"
-function getCurrentPage() {
-    const pageElements = document.querySelectorAll('[id^=""page_""]');
-    let currentPage = 0;
-    
-    pageElements.forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        if (rect.top <= window.innerHeight && rect.bottom >= 0) {
-            const pageNum = parseInt(element.id.split('_')[1]);
-            currentPage = pageNum;
-        }
-    });
-    console.log('Current page: ' + currentPage);
-    return currentPage;
-}";
-
-	static readonly string scrollCheck = @"
-function scrolledToBottom() {
-    const scrollPosition = Math.ceil(window.scrollY);
-    const viewportHeight = window.innerHeight;
-    const totalHeight = document.documentElement.scrollHeight;
-    const bottomPosition = totalHeight - viewportHeight;
-    
-    return scrollPosition >= bottomPosition ? 'Yes' : 'No';
-}
-";
-
-	static readonly string scrolledToTop = @"
-function ScrolledToTop() {
-if (window.pageYOffset === 0) {
-	return 'Yes';
-}
-}";
-
 	static string GenerateCSSFromString(string html, Settings settings)
 	{
 		if (string.IsNullOrWhiteSpace(html))
@@ -112,10 +47,16 @@ if (window.pageYOffset === 0) {
 	}
 	public static string InjectAllCss(string html, Book book, Settings settings)
 	{
+		if(string.IsNullOrEmpty(html))
+		{
+			System.Diagnostics.Debug.WriteLine("InjectAllCss: html is null or empty");
+			return string.Empty;
+		}
 		// Remove existing <style> tags
 		html = RemoveStyleTags(html);
 
 		var otherCss = book.Css[^1].Content ?? string.Empty;
+		otherCss += book.Css[0].Content ?? string.Empty;
 		string styleTag = GenerateCSSFromString(html, settings);
 
 		otherCss = FilterCss(otherCss, settings);
@@ -128,8 +69,6 @@ if (window.pageYOffset === 0) {
 			html = InjectCss(html, styleTag);
 		}
 
-		var js = scrollCheck + disableScroll + scrolledToTop + getCurrentPageFunction + disableScrollBars + scrollToPageFunction + getScrollPosition;
-		html = InjectJavascript(html, js);
 		foreach (var image in book.Images)
 		{
 			html = ReplaceImageUrls(html, image.FileName, image.ImageUrl);
@@ -170,18 +109,31 @@ if (window.pageYOffset === 0) {
     {
         // Define a timeout for the regex operations
         TimeSpan regexTimeout = TimeSpan.FromSeconds(2);
+		System.Diagnostics.Debug.WriteLine($"Replacing {sourcePattern} with {newImageSource}");
 
-        // Handle standard img tags
-        string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
-        htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
+		// Handle standard img tags
+		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+		
+		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
         {
             string originalTag = match.Value;
             return originalTag.Replace(match.Groups[1].Value, newImageSource);
         }, RegexOptions.None, regexTimeout);
 
-        // Handle SVG image tags
-        string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
-        htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
+		// Handle img tags with additional attributes
+		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
+
+		// Replace the src attribute value with the new image source
+		htmlContent = Regex.Replace(htmlContent, imgPattern2, match =>
+		{
+			string originalTag = match.Value;
+			return originalTag.Replace(match.Groups[1].Value, newImageSource);
+		}, RegexOptions.None);
+
+		// Handle SVG image tags
+		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+        
+		htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
         {
             string originalTag = match.Value;
             return originalTag.Replace(match.Groups[1].Value, newImageSource);

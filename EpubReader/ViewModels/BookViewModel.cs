@@ -12,74 +12,58 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Views;
+using MetroLog;
 
 namespace EpubReader.ViewModels;
 
 public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
-    public partial bool IsNavMenuVisible { get; set; } = true;
+	public partial bool IsNavMenuVisible { get; set; } = true;
 	[ObservableProperty]
 	public partial string Source { get; set; }
 	[ObservableProperty]
 	public partial Settings Settings { get; set; }
 
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookViewModel));
+
 	public async void ApplyQueryAttributes(IDictionary<string, object> query)
-    {
-        if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
-        {
+	{
+		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
+		{
 			Book = book;
-			Settings = await db.GetSettings(CancellationToken.None);
-			Source = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
-			if(OperatingSystem.IsAndroid())
+			Settings = await db.GetSettings(CancellationToken.None) ?? new Settings();
+			var result = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
+			if(!string.IsNullOrEmpty(result))
+			{
+				logger.Info("Setting source");
+				Source = result;
+			}
+			else
+			{
+				logger.Info("html is null or empty");
+			}
+			if (OperatingSystem.IsAndroid())
 			{
 				IsNavMenuVisible = false;
 			}
 		}
 		else
 		{
-			throw new InvalidOperationException("Book not found");
+			logger.Info("Book is null");
 		}
-	}
-
-    [RelayCommand]
-    static void ShowPopup()
-    {
-        SettingsPage popup = new();
-        Shell.Current.ShowPopup(popup);
-    }
-
-	[RelayCommand]
-	public void DoubleTapped()
-	{
-		HandleMenuCommand();
 	}
 
 	[RelayCommand]
-	void LongPress()
+	static void ShowPopup()
 	{
-		HandleMenuCommand();
+		SettingsPage popup = new();
+		Shell.Current.ShowPopup(popup);
 	}
 
-	void HandleMenuCommand()
+	[RelayCommand]
+	void Press()
 	{
-		if (IsNavMenuVisible)
-		{
-			System.Diagnostics.Debug.WriteLine("Long press");
-			IsNavMenuVisible = false;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, false);
-#if ANDROID
-			StatusBarExtensions.SetStatusBarsHidden(true);
-#endif
-		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("Long press");
-			IsNavMenuVisible = true;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-#if ANDROID
-			StatusBarExtensions.SetStatusBarsHidden(false);
-#endif
-		}
+		IsNavMenuVisible = !IsNavMenuVisible;
 	}
 }

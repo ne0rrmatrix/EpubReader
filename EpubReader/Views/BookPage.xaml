@@ -9,7 +9,11 @@
     xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
     x:DataType="viewModels:BookViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource Blue100Accent},
+                                      Dark={StaticResource AppBackgroundDarkColor}}"
     Loaded="CurrentPage_Loaded"
+    Shell.BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent},
+                                            Dark={StaticResource AppBackgroundDarkColor}}"
     Shell.NavBarIsVisible="{Binding IsNavMenuVisible}">
     <ContentPage.BindingContext>
         <viewModels:BookViewModel />
@@ -17,7 +21,7 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem
-            BindingContext="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}"
+            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
             Command="{Binding ShowPopupCommand}"
             IconImageSource="settings.png"
             Order="Primary" />
@@ -25,14 +29,10 @@
 
     <Grid BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
         <Grid.GestureRecognizers>
-            <OnPlatform x:TypeArguments="TapGestureRecognizer">
-                <On Platform="WinUI">
-                    <TapGestureRecognizer
-                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                        Command="{Binding DoubleTappedCommand}"
-                        NumberOfTapsRequired="2" />
-                </On>
-            </OnPlatform>
+            <TapGestureRecognizer
+                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                Command="{OnPlatform WinUI={Binding PressCommand}}"
+                NumberOfTapsRequired="2" />
         </Grid.GestureRecognizers>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -64,11 +64,11 @@
                 </OnPlatform>
             </WebView.GestureRecognizers>
             <WebView.Behaviors>
-                <OnPlatform x:TypeArguments="Behavior">
-                    <On Platform="Android">
-                        <toolkit:TouchBehavior BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" LongPressCommand="{Binding LongPressCommand}" />
-                    </On>
-                </OnPlatform>
+                <toolkit:TouchBehavior
+                    BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                    DisallowTouchThreshold="4000"
+                    LongPressCommand="{OnPlatform Android={Binding PressCommand}}"
+                    LongPressDuration="5000" />
             </WebView.Behaviors>
         </WebView>
         <StackLayout

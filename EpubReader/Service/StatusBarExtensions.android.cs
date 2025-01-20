@@ -22,10 +22,11 @@ public static class StatusBarExtensions
 				window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
 				window.SetFlags(WindowManagerFlags.TranslucentStatus, WindowManagerFlags.TranslucentStatus);
 				window.SetFlags(WindowManagerFlags.TranslucentNavigation, WindowManagerFlags.TranslucentNavigation);
+				
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Hide(WindowInsets.Type.NavigationBars());
+					insets.Hide(WindowInsets.Type.SystemBars());
 				}
 			}
 			else
@@ -35,7 +36,7 @@ public static class StatusBarExtensions
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Show(WindowInsets.Type.NavigationBars());
+					insets.Show(WindowInsets.Type.SystemBars());
 				}
 			}
 		}

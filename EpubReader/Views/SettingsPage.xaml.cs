@@ -2,6 +2,7 @@ using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
+using MetroLog;
 
 namespace EpubReader.Views;
 
@@ -12,22 +13,31 @@ public partial class SettingsPage : Popup, IDisposable
 	readonly Task loadTask;
 	bool disposedValue;
 	IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	public SettingsPage()
-    {
+	{
         InitializeComponent();
-        BindingContext = this;
+		BindingContext = this;
 		cancellationTokenSource = new CancellationTokenSource();
 		loadTask = LoadSettings(cancellationTokenSource.Token);
 		if (loadTask.IsFaulted)
 		{
-			System.Diagnostics.Trace.TraceInformation("Error loading settings");
+			logger.Info("Error loading settings");
 		}
 	}
 	async Task LoadSettings(CancellationToken cancellationToken = default)
 	{
 		var settings = await db.GetSettings(cancellationToken);
-		Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+		if (Dispatcher.IsDispatchRequired)
+		{
+			Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+		}
+		else
+		{
+			SystemThemeSwitch.IsToggled = settings.IsSystemMode;
+		}
 	}
+
 	async void OnApplyColorChanged(object sender, EventArgs e)
     {
 		string backgroundColorArgb;
@@ -119,7 +129,7 @@ public partial class SettingsPage : Popup, IDisposable
 
         var font = $"'{selectedTheme}'";
 		settings.FontFamily = font;
-		System.Diagnostics.Trace.TraceInformation($"Font: {font}");
+		logger.Info($"Chaging Font to: {font}");
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
@@ -145,6 +155,7 @@ public partial class SettingsPage : Popup, IDisposable
 			settings.TextColor = "#2B2B2B";
 		}
 		await db.SaveSettings(settings);
+		logger.Info("System theme changed");
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 	protected virtual void Dispose(bool disposing)
@@ -167,11 +178,12 @@ public partial class SettingsPage : Popup, IDisposable
 		GC.SuppressFinalize(this);
 	}
 
-	async void Button_Clicked(object sender, EventArgs e)
+	async void RemoveAllSettings(object sender, EventArgs e)
 	{
 		await db.RemoveAllSettings(CancellationToken.None);
 		var settings = new Models.Settings();
 		await db.SaveSettings(settings, CancellationToken.None);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		logger.Info("Settings removed");
 	}
 }
