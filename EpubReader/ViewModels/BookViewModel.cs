@@ -16,7 +16,7 @@ using MetroLog;
 
 namespace EpubReader.ViewModels;
 
-public partial class BookViewModel() : BaseViewModel, IQueryAttributable
+public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; } = true;
@@ -27,6 +27,16 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookViewModel));
 
+	public BookViewModel()
+	{
+		Settings = new();
+		Source = string.Empty;
+#if ANDROID
+		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
+#endif
+		IsNavMenuVisible = !IsNavMenuVisible;
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+	}
 	public async void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
@@ -42,10 +52,6 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 			else
 			{
 				logger.Info("html is null or empty");
-			}
-			if (OperatingSystem.IsAndroid())
-			{
-				IsNavMenuVisible = false;
 			}
 		}
 		else
@@ -64,6 +70,10 @@ public partial class BookViewModel() : BaseViewModel, IQueryAttributable
 	[RelayCommand]
 	void Press()
 	{
+#if ANDROID
+		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
+#endif
 		IsNavMenuVisible = !IsNavMenuVisible;
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
 	}
 }

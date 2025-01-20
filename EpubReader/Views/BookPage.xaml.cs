@@ -33,15 +33,12 @@ public partial class BookPage : ContentPage
 		settings = ((BookViewModel)BindingContext).Settings;
 	
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		logger.Info("Toolbar created");
-
 		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 		if (!OperatingSystem.IsAndroid())
 		{
 			EpubText.Navigated += OnEpubText_Navigated;
 		}
-		
 	}
 
 	async void OnSettingsClicked()

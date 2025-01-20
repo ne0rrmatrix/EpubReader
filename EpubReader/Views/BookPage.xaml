@@ -13,8 +13,7 @@
                                       Dark={StaticResource AppBackgroundDarkColor}}"
     Loaded="CurrentPage_Loaded"
     Shell.BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent},
-                                            Dark={StaticResource AppBackgroundDarkColor}}"
-    Shell.NavBarIsVisible="{Binding IsNavMenuVisible}">
+                                            Dark={StaticResource AppBackgroundDarkColor}}">
     <ContentPage.BindingContext>
         <viewModels:BookViewModel />
     </ContentPage.BindingContext>

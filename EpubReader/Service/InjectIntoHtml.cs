@@ -109,7 +109,6 @@ public static partial class InjectIntoHtml
     {
         // Define a timeout for the regex operations
         TimeSpan regexTimeout = TimeSpan.FromSeconds(2);
-		System.Diagnostics.Debug.WriteLine($"Replacing {sourcePattern} with {newImageSource}");
 
 		// Handle standard img tags
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
@@ -128,7 +127,7 @@ public static partial class InjectIntoHtml
 		{
 			string originalTag = match.Value;
 			return originalTag.Replace(match.Groups[1].Value, newImageSource);
-		}, RegexOptions.None);
+		}, RegexOptions.None, regexTimeout);
 
 		// Handle SVG image tags
 		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
@@ -141,19 +140,4 @@ public static partial class InjectIntoHtml
 
         return htmlContent;
     }
-
-	static string InjectJavascript(string html, string javascript)
-	{
-		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
-		if (headEndTagIndex >= 0)
-		{
-			html = html.Insert(headEndTagIndex, $@"<script>{javascript}</script>");
-		}
-		else
-		{
-			// If no <head> tag is found, prepend the style to the HTML
-			html = $"<script>{javascript}</script>" + html;
-		}
-		return html;
-	}
 }

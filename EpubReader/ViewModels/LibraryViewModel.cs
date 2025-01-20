@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Core.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
@@ -24,6 +25,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
    
 	public LibraryViewModel()
     {
+		StatusBar.SetColor(Color.FromArgb("#3E8EED"));
 		cancellationtokensource = new CancellationTokenSource();
 		loadTask = LoadBooks(cancellationtokensource.Token);
 		
@@ -160,19 +162,14 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 	public async Task<Book?> GetBook(string fileName, CancellationToken cancellationToken = default)
 	{
 		var bookData = await db.GetBook(fileName, cancellationToken);
-		if (bookData is null)
-		{
-			logger.Info("Book is null");
-			return null;
-		}
 		var book = EbookService.OpenEbook(fileName);
 		if (book is null)
 		{
 			logger.Info("Book is null");
 			return null;
 		}
-		book.CurrentChapter = bookData?.CurrentChapter ?? 0;
-		book.CurrentPage = bookData?.CurrentPage ?? 0;
+		book.CurrentChapter = bookData.CurrentChapter;
+		book.CurrentPage = bookData.CurrentPage;
 		return book;
 	}
 

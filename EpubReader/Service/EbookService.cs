@@ -9,6 +9,9 @@ namespace EpubReader.Service;
 public partial class EbookService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
+	static string jpg => "image/jpeg";
+	static string png => "image/png";
+	static string gif => "image/gif";
     protected EbookService()
     {
     }
@@ -33,39 +36,35 @@ public partial class EbookService
 			return null;
 		}
 
-		var format = book.Format;
 		string mimeType = string.Empty;
 		string coverImage = string.Empty;
 		var toc = book.TableOfContents.ToList();
         var html = book.Resources.Html.ToList();
 		var imageList = book.Resources.Images.ToList();
-		
-		var image = format.Opf.Manifest.Items?.Where(x => x.MediaType == "image/jpeg")?.FirstOrDefault()?.Href ?? string.Empty;
-		var coverImageBytes = imageList.Find(x => x.Href == image)?.Content ?? [];
-		
-		chapters.AddRange(toc.Select(item => new Chapter 
-		{ 
-			Title = item.Title, 
-			HtmlFile = html.Find(x => x.AbsolutePath == item.AbsolutePath)?.TextContent ?? string.Empty, 
-			FileName = Path.GetFileName(item.RelativePath) ?? string.Empty
+		var imageItem = imageList.MaxBy(x => x.Content.Length);
+
+		chapters.AddRange(html.Select(item => new Chapter
+		{
+			Title = toc.Find(x => x.AbsolutePath == item.AbsolutePath)?.Title ?? string.Empty,
+			HtmlFile = item.TextContent,
+			FileName = item.FileName ?? string.Empty
 		}));
 		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
 		images.AddRange(imageList.Select(item => GetImage(item.Content, item.Href)));
 		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
 		
-		if (book.CoverImage is null && coverImageBytes.Length > 0)
+		if (book.CoverImage is null && imageItem?.Content.Length > 0)
 		{
 			logger.Info("Found alternative cover image.");
-			coverImage = BytesToWebSafeString(coverImageBytes);
-			var result = image.Replace("image/", string.Empty);
-			mimeType = GetMimeType(result);
+			coverImage = BytesToWebSafeString(imageItem.Content);
+			mimeType = imageItem.MimeType;
 		}
-		if (coverImageBytes.Length == 0 && book.CoverImage is null)
+		if (imageItem?.Content.Length == 0 && book.CoverImage is null)
 		{
 			logger.Info("Cover image is null. Generating one.");
-			coverImageBytes = BitmapImageCover(book.Title);
+			var coverImageBytes = BitmapImageCover(book.Title);
 			coverImage = BytesToWebSafeString(coverImageBytes);
-			mimeType = "image/png";
+			mimeType = png;
 		}
 		
 		Book books = new()
@@ -73,7 +72,7 @@ public partial class EbookService
             Title = book.Title.Trim(),
             Authors = authors,
             FilePath = path,
-            CoverImage = book.CoverImage ?? coverImageBytes ?? [],
+            CoverImage = book.CoverImage ?? imageItem?.Content ?? [],
 			CoverUrl = $"data:{mimeType};charset=utf-8;base64, {coverImage}",
 			Chapters = [.. chapters],
 			Images = [.. images],
@@ -134,11 +133,11 @@ public partial class EbookService
 		var fileExtension = Path.GetExtension(fileName);
 		return fileExtension switch
 		{
-			".jpg" => "image/jpeg",
-			".jpeg" => "image/jpeg",
-			".png" => "image/png",
-			".gif" => "image/gif",
-			_ => "image/jpeg"
+			".jpg" => jpg,
+			".jpeg" => jpg,
+			".png" => png,
+			".gif" => gif,
+			_ => jpg
 		};
 	}
 	public static string BytesToWebSafeString(byte[] data)
