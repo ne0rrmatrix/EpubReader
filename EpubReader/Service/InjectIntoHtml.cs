@@ -5,6 +5,15 @@ namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
+	static readonly string disableTouchCSS = @"
+		* {
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}";
 	static string GenerateCSSFromString(string html, Settings settings)
 	{
 		if (string.IsNullOrWhiteSpace(html))
@@ -57,6 +66,7 @@ public static partial class InjectIntoHtml
 
 		var otherCss = book.Css[^1].Content ?? string.Empty;
 		otherCss += book.Css[0].Content ?? string.Empty;
+		otherCss += disableTouchCSS;
 		string styleTag = GenerateCSSFromString(html, settings);
 
 		otherCss = FilterCss(otherCss, settings);

@@ -65,9 +65,9 @@
             <WebView.Behaviors>
                 <toolkit:TouchBehavior
                     BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                    DisallowTouchThreshold="4000"
+                    DisallowTouchThreshold="2000"
                     LongPressCommand="{OnPlatform Android={Binding PressCommand}}"
-                    LongPressDuration="5000" />
+                    LongPressDuration="500" />
             </WebView.Behaviors>
         </WebView>
         <StackLayout
