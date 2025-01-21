@@ -23,7 +23,7 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
-            IconImageSource="add_circle.png"
+            IconImageSource="add.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
 

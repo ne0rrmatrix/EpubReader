@@ -30,24 +30,23 @@ public static class StatusBarExtensions
 				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
-				window.SetFlags(WindowManagerFlags.LayoutNoLimits, WindowManagerFlags.LayoutNoLimits);
-				window.SetFlags(WindowManagerFlags.TranslucentStatus, WindowManagerFlags.TranslucentStatus);
-				window.SetFlags(WindowManagerFlags.TranslucentNavigation, WindowManagerFlags.TranslucentNavigation);
-				
+				window.AddFlags(WindowManagerFlags.Fullscreen);
+				window.SetFlags(WindowManagerFlags.Fullscreen, WindowManagerFlags.Fullscreen);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Hide(WindowInsets.Type.NavigationBars());
+					insets.Hide(WindowInsets.Type.SystemBars());
 				}
 			}
 			else
 			{
 				SetStatusBarTransparent();
+				window.ClearFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Show(WindowInsets.Type.NavigationBars());
+					insets.Show(WindowInsets.Type.SystemBars());
 				}
 			}
 		}
