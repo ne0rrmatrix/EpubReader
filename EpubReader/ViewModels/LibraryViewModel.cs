@@ -43,14 +43,12 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		{
 			Books.Clear();
 		}
-		var fileData = await db.GetAllFileData(cancellationToken) ?? [];
-		foreach (var item in fileData)
+		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
+		foreach (var item in bookData)
 		{
-			var savedBook = await GetBook(item.FileName, cancellationToken);
-			if (savedBook is not null)
-			{
-				Books.Add(savedBook);
-			}
+			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
+			ebook.CurrentChapter = item.CurrentChapter;
+			Books.Add(ebook);
 		}
     }
 
@@ -92,8 +90,8 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("No file selected");
 			return;
 		}
-		var currentFileData = await db.GetAllFileData(cancellationToken);
-		var exists = currentFileData?.Any(x => x.FileName == FileService.GetFileName(result.FileName)) ?? false;
+		var bookData = await db.GetAllBooks(cancellationToken);
+		var exists = bookData.Any(x => x.FilePath == result.FileName);
 		if (exists)
 		{
 			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
@@ -109,13 +107,9 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("Error opening ebook");
 			return;
 		}
-		FileData fileData = new()
-		{
-			Title = ebook.Title,
-			FileName = filePath,
-		};
+		
+		ebook.FilePath = filePath;
 		await db.SaveBookData(ebook, cancellationToken);
-		await db.SaveFileData(fileData, cancellationToken);
 		Books.Add(ebook);
 		return;
 	}
@@ -148,15 +142,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
             FileService.DeleteFile(book.FilePath);
 			await db.RemoveBook(book, cancellationToken);
 			Books.Remove(book);
-			var fileData = await db.GetAllFileData(cancellationToken);
-			var item = fileData.FirstOrDefault(x => x.FileName == book.FilePath);
-			if (item is null)
-			{
-				logger.Info("File data is null");
-				return;
-			}
-			await db.RemoveFileData(item, cancellationToken);
-			
             logger.Info("Book removed from library.");
             OnPropertyChanged(nameof(Books));
         }

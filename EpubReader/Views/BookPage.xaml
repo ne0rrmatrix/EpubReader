@@ -26,7 +26,7 @@
             Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <Grid BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
+    <Grid x:Name="Grid">
         <Grid.GestureRecognizers>
             <TapGestureRecognizer
                 BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
@@ -39,6 +39,7 @@
         </Grid.RowDefinitions>
         <WebView
             x:Name="EpubText"
+            Margin="10,10,10,10"
             Grid.Row="0"
             HorizontalOptions="FillAndExpand"
             Scale="1"
@@ -73,8 +74,6 @@
         <StackLayout
             Grid.Row="1"
             Padding="10,10,10,10"
-            BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
-                                              Dark={StaticResource AppBackgroundDarkColor}}"
             HorizontalOptions="Center"
             IsVisible="{OnPlatform WinUI=true,
                                    Android={Binding IsNavMenuVisible}}"

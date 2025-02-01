@@ -86,13 +86,13 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
-	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 2000)]
+	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
 
-	[GeneratedRegex("font-size:\\s*\\d+px\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 2000)]
+	[GeneratedRegex("font-size:\\s*\\d+px\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex FontSizeRegex();
 
-	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 2000)]
+	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex FontFamilyRegex();
 
 	static string RemoveStyleTags(string html)
@@ -118,7 +118,7 @@ public static partial class InjectIntoHtml
     static string ReplaceImageUrls(string htmlContent, string sourcePattern, string newImageSource)
     {
         // Define a timeout for the regex operations
-        TimeSpan regexTimeout = TimeSpan.FromSeconds(2);
+        TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
 
 		// Handle standard img tags
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";

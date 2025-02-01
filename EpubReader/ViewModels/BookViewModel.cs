@@ -21,7 +21,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; } = true;
 	[ObservableProperty]
-	public partial string Source { get; set; }
+	public partial string Source { get; set; } = string.Empty;
 	[ObservableProperty]
 	public partial Settings Settings { get; set; }
 

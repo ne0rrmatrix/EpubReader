@@ -29,8 +29,6 @@ public partial class Db : IDb
         }
         db = new SQLiteAsyncConnection(DbPath, Flags);
         logger.Info("Database created");
-        await db.CreateTableAsync<FileData>().WaitAsync(cancellationToken);
-		logger.Info("FileData Table created");
 		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 		logger.Info("Settings Table created");
 		await db.CreateTableAsync<Book>().WaitAsync(cancellationToken);
@@ -69,28 +67,7 @@ public partial class Db : IDb
 		}
 		return await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == title).WaitAsync(cancellationToken) ?? new Book();
 	}
-
-	public async Task<FileData> GetFileData(CancellationToken cancellationToken = default)
-    {
-        await Init(cancellationToken);
-		if (db is null)
-        {
-            logger.Error("DB is null");
-            return new FileData();
-        }
-		return await db.Table<FileData>().FirstOrDefaultAsync().WaitAsync(cancellationToken) ?? new FileData();
-	}
-
-	public async Task<List<FileData>> GetAllFileData(CancellationToken cancellationToken = default)
-	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			logger.Error("DB is null");
-			return [];
-		}
-		return await db.Table<FileData>().ToListAsync().WaitAsync(cancellationToken) ?? [];
-	}
+	
 	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
 	{
 		await Init(cancellationToken);
@@ -99,8 +76,18 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
-		logger.Info("Inserting settings");
-		await db.InsertOrReplaceAsync(settings).WaitAsync(cancellationToken);
+		var item = await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
+		if (settings.Id == 0 && item is null)
+		{
+			logger.Info("Inserting settings");
+			await db.InsertAsync(settings).WaitAsync(cancellationToken);
+			return;
+		}
+		else
+		{
+			logger.Info("Updating settings");
+			await db.UpdateAsync(settings).WaitAsync(cancellationToken);
+		}
 	}
 
 	public async Task SaveBookData(Book book, CancellationToken cancellationToken = default)
@@ -112,52 +99,19 @@ public partial class Db : IDb
 			return;
 		}
 		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
-		if (item is not null)
+		if (book.Id == 0 && item is null)
+		{
+			logger.Info("Inserting book");
+			await db.InsertAsync(book).WaitAsync(cancellationToken);
+			return;
+		}
+		else
 		{
 			logger.Info("Updating book");
-			await db.InsertOrReplaceAsync(book).WaitAsync(cancellationToken);
-			return;
+			await db.UpdateAsync(book).WaitAsync(cancellationToken);
 		}
-		await db.InsertAsync(book).WaitAsync(cancellationToken);
-		logger.Info("Inserting book");
 	}
 
-	public async Task SaveFileData(FileData fileData, CancellationToken cancellationToken = default)
-    {
-        await Init(cancellationToken);
-		if (db is null)
-        {
-            logger.Error("DB is null");
-            return;
-        }
-		var item = await db.Table<FileData>().FirstOrDefaultAsync(x => x.Title == fileData.Title).WaitAsync(cancellationToken);
-		if (item is not null)
-		{
-			logger.Info("Updating fileData");
-			await db.InsertOrReplaceAsync(fileData).WaitAsync(cancellationToken);
-			return;
-		}
-		await db.InsertAsync(fileData).WaitAsync(cancellationToken);
-		logger.Info("Inserting fileData");
-	}
-
-	public async Task RemoveFileData(FileData fileData, CancellationToken cancellationToken = default)
-	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			logger.Error("DB is null");
-			return;
-		}
-		
-		var item = await db.Table<FileData>().FirstOrDefaultAsync(x => x.Title == fileData.Title).WaitAsync(cancellationToken);
-		if (item is null)
-		{
-			logger.Error("FileData is null");
-			return;
-		}
-		await db.DeleteAsync(item).WaitAsync(cancellationToken);
-	}
 	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)
 	{
 		await Init(cancellationToken);
