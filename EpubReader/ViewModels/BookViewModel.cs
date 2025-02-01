@@ -75,5 +75,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 #endif
 		IsNavMenuVisible = !IsNavMenuVisible;
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, Color.FromArgb(Settings.BackgroundColor));
 	}
 }

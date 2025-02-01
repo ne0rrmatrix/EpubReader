@@ -31,8 +31,27 @@ public partial class BookPage : ContentPage
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = ((BookViewModel)BindingContext).Settings;
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
+			{
+				settings.BackgroundColor = "#FFFBF5";
+				settings.TextColor = "#000000";
+			}
+			else
+			{
+				settings.BackgroundColor = "#121212";
+				settings.TextColor = "#FFFFFF";
+			}
+		}
 		Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		OnPropertyChanged(nameof(Grid));
+		StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+		PageLabel.TextColor = Color.FromArgb(settings.TextColor);
+		PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+		var color = Color.FromRgba(settings.BackgroundColor);
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
+		CurrentPage.BackgroundColor = color;
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
@@ -45,16 +64,36 @@ public partial class BookPage : ContentPage
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-		Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		OnPropertyChanged(nameof(Grid));
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		if(Dispatcher.IsDispatchRequired)
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
+			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
+			{
+				settings.BackgroundColor = "#FFFBF5";
+				settings.TextColor = "#000000";
+			}
+			else
+			{
+				settings.BackgroundColor = "#121212";
+				settings.TextColor = "#FFFFFF";
+			}
+		}
+		Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+		StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+		PageLabel.TextColor = Color.FromArgb(settings.TextColor);
+		PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+
+		var color = Color.FromRgba(settings.BackgroundColor);
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
+		CurrentPage.BackgroundColor = color;
+		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		if (Dispatcher.IsDispatchRequired)
+		{
+			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
 		}
 		else
 		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
+			EpubText.Source = new HtmlWebViewSource { Html = html }; 
 		}
 	}
 
@@ -76,6 +115,7 @@ public partial class BookPage : ContentPage
 				{
 					EpubText.Source = new HtmlWebViewSource { Html = html };
 				}
+				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 			})
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
@@ -115,9 +155,10 @@ public partial class BookPage : ContentPage
 		book.CurrentChapter--;
 		await db.SaveBookData(book, CancellationToken.None);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		if (Dispatcher.IsDispatchRequired)
 		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; });
+			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
 		}
 		else
 		{
@@ -146,9 +187,10 @@ public partial class BookPage : ContentPage
 		book.CurrentChapter++;
 		await db.SaveBookData(book, CancellationToken.None);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		if (Dispatcher.IsDispatchRequired)
 		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; });
+			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
 		}
 		else
 		{

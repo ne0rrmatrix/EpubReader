@@ -9,16 +9,12 @@
     xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
     x:DataType="viewModels:BookViewModel"
-    BackgroundColor="{AppThemeBinding Light={StaticResource Blue100Accent},
-                                      Dark={StaticResource AppBackgroundDarkColor}}"
-    Loaded="CurrentPage_Loaded"
-    Shell.BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent},
-                                            Dark={StaticResource AppBackgroundDarkColor}}">
+    Loaded="CurrentPage_Loaded">
     <ContentPage.BindingContext>
         <viewModels:BookViewModel />
     </ContentPage.BindingContext>
-
-    <ContentPage.ToolbarItems>
+    
+        <ContentPage.ToolbarItems>
         <ToolbarItem
             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
             Command="{Binding ShowPopupCommand}"
@@ -26,7 +22,9 @@
             Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <Grid x:Name="Grid">
+    <Grid   BackgroundColor="{AppThemeBinding Light={StaticResource Blue100Accent},
+                                    Dark={StaticResource AppBackgroundDarkColor}}"
+            x:Name="Grid">
         <Grid.GestureRecognizers>
             <TapGestureRecognizer
                 BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
@@ -73,6 +71,7 @@
         </WebView>
         <StackLayout
             Grid.Row="1"
+            x:Name="StackLayout"
             Padding="10,10,10,10"
             HorizontalOptions="Center"
             IsVisible="{OnPlatform WinUI=true,
@@ -80,7 +79,6 @@
             Orientation="Horizontal"
             Spacing="50">
             <ImageButton
-                BackgroundColor="Transparent"
                 Clicked="PreviousPage"
                 IsEnabled="{OnPlatform WinUI=true,
                                        Default=false}"
@@ -93,7 +91,6 @@
                 FontSize="20"
                 HorizontalOptions="Center" />
             <ImageButton
-                BackgroundColor="Transparent"
                 Clicked="NextPage"
                 IsEnabled="{OnPlatform WinUI=true,
                                        Default=false}"
