@@ -27,8 +27,10 @@ public partial class Db : IDb
         {
             Directory.CreateDirectory(Service.FileService.SaveDirectory);
         }
+
         db = new SQLiteAsyncConnection(DbPath, Flags);
-        logger.Info("Database created");
+        
+		logger.Info("Database created");
 		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 		logger.Info("Settings Table created");
 		await db.CreateTableAsync<Book>().WaitAsync(cancellationToken);
@@ -43,6 +45,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return new Settings();
 		}
+
 		return await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken) ?? new Settings();
 	}
 
@@ -54,6 +57,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return [];
 		}
+
 		return await db.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
 	}
 
@@ -65,6 +69,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return new Book();
 		}
+
 		return await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == title).WaitAsync(cancellationToken) ?? new Book();
 	}
 	
@@ -76,6 +81,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
+
 		var item = await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
 		if (item is null)
 		{
@@ -83,11 +89,9 @@ public partial class Db : IDb
 			await db.InsertAsync(settings).WaitAsync(cancellationToken);
 			return;
 		}
-		else
-		{
-			logger.Info("Updating settings");
-			await db.UpdateAsync(settings).WaitAsync(cancellationToken);
-		}
+
+		logger.Info("Updating settings");
+		await db.UpdateAsync(settings).WaitAsync(cancellationToken);
 	}
 
 	public async Task SaveBookData(Book book, CancellationToken cancellationToken = default)
@@ -98,6 +102,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
+
 		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
 		if (item is null)
 		{
@@ -105,11 +110,9 @@ public partial class Db : IDb
 			await db.InsertAsync(book).WaitAsync(cancellationToken);
 			return;
 		}
-		else
-		{
-			logger.Info("Updating book");
-			await db.UpdateAsync(book).WaitAsync(cancellationToken);
-		}
+
+		logger.Info("Updating book");
+		await db.UpdateAsync(book).WaitAsync(cancellationToken);
 	}
 
 	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)
@@ -120,6 +123,7 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
+
 		logger.Info("Removing all settings");
 		await db.DeleteAllAsync<Settings>().WaitAsync(cancellationToken);
 	}
@@ -132,12 +136,15 @@ public partial class Db : IDb
             logger.Error("DB is null");
             return;
         }
+
 		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
 		if (item is null)
 		{
-			logger.Error("FileData is null");
+			logger.Error("Book is null");
 			return;
 		}
+
+		logger.Info("Removing book");
 		await db.DeleteAsync(item).WaitAsync(cancellationToken);
 	}
 
@@ -149,6 +156,8 @@ public partial class Db : IDb
 			logger.Error("DB is null");
 			return;
 		}
+
+		logger.Info("Removing all books");
 		await db.DeleteAllAsync<Book>().WaitAsync(cancellationToken);
 	}
 }

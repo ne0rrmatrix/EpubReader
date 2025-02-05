@@ -19,9 +19,9 @@ namespace EpubReader.ViewModels;
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
-	public partial bool IsNavMenuVisible { get; set; } = true;
+	public partial bool IsNavMenuVisible { get; set; }
 	[ObservableProperty]
-	public partial string Source { get; set; } = string.Empty;
+	public partial string Source { get; set; }
 	[ObservableProperty]
 	public partial Settings Settings { get; set; }
 
@@ -30,6 +30,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	public BookViewModel()
 	{
 		Settings = new();
+		IsNavMenuVisible = true;
 		Source = string.Empty;
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
@@ -48,16 +49,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			{
 				logger.Info("Setting source");
 				Source = result;
+				return;
 			}
-			else
-			{
-				logger.Info("html is null or empty");
-			}
+			logger.Info("html is null or empty");
+			return;
 		}
-		else
-		{
-			logger.Info("Book is null");
-		}
+		logger.Info("Book is null");
 	}
 
 	[RelayCommand]

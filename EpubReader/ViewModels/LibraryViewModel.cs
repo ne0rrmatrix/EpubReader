@@ -110,7 +110,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		ebook.FilePath = filePath;
 		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 		Books.Add(ebook);
-		return;
 	}
 
 	static async Task ShowSnackBar(string text, string actionButtonText, CancellationToken cancellationToken = default)
