@@ -42,7 +42,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
 			Book = book;
-			Settings = await db.GetSettings(CancellationToken.None) ?? new Settings();
+			Settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false) ?? new Settings();
 			var result = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
 			if(!string.IsNullOrEmpty(result))
 			{

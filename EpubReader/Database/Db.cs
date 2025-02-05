@@ -77,7 +77,7 @@ public partial class Db : IDb
 			return;
 		}
 		var item = await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
-		if (settings.Id == 0 && item is null)
+		if (item is null)
 		{
 			logger.Info("Inserting settings");
 			await db.InsertAsync(settings).WaitAsync(cancellationToken);
@@ -99,7 +99,7 @@ public partial class Db : IDb
 			return;
 		}
 		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
-		if (book.Id == 0 && item is null)
+		if (item is null)
 		{
 			logger.Info("Inserting book");
 			await db.InsertAsync(book).WaitAsync(cancellationToken);

@@ -10,17 +10,11 @@ public partial class BaseViewModel : ObservableObject
 	public readonly IDispatcher Dispatcher = Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 
-	Book book = new();
-	public Book Book
-	{
-		get => book;
-		set
-		{
-			SetProperty(ref book, value);
-		}
-	}
+	[ObservableProperty]
+	public partial Book Book { get; set; }
 
 	public BaseViewModel()
 	{
+		Book = new();
 	}
 }

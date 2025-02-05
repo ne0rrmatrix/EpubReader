@@ -31,27 +31,8 @@ public partial class BookPage : ContentPage
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = ((BookViewModel)BindingContext).Settings;
-		if (string.IsNullOrEmpty(settings.BackgroundColor))
-		{
-			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
-			{
-				settings.BackgroundColor = "#FFFBF5";
-				settings.TextColor = "#000000";
-			}
-			else
-			{
-				settings.BackgroundColor = "#121212";
-				settings.TextColor = "#FFFFFF";
-			}
-		}
-		Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		PageLabel.TextColor = Color.FromArgb(settings.TextColor);
-		PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		var color = Color.FromRgba(settings.BackgroundColor);
-		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
-		CurrentPage.BackgroundColor = color;
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		SetColors();
+		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}");
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
@@ -61,40 +42,14 @@ public partial class BookPage : ContentPage
 		}
 	}
 
+	
 	async void OnSettingsClicked()
 	{
-		settings = await db.GetSettings(CancellationToken.None);
-		if (string.IsNullOrEmpty(settings.BackgroundColor))
-		{
-			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
-			{
-				settings.BackgroundColor = "#FFFBF5";
-				settings.TextColor = "#000000";
-			}
-			else
-			{
-				settings.BackgroundColor = "#121212";
-				settings.TextColor = "#FFFFFF";
-			}
-		}
-		Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		PageLabel.TextColor = Color.FromArgb(settings.TextColor);
-		PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-
-		var color = Color.FromRgba(settings.BackgroundColor);
-		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
-		CurrentPage.BackgroundColor = color;
+		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
+		SetColors();
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		if (Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html }; 
-		}
+		Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -107,15 +62,11 @@ public partial class BookPage : ContentPage
 			Command = new Command(() =>
 			{
 				var html = InjectIntoHtml.InjectAllCss(chapter.HtmlFile, book, settings);
-				if(Dispatcher.IsDispatchRequired)
-				{
-					Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-				}
-				else
-				{
-					EpubText.Source = new HtmlWebViewSource { Html = html };
-				}
-				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+				Dispatcher.Dispatch(() => 
+				{ 
+					EpubText.Source = new HtmlWebViewSource { Html = html }; 
+					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+				});
 			})
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
@@ -125,9 +76,9 @@ public partial class BookPage : ContentPage
     {
         base.OnNavigatedFrom(args);
         EpubText.Navigating -= EpubText_Navigating;
-        WeakReferenceMessenger.Default.UnregisterAll(this);
-        EpubText.Navigated -= OnEpubText_Navigated;
+		EpubText.Navigated -= OnEpubText_Navigated;
 
+		WeakReferenceMessenger.Default.UnregisterAll(this);
         Shell.Current.ToolbarItems.Clear();
         Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
     }
@@ -153,17 +104,14 @@ public partial class BookPage : ContentPage
 			return;
 		}
 		book.CurrentChapter--;
-		await db.SaveBookData(book, CancellationToken.None);
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		if (Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-		}
+
+		Dispatcher.Dispatch(() => 
+		{ 
+			EpubText.Source = new HtmlWebViewSource { Html = html }; 
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+		});
 	}
 	
 	async void PreviousPage(object sender, EventArgs e)
@@ -185,17 +133,13 @@ public partial class BookPage : ContentPage
 			return;
 		}
 		book.CurrentChapter++;
-		await db.SaveBookData(book, CancellationToken.None);
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		if (Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-		}
+		Dispatcher.Dispatch(() => 
+		{ 
+			EpubText.Source = new HtmlWebViewSource { Html = html }; 
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+		});
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
@@ -208,5 +152,33 @@ public partial class BookPage : ContentPage
 		{
 			await PreviousPage();
 		}
+	}
+
+	void SetColors()
+	{
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
+			{
+				settings.BackgroundColor = "#FFFBF5";
+				settings.TextColor = "#000000";
+			}
+			else
+			{
+				settings.BackgroundColor = "#121212";
+				settings.TextColor = "#FFFFFF";
+			}
+		}
+
+		Dispatcher.Dispatch(() =>
+		{
+			Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+			StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+			PageLabel.TextColor = Color.FromArgb(settings.TextColor);
+			PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+			var color = Color.FromRgba(settings.BackgroundColor);
+			Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
+			CurrentPage.BackgroundColor = color;
+		});
 	}
 }
