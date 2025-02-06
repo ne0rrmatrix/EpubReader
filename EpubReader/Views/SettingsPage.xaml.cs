@@ -4,7 +4,6 @@ using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Service;
 using MetroLog;
-using Microsoft.Maui.Graphics.Text;
 using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
