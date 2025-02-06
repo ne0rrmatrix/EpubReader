@@ -124,22 +124,25 @@ public partial class BookPage : ContentPage
 
 	async Task PreviousPage()
 	{
-		if (book.CurrentChapter <= 0)
+		string isFirst = await EpubText.EvaluateJavaScriptAsync("isFirstPage()");
+		if (isFirst == "Yes" && book.CurrentChapter > 0)
 		{
-			logger.Info("Start of book");
-			return;
-		}
-		Dispatcher.Dispatch(() => Shimmer.IsActive = true);
-		book.CurrentChapter--;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+			Dispatcher.Dispatch(() => Shimmer.IsActive = true);
+			book.CurrentChapter--;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 
-		Dispatcher.Dispatch(() =>
+			Dispatcher.Dispatch(() =>
+			{
+				EpubText.Source = new HtmlWebViewSource { Html = html };
+				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+				Shimmer.IsActive = false;
+			});
+		}
+		else
 		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-			Shimmer.IsActive = false;
-		});
+			await EpubText.EvaluateJavaScriptAsync("previousPage()");
+		}
 	}
 
 	async void PreviousPage(object sender, EventArgs e)
@@ -160,16 +163,26 @@ public partial class BookPage : ContentPage
 			logger.Info("End of book");
 			return;
 		}
-		Dispatcher.Dispatch(() => Shimmer.IsActive = true);
-		book.CurrentChapter++;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		Dispatcher.Dispatch(() =>
+		string isLast = await EpubText.EvaluateJavaScriptAsync("isLastPage()");
+
+		// Now you can use isFirst and isLast (which will be strings "Yes" or "No")
+		if (isLast == "Yes")
 		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-			Shimmer.IsActive = false;
-		});
+			Dispatcher.Dispatch(() => Shimmer.IsActive = true);
+			book.CurrentChapter++;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+			Dispatcher.Dispatch(() =>
+			{
+				EpubText.Source = new HtmlWebViewSource { Html = html };
+				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+				Shimmer.IsActive = false;
+			});
+		}
+		else
+		{
+			await EpubText.EvaluateJavaScriptAsync("nextPage()");
+		}
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
