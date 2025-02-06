@@ -187,43 +187,30 @@ public partial class BookPage : ContentPage
 	void UpdateTheme()
 	{
 		ArgumentNullException.ThrowIfNull(Application.Current);
-		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries;
-		if (mergedDictionaries != null)
+		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries ?? throw new InvalidOperationException();
+		var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault() ?? throw new InvalidOperationException();
+		(Color? background, Color? text, Color? navigationColor) = (null, null, null);
+		switch (Application.Current?.RequestedTheme)
 		{
-			var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault();
-			if (theme != null)
-			{
-				if (Application.Current?.RequestedTheme == AppTheme.Dark)
-				{
-					(Color? background, Color? text, Color? navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
-					if(background is null || text is null || navigationColor is null)
-					{
-						return;
-					}
-					Grid.BackgroundColor = background;
-					StackLayout.BackgroundColor = navigationColor;
-					PageLabel.BackgroundColor = background;
-					PageLabel.TextColor = text;
-					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
-					CurrentPage.BackgroundColor = navigationColor;
-					theme.VisualTheme = SfVisuals.MaterialLight;
-				}
-				else
-				{
-					(Color? background, Color? text, Color? navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
-					if (background is null || text is null || navigationColor is null)
-					{
-						return;
-					}
-					Grid.BackgroundColor = background;
-					StackLayout.BackgroundColor = navigationColor;
-					PageLabel.BackgroundColor = background;
-					PageLabel.TextColor = text;
-					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
-					CurrentPage.BackgroundColor = navigationColor;
-					theme.VisualTheme = SfVisuals.MaterialLight;
-				}
-			}
+			case AppTheme.Dark:
+				(background, text, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
+			case AppTheme.Light:
+				(background, text, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
 		}
+		if (background is null || text is null || navigationColor is null)
+		{
+			return;
+		}
+		Grid.BackgroundColor = background;
+		StackLayout.BackgroundColor = navigationColor;
+		PageLabel.BackgroundColor = background;
+		PageLabel.TextColor = text;
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
+		CurrentPage.BackgroundColor = navigationColor;
+		
 	}
 }

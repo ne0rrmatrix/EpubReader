@@ -2,21 +2,23 @@
 
 static class CustomColors
 {
+	const string defaultBlack = "#000000";
+	const string defaultWhite = "#ffffff";
 	public const string DarkBackgroundColor = "#121212";
 	public const string DarkTextColor = "#E1E1E1";
 	public const string DarkNavigationBarColor = "#121212";
 	public const string SepiaBackgroundColor = "#f4ecd8";
 	public const string SepiaTextColor = "#5b4636";
 	public const string SepiaNavigationBarColor = "#E1E1E1";
-	public const string NightModeBackgroundColor = "#000000";
-	public const string NightModeTextColor = "#ffffff";
-	public const string NightModeNavigationBarColor = "#000000";
-	public const string DaylightBackgroundColor = "#ffffff";
-	public const string DaylightTextColor = "#000000";
-	public const string DaylightNavigationBarColor = "#ffffff";
-	public const string DefaultBackgroundColor = "#ffffff";
-	public const string DefaultTextColor = "#000000";
-	public const string DefaultNavigationBarColor = "#ffffff";
+	public const string NightModeBackgroundColor = defaultBlack;
+	public const string NightModeTextColor = defaultWhite;
+	public const string NightModeNavigationBarColor = defaultBlack;
+	public const string DaylightBackgroundColor = defaultWhite;
+	public const string DaylightTextColor = defaultBlack;
+	public const string DaylightNavigationBarColor = defaultWhite;
+	public const string DefaultBackgroundColor = defaultWhite;
+	public const string DefaultTextColor = defaultBlack;
+	public const string DefaultNavigationBarColor = defaultWhite;
 	public const string Forest = "#e0f2e9";
 	public const string ForestTextColor = "#2e4d38";
 	public const string ForestNavigationBarColor = "#e0f2e9";
@@ -24,13 +26,13 @@ static class CustomColors
 	public const string OceanTextColor = "#01579b";
 	public const string OceanNavigationBarColor = "#e0f7fa";
 	public const string Sand = "#f5deb3";
-	public const string SandTextColor = "#000000";
+	public const string SandTextColor = defaultBlack;
 	public const string SandNavigationBarColor = "#f5deb3";
 	public const string Charcoal = "#36454f";
 	public const string CharcoalTextColor = "#dcdcdc";
 	public const string CharcoalNavigationBarColor = "#36454f";
 	public const string Vintage = "#f5f5dc";
-	public const string VintageTextColor = "#000000";
+	public const string VintageTextColor = defaultBlack;
 	public const string VintageNavigationBarColor = "#f5f5dc";
 }
 public enum CustomColor

@@ -22,27 +22,21 @@ public partial class BaseViewModel : ObservableObject
 	static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(Application.Current);
-		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries;
-		if (mergedDictionaries != null)
+		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries ?? throw new InvalidOperationException();
+		var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault() ?? throw new InvalidOperationException();
+		(Color? _, Color? _, Color? navigationColor) = (null, null, null);
+		switch (Application.Current?.RequestedTheme)
 		{
-			var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault();
-			if (theme != null)
-			{
-				if (Application.Current?.RequestedTheme == AppTheme.Dark)
-				{
-					(_, _,var navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
-					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
-					theme.VisualTheme = SfVisuals.MaterialLight;
-				}
-				else
-				{
-					(_, _,var navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
-					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
-					theme.VisualTheme = SfVisuals.MaterialDark;
-				}
-			}
-
+			case AppTheme.Dark:
+				(_, _, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
+			case AppTheme.Light:
+				(_, _, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
 		}
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
 	}
 	~BaseViewModel()
 	{
