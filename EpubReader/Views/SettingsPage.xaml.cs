@@ -15,11 +15,27 @@ public partial class SettingsPage : Popup, IDisposable
 	readonly CancellationTokenSource cancellationTokenSource;
 	readonly Task loadTask;
 	bool disposedValue;
+	readonly List<EbookFonts> fonts = [
+		new EbookFonts { FontFamily = "Arial" },
+		new EbookFonts { FontFamily = "Times New Roman" },
+		new EbookFonts { FontFamily = "Verdana" },
+		new EbookFonts { FontFamily = "Courier New" },
+		new EbookFonts { FontFamily = "Georgia" },
+		new EbookFonts { FontFamily = "Tahoma" },
+		new EbookFonts { FontFamily = "Trebuchet MS" },
+		new EbookFonts { FontFamily = "Comic Sans MS" },
+		new EbookFonts { FontFamily = "Lucida Sans Unicode" },
+		new EbookFonts { FontFamily = "Helvetica" }
+	];
+	public List<EbookFonts> Fonts => fonts;
+	readonly List<EbookColor> colors;
+	public List<EbookColor> Colors => colors;
 	IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	public SettingsPage()
 	{
         InitializeComponent();
+		colors = [.. Enum.GetValues<EbookColor>()];
 		BindingContext = this;
 		cancellationTokenSource = new CancellationTokenSource();
 		loadTask = LoadSettings(cancellationTokenSource.Token);
@@ -43,21 +59,19 @@ public partial class SettingsPage : Popup, IDisposable
 
 	async void OnApplyColorChanged(object sender, EventArgs e)
     {
-		var selectedTheme = ThemePicker.SelectedItem.ToString();
+		var selectedTheme = ThemePicker.SelectedItem;
 		var settings = await db.GetSettings(cancellationTokenSource.Token);
 
 		(settings.BackgroundColor, settings.TextColor, _) = selectedTheme switch
 		{
-			"Dark" => CustomColorScheme.GetColorSchemeString(CustomColor.Dark),
-			"Sepia" => CustomColorScheme.GetColorSchemeString(CustomColor.Sepia),
-			"Night Mode" => CustomColorScheme.GetColorSchemeString(CustomColor.NightMode),
-			"Daylight" => CustomColorScheme.GetColorSchemeString(CustomColor.Daylight),
-			"Forest" => CustomColorScheme.GetColorSchemeString(CustomColor.Forest),
-			"Ocean" => CustomColorScheme.GetColorSchemeString(CustomColor.Ocean),
-			"Sand" => CustomColorScheme.GetColorSchemeString(CustomColor.Sand),
-			"Charcoal" => CustomColorScheme.GetColorSchemeString(CustomColor.Charcoal),
-			"Vintage" => CustomColorScheme.GetColorSchemeString(CustomColor.Vintage),
-			_ => CustomColorScheme.GetColorSchemeString(CustomColor.Default),
+			EbookColor.Dark => EbookColorScheme.GetColorSchemeString(EbookColor.Dark),
+			EbookColor.Sepia => EbookColorScheme.GetColorSchemeString(EbookColor.Sepia),
+			EbookColor.Forest => EbookColorScheme.GetColorSchemeString(EbookColor.Forest),
+			EbookColor.Ocean => EbookColorScheme.GetColorSchemeString(EbookColor.Ocean),
+			EbookColor.Sand => EbookColorScheme.GetColorSchemeString(EbookColor.Sand),
+			EbookColor.Charcoal => EbookColorScheme.GetColorSchemeString(EbookColor.Charcoal),
+			EbookColor.Vintage => EbookColorScheme.GetColorSchemeString(EbookColor.Vintage),
+			_ => EbookColorScheme.GetColorSchemeString(EbookColor.Default),
 		};
 		if (string.IsNullOrEmpty(settings.BackgroundColor) || string.IsNullOrEmpty(settings.TextColor))
         {
@@ -84,11 +98,15 @@ public partial class SettingsPage : Popup, IDisposable
     async void OnFontChange(object sender, EventArgs e)
     {
 		var settings = await db.GetSettings(CancellationToken.None);
-		var selectedTheme = FontPicker.SelectedItem.ToString();
+		var selectedTheme = FontPicker.SelectedItem;
+		if(selectedTheme is not EbookFonts font)
+		{
+			logger.Info("Selected font is null");
+			return;
+		}
 
-        var font = $"'{selectedTheme}'";
-		settings.FontFamily = font;
-		logger.Info($"Chaging Font to: {font}");
+		settings.FontFamily = font.FontFamily;
+		logger.Info($"Chaging Font to: {font.FontFamily}");
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
@@ -111,14 +129,14 @@ public partial class SettingsPage : Popup, IDisposable
 			{
 				if (Application.Current?.RequestedTheme == AppTheme.Dark)
 				{
-					var (BackgroundColor, TextColor, _) = CustomColorScheme.GetColorSchemeString(CustomColor.Dark);
+					var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Dark);
 					settings.BackgroundColor = BackgroundColor;
 					settings.TextColor = TextColor;
 					theme.VisualTheme = SfVisuals.MaterialLight;
 				}
 				else
 				{
-					var (BackgroundColor, TextColor, _) = CustomColorScheme.GetColorSchemeString(CustomColor.Default);
+					var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Default);
 					settings.BackgroundColor = BackgroundColor;
 					settings.TextColor = TextColor;
 					theme.VisualTheme = SfVisuals.MaterialDark;

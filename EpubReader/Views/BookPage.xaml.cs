@@ -193,11 +193,11 @@ public partial class BookPage : ContentPage
 		switch (Application.Current?.RequestedTheme)
 		{
 			case AppTheme.Dark:
-				(background, text, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
+				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Dark);
 				theme.VisualTheme = SfVisuals.MaterialLight;
 				break;
 			case AppTheme.Light:
-				(background, text, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
+				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Default);
 				theme.VisualTheme = SfVisuals.MaterialLight;
 				break;
 		}

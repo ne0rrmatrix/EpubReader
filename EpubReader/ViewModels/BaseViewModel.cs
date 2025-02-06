@@ -28,11 +28,11 @@ public partial class BaseViewModel : ObservableObject
 		switch (Application.Current?.RequestedTheme)
 		{
 			case AppTheme.Dark:
-				(_, _, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
+				(_, _, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Dark);
 				theme.VisualTheme = SfVisuals.MaterialLight;
 				break;
 			case AppTheme.Light:
-				(_, _, navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
+				(_, _, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Default);
 				theme.VisualTheme = SfVisuals.MaterialLight;
 				break;
 		}

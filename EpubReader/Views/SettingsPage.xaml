@@ -6,13 +6,12 @@
     xmlns:local="clr-namespace:EpubReader.Converters"
     xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:page="clr-namespace:EpubReader.Views"
+    xmlns:service="clr-namespace:EpubReader.Service"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Name="CurrentPage"
     Size="400,600">
 
-    <mct:Popup.BindingContext>
-        <BindingCondition Binding="{Binding Source={x:Reference CurrentPage}, Path=BindingContext, x:DataType=ContentPage}" />
-    </mct:Popup.BindingContext>
     <mct:Popup.Resources>
         <ResourceDictionary>
             <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
@@ -75,23 +74,9 @@
             x:Name="FontPicker"
             Grid.Row="4"
             HeightRequest="40"
-            SelectedIndexChanged="OnFontChange">
-
-            <Picker.ItemsSource>
-                <x:Array Type="{x:Type x:String}">
-                    <x:String>Arial</x:String>
-                    <x:String>Times New Roman</x:String>
-                    <x:String>Courier New</x:String>
-                    <x:String>Verdana</x:String>
-                    <x:String>Georgia</x:String>
-                    <x:String>Tahoma</x:String>
-                    <x:String>Trebuchet MS</x:String>
-                    <x:String>Comic Sans MS</x:String>
-                    <x:String>Lucida Sans Unicode</x:String>
-                    <x:String>Helvetica</x:String>
-                </x:Array>
-            </Picker.ItemsSource>
-        </Picker>
+            ItemDisplayBinding="{Binding FontFamily, x:DataType=service:EbookFonts}"
+            ItemsSource="{Binding Fonts, x:DataType=page:SettingsPage}"
+            SelectedIndexChanged="OnFontChange" />
 
         <Label
             Grid.Row="5"
@@ -116,25 +101,10 @@
             x:Name="ThemePicker"
             Title="Choose a theme"
             Grid.Row="8"
-            x:DataType="{x:Type Switch}"
             HeightRequest="70"
-            IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, Converter={StaticResource InverseBooleanConverter}}"
-            SelectedIndexChanged="OnApplyColorChanged">
-            <Picker.ItemsSource>
-                <x:Array Type="{x:Type x:String}">
-                    <x:String>Dark</x:String>
-                    <x:String>Light</x:String>
-                    <x:String>Sepia</x:String>
-                    <x:String>Night Mode</x:String>
-                    <x:String>Daylight</x:String>
-                    <x:String>Forest</x:String>
-                    <x:String>Ocean</x:String>
-                    <x:String>Sand</x:String>
-                    <x:String>Charcoal</x:String>
-                    <x:String>Vintage</x:String>
-                </x:Array>
-            </Picker.ItemsSource>
-        </Picker>
+            IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, x:DataType={x:Type Switch}, Converter={StaticResource InverseBooleanConverter}}"
+            ItemsSource="{Binding Colors, x:DataType=page:SettingsPage}"
+            SelectedIndexChanged="OnApplyColorChanged" />
 
         <Label
             Grid.Row="9"
