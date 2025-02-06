@@ -12,6 +12,7 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
+using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
@@ -22,34 +23,57 @@ public partial class BookPage : ContentPage
 	Book book = new();
 	Settings settings = new();
 	public BookPage(BookViewModel viewModel)
-    {
-        InitializeComponent();
+	{
+		InitializeComponent();
 		BindingContext = viewModel;
+		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
+	}
+
+	void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+	{
+		Dispatcher.Dispatch(() => UpdateTheme());
 	}
 
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = ((BookViewModel)BindingContext).Settings;
-		SetColors();
-		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}");
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+
 		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 		if (!OperatingSystem.IsAndroid())
 		{
 			EpubText.Navigated += OnEpubText_Navigated;
 		}
+
+		Dispatcher.Dispatch(() =>
+		{
+			Shimmer.IsActive = true;
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		});
+
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+
+		Dispatcher.Dispatch(() =>
+		{
+			EpubText.Source = new HtmlWebViewSource { Html = html };
+			Shimmer.IsActive = false;
+			UpdateTheme();
+		});
 	}
 
-	
+
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		SetColors();
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		Dispatcher.Dispatch(() => EpubText.Source = new HtmlWebViewSource { Html = html });
+		Dispatcher.Dispatch(() =>
+		{
+			EpubText.Source = new HtmlWebViewSource { Html = html };
+			UpdateTheme();
+		});
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -62,26 +86,28 @@ public partial class BookPage : ContentPage
 			Command = new Command(() =>
 			{
 				var html = InjectIntoHtml.InjectAllCss(chapter.HtmlFile, book, settings);
-				Dispatcher.Dispatch(() => 
-				{ 
-					EpubText.Source = new HtmlWebViewSource { Html = html }; 
-					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+				Dispatcher.Dispatch(() =>
+				{
+					EpubText.Source = new HtmlWebViewSource { Html = html };
+					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 				});
 			})
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 	}
 
-    protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
-    {
-        base.OnNavigatedFrom(args);
-        EpubText.Navigating -= EpubText_Navigating;
+	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+	{
+		base.OnNavigatedFrom(args);
+		EpubText.Navigating -= EpubText_Navigating;
 		EpubText.Navigated -= OnEpubText_Navigated;
+		ArgumentNullException.ThrowIfNull(Application.Current);
+		Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
 
 		WeakReferenceMessenger.Default.UnregisterAll(this);
-        Shell.Current.ToolbarItems.Clear();
-        Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-    }
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+	}
 
 	void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
@@ -98,28 +124,30 @@ public partial class BookPage : ContentPage
 
 	async Task PreviousPage()
 	{
-		if(book.CurrentChapter <= 0)
+		if (book.CurrentChapter <= 0)
 		{
 			logger.Info("Start of book");
 			return;
 		}
+		Dispatcher.Dispatch(() => Shimmer.IsActive = true);
 		book.CurrentChapter--;
 		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 
-		Dispatcher.Dispatch(() => 
-		{ 
-			EpubText.Source = new HtmlWebViewSource { Html = html }; 
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+		Dispatcher.Dispatch(() =>
+		{
+			EpubText.Source = new HtmlWebViewSource { Html = html };
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			Shimmer.IsActive = false;
 		});
 	}
-	
+
 	async void PreviousPage(object sender, EventArgs e)
 	{
 		await PreviousPage();
 	}
 
-	
+
 	async void NextPage(object sender, EventArgs e)
 	{
 		await NextPage();
@@ -127,18 +155,20 @@ public partial class BookPage : ContentPage
 
 	async Task NextPage()
 	{
-		if(book.CurrentChapter >= book.Chapters.Count)
+		if (book.CurrentChapter >= book.Chapters.Count)
 		{
 			logger.Info("End of book");
 			return;
 		}
+		Dispatcher.Dispatch(() => Shimmer.IsActive = true);
 		book.CurrentChapter++;
 		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		Dispatcher.Dispatch(() => 
-		{ 
-			EpubText.Source = new HtmlWebViewSource { Html = html }; 
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}"; 
+		Dispatcher.Dispatch(() =>
+		{
+			EpubText.Source = new HtmlWebViewSource { Html = html };
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			Shimmer.IsActive = false;
 		});
 	}
 
@@ -154,31 +184,46 @@ public partial class BookPage : ContentPage
 		}
 	}
 
-	void SetColors()
+	void UpdateTheme()
 	{
-		if (string.IsNullOrEmpty(settings.BackgroundColor))
+		ArgumentNullException.ThrowIfNull(Application.Current);
+		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries;
+		if (mergedDictionaries != null)
 		{
-			if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
+			var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault();
+			if (theme != null)
 			{
-				settings.BackgroundColor = "#FFFBF5";
-				settings.TextColor = "#000000";
-			}
-			else
-			{
-				settings.BackgroundColor = "#121212";
-				settings.TextColor = "#FFFFFF";
+				if (Application.Current?.RequestedTheme == AppTheme.Dark)
+				{
+					(Color? background, Color? text, Color? navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Dark);
+					if(background is null || text is null || navigationColor is null)
+					{
+						return;
+					}
+					Grid.BackgroundColor = background;
+					StackLayout.BackgroundColor = navigationColor;
+					PageLabel.BackgroundColor = background;
+					PageLabel.TextColor = text;
+					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
+					CurrentPage.BackgroundColor = navigationColor;
+					theme.VisualTheme = SfVisuals.MaterialLight;
+				}
+				else
+				{
+					(Color? background, Color? text, Color? navigationColor) = CustomColorScheme.GetColorSchemeColor(CustomColor.Default);
+					if (background is null || text is null || navigationColor is null)
+					{
+						return;
+					}
+					Grid.BackgroundColor = background;
+					StackLayout.BackgroundColor = navigationColor;
+					PageLabel.BackgroundColor = background;
+					PageLabel.TextColor = text;
+					Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
+					CurrentPage.BackgroundColor = navigationColor;
+					theme.VisualTheme = SfVisuals.MaterialLight;
+				}
 			}
 		}
-
-		Dispatcher.Dispatch(() =>
-		{
-			Grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-			StackLayout.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-			PageLabel.TextColor = Color.FromArgb(settings.TextColor);
-			PageLabel.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-			var color = Color.FromRgba(settings.BackgroundColor);
-			Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, color);
-			CurrentPage.BackgroundColor = color;
-		});
 	}
 }

@@ -2,7 +2,10 @@ using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
+using EpubReader.Service;
 using MetroLog;
+using Microsoft.Maui.Graphics.Text;
+using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
@@ -40,71 +43,27 @@ public partial class SettingsPage : Popup, IDisposable
 
 	async void OnApplyColorChanged(object sender, EventArgs e)
     {
-		string backgroundColorArgb;
-        string textColorArgb;
 		var selectedTheme = ThemePicker.SelectedItem.ToString();
 		var settings = await db.GetSettings(cancellationTokenSource.Token);
 
-		switch (selectedTheme)
-        {
-            case "Dark":
-				backgroundColorArgb = "#121212";
-				textColorArgb = "#E1E1E1";
-				break;
-
-            case "Sepia":
-                backgroundColorArgb = "#f4ecd8"; // Sepia background
-                textColorArgb = "#5b4636"; // Dark brown text
-				break;
-
-            case "Night Mode":
-                backgroundColorArgb = "#000000"; // Dark background
-                textColorArgb = "#ffffff"; // Light text
-                break;
-
-            case "Daylight":
-                backgroundColorArgb = "#ffffff"; // Bright white background
-                textColorArgb = "#000000"; // Dark text
-                break;
-
-            case "Forest":
-                backgroundColorArgb = "#e0f2e9"; // Greenish background
-                textColorArgb = "#2e4d38"; // Dark green text
-                break;
-
-            case "Ocean":
-                backgroundColorArgb = "#e0f7fa"; // Light blue background
-                textColorArgb = "#01579b"; // Navy text
-                break;
-
-            case "Sand":
-                backgroundColorArgb = "#f5deb3"; // Sandy background
-                textColorArgb = "#000000"; // Dark text
-                break;
-
-            case "Charcoal":
-                backgroundColorArgb = "#36454f"; // Dark gray background
-                textColorArgb = "#dcdcdc"; // Light gray text
-                break;
-
-            case "Vintage":
-                backgroundColorArgb = "#f5f5dc"; // Yellowed paper background
-                textColorArgb = "#000000"; // Dark text
-                break;
-
-            default:
-				// Default color scheme if none match. Is the a default light theme.
-				backgroundColorArgb = "#FFFBF5"; // Light gray background
-				textColorArgb = "#2B2B2B"; // Black text
-				break;
-        }
-
-        if (string.IsNullOrEmpty(backgroundColorArgb) || string.IsNullOrEmpty(textColorArgb))
+		(settings.BackgroundColor, settings.TextColor, _) = selectedTheme switch
+		{
+			"Dark" => CustomColorScheme.GetColorSchemeString(CustomColor.Dark),
+			"Sepia" => CustomColorScheme.GetColorSchemeString(CustomColor.Sepia),
+			"Night Mode" => CustomColorScheme.GetColorSchemeString(CustomColor.NightMode),
+			"Daylight" => CustomColorScheme.GetColorSchemeString(CustomColor.Daylight),
+			"Forest" => CustomColorScheme.GetColorSchemeString(CustomColor.Forest),
+			"Ocean" => CustomColorScheme.GetColorSchemeString(CustomColor.Ocean),
+			"Sand" => CustomColorScheme.GetColorSchemeString(CustomColor.Sand),
+			"Charcoal" => CustomColorScheme.GetColorSchemeString(CustomColor.Charcoal),
+			"Vintage" => CustomColorScheme.GetColorSchemeString(CustomColor.Vintage),
+			_ => CustomColorScheme.GetColorSchemeString(CustomColor.Default),
+		};
+		if (string.IsNullOrEmpty(settings.BackgroundColor) || string.IsNullOrEmpty(settings.TextColor))
         {
             return;
         }
-		settings.BackgroundColor = backgroundColorArgb;
-		settings.TextColor = textColorArgb;
+
 		await db.SaveSettings(settings, CancellationToken.None);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
@@ -144,16 +103,29 @@ public partial class SettingsPage : Popup, IDisposable
 			return;
 		}
 		ArgumentNullException.ThrowIfNull(Application.Current);
-		if (Application.Current.RequestedTheme == AppTheme.Dark)
+		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries;
+		if (mergedDictionaries != null)
 		{
-			settings.BackgroundColor = "#121212";
-			settings.TextColor = "#E1E1E1";
+			var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault();
+			if (theme != null)
+			{
+				if (Application.Current?.RequestedTheme == AppTheme.Dark)
+				{
+					var (BackgroundColor, TextColor, _) = CustomColorScheme.GetColorSchemeString(CustomColor.Dark);
+					settings.BackgroundColor = BackgroundColor;
+					settings.TextColor = TextColor;
+					theme.VisualTheme = SfVisuals.MaterialLight;
+				}
+				else
+				{
+					var (BackgroundColor, TextColor, _) = CustomColorScheme.GetColorSchemeString(CustomColor.Default);
+					settings.BackgroundColor = BackgroundColor;
+					settings.TextColor = TextColor;
+					theme.VisualTheme = SfVisuals.MaterialDark;
+				}
+			}
 		}
-		else
-		{
-			settings.BackgroundColor = "#FFFBF5";
-			settings.TextColor = "#2B2B2B";
-		}
+		
 		await db.SaveSettings(settings);
 		logger.Info("System theme changed");
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));

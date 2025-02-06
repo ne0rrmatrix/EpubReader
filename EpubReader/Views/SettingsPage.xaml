@@ -21,8 +21,6 @@
 
     <Grid
         Padding="20"
-        BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
-                                          Dark={StaticResource AppBackgroundDarkColor}}"
         ColumnSpacing="10"
         RowSpacing="20">
 

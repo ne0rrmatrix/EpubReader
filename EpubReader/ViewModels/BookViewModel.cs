@@ -12,7 +12,6 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Views;
-using MetroLog;
 
 namespace EpubReader.ViewModels;
 
@@ -20,18 +19,13 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; }
-	[ObservableProperty]
-	public partial string Source { get; set; }
+
 	[ObservableProperty]
 	public partial Settings Settings { get; set; }
-
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookViewModel));
-
 	public BookViewModel()
 	{
 		Settings = new();
 		IsNavMenuVisible = true;
-		Source = string.Empty;
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
@@ -44,17 +38,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			Settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false) ?? new Settings();
-			var result = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
-			if(!string.IsNullOrEmpty(result))
-			{
-				logger.Info("Setting source");
-				Source = result;
-				return;
-			}
-			logger.Info("html is null or empty");
-			return;
 		}
-		logger.Info("Book is null");
 	}
 
 	[RelayCommand]
@@ -72,6 +56,5 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 #endif
 		IsNavMenuVisible = !IsNavMenuVisible;
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
-		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, Color.FromArgb(Settings.BackgroundColor));
 	}
 }
