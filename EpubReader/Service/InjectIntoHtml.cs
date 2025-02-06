@@ -95,7 +95,7 @@ public static partial class InjectIntoHtml
 			string bodyContent = htmlString[bodyStartIndex..bodyEndIndex];
 
 			string sectionBlockPattern = @"<section[^>]*>(?<sectionContent>.*?)</section>";
-			Regex sectionRegex = new(sectionBlockPattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+			Regex sectionRegex = new(sectionBlockPattern, RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(5000));
 
 			Match sectionMatch = sectionRegex.Match(bodyContent);
 
@@ -122,7 +122,7 @@ public static partial class InjectIntoHtml
 		// Regex to find self-closing anchor tags *inside* h1 tags with class="ch"
 		// and capture the text immediately following it.
 		string pattern = @"<h1 class=""ch""><a(?=[^>]*\/>)([^>]*)/>(?<followingText>.*?)<\/h1>";
-		Regex regex = new(pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+		Regex regex = new(pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(5000));
 
 		string modifiedHtml = regex.Replace(htmlString, match =>
 		{

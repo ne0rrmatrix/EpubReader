@@ -46,34 +46,23 @@ public partial class BookPage : ContentPage
 			EpubText.Navigated += OnEpubText_Navigated;
 		}
 
-		Dispatcher.Dispatch(() =>
-		{
-			Shimmer.IsActive = true;
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		});
-
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-
-		Dispatcher.Dispatch(() =>
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-			Shimmer.IsActive = false;
-			UpdateTheme();
-		});
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
-
+	void UpdateWebView()
+	{
+		Shimmer.IsActive = true;
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		EpubText.Source = new HtmlWebViewSource { Html = html };
+		Shimmer.IsActive = false;
+		UpdateTheme();
+	}
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		Dispatcher.Dispatch(() =>
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-			UpdateTheme();
-		});
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -99,9 +88,10 @@ public partial class BookPage : ContentPage
 	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
 	{
 		base.OnNavigatedFrom(args);
+		ArgumentNullException.ThrowIfNull(Application.Current);
+
 		EpubText.Navigating -= EpubText_Navigating;
 		EpubText.Navigated -= OnEpubText_Navigated;
-		ArgumentNullException.ThrowIfNull(Application.Current);
 		Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
 
 		WeakReferenceMessenger.Default.UnregisterAll(this);
@@ -127,22 +117,12 @@ public partial class BookPage : ContentPage
 		string isFirst = await EpubText.EvaluateJavaScriptAsync("isFirstPage()");
 		if (isFirst == "Yes" && book.CurrentChapter > 0)
 		{
-			Dispatcher.Dispatch(() => Shimmer.IsActive = true);
 			book.CurrentChapter--;
 			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-
-			Dispatcher.Dispatch(() =>
-			{
-				EpubText.Source = new HtmlWebViewSource { Html = html };
-				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-				Shimmer.IsActive = false;
-			});
+			Dispatcher.Dispatch(() => UpdateWebView());
+			return;
 		}
-		else
-		{
-			await EpubText.EvaluateJavaScriptAsync("previousPage()");
-		}
+		await EpubText.EvaluateJavaScriptAsync("previousPage()");
 	}
 
 	async void PreviousPage(object sender, EventArgs e)
@@ -164,25 +144,14 @@ public partial class BookPage : ContentPage
 			return;
 		}
 		string isLast = await EpubText.EvaluateJavaScriptAsync("isLastPage()");
-
-		// Now you can use isFirst and isLast (which will be strings "Yes" or "No")
 		if (isLast == "Yes")
 		{
-			Dispatcher.Dispatch(() => Shimmer.IsActive = true);
 			book.CurrentChapter++;
 			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-			Dispatcher.Dispatch(() =>
-			{
-				EpubText.Source = new HtmlWebViewSource { Html = html };
-				PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-				Shimmer.IsActive = false;
-			});
+			Dispatcher.Dispatch(() => UpdateWebView());
+			return;
 		}
-		else
-		{
-			await EpubText.EvaluateJavaScriptAsync("nextPage()");
-		}
+		await EpubText.EvaluateJavaScriptAsync("nextPage()");
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
