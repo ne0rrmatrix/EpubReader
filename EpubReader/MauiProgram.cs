@@ -8,6 +8,7 @@ using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
+using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
 
@@ -27,6 +28,7 @@ public static class MauiProgram
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);
 		})
+		.ConfigureSyncfusionToolkit()
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST
@@ -70,12 +72,10 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
         builder.Services.AddSingleton<IFilePicker>(FilePicker.Default);
         builder.Services.AddSingleton<AppShell>();
-
         builder.Services.AddSingleton<BaseViewModel>();
-        builder.Services.AddSingleton<LibraryPage>();
-        builder.Services.AddSingleton<LibraryViewModel>();
-        builder.Services.AddTransient<BookPage>();
-        builder.Services.AddTransient<BookViewModel>();
-        return builder.Build();
+
+		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("//LibraryPage");
+		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("//BookPage");
+		return builder.Build();
     }
 }

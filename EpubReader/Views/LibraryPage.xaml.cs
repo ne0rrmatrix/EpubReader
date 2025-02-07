@@ -8,7 +8,7 @@ public partial class LibraryPage : ContentPage
 	{
 		InitializeComponent();
         BindingContext = viewModel;
-    }
+	}
 
     protected override void OnNavigatedTo(NavigatedToEventArgs args)
     {

@@ -12,6 +12,7 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
+using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
@@ -22,37 +23,37 @@ public partial class BookPage : ContentPage
 	Book book = new();
 	Settings settings = new();
 	public BookPage(BookViewModel viewModel)
-    {
-        InitializeComponent();
+	{
+		InitializeComponent();
 		BindingContext = viewModel;
+		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
+	}
+
+	void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+	{
+		Dispatcher.Dispatch(() => UpdateTheme());
 	}
 
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = ((BookViewModel)BindingContext).Settings;
-	
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+
 		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 		if (!OperatingSystem.IsAndroid())
 		{
 			EpubText.Navigated += OnEpubText_Navigated;
 		}
+
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	async void OnSettingsClicked()
 	{
-		settings = await db.GetSettings(CancellationToken.None);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		if(Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-		}
+		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -65,29 +66,29 @@ public partial class BookPage : ContentPage
 			Command = new Command(() =>
 			{
 				var html = InjectIntoHtml.InjectAllCss(chapter.HtmlFile, book, settings);
-				if(Dispatcher.IsDispatchRequired)
-				{
-					Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-				}
-				else
+				Dispatcher.Dispatch(() =>
 				{
 					EpubText.Source = new HtmlWebViewSource { Html = html };
-				}
+					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+				});
 			})
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 	}
 
-    protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
-    {
-        base.OnNavigatedFrom(args);
-        EpubText.Navigating -= EpubText_Navigating;
-        WeakReferenceMessenger.Default.UnregisterAll(this);
-        EpubText.Navigated -= OnEpubText_Navigated;
+	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+	{
+		base.OnNavigatedFrom(args);
+		ArgumentNullException.ThrowIfNull(Application.Current);
 
-        Shell.Current.ToolbarItems.Clear();
-        Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-    }
+		EpubText.Navigating -= EpubText_Navigating;
+		EpubText.Navigated -= OnEpubText_Navigated;
+		Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
+
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+	}
 
 	void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
@@ -104,30 +105,21 @@ public partial class BookPage : ContentPage
 
 	async Task PreviousPage()
 	{
-		if(book.CurrentChapter <= 0)
+		if (book.CurrentChapter <= 0)
 		{
 			logger.Info("Start of book");
 			return;
 		}
 		book.CurrentChapter--;
-		await db.SaveBookData(book, CancellationToken.None);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		if (Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-		}
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
-	
+
 	async void PreviousPage(object sender, EventArgs e)
 	{
 		await PreviousPage();
 	}
 
-	
 	async void NextPage(object sender, EventArgs e)
 	{
 		await NextPage();
@@ -135,22 +127,14 @@ public partial class BookPage : ContentPage
 
 	async Task NextPage()
 	{
-		if(book.CurrentChapter >= book.Chapters.Count)
+		if (book.CurrentChapter >= book.Chapters.Count)
 		{
 			logger.Info("End of book");
 			return;
 		}
 		book.CurrentChapter++;
-		await db.SaveBookData(book, CancellationToken.None);
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		if (Dispatcher.IsDispatchRequired)
-		{
-			Dispatcher.Dispatch(() => { EpubText.Source = new HtmlWebViewSource { Html = html }; });
-		}
-		else
-		{
-			EpubText.Source = new HtmlWebViewSource { Html = html };
-		}
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
@@ -163,5 +147,44 @@ public partial class BookPage : ContentPage
 		{
 			await PreviousPage();
 		}
+	}
+
+	void UpdateWebView()
+	{
+		Shimmer.IsActive = true;
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		EpubText.Source = new HtmlWebViewSource { Html = html };
+		Shimmer.IsActive = false;
+		UpdateTheme();
+	}
+
+	void UpdateTheme()
+	{
+		ArgumentNullException.ThrowIfNull(Application.Current);
+		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries ?? throw new InvalidOperationException();
+		var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault() ?? throw new InvalidOperationException();
+		(Color? background, Color? text, Color? navigationColor) = (null, null, null);
+		switch (Application.Current?.RequestedTheme)
+		{
+			case AppTheme.Dark:
+				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Dark);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
+			case AppTheme.Light:
+				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Default);
+				theme.VisualTheme = SfVisuals.MaterialLight;
+				break;
+		}
+		if (background is null || text is null || navigationColor is null)
+		{
+			return;
+		}
+		Grid.BackgroundColor = background;
+		StackLayout.BackgroundColor = navigationColor;
+		PageLabel.BackgroundColor = background;
+		PageLabel.TextColor = text;
+		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
+		CurrentPage.BackgroundColor = navigationColor;
 	}
 }

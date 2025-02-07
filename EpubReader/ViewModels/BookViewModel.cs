@@ -12,25 +12,20 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Views;
-using MetroLog;
 
 namespace EpubReader.ViewModels;
 
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
-	public partial bool IsNavMenuVisible { get; set; } = true;
-	[ObservableProperty]
-	public partial string Source { get; set; }
+	public partial bool IsNavMenuVisible { get; set; }
+
 	[ObservableProperty]
 	public partial Settings Settings { get; set; }
-
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookViewModel));
-
 	public BookViewModel()
 	{
 		Settings = new();
-		Source = string.Empty;
+		IsNavMenuVisible = true;
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
@@ -42,21 +37,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
 			Book = book;
-			Settings = await db.GetSettings(CancellationToken.None) ?? new Settings();
-			var result = InjectIntoHtml.InjectAllCss(Book.Chapters[book.CurrentChapter].HtmlFile, book, Settings);
-			if(!string.IsNullOrEmpty(result))
-			{
-				logger.Info("Setting source");
-				Source = result;
-			}
-			else
-			{
-				logger.Info("html is null or empty");
-			}
-		}
-		else
-		{
-			logger.Info("Book is null");
+			Settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false) ?? new Settings();
 		}
 	}
 

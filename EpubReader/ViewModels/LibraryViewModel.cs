@@ -18,6 +18,15 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
+	readonly FilePickerFileType customFileType = new(
+			   new Dictionary<DevicePlatform, IEnumerable<string>>
+			   {
+					{ DevicePlatform.iOS, epub },
+					{ DevicePlatform.Android, android_epub },
+					{ DevicePlatform.WinUI, epub },
+					{ DevicePlatform.Tizen, epub },
+					{ DevicePlatform.macOS, epub },
+			   });
 	bool disposedValue;
 
 	[ObservableProperty]
@@ -43,14 +52,12 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		{
 			Books.Clear();
 		}
-		var fileData = await db.GetAllFileData(cancellationToken) ?? [];
-		foreach (var item in fileData)
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		foreach (var item in bookData)
 		{
-			var savedBook = await GetBook(item.FileName, cancellationToken);
-			if (savedBook is not null)
-			{
-				Books.Add(savedBook);
-			}
+			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
+			ebook.CurrentChapter = item.CurrentChapter;
+			Books.Add(ebook);
 		}
     }
 
@@ -72,16 +79,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
     [RelayCommand]
     async Task Add(CancellationToken cancellationToken = default)
     {
-        var customFileType = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.iOS, epub },
-                    { DevicePlatform.Android, android_epub },
-                    { DevicePlatform.WinUI, epub },
-                    { DevicePlatform.Tizen, epub },
-                    { DevicePlatform.macOS, epub },
-                });
-
         var result = await PickAndShow(new PickOptions
         {
             FileTypes = customFileType,
@@ -92,8 +89,8 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("No file selected");
 			return;
 		}
-		var currentFileData = await db.GetAllFileData(cancellationToken);
-		var exists = currentFileData?.Any(x => x.FileName == FileService.GetFileName(result.FileName)) ?? false;
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false);
+		var exists = bookData.Any(x => x.FilePath == result.FileName);
 		if (exists)
 		{
 			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
@@ -101,7 +98,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			return;
 		}
 
-		var filePath = await FileService.SaveFile(result);
+		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
 		// Open the epub file
 		var ebook = EbookService.OpenEbook(filePath);
 		if (ebook is null)
@@ -109,15 +106,10 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("Error opening ebook");
 			return;
 		}
-		FileData fileData = new()
-		{
-			Title = ebook.Title,
-			FileName = filePath,
-		};
-		await db.SaveBookData(ebook, cancellationToken);
-		await db.SaveFileData(fileData, cancellationToken);
+		
+		ebook.FilePath = filePath;
+		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 		Books.Add(ebook);
-		return;
 	}
 
 	static async Task ShowSnackBar(string text, string actionButtonText, CancellationToken cancellationToken = default)
@@ -146,24 +138,15 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         {
             logger.Info("Removing book");
             FileService.DeleteFile(book.FilePath);
-			await db.RemoveBook(book, cancellationToken);
+			await db.RemoveBook(book, cancellationToken).ConfigureAwait(false);
 			Books.Remove(book);
-			var fileData = await db.GetAllFileData(cancellationToken);
-			var item = fileData.FirstOrDefault(x => x.FileName == book.FilePath);
-			if (item is null)
-			{
-				logger.Info("File data is null");
-				return;
-			}
-			await db.RemoveFileData(item, cancellationToken);
-			
             logger.Info("Book removed from library.");
             OnPropertyChanged(nameof(Books));
         }
     }
 	public async Task<Book?> GetBook(string fileName, CancellationToken cancellationToken = default)
 	{
-		var bookData = await db.GetBook(fileName, cancellationToken);
+		var bookData = await db.GetBook(fileName, cancellationToken).ConfigureAwait(false);
 		var book = EbookService.OpenEbook(fileName);
 		if (book is null)
 		{
