@@ -50,15 +50,6 @@ public partial class BookPage : ContentPage
 		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
-	void UpdateWebView()
-	{
-		Shimmer.IsActive = true;
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
-		EpubText.Source = new HtmlWebViewSource { Html = html };
-		Shimmer.IsActive = false;
-		UpdateTheme();
-	}
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
@@ -114,22 +105,20 @@ public partial class BookPage : ContentPage
 
 	async Task PreviousPage()
 	{
-		string isFirst = await EpubText.EvaluateJavaScriptAsync("isFirstPage()");
-		if (isFirst == "Yes" && book.CurrentChapter > 0)
+		if (book.CurrentChapter <= 0)
 		{
-			book.CurrentChapter--;
-			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			Dispatcher.Dispatch(() => UpdateWebView());
+			logger.Info("Start of book");
 			return;
 		}
-		await EpubText.EvaluateJavaScriptAsync("previousPage()");
+		book.CurrentChapter--;
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	async void PreviousPage(object sender, EventArgs e)
 	{
 		await PreviousPage();
 	}
-
 
 	async void NextPage(object sender, EventArgs e)
 	{
@@ -143,15 +132,9 @@ public partial class BookPage : ContentPage
 			logger.Info("End of book");
 			return;
 		}
-		string isLast = await EpubText.EvaluateJavaScriptAsync("isLastPage()");
-		if (isLast == "Yes")
-		{
-			book.CurrentChapter++;
-			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			Dispatcher.Dispatch(() => UpdateWebView());
-			return;
-		}
-		await EpubText.EvaluateJavaScriptAsync("nextPage()");
+		book.CurrentChapter++;
+		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
@@ -164,6 +147,16 @@ public partial class BookPage : ContentPage
 		{
 			await PreviousPage();
 		}
+	}
+
+	void UpdateWebView()
+	{
+		Shimmer.IsActive = true;
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		EpubText.Source = new HtmlWebViewSource { Html = html };
+		Shimmer.IsActive = false;
+		UpdateTheme();
 	}
 
 	void UpdateTheme()
@@ -193,6 +186,5 @@ public partial class BookPage : ContentPage
 		PageLabel.TextColor = text;
 		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
 		CurrentPage.BackgroundColor = navigationColor;
-		
 	}
 }
