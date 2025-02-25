@@ -26,8 +26,7 @@
 
     <shimmer:SfShimmer
         x:Name="Shimmer"
-        AnimationDuration="3000"
-        VerticalOptions="FillAndExpand">
+        AnimationDuration="3000">
         <shimmer:SfShimmer.Content>
             <Grid x:Name="Grid">
                 <Grid.GestureRecognizers>
@@ -44,9 +43,7 @@
                 <WebView
                     x:Name="EpubText"
                     Grid.Row="0"
-                    HorizontalOptions="FillAndExpand"
-                    Scale="1"
-                    VerticalOptions="FillAndExpand">
+                    Scale="1">
                     <WebView.GestureRecognizers>
                         <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                             <On Platform="iOS">
@@ -66,9 +63,8 @@
                     <WebView.Behaviors>
                         <toolkit:TouchBehavior
                             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                            DisallowTouchThreshold="2000"
                             LongPressCommand="{OnPlatform Android={Binding PressCommand}}"
-                            LongPressDuration="1000" />
+                            LongPressDuration="4000" />
                     </WebView.Behaviors>
                 </WebView>
                 <StackLayout
@@ -81,6 +77,7 @@
                     Orientation="Horizontal"
                     Spacing="50">
                     <ImageButton
+                        Background="Transparent"
                         Clicked="PreviousPage"
                         IsEnabled="{OnPlatform WinUI=true,
                                                Default=false}"
@@ -93,6 +90,7 @@
                         FontSize="20"
                         HorizontalOptions="Center" />
                     <ImageButton
+                        Background="Transparent"
                         Clicked="NextPage"
                         IsEnabled="{OnPlatform WinUI=true,
                                                Default=false}"

@@ -73,8 +73,8 @@
 	
 	<ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="9.0.30" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="9.0.30" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="EpubCore" Version="1.6.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
