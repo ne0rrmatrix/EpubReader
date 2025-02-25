@@ -66,10 +66,12 @@ public partial class BookPage : ContentPage
 			Command = new Command(() =>
 			{
 				var html = InjectIntoHtml.InjectAllCss(chapter.HtmlFile, book, settings);
-				Dispatcher.Dispatch(() =>
+				Dispatcher.Dispatch(async () =>
 				{
 					EpubText.Source = new HtmlWebViewSource { Html = html };
+					book.CurrentChapter = index;
 					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 				});
 			})
 		};
