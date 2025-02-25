@@ -7,29 +7,29 @@ namespace EpubReader.Database;
 
 public partial class Db : IDb
 {
-    public static string DbPath => Path.Combine(Service.FileService.SaveDirectory, "MyData.db");
-    SQLiteAsyncConnection? db;
+	public static string DbPath => Path.Combine(Service.FileService.SaveDirectory, "MyData.db");
+	SQLiteAsyncConnection? db;
 
-    public const SQLiteOpenFlags Flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache;
-    static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
+	public const SQLiteOpenFlags Flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache;
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
 
-    public Db()
-    {
-    }
+	public Db()
+	{
+	}
 
-    async Task Init(CancellationToken cancellationToken = default)
-    {
-        if (db is not null)
-        {
-            return;
-        }
-        if(!File.Exists(DbPath))
-        {
-            Directory.CreateDirectory(Service.FileService.SaveDirectory);
-        }
+	async Task Init(CancellationToken cancellationToken = default)
+	{
+		if (db is not null)
+		{
+			return;
+		}
+		if (!File.Exists(DbPath))
+		{
+			Directory.CreateDirectory(Service.FileService.SaveDirectory);
+		}
 
-        db = new SQLiteAsyncConnection(DbPath, Flags);
-        
+		db = new SQLiteAsyncConnection(DbPath, Flags);
+
 		logger.Info("Database created");
 		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 		logger.Info("Settings Table created");
@@ -42,7 +42,6 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return new Settings();
 		}
 
@@ -54,7 +53,6 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return [];
 		}
 
@@ -66,19 +64,17 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return new Book();
 		}
 
 		return await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == title).WaitAsync(cancellationToken) ?? new Book();
 	}
-	
+
 	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
 	{
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return;
 		}
 
@@ -99,7 +95,6 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return;
 		}
 
@@ -120,7 +115,6 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return;
 		}
 
@@ -129,18 +123,16 @@ public partial class Db : IDb
 	}
 
 	public async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
-    {
-        await Init(cancellationToken);
+	{
+		await Init(cancellationToken);
 		if (db is null)
-        {
-            logger.Error("DB is null");
-            return;
-        }
+		{
+			return;
+		}
 
 		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
 		if (item is null)
 		{
-			logger.Error("Book is null");
 			return;
 		}
 
@@ -153,7 +145,6 @@ public partial class Db : IDb
 		await Init(cancellationToken);
 		if (db is null)
 		{
-			logger.Error("DB is null");
 			return;
 		}
 
