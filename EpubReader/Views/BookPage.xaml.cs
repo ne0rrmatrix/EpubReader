@@ -48,13 +48,13 @@ public partial class BookPage : ContentPage
 		}
 
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		Dispatcher.Dispatch(() => UpdateWebView());
+		Dispatcher.Dispatch(async () => await UpdateWebView());
 	}
 
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		Dispatcher.Dispatch(async () => await UpdateWebView());
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -119,7 +119,7 @@ public partial class BookPage : ContentPage
 			book.CurrentChapter--;
 			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 			isPreviousPage = true;
-			Dispatcher.Dispatch(() => UpdateWebView());
+			Dispatcher.Dispatch(async () => await UpdateWebView());
 		
 			return;
 		}
@@ -148,13 +148,13 @@ public partial class BookPage : ContentPage
 		{
 			book.CurrentChapter++;
 			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			Dispatcher.Dispatch(() => UpdateWebView());
+			Dispatcher.Dispatch(async () => await UpdateWebView());
 			return;
 		}
 		EpubText.Eval("nextPage()");
 	}
 
-	async void GotoEnd()
+	async Task GotoEnd()
 	{
 		try
 		{
@@ -165,7 +165,7 @@ public partial class BookPage : ContentPage
 				return;
 			}
 			EpubText.Eval("nextPage()");
-			GotoEnd();
+			await GotoEnd();
 		}
 		catch (Exception ex)
 		{
@@ -185,7 +185,7 @@ public partial class BookPage : ContentPage
 		}
 	}
 
-	void UpdateWebView()
+	async Task UpdateWebView()
 	{
 		Shimmer.IsActive = true;
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
@@ -195,7 +195,7 @@ public partial class BookPage : ContentPage
 		UpdateTheme();
 		if(isPreviousPage)
 		{
-			GotoEnd();
+			await GotoEnd();
 		}
 	}
 

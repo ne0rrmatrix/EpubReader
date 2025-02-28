@@ -135,7 +135,7 @@ public partial class EbookService
 	public static byte[] ResizeImageImageSharp(byte[] imageData, int maxWidth, int maxHeight, int quality)
 	{
 		// If the image is smaller than 500 bytes, return it as is
-		if (imageData.Length < 500)
+		if (imageData.Length < 900000)
 		{
 			return imageData;
 		}

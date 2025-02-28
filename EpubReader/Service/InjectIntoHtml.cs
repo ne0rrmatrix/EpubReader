@@ -13,10 +13,16 @@ public static partial class InjectIntoHtml
 		{
 			return string.Empty;
 		}
-		html = RemoveStyleTags(html);
-		var cssFileNames = ExtractCssFilenames(html);
 		var otherCss = style;
-		cssFileNames.ForEach(cssFilename => otherCss += cssFileNames);
+		var cssList = ExtractCssFileNames(html);
+		foreach (var cssFile in from item in cssList
+								let cssFile = book.Css.Find(x => item.Contains(x.FileName))
+								select cssFile)
+		{
+			otherCss += cssFile?.Content;
+		}
+
+		html = StyleTagRegex().Replace(html, string.Empty);
 		string styleTag = GenerateCSSFromString(settings);
 
 		otherCss = FilterCss(otherCss, settings);
@@ -37,9 +43,28 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
-	static string RemoveStyleTags(string html)
+	static List<string> ExtractCssFileNames(string html)
 	{
-		return StyleTagRegex().Replace(html, string.Empty);
+		List<string> cssFiles = [];
+		if (string.IsNullOrEmpty(html))
+		{
+			return cssFiles;
+		}
+
+		string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
+
+		MatchCollection matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
+
+		foreach (Match match in matches)
+		{
+			if (match.Groups.Count > 1)
+			{
+				string cssFileName = Path.GetFileName(match.Groups[1].Value);
+				cssFiles.Add(cssFileName);
+			}
+		}
+
+		return cssFiles;
 	}
 
 	static string GenerateCSSFromString(Settings settings) // Modified to accept settings directly
@@ -120,32 +145,6 @@ public static partial class InjectIntoHtml
 		return htmlContent;
 	}
 
-	static List<string> ExtractCssFilenames(string html)
-	{
-		List<string> cssFilenames = [];
-
-		if (string.IsNullOrEmpty(html))
-		{
-			return cssFilenames;
-		}
-
-		// Regular expression to find <link> tags with rel="stylesheet" and href attribute
-		string pattern = @"<link\s+[^>]*rel=""stylesheet""[^>]*href=""([^""]+\.css)""[^>]*>";
-		Regex regex = new(pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(20));
-
-		MatchCollection matches = regex.Matches(html);
-
-		foreach (Match match in matches)
-		{
-			if (match.Groups.Count > 1)
-			{
-				string filename = match.Groups[1].Value;
-				cssFilenames.Add(filename);
-			}
-		}
-
-		return cssFilenames;
-	}
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
