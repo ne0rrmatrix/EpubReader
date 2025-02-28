@@ -18,6 +18,7 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage
 {
+	bool isPreviousPage = false;
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	Book book = new();
@@ -112,9 +113,17 @@ public partial class BookPage : ContentPage
 			logger.Info("Start of book");
 			return;
 		}
-		book.CurrentChapter--;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontalScrollAtStart()");
+		if (result.Equals("true"))
+		{
+			book.CurrentChapter--;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			isPreviousPage = true;
+			Dispatcher.Dispatch(() => UpdateWebView());
+		
+			return;
+		}
+		EpubText.Eval("prevPage()");
 	}
 
 	async void PreviousPage(object sender, EventArgs e)
@@ -134,9 +143,34 @@ public partial class BookPage : ContentPage
 			logger.Info("End of book");
 			return;
 		}
-		book.CurrentChapter++;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
+		if (result.Equals("true"))
+		{
+			book.CurrentChapter++;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			Dispatcher.Dispatch(() => UpdateWebView());
+			return;
+		}
+		EpubText.Eval("nextPage()");
+	}
+
+	async void GotoEnd()
+	{
+		try
+		{
+			var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
+			if (result.Equals("true"))
+			{
+				isPreviousPage = false;
+				return;
+			}
+			EpubText.Eval("nextPage()");
+			GotoEnd();
+		}
+		catch (Exception ex)
+		{
+			logger.Error(ex.Message);
+		}
 	}
 
 	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
@@ -159,6 +193,10 @@ public partial class BookPage : ContentPage
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
 		UpdateTheme();
+		if(isPreviousPage)
+		{
+			GotoEnd();
+		}
 	}
 
 	void UpdateTheme()

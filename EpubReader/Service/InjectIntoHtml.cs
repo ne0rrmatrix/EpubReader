@@ -1,10 +1,12 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using EpubReader.Models;
 
 namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
+	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
 	public static string InjectAllCss(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -14,8 +16,8 @@ public static partial class InjectIntoHtml
 		html = RemoveStyleTags(html);
 
 		var otherCss = book.Css[^1].Content ?? string.Empty;
-		otherCss += book.Css[0].Content ?? string.Empty;
 		otherCss += disableTouchCSS;
+		otherCss += style;
 		string styleTag = GenerateCSSFromString(settings);
 
 		otherCss = FilterCss(otherCss, settings);
@@ -30,6 +32,9 @@ public static partial class InjectIntoHtml
 		{
 			html = ReplaceImageUrls(html, image.FileName, image.ImageUrl);
 		}
+		var js = disableScrollBars + disableScroll + jsButtons;
+		html = InjectJavascript(html, js);
+		html = AddDivContainer(html);
 		return html;
 	}
 
@@ -90,8 +95,6 @@ public static partial class InjectIntoHtml
 	}
 	static string ReplaceImageUrls(string htmlContent, string sourcePattern, string newImageSource)
 	{
-		TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
-
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
 		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
 		{
@@ -117,6 +120,61 @@ public static partial class InjectIntoHtml
 		}, RegexOptions.None, regexTimeout);
 	}
 
+	static string InjectJavascript(string html, string javascript)
+	{
+		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+		if (headEndTagIndex >= 0)
+		{
+			html = html.Insert(headEndTagIndex, $@"<script>{javascript}</script>");
+		}
+		else
+		{
+			// If no <head> tag is found, prepend the style to the HTML
+			html = $"<script>{javascript}</script>" + html;
+		}
+		return html;
+	}
+
+	static string AddDivContainer(string html)
+	{
+		if (string.IsNullOrEmpty(html))
+		{
+			return html;
+		}
+
+		// Regex to find opening and closing body tags, allowing for attributes and whitespace.
+		string openingBodyRegex = @"<body\s*([^>]*)>";
+		string closingBodyRegex = @"</body>";
+
+		// Check for body tags.
+		Match openingBodyMatch = Regex.Match(html, openingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
+		Match closingBodyMatch = Regex.Match(html, closingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
+
+		if (!openingBodyMatch.Success || !closingBodyMatch.Success)
+		{
+			return html; // Return original if no body tags found.
+		}
+
+		StringBuilder result = new();
+
+		// Append the part before the opening body.
+		result.Append(html.AsSpan(0, openingBodyMatch.Index + openingBodyMatch.Length));
+
+		// Append the opening div.
+		result.Append("<div id=\"scrollContainer\">");
+
+		// Append the content between the body tags.
+		result.Append(html.AsSpan(openingBodyMatch.Index + openingBodyMatch.Length, closingBodyMatch.Index - (openingBodyMatch.Index + openingBodyMatch.Length)));
+
+		// Append the closing div and the closing body tag.
+		result.Append("</div></body>");
+
+		// Append the part after the closing body.
+		result.Append(html.AsSpan(closingBodyMatch.Index + closingBodyMatch.Length));
+
+		return result.ToString();
+	}
+
 
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
@@ -128,15 +186,69 @@ public static partial class InjectIntoHtml
 	private static partial Regex FontFamilyRegex();
 
 	static readonly string disableTouchCSS = @"
-		* {
+		*	{
 				-webkit-touch-callout: none;
 				-webkit-user-select: none;
 				-khtml-user-select: none;
 				-moz-user-select: none;
 				-ms-user-select: none;
 				user-select: none;
+			}";
+
+	static readonly string disableScrollBars = @"
+		function disableScrollBars() {
+		document.querySelector('body').style.overflow = 'scroll';
+		var style = document.createElement('style');
+		style.type = 'text/css';
+		style.innerHTML = '::-webkit-scrollbar { display: none }';
+		document.getElementsByTagName('body')[0].appendChild(style);}";
+
+	static readonly string disableScroll = @"
+		window.addEventListener('wheel', function(event) {
+			event.preventDefault();
+		}, { passive: false });
+
+		window.addEventListener('touchmove', function(event) {
+			event.preventDefault();
+		}, { passive: false });";
+
+	static readonly string style = @"
+		#scrollContainer {
+			columns: 1;
+			overflow-x: auto;
+			height: 100vh;
+		}
+
+		#scrollContainer p {
+			text-align: justify;
+			margin-left: 2em;
+			margin-right: 2em;
+		}";
+
+	static readonly string jsButtons = @"
+		function nextPage() {
+        document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
+		}
+
+		function prevPage() {
+			document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
+		}
+	
+		function isHorizontalScrollAtStart() {
+			var element = document.getElementById(""scrollContainer"");
+			if (!element) {
+				// Handle cases where the element is not provided or doesn't exist.
+				return false; // Or false, depending on how you want to handle this case.
 			}
-			body {
-			margin: 1em;
+			return element.scrollLeft === 0;
+		}
+
+		 function isHorizontallyScrolledToEnd() {
+			var element = document.getElementById(""scrollContainer"");
+			if (!element) {
+				return false; // Handle cases where the element doesn't exist.
+			}
+		  const maxScrollLeft = element.scrollWidth - element.clientWidth;
+		  return Math.abs(element.scrollLeft - maxScrollLeft) <= 1; // Using a small tolerance to account for potential rounding errors.
 		}";
 }
