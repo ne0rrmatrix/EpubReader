@@ -13,43 +13,36 @@ public static partial class InjectIntoHtml
 		{
 			return string.Empty;
 		}
-		var otherCss = style;
+		StringBuilder css = new();
+		StringBuilder styleTag = new();
+
+		css.Append(style);
 		var cssList = ExtractCssFileNames(html);
 		foreach (var cssFile in from item in cssList
 								let cssFile = book.Css.Find(x => item.Contains(x.FileName))
 								select cssFile)
 		{
-			otherCss += cssFile?.Content;
+			css.Append(cssFile?.Content);
 		}
-
 		html = StyleTagRegex().Replace(html, string.Empty);
-		string styleTag = GenerateCSSFromString(settings);
 
-		otherCss = FilterCss(otherCss, settings);
-		styleTag += otherCss;
-
-
-		if (!string.IsNullOrEmpty(styleTag))
-		{
-			html = InjectCss(html, styleTag);
-		}
-		foreach (var image in book.Images)
-		{
-			html = ReplaceImageUrls(html, image.FileName, image.ImageUrl);
-		}
+		styleTag.Append(GenerateCSSFromString(settings));
+		styleTag.Append(FilterCss(css.ToString(), settings));
+		styleTag.Append(css);
+		html = InjectCss(html, styleTag.ToString());
+		book.Images.ForEach(image => 
+		html = ReplaceImageUrls(html, image.FileName, image.ImageUrl));
+	
 		var js = disableScroll + jsButtons;
 		html = InjectJavascript(html, js);
 		html = AddDivContainer(html);
+		System.Diagnostics.Debug.WriteLine(html);
 		return html;
 	}
 
 	static List<string> ExtractCssFileNames(string html)
 	{
 		List<string> cssFiles = [];
-		if (string.IsNullOrEmpty(html))
-		{
-			return cssFiles;
-		}
 		string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
 
 		MatchCollection matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
@@ -79,10 +72,6 @@ public static partial class InjectIntoHtml
 
 	static string FilterCss(string css, Settings settings)
 	{
-		if (string.IsNullOrEmpty(css))
-		{
-			return string.Empty;
-		}
 		// Remove font-size and font-family from the Css
 		if (settings.FontSize > 0)
 		{
