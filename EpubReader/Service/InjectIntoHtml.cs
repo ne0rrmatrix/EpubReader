@@ -50,20 +50,13 @@ public static partial class InjectIntoHtml
 		{
 			return cssFiles;
 		}
-
 		string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
 
 		MatchCollection matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
-
-		foreach (Match match in matches)
-		{
-			if (match.Groups.Count > 1)
-			{
-				string cssFileName = Path.GetFileName(match.Groups[1].Value);
-				cssFiles.Add(cssFileName);
-			}
-		}
-
+		matches.Select(match => match.Groups[1].Value)
+			.ToList()
+			.ForEach(cssFileName => cssFiles.Add(Path.GetFileName(cssFileName)));
+		
 		return cssFiles;
 	}
 
