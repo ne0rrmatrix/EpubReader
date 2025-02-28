@@ -14,10 +14,9 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 		html = RemoveStyleTags(html);
-
-		var otherCss = book.Css[^1].Content ?? string.Empty;
-		otherCss += disableTouchCSS;
-		otherCss += style;
+		var cssFileNames = ExtractCssFilenames(html);
+		var otherCss = style;
+		cssFileNames.ForEach(cssFilename => otherCss += cssFileNames);
 		string styleTag = GenerateCSSFromString(settings);
 
 		otherCss = FilterCss(otherCss, settings);
@@ -32,7 +31,7 @@ public static partial class InjectIntoHtml
 		{
 			html = ReplaceImageUrls(html, image.FileName, image.ImageUrl);
 		}
-		var js = disableScrollBars + disableScroll + jsButtons;
+		var js = disableScroll + jsButtons;
 		html = InjectJavascript(html, js);
 		html = AddDivContainer(html);
 		return html;
@@ -112,14 +111,41 @@ public static partial class InjectIntoHtml
 
 
 		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
-
-		return Regex.Replace(htmlContent, svgPattern, match =>
+		
+		htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
 		{
 			string originalTag = match.Value;
 			return originalTag.Replace(match.Groups[1].Value, newImageSource);
 		}, RegexOptions.None, regexTimeout);
+		return htmlContent;
 	}
 
+	static List<string> ExtractCssFilenames(string html)
+	{
+		List<string> cssFilenames = [];
+
+		if (string.IsNullOrEmpty(html))
+		{
+			return cssFilenames;
+		}
+
+		// Regular expression to find <link> tags with rel="stylesheet" and href attribute
+		string pattern = @"<link\s+[^>]*rel=""stylesheet""[^>]*href=""([^""]+\.css)""[^>]*>";
+		Regex regex = new(pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(20));
+
+		MatchCollection matches = regex.Matches(html);
+
+		foreach (Match match in matches)
+		{
+			if (match.Groups.Count > 1)
+			{
+				string filename = match.Groups[1].Value;
+				cssFilenames.Add(filename);
+			}
+		}
+
+		return cssFilenames;
+	}
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -185,23 +211,6 @@ public static partial class InjectIntoHtml
 	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex FontFamilyRegex();
 
-	static readonly string disableTouchCSS = @"
-		*	{
-				-webkit-touch-callout: none;
-				-webkit-user-select: none;
-				-khtml-user-select: none;
-				-moz-user-select: none;
-				-ms-user-select: none;
-				user-select: none;
-			}";
-
-	static readonly string disableScrollBars = @"
-		function disableScrollBars() {
-		document.querySelector('body').style.overflow = 'scroll';
-		var style = document.createElement('style');
-		style.type = 'text/css';
-		style.innerHTML = '::-webkit-scrollbar { display: none }';
-		document.getElementsByTagName('body')[0].appendChild(style);}";
 
 	static readonly string disableScroll = @"
 		window.addEventListener('wheel', function(event) {
@@ -213,6 +222,18 @@ public static partial class InjectIntoHtml
 		}, { passive: false });";
 
 	static readonly string style = @"
+		 ::-webkit-scrollbar{
+        display: none;
+		}
+		
+		*	{
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
 		#scrollContainer {
 			columns: 1;
 			overflow-x: auto;
