@@ -13,14 +13,14 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
+using Microsoft.Maui.Controls;
 using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
-#if ANDROID || IOS
-	readonly SwipeGestureRecognizer swipeGestureRecognizer = new();
+#if ANDROID
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	bool isPreviousPage = false;
@@ -34,14 +34,8 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
-#if ANDROID || IOS
-		var temp = (BookViewModel)BindingContext;
-		touchbehavior.LongPressCommand = new Command(() => temp.Press());
-		touchbehavior.LongPressDuration = 700;
+#if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
-		swipeGestureRecognizer.Direction = SwipeDirection.Left | SwipeDirection.Right;
-		swipeGestureRecognizer.Swiped += SwipeGestureRecognizer_Swiped;
-		EpubText.GestureRecognizers.Add(swipeGestureRecognizer);
 #endif
 		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
 	}
@@ -191,13 +185,18 @@ public partial class BookPage : ContentPage, IDisposable
 
 	public async void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
-		if (e.Direction == SwipeDirection.Left)
+		switch(e.Direction)
 		{
-			await NextPage();
-		}
-		else if (e.Direction == SwipeDirection.Right)
-		{
-			await PreviousPage();
+			case SwipeDirection.Left:
+				await NextPage();
+				break;
+			case SwipeDirection.Right:
+				await PreviousPage();
+				break;
+			default:
+				var viewModel = (BookViewModel)BindingContext;
+				viewModel.Press();
+				break;
 		}
 	}
 
@@ -250,14 +249,8 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			if (disposing)
 			{
-				EpubText.Navigating -= EpubText_Navigating;
-				WeakReferenceMessenger.Default.UnregisterAll(this);
-				if (Application.Current is not null)
-				{
-					Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
-				}
-#if ANDROID || IOS
-				swipeGestureRecognizer.Swiped -= SwipeGestureRecognizer_Swiped;
+#if ANDROID
+				touchbehavior.Dispose();
 #endif
 			}
 			disposedValue = true;

@@ -34,7 +34,7 @@
                         <On Platform="WinUI">
                             <TapGestureRecognizer
                                 BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{OnPlatform WinUI={Binding PressCommand}}"
+                                Command="{Binding PressCommand}"
                                 NumberOfTapsRequired="2" />
                         </On>
                     </OnPlatform>
@@ -48,6 +48,20 @@
                     x:Name="EpubText"
                     Grid.Row="0"
                     Scale="1">
+                    <WebView.GestureRecognizers>
+                        <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
+                            <On Platform="Android">
+                                <SwipeGestureRecognizer
+                                    Direction="Left,Right,Up,Down"
+                                    Swiped="SwipeGestureRecognizer_Swiped"/>
+                            </On>
+                            <On Platform="IOS">
+                                <SwipeGestureRecognizer
+                                    Direction="Left,Right,Up,Down"
+                                    Swiped="SwipeGestureRecognizer_Swiped"/>
+                            </On>
+                        </OnPlatform>
+                    </WebView.GestureRecognizers>
                 </WebView>
                 <StackLayout
                     x:Name="StackLayout"
