@@ -35,7 +35,6 @@ public partial class BookPage : ContentPage, IDisposable
 		InitializeComponent();
 		BindingContext = viewModel;
 #if ANDROID
-		var temp = (BookViewModel)BindingContext;
 		EpubText.Behaviors.Add(touchbehavior);
 #endif
 		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
