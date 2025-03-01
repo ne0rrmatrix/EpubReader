@@ -30,10 +30,14 @@
         <shimmer:SfShimmer.Content>
             <Grid x:Name="Grid">
                 <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                        Command="{OnPlatform WinUI={Binding PressCommand}}"
-                        NumberOfTapsRequired="2" />
+                    <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                        <On Platform="WinUI">
+                            <TapGestureRecognizer
+                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                                Command="{OnPlatform WinUI={Binding PressCommand}}"
+                                NumberOfTapsRequired="2" />
+                        </On>
+                    </OnPlatform>
                 </Grid.GestureRecognizers>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -44,28 +48,6 @@
                     x:Name="EpubText"
                     Grid.Row="0"
                     Scale="1">
-                    <WebView.GestureRecognizers>
-                        <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
-                            <On Platform="iOS">
-                                <SwipeGestureRecognizer
-                                    BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                    Direction="Right,Left"
-                                    Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                            <On Platform="Android">
-                                <SwipeGestureRecognizer
-                                    BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                    Direction="Right,Left"
-                                    Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                        </OnPlatform>
-                    </WebView.GestureRecognizers>
-                    <WebView.Behaviors>
-                        <toolkit:TouchBehavior
-                            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                            LongPressCommand="{OnPlatform Android={Binding PressCommand}}"
-                            LongPressDuration="4000" />
-                    </WebView.Behaviors>
                 </WebView>
                 <StackLayout
                     x:Name="StackLayout"

@@ -1,6 +1,7 @@
 #if ANDROID
 using Android.Views;
 using AndroidX.Core.View;
+using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Core.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 #endif
@@ -16,16 +17,32 @@ using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
-public partial class BookPage : ContentPage
+public partial class BookPage : ContentPage, IDisposable
 {
+#if ANDROID || IOS
+	readonly SwipeGestureRecognizer swipeGestureRecognizer = new();
+	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
+#endif
+	bool isPreviousPage = false;
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	Book book = new();
 	Settings settings = new();
+	bool disposedValue;
+
 	public BookPage(BookViewModel viewModel)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+#if ANDROID || IOS
+		var temp = (BookViewModel)BindingContext;
+		touchbehavior.LongPressCommand = new Command(() => temp.Press());
+		touchbehavior.LongPressDuration = 700;
+		EpubText.Behaviors.Add(touchbehavior);
+		swipeGestureRecognizer.Direction = SwipeDirection.Left | SwipeDirection.Right;
+		swipeGestureRecognizer.Swiped += SwipeGestureRecognizer_Swiped;
+		EpubText.GestureRecognizers.Add(swipeGestureRecognizer);
+#endif
 		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
 	}
 
@@ -47,13 +64,13 @@ public partial class BookPage : ContentPage
 		}
 
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		Dispatcher.Dispatch(() => UpdateWebView());
+		Dispatcher.Dispatch(async () => await UpdateWebView());
 	}
 
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		Dispatcher.Dispatch(async () => await UpdateWebView());
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -112,9 +129,17 @@ public partial class BookPage : ContentPage
 			logger.Info("Start of book");
 			return;
 		}
-		book.CurrentChapter--;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontalScrollAtStart()");
+		if (result.Equals("true"))
+		{
+			book.CurrentChapter--;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			isPreviousPage = true;
+			Dispatcher.Dispatch(async () => await UpdateWebView());
+		
+			return;
+		}
+		EpubText.Eval("prevPage()");
 	}
 
 	async void PreviousPage(object sender, EventArgs e)
@@ -134,12 +159,37 @@ public partial class BookPage : ContentPage
 			logger.Info("End of book");
 			return;
 		}
-		book.CurrentChapter++;
-		await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(() => UpdateWebView());
+		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
+		if (result.Equals("true"))
+		{
+			book.CurrentChapter++;
+			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			Dispatcher.Dispatch(async () => await UpdateWebView());
+			return;
+		}
+		EpubText.Eval("nextPage()");
 	}
 
-	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
+	async Task GotoEnd()
+	{
+		try
+		{
+			var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
+			if (result.Equals("true"))
+			{
+				isPreviousPage = false;
+				return;
+			}
+			EpubText.Eval("nextPage()");
+			await GotoEnd();
+		}
+		catch (Exception ex)
+		{
+			logger.Error(ex.Message);
+		}
+	}
+
+	public async void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
 		if (e.Direction == SwipeDirection.Left)
 		{
@@ -151,7 +201,7 @@ public partial class BookPage : ContentPage
 		}
 	}
 
-	void UpdateWebView()
+	async Task UpdateWebView()
 	{
 		Shimmer.IsActive = true;
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
@@ -159,6 +209,10 @@ public partial class BookPage : ContentPage
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
 		UpdateTheme();
+		if(isPreviousPage)
+		{
+			await GotoEnd();
+		}
 	}
 
 	void UpdateTheme()
@@ -188,5 +242,31 @@ public partial class BookPage : ContentPage
 		PageLabel.TextColor = text;
 		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
 		CurrentPage.BackgroundColor = navigationColor;
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				EpubText.Navigating -= EpubText_Navigating;
+				WeakReferenceMessenger.Default.UnregisterAll(this);
+				if (Application.Current is not null)
+				{
+					Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
+				}
+#if ANDROID || IOS
+				swipeGestureRecognizer.Swiped -= SwipeGestureRecognizer_Swiped;
+#endif
+			}
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }
