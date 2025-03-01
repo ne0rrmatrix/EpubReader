@@ -13,66 +13,61 @@ public static partial class InjectIntoHtml
 		{
 			return string.Empty;
 		}
-		StringBuilder css = new();
-		StringBuilder styleTag = new();
 
-		css.Append(style);
+		var cssContent = BuildCssContent(html, book, settings);
+		html = RemoveExistingStyleTags(html);
+		html = InjectCss(html, cssContent);
+		html = ReplaceImageUrls(html, book.Images);
+		html = InjectJavascript(html, disableScroll + jsButtons);
+		html = AddDivContainer(html);
+
+		return html;
+	}
+
+	static string BuildCssContent(string html, Book book, Settings settings)
+	{
+		var css = new StringBuilder(style);
 		var cssList = ExtractCssFileNames(html);
-		foreach (var cssFile in from item in cssList
-								let cssFile = book.Css.Find(x => item.Contains(x.FileName))
-								select cssFile)
+
+		foreach (var cssFile in cssList.Select(item => book.Css.Find(x => item.Contains(x.FileName))))
 		{
 			css.Append(cssFile?.Content);
 		}
-		html = StyleTagRegex().Replace(html, string.Empty);
 
+		var styleTag = new StringBuilder();
 		styleTag.Append(GenerateCSSFromString(settings));
 		styleTag.Append(FilterCss(css.ToString(), settings));
 		styleTag.Append(css);
-		html = InjectCss(html, styleTag.ToString());
-		book.Images.ForEach(image => 
-		html = ReplaceImageUrls(html, image.FileName, image.ImageUrl));
-	
-		var js = disableScroll + jsButtons;
-		html = InjectJavascript(html, js);
-		html = AddDivContainer(html);
-		System.Diagnostics.Debug.WriteLine(html);
-		return html;
+
+		return styleTag.ToString();
 	}
 
 	static List<string> ExtractCssFileNames(string html)
 	{
-		List<string> cssFiles = [];
-		string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
+		const string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
+		var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
 
-		MatchCollection matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
-		matches.Select(match => match.Groups[1].Value)
-			.ToList()
-			.ForEach(cssFileName => cssFiles.Add(Path.GetFileName(cssFileName)));
-		
-		return cssFiles;
+		return [.. matches.Select(match => Path.GetFileName(match.Groups[1].Value))];
 	}
 
-	static string GenerateCSSFromString(Settings settings) // Modified to accept settings directly
+	static string GenerateCSSFromString(Settings settings)
 	{
-		string styleTag = string.Empty;
-
-		if (!string.IsNullOrEmpty(settings.BackgroundColor) || !string.IsNullOrEmpty(settings.TextColor) || settings.FontSize > 0 || !string.IsNullOrEmpty(settings.FontFamily))
+		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor) && settings.FontSize <= 0 && string.IsNullOrEmpty(settings.FontFamily))
 		{
-			styleTag = $@"
-                body {{
-                    {(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
-                    {(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
-                    {(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
-                    {(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
-                }}";
+			return string.Empty;
 		}
-		return styleTag;
+
+		return $@"
+            body {{
+                {(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
+                {(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
+                {(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
+                {(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
+            }}";
 	}
 
 	static string FilterCss(string css, Settings settings)
 	{
-		// Remove font-size and font-family from the Css
 		if (settings.FontSize > 0)
 		{
 			css = FontSizeRegex().Replace(css, string.Empty);
@@ -86,7 +81,6 @@ public static partial class InjectIntoHtml
 
 	static string InjectCss(string html, string css)
 	{
-		// Assuming you want to inject the Css into the <head> section
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
 		if (headEndTagIndex >= 0)
 		{
@@ -94,12 +88,21 @@ public static partial class InjectIntoHtml
 		}
 		else
 		{
-			// If no <head> tag is found, prepend the style to the HTML
 			html = $"<style>{css}</style>" + html;
 		}
 		return html;
 	}
-	static string ReplaceImageUrls(string htmlContent, string sourcePattern, string newImageSource)
+
+	static string ReplaceImageUrls(string html, List<Models.Image> images)
+	{
+		foreach (var image in images)
+		{
+			html = ReplaceImageUrl(html, image.FileName, image.ImageUrl);
+		}
+		return html;
+	}
+
+	static string ReplaceImageUrl(string htmlContent, string sourcePattern, string newImageSource)
 	{
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
 		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
@@ -136,7 +139,6 @@ public static partial class InjectIntoHtml
 		}
 		else
 		{
-			// If no <head> tag is found, prepend the style to the HTML
 			html = $"<script>{javascript}</script>" + html;
 		}
 		return html;
@@ -149,39 +151,31 @@ public static partial class InjectIntoHtml
 			return html;
 		}
 
-		// Regex to find opening and closing body tags, allowing for attributes and whitespace.
-		string openingBodyRegex = @"<body\s*([^>]*)>";
-		string closingBodyRegex = @"</body>";
+		const string openingBodyRegex = @"<body\s*([^>]*)>";
+		const string closingBodyRegex = @"</body>";
 
-		// Check for body tags.
-		Match openingBodyMatch = Regex.Match(html, openingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
-		Match closingBodyMatch = Regex.Match(html, closingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
+		var openingBodyMatch = Regex.Match(html, openingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
+		var closingBodyMatch = Regex.Match(html, closingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
 
 		if (!openingBodyMatch.Success || !closingBodyMatch.Success)
 		{
-			return html; // Return original if no body tags found.
+			return html;
 		}
 
-		StringBuilder result = new();
-
-		// Append the part before the opening body.
+		var result = new StringBuilder();
 		result.Append(html.AsSpan(0, openingBodyMatch.Index + openingBodyMatch.Length));
-
-		// Append the opening div.
 		result.Append("<div id=\"scrollContainer\">");
-
-		// Append the content between the body tags.
 		result.Append(html.AsSpan(openingBodyMatch.Index + openingBodyMatch.Length, closingBodyMatch.Index - (openingBodyMatch.Index + openingBodyMatch.Length)));
-
-		// Append the closing div and the closing body tag.
 		result.Append("</div></body>");
-
-		// Append the part after the closing body.
 		result.Append(html.AsSpan(closingBodyMatch.Index + closingBodyMatch.Length));
 
 		return result.ToString();
 	}
 
+	static string RemoveExistingStyleTags(string html)
+	{
+		return StyleTagRegex().Replace(html, string.Empty);
+	}
 
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
@@ -192,65 +186,64 @@ public static partial class InjectIntoHtml
 	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex FontFamilyRegex();
 
-
 	static readonly string disableScroll = @"
-		window.addEventListener('wheel', function(event) {
-			event.preventDefault();
-		}, { passive: false });
+        window.addEventListener('wheel', function(event) {
+            event.preventDefault();
+        }, { passive: false });
 
-		window.addEventListener('touchmove', function(event) {
-			event.preventDefault();
-		}, { passive: false });";
+        window.addEventListener('touchmove', function(event) {
+            event.preventDefault();
+        }, { passive: false });";
 
 	static readonly string style = @"
-		 ::-webkit-scrollbar{
-        display: none;
-		}
-		
-		*	{
-				-webkit-touch-callout: none;
-				-webkit-user-select: none;
-				-khtml-user-select: none;
-				-moz-user-select: none;
-				-ms-user-select: none;
-				user-select: none;
-			}
-		#scrollContainer {
-			columns: 1;
-			overflow-x: auto;
-			height: 100vh;
-		}
+        ::-webkit-scrollbar {
+            display: none;
+        }
 
-		#scrollContainer p {
-			text-align: justify;
-			margin-left: 2em;
-			margin-right: 2em;
-		}";
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        #scrollContainer {
+            columns: 1;
+            overflow-x: auto;
+            height: 100vh;
+        }
+
+        #scrollContainer p {
+            text-align: justify;
+            margin-left: 2em;
+            margin-right: 2em;
+        }";
 
 	static readonly string jsButtons = @"
-		function nextPage() {
-        document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
-		}
+        function nextPage() {
+            document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
+        }
 
-		function prevPage() {
-			document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
-		}
-	
-		function isHorizontalScrollAtStart() {
-			var element = document.getElementById(""scrollContainer"");
-			if (!element) {
-				// Handle cases where the element is not provided or doesn't exist.
-				return false; // Or false, depending on how you want to handle this case.
-			}
-			return element.scrollLeft === 0;
-		}
+        function prevPage() {
+            document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
+        }
 
-		 function isHorizontallyScrolledToEnd() {
-			var element = document.getElementById(""scrollContainer"");
-			if (!element) {
-				return false; // Handle cases where the element doesn't exist.
-			}
-		  const maxScrollLeft = element.scrollWidth - element.clientWidth;
-		  return Math.abs(element.scrollLeft - maxScrollLeft) <= 1; // Using a small tolerance to account for potential rounding errors.
-		}";
+        function isHorizontalScrollAtStart() {
+            var element = document.getElementById(""scrollContainer"");
+            if (!element) {
+                return false;
+            }
+            return element.scrollLeft === 0;
+        }
+
+        function isHorizontallyScrolledToEnd() {
+            var element = document.getElementById(""scrollContainer"");
+            if (!element) {
+                return false;
+            }
+            const maxScrollLeft = element.scrollWidth - element.clientWidth;
+            return Math.abs(element.scrollLeft - maxScrollLeft) <= 1;
+        }";
 }

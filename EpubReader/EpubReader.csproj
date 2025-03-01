@@ -77,6 +77,7 @@
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
 		<PackageReference Include="EpubCore" Version="1.6.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.1" />
