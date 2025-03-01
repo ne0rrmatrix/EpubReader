@@ -19,8 +19,10 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
-	readonly SwipeGestureRecognizer swipeGestureRecognizer;
-	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior;
+#if ANDROID || IOS
+	readonly SwipeGestureRecognizer swipeGestureRecognizer = new();
+	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
+#endif
 	bool isPreviousPage = false;
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
@@ -31,8 +33,6 @@ public partial class BookPage : ContentPage, IDisposable
 	public BookPage(BookViewModel viewModel)
 	{
 		InitializeComponent();
-		swipeGestureRecognizer = new();
-		touchbehavior = new();
 		BindingContext = viewModel;
 #if ANDROID || IOS
 		var temp = (BookViewModel)BindingContext;
