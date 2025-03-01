@@ -1,6 +1,7 @@
 #if ANDROID
 using Android.Views;
 using AndroidX.Core.View;
+using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Core.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 #endif
@@ -16,17 +17,32 @@ using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
-public partial class BookPage : ContentPage
+public partial class BookPage : ContentPage, IDisposable
 {
+	readonly SwipeGestureRecognizer swipeGestureRecognizer;
+	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior;
 	bool isPreviousPage = false;
 	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	Book book = new();
 	Settings settings = new();
+	bool disposedValue;
+
 	public BookPage(BookViewModel viewModel)
 	{
 		InitializeComponent();
+		swipeGestureRecognizer = new();
+		touchbehavior = new();
 		BindingContext = viewModel;
+#if ANDROID || IOS
+		var temp = (BookViewModel)BindingContext;
+		touchbehavior.LongPressCommand = new Command(() => temp.Press());
+		touchbehavior.LongPressDuration = 700;
+		EpubText.Behaviors.Add(touchbehavior);
+		swipeGestureRecognizer.Direction = SwipeDirection.Left | SwipeDirection.Right;
+		swipeGestureRecognizer.Swiped += SwipeGestureRecognizer_Swiped;
+		EpubText.GestureRecognizers.Add(swipeGestureRecognizer);
+#endif
 		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
 	}
 
@@ -173,7 +189,7 @@ public partial class BookPage : ContentPage
 		}
 	}
 
-	public async void SwipeGestureRecognizer_Swiped(object sender, SwipedEventArgs e)
+	public async void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
 		if (e.Direction == SwipeDirection.Left)
 		{
@@ -226,5 +242,31 @@ public partial class BookPage : ContentPage
 		PageLabel.TextColor = text;
 		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
 		CurrentPage.BackgroundColor = navigationColor;
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				EpubText.Navigating -= EpubText_Navigating;
+				WeakReferenceMessenger.Default.UnregisterAll(this);
+				if (Application.Current is not null)
+				{
+					Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
+				}
+#if ANDROID || IOS
+				swipeGestureRecognizer.Swiped -= SwipeGestureRecognizer_Swiped;
+#endif
+			}
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

@@ -12,6 +12,10 @@ using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
 
+#if DEBUG
+using Microsoft.Extensions.Logging;
+#endif
+
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
 namespace EpubReader;

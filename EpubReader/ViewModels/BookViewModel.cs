@@ -26,11 +26,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		Settings = new();
 		IsNavMenuVisible = true;
-#if ANDROID
-		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
-#endif
-		IsNavMenuVisible = !IsNavMenuVisible;
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		Press();
 	}
 	public async void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
@@ -49,7 +45,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	}
 
 	[RelayCommand]
-	void Press()
+	public void Press()
 	{
 #if ANDROID
 		StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
