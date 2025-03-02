@@ -54,26 +54,12 @@ public partial class EbookService
 		images.AddRange(imageList.Select(item => GetImage(ResizeImageImageSharp(item.Content, 1080, 1920, 80), item.Href)));
 		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
 		
-		if (book.CoverImage is null && imageItem?.Content.Length > 0)
-		{
-			logger.Info("Found alternative cover image.");
-			coverImage = BytesToWebSafeString(imageItem.Content);
-			mimeType = imageItem.MimeType;
-		}
-		if (imageItem?.Content.Length == 0 && book.CoverImage is null)
-		{
-			logger.Info("Cover image is null. Generating one.");
-			var coverImageBytes = BitmapImageCover(book.Title);
-			coverImage = BytesToWebSafeString(coverImageBytes);
-			mimeType = imageItem.MimeType;
-		}
-		
 		Book books = new()
         {
             Title = book.Title.Trim(),
             Authors = authors,
             FilePath = path,
-            CoverImage = book.CoverImage ?? imageItem?.Content ?? [],
+            CoverImage = book.CoverImage ?? imageItem?.Content ?? BitmapImageCover(book.Title),
 			CoverUrl = $"data:{mimeType};charset=utf-8;base64, {coverImage}",
 			Chapters = [.. chapters],
 			Images = [.. images],
