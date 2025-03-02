@@ -6,7 +6,7 @@
     xmlns:local="clr-namespace:EpubReader.Views"
     xmlns:shimmer="clr-namespace:Syncfusion.Maui.Toolkit.Shimmer;assembly=Syncfusion.Maui.Toolkit"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
     x:DataType="viewModels:BookViewModel"
@@ -20,15 +20,15 @@
         <ToolbarItem
             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
             Command="{Binding ShowPopupCommand}"
-            IconImageSource="settings.png"
+            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
+                                                                Default=settings_lightmode.png},
+                                              Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <shimmer:SfShimmer
-        x:Name="Shimmer"
-        AnimationDuration="3000">
+    <shimmer:SfShimmer x:Name="Shimmer" AnimationDuration="3000">
         <shimmer:SfShimmer.Content>
-            <Grid x:Name="Grid">
+            <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
                 <Grid.GestureRecognizers>
                     <OnPlatform x:TypeArguments="TapGestureRecognizer">
                         <On Platform="WinUI">
@@ -43,7 +43,9 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="auto" />
                 </Grid.RowDefinitions>
-
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
                 <WebView
                     x:Name="EpubText"
                     Grid.Row="0"
@@ -51,50 +53,49 @@
                     <WebView.GestureRecognizers>
                         <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                             <On Platform="Android">
-                                <SwipeGestureRecognizer
-                                    Direction="Left,Right,Up,Down"
-                                    Swiped="SwipeGestureRecognizer_Swiped"/>
+                                <SwipeGestureRecognizer Direction="Left,Right,Up,Down" Swiped="SwipeGestureRecognizer_Swiped" />
                             </On>
                             <On Platform="IOS">
-                                <SwipeGestureRecognizer
-                                    Direction="Left,Right,Up,Down"
-                                    Swiped="SwipeGestureRecognizer_Swiped"/>
+                                <SwipeGestureRecognizer Direction="Left,Right,Up,Down" Swiped="SwipeGestureRecognizer_Swiped" />
                             </On>
                         </OnPlatform>
                     </WebView.GestureRecognizers>
                 </WebView>
-                <StackLayout
-                    x:Name="StackLayout"
+
+                <ImageButton
                     Grid.Row="1"
-                    Padding="10,10,10,10"
+                    Margin="30,0,0,0"
+                    Background="Transparent"
+                    Clicked="PreviousPage"
+                    HorizontalOptions="Start"
+                    IsEnabled="{OnPlatform WinUI=true,
+                                           Default=false}"
+                    IsVisible="{OnPlatform WinUI=true,
+                                           Default=false}"
+                    Source="{AppThemeBinding Dark=arrow_back.png,
+                                             Light=arrow_back_lightmode.png}"
+                    WidthRequest="40" />
+                <Label
+                    x:Name="PageLabel"
+                    Grid.Row="1"
+                    FontSize="20"
                     HorizontalOptions="Center"
                     IsVisible="{OnPlatform WinUI=true,
-                                           Android={Binding IsNavMenuVisible}}"
-                    Orientation="Horizontal"
-                    Spacing="50">
-                    <ImageButton
-                        Background="Transparent"
-                        Clicked="PreviousPage"
-                        IsEnabled="{OnPlatform WinUI=true,
-                                               Default=false}"
-                        IsVisible="{OnPlatform WinUI=true,
-                                               Default=false}"
-                        Source="arrow_back.png"
-                        WidthRequest="40" />
-                    <Label
-                        x:Name="PageLabel"
-                        FontSize="20"
-                        HorizontalOptions="Center" />
-                    <ImageButton
-                        Background="Transparent"
-                        Clicked="NextPage"
-                        IsEnabled="{OnPlatform WinUI=true,
-                                               Default=false}"
-                        IsVisible="{OnPlatform WinUI=true,
-                                               Default=false}"
-                        Source="arrow_forward.png"
-                        WidthRequest="40" />
-                </StackLayout>
+                                           Android={Binding IsNavMenuVisible}}" />
+                <ImageButton
+                    Grid.Row="1"
+                    Margin="0,0,30,0"
+                    Background="Transparent"
+                    Clicked="NextPage"
+                    HorizontalOptions="End"
+                    IsEnabled="{OnPlatform WinUI=true,
+                                           Default=false}"
+                    IsVisible="{OnPlatform WinUI=true,
+                                           Default=false}"
+                    Source="{AppThemeBinding Dark=arrow_forward.png,
+                                             Light=arrow_forward_lightmode.png}"
+                    WidthRequest="40" />
+
             </Grid>
         </shimmer:SfShimmer.Content>
     </shimmer:SfShimmer>

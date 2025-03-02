@@ -1,22 +1,9 @@
 ﻿using Android.Views;
 using AndroidX.Core.View;
-using CommunityToolkit.Maui.Core.Platform;
 
 namespace EpubReader.Service;
 public static class StatusBarExtensions
 {
-	public static void SetStatusBarTransparent()
-	{
-		if (Application.Current?.PlatformAppTheme == AppTheme.Dark)
-		{
-			StatusBar.SetStyle(CommunityToolkit.Maui.Core.StatusBarStyle.LightContent);
-		}
-		else
-		{
-			StatusBar.SetStyle(CommunityToolkit.Maui.Core.StatusBarStyle.DarkContent);
-		}
-	}
-
 	public static void SetStatusBarsHidden(bool hidden)
 	{
 		var window = Platform.CurrentActivity?.Window ?? throw new InvalidOperationException();
@@ -26,7 +13,6 @@ public static class StatusBarExtensions
 		{
 			if (hidden)
 			{
-				SetStatusBarTransparent();
 				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
@@ -40,7 +26,6 @@ public static class StatusBarExtensions
 			}
 			else
 			{
-				SetStatusBarTransparent();
 				window.ClearFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;

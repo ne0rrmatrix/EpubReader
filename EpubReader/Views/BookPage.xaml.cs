@@ -13,7 +13,6 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
-using Microsoft.Maui.Controls;
 using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
@@ -37,12 +36,6 @@ public partial class BookPage : ContentPage, IDisposable
 #if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
 #endif
-		Application.Current.RequestedThemeChanged += OnRequestedThemeChanged;
-	}
-
-	void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
-	{
-		Dispatcher.Dispatch(() => UpdateTheme());
 	}
 
 	void CurrentPage_Loaded(object sender, EventArgs e)
@@ -96,7 +89,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 		EpubText.Navigating -= EpubText_Navigating;
 		EpubText.Navigated -= OnEpubText_Navigated;
-		Application.Current.RequestedThemeChanged -= OnRequestedThemeChanged;
 
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 		Shell.Current.ToolbarItems.Clear();
@@ -207,41 +199,12 @@ public partial class BookPage : ContentPage, IDisposable
 		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
-		UpdateTheme();
 		if(isPreviousPage)
 		{
 			await GotoEnd();
 		}
 	}
 
-	void UpdateTheme()
-	{
-		ArgumentNullException.ThrowIfNull(Application.Current);
-		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries ?? throw new InvalidOperationException();
-		var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault() ?? throw new InvalidOperationException();
-		(Color? background, Color? text, Color? navigationColor) = (null, null, null);
-		switch (Application.Current?.RequestedTheme)
-		{
-			case AppTheme.Dark:
-				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Dark);
-				theme.VisualTheme = SfVisuals.MaterialLight;
-				break;
-			case AppTheme.Light:
-				(background, text, navigationColor) = EbookColorScheme.GetColorSchemeColor(EbookColor.Default);
-				theme.VisualTheme = SfVisuals.MaterialLight;
-				break;
-		}
-		if (background is null || text is null || navigationColor is null)
-		{
-			return;
-		}
-		Grid.BackgroundColor = background;
-		StackLayout.BackgroundColor = navigationColor;
-		PageLabel.BackgroundColor = background;
-		PageLabel.TextColor = text;
-		Shell.SetBackgroundColor(Application.Current?.Windows[0].Page, navigationColor);
-		CurrentPage.BackgroundColor = navigationColor;
-	}
 
 	protected virtual void Dispose(bool disposing)
 	{
