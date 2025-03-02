@@ -13,9 +13,6 @@ namespace EpubReader.Service;
 public partial class EbookService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
-	static string jpg => "image/jpeg";
-	static string png => "image/png";
-	static string gif => "image/gif";
     protected EbookService()
     {
     }
@@ -46,7 +43,7 @@ public partial class EbookService
         var html = book.Resources.Html.ToList();
 		var imageList = book.Resources.Images.ToList();
 		var imageItem = imageList.MaxBy(x => x.Content.Length);
-
+		
 		chapters.AddRange(html.Select(item => new Chapter
 		{
 			Title = toc.Find(x => x.AbsolutePath == item.AbsolutePath)?.Title ?? string.Empty,
@@ -68,7 +65,7 @@ public partial class EbookService
 			logger.Info("Cover image is null. Generating one.");
 			var coverImageBytes = BitmapImageCover(book.Title);
 			coverImage = BytesToWebSafeString(coverImageBytes);
-			mimeType = png;
+			mimeType = imageItem.MimeType;
 		}
 		
 		Book books = new()
@@ -123,12 +120,11 @@ public partial class EbookService
 	}
 	public static Models.Image GetImage(byte[] imageByte, string href)
 	{
-		var imageString = BytesToWebSafeString(imageByte);
-		var mimeType = GetMimeType(href);
+		string base64 = Convert.ToBase64String(imageByte);
 		return new Models.Image
 		{
 			FileName = href,
-			ImageUrl = $"data:{mimeType};charset=utf-8;base64, {imageString}"
+			ImageUrl = base64
 		};
 	}
 
@@ -146,18 +142,7 @@ public partial class EbookService
 		image.Save(resizedMs, new JpegEncoder { Quality = quality });
 		return resizedMs.ToArray();
 	}
-	public static string GetMimeType(string fileName)
-	{
-		var fileExtension = Path.GetExtension(fileName);
-		return fileExtension switch
-		{
-			".jpg" => jpg,
-			".jpeg" => jpg,
-			".png" => png,
-			".gif" => gif,
-			_ => jpg
-		};
-	}
+
 	public static string BytesToWebSafeString(byte[] data)
 	{
 		if (data is null || data.Length == 0)
