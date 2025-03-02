@@ -3,13 +3,12 @@
     x:Class="EpubReader.Views.LibraryPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:Models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:Models="clr-namespace:EpubReader.Models"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels;assembly=EpubReader"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
     x:DataType="viewModels:LibraryViewModel">
-
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -20,8 +19,7 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
-            IconImageSource="{AppThemeBinding Dark=add.png,
-                                              Light=library_add_lightmode.png}"
+            IconImageSource="add.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
 

@@ -4,7 +4,6 @@ using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Service;
 using MetroLog;
-using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
@@ -119,30 +118,19 @@ public partial class SettingsPage : Popup, IDisposable
 		{
 			return;
 		}
-		ArgumentNullException.ThrowIfNull(Application.Current);
-		ICollection<ResourceDictionary> mergedDictionaries = Application.Current.Resources.MergedDictionaries;
-		if (mergedDictionaries != null)
+		if (Application.Current?.RequestedTheme == AppTheme.Dark)
 		{
-			var theme = mergedDictionaries.OfType<SyncfusionThemeResourceDictionary>().FirstOrDefault();
-			if (theme != null)
-			{
-				if (Application.Current?.RequestedTheme == AppTheme.Dark)
-				{
-					var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Dark);
-					settings.BackgroundColor = BackgroundColor;
-					settings.TextColor = TextColor;
-					theme.VisualTheme = SfVisuals.MaterialLight;
-				}
-				else
-				{
-					var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Default);
-					settings.BackgroundColor = BackgroundColor;
-					settings.TextColor = TextColor;
-					theme.VisualTheme = SfVisuals.MaterialDark;
-				}
-			}
+			var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Dark);
+			settings.BackgroundColor = BackgroundColor;
+			settings.TextColor = TextColor;
 		}
-		
+		else
+		{
+			var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Default);
+			settings.BackgroundColor = BackgroundColor;
+			settings.TextColor = TextColor;
+		}
+
 		await db.SaveSettings(settings);
 		logger.Info("System theme changed");
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
