@@ -101,7 +101,7 @@ public static partial class InjectIntoHtml
 		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
 		string pattern = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
 		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
-		string modifiedCss = Regex.Replace(css, pattern, replacement, RegexOptions.IgnoreCase);
+		string modifiedCss = Regex.Replace(css, pattern, replacement, RegexOptions.IgnoreCase, regexTimeout);
 		return modifiedCss;
 	}
 
