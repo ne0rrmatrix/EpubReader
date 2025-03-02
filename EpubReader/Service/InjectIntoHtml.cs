@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using EpubReader.Models;
 
@@ -7,6 +8,9 @@ namespace EpubReader.Service;
 public static partial class InjectIntoHtml
 {
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
+	static string jpg => "image/jpeg";
+	static string png => "image/png";
+	static string gif => "image/gif";
 	public static string InjectAllCss(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -31,12 +35,11 @@ public static partial class InjectIntoHtml
 
 		foreach (var cssFile in cssList.Select(item => book.Css.Find(x => item.Contains(x.FileName))))
 		{
-			css.Append(cssFile?.Content);
+			css.Append(ReplaceCssImageUrls(cssFile?.Content, book.Images));
 		}
 
 		var styleTag = new StringBuilder();
 		styleTag.Append(GenerateCSSFromString(settings));
-		styleTag.Append(FilterCss(css.ToString(), settings));
 		styleTag.Append(css);
 
 		return styleTag.ToString();
@@ -66,19 +69,6 @@ public static partial class InjectIntoHtml
             }}";
 	}
 
-	static string FilterCss(string css, Settings settings)
-	{
-		if (settings.FontSize > 0)
-		{
-			css = FontSizeRegex().Replace(css, string.Empty);
-		}
-		if (!string.IsNullOrEmpty(settings.FontFamily))
-		{
-			css = FontFamilyRegex().Replace(css, string.Empty);
-		}
-		return css;
-	}
-
 	static string InjectCss(string html, string css)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -92,6 +82,28 @@ public static partial class InjectIntoHtml
 		}
 		return html;
 	}
+	static string ReplaceCssImageUrls(string? css, List<Models.Image> images)
+	{
+		if (string.IsNullOrEmpty(css))
+		{
+			return string.Empty;
+		}
+		foreach (var image in images)
+		{
+			css = ReplaceCssImageUrl(css, image.FileName, image.ImageUrl);
+		}
+		return css;
+	}
+
+	public static string ReplaceCssImageUrl(string css, string imageName, string base64String)
+	{
+		base64String = $"data:{GetMimeType(imageName)};base64,{base64String}";
+		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
+		string pattern = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
+		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
+		string modifiedCss = Regex.Replace(css, pattern, replacement, RegexOptions.IgnoreCase, regexTimeout);
+		return modifiedCss;
+	}
 
 	static string ReplaceImageUrls(string html, List<Models.Image> images)
 	{
@@ -102,9 +114,11 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
-	static string ReplaceImageUrl(string htmlContent, string sourcePattern, string newImageSource)
+	static string ReplaceImageUrl(string htmlContent, string imageName, string newImageSource)
 	{
-		string imgPattern = $@"<img[^>]*src=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+		newImageSource = HtmlEncoder.Default.Encode(newImageSource);
+		newImageSource = $"data:{GetMimeType(imageName)};base64,{newImageSource}";
+		string imgPattern = $@"<img[^>]*src=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
 		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
 		{
 			string originalTag = match.Value;
@@ -120,7 +134,7 @@ public static partial class InjectIntoHtml
 		}, RegexOptions.None, regexTimeout);
 
 
-		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{sourcePattern}[^""']*)[""'][^>]*>";
+		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
 		
 		htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
 		{
@@ -171,7 +185,18 @@ public static partial class InjectIntoHtml
 
 		return result.ToString();
 	}
-
+	public static string GetMimeType(string fileName)
+	{
+		var fileExtension = Path.GetExtension(fileName);
+		return fileExtension switch
+		{
+			".jpg" => jpg,
+			".jpeg" => jpg,
+			".png" => png,
+			".gif" => gif,
+			_ => jpg
+		};
+	}
 	static string RemoveExistingStyleTags(string html)
 	{
 		return StyleTagRegex().Replace(html, string.Empty);
@@ -217,6 +242,36 @@ public static partial class InjectIntoHtml
         }";
 
 	static readonly string jsButtons = @"
+		window.addEventListener('load', () => adjustSvgToScreen(true));
+
+		function adjustSvgToScreen(preserveAspect = true) {
+		// Get the SVG element
+		const svg = document.querySelector('svg');
+    
+		if (!svg) return;
+    
+		// Set appropriate preserveAspectRatio
+		if (preserveAspect) {
+			// 'xMidYMid meet' maintains aspect ratio and centers the image
+			svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+		}
+    
+		// Make sure the container div takes full available space
+		const container = svg.parentElement;
+		container.style.width = '100%';
+		container.style.height = '100%';
+		container.style.display = 'flex';
+		container.style.justifyContent = 'center';
+		container.style.alignItems = 'center';
+    
+		// Ensure body and html are set to use full viewport
+		document.body.style.margin = '0';
+		document.body.style.padding = '0';
+		document.body.style.width = '100%';
+		document.body.style.height = '100vh';
+		document.documentElement.style.width = '100%';
+		document.documentElement.style.height = '100%';
+	}
         function nextPage() {
             document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
         }
