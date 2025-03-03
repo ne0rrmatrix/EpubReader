@@ -13,7 +13,6 @@ public partial class Book
 	public int CurrentPage { get; set; } = 0;
 	public bool HasPages { get; set; } = false;
 	public int CurrentChapter { get; set; } = 0;
-	public string CoverUrl { get; set; } = string.Empty;
 
 	[Ignore]
 	public List<Chapter> Chapters { get; set; } = [];

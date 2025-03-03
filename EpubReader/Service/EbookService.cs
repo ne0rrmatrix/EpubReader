@@ -12,13 +12,13 @@ namespace EpubReader.Service;
 
 public partial class EbookService
 {
-    static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
-    protected EbookService()
-    {
-    }
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
+	protected EbookService()
+	{
+	}
 
-    public static Book? OpenEbook(string path)
-    {
+	public static Book? OpenEbook(string path)
+	{
 
 		List<Chapter> chapters = [];
 		List<Author> authors = [];
@@ -37,13 +37,11 @@ public partial class EbookService
 			return null;
 		}
 
-		string mimeType = string.Empty;
-		string coverImage = string.Empty;
 		var toc = book.TableOfContents.ToList();
-        var html = book.Resources.Html.ToList();
+		var html = book.Resources.Html.ToList();
 		var imageList = book.Resources.Images.ToList();
 		var imageItem = imageList.MaxBy(x => x.Content.Length);
-		
+
 		chapters.AddRange(html.Select(item => new Chapter
 		{
 			Title = toc.Find(x => x.AbsolutePath == item.AbsolutePath)?.Title ?? string.Empty,
@@ -51,30 +49,29 @@ public partial class EbookService
 			FileName = item.FileName ?? string.Empty
 		}));
 		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
-		images.AddRange(imageList.Select(item => GetImage(ResizeImageImageSharp(item.Content, 1080, 1920, 80), item.Href)));
+		images.AddRange(imageList.Select(item => GetImage(ResizeImageSharp(item.Content, 1080, 1920, 80), item.Href)));
 		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
-		
+
 		Book books = new()
-        {
-            Title = book.Title.Trim(),
-            Authors = authors,
-            FilePath = path,
-            CoverImage = book.CoverImage ?? imageItem?.Content ?? BitmapImageCover(book.Title),
-			CoverUrl = $"data:{mimeType};charset=utf-8;base64, {coverImage}",
+		{
+			Title = book.Title.Trim(),
+			Authors = authors,
+			FilePath = path,
+			CoverImage = book.CoverImage ?? imageItem?.Content ?? BitmapImageCover(book.Title),
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
 			HasPages = book.Format.Ncx.PageList?.PageTargets is not null && book.Format.Ncx.PageList.PageTargets.Count > 0
 		};
 		return books;
-    }
+	}
 
 	static byte[] BitmapImageCover(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);
 		ICanvas canvas = bmp.Canvas;
 
-		Rect backgroundRectangle = new(0,0, bmp.Width, bmp.Height);
+		Rect backgroundRectangle = new(0, 0, bmp.Width, bmp.Height);
 		canvas.FillColor = Colors.White;
 		canvas.FillRectangle(backgroundRectangle);
 		canvas.StrokeColor = Colors.Black;
@@ -84,7 +81,7 @@ public partial class EbookService
 		Microsoft.Maui.Graphics.Font font = new("Arial");
 		float fontSize = 60;
 		canvas.FontSize = fontSize;
-		SizeF textSize = canvas.GetStringSize(title,font, fontSize);
+		SizeF textSize = canvas.GetStringSize(title, font, fontSize);
 
 		// Draw a rectangle to hold the string
 		Microsoft.Maui.Graphics.Point point = new(
@@ -104,7 +101,7 @@ public partial class EbookService
 			HorizontalAlignment.Center, VerticalAlignment.Center, TextFlow.OverflowBounds);
 		return bmp.Image.AsBytes(ImageFormat.Jpeg);
 	}
-	public static Models.Image GetImage(byte[] imageByte, string href)
+	static Models.Image GetImage(byte[] imageByte, string href)
 	{
 		string base64 = Convert.ToBase64String(imageByte);
 		return new Models.Image
@@ -114,7 +111,7 @@ public partial class EbookService
 		};
 	}
 
-	public static byte[] ResizeImageImageSharp(byte[] imageData, int maxWidth, int maxHeight, int quality)
+	static byte[] ResizeImageSharp(byte[] imageData, int maxWidth, int maxHeight, int quality)
 	{
 		// If the image is smaller than 500 bytes, return it as is
 		if (imageData.Length < 900000)
@@ -127,15 +124,5 @@ public partial class EbookService
 		image.Mutate(x => x.Resize(maxWidth, maxHeight));
 		image.Save(resizedMs, new JpegEncoder { Quality = quality });
 		return resizedMs.ToArray();
-	}
-
-	public static string BytesToWebSafeString(byte[] data)
-	{
-		if (data is null || data.Length == 0)
-		{
-			return string.Empty;
-		}
-		string base64 = Convert.ToBase64String(data);
-		return HtmlEncoder.Default.Encode(base64);
 	}
 }
