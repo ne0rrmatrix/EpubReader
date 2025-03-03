@@ -35,18 +35,47 @@ public partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-
+		var navMap = book.Format.Ncx.NavMap;
 		var toc = book.TableOfContents.ToList();
 		var html = book.Resources.Html.ToList();
 		var imageList = book.Resources.Images.ToList();
 		var imageItem = imageList.MaxBy(x => x.Content.Length);
-
-		chapters.AddRange(html.Select(item => new Chapter
+	
+		foreach (var navPoint in navMap.NavPoints)
 		{
-			Title = toc.Find(x => x.AbsolutePath == item.AbsolutePath)?.Title ?? string.Empty,
-			HtmlFile = item.TextContent,
-			FileName = item.FileName ?? string.Empty
-		}));
+			var chapter = html.Find(x => x.Href == navPoint.ContentSrc) ?? html.Find(x => navPoint.ContentSrc.Contains(x.Href));
+			
+			if (chapter is null)
+			{
+				continue;
+			}
+			if (chapter.AbsolutePath.Contains("_split_000.xhtml"))
+			{
+				chapter = html.Find(x => x.AbsolutePath == chapter.AbsolutePath.Replace("_split_000.xhtml", "_split_001.xhtml"));
+			}
+			
+			if (chapter is null)
+			{
+				continue;
+			}
+			chapters.Add(new Chapter
+			{
+				Title = navPoint.NavLabelText ?? string.Empty,
+				HtmlFile = chapter.TextContent ?? string.Empty,
+				FileName = chapter.FileName ?? string.Empty
+			});
+		}
+		
+		if (navMap.NavPoints.Count <= 1)
+		{
+			chapters.AddRange(html.Select(chapter => new Chapter
+			{
+				Title = toc.Find(x => x.AbsolutePath == chapter.AbsolutePath)?.Title ?? string.Empty,
+				HtmlFile = chapter.TextContent ?? string.Empty,
+				FileName = chapter.FileName ?? string.Empty
+			}));
+		}
+		
 		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
 		images.AddRange(imageList.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.Href)));
 		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
