@@ -35,35 +35,30 @@ public partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		var navMap = book.Format.Ncx.NavMap;
+		
+		var navMap = book.Format?.Ncx?.NavMap ?? new();
 		var toc = book.TableOfContents.ToList();
 		var html = book.Resources.Html.ToList();
 		var imageList = book.Resources.Images.ToList();
 		var imageItem = imageList.MaxBy(x => x.Content.Length);
 	
 		foreach (var navPoint in navMap.NavPoints)
-		{
+		{	
 			var chapter = html.Find(x => x.Href == navPoint.ContentSrc) ?? html.Find(x => navPoint.ContentSrc.Contains(x.Href));
-			
-			if (chapter is null)
-			{
-				continue;
-			}
-			if (chapter.AbsolutePath.Contains("_split_000.xhtml"))
+			if (chapter is not null && chapter.AbsolutePath.Contains("_split_000.xhtml"))
 			{
 				chapter = html.Find(x => x.AbsolutePath == chapter.AbsolutePath.Replace("_split_000.xhtml", "_split_001.xhtml"));
 			}
 			
-			if (chapter is null)
+			if (chapter is not null)
 			{
-				continue;
+				chapters.Add(new Chapter
+				{
+					Title = navPoint.NavLabelText ?? string.Empty,
+					HtmlFile = chapter.TextContent ?? string.Empty,
+					FileName = chapter.FileName ?? string.Empty
+				});
 			}
-			chapters.Add(new Chapter
-			{
-				Title = navPoint.NavLabelText ?? string.Empty,
-				HtmlFile = chapter.TextContent ?? string.Empty,
-				FileName = chapter.FileName ?? string.Empty
-			});
 		}
 		
 		if (navMap.NavPoints.Count <= 1)
@@ -89,7 +84,6 @@ public partial class EbookService
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
-			HasPages = book.Format.Ncx.PageList?.PageTargets is not null && book.Format.Ncx.PageList.PageTargets.Count > 0
 		};
 		return books;
 	}

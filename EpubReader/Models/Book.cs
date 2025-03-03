@@ -11,7 +11,6 @@ public partial class Book
 	public string Title { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
 	public int CurrentPage { get; set; } = 0;
-	public bool HasPages { get; set; } = false;
 	public int CurrentChapter { get; set; } = 0;
 
 	[Ignore]
