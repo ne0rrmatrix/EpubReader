@@ -90,7 +90,15 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			return;
 		}
 		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false);
-		var exists = bookData.Any(x => x.FilePath == result.FileName);
+		
+		// Open the epub file
+		var ebook = EbookService.OpenEbook(result.FullPath);
+		if (ebook is null)
+		{
+			logger.Info("Error opening ebook");
+			return;
+		}
+		var exists = bookData.Any(x => x.Title == ebook.Title);
 		if (exists)
 		{
 			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
@@ -99,14 +107,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		}
 
 		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
-		// Open the epub file
-		var ebook = EbookService.OpenEbook(filePath);
-		if (ebook is null)
-		{
-			logger.Info("Error opening ebook");
-			return;
-		}
-		
 		ebook.FilePath = filePath;
 		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 		Books.Add(ebook);

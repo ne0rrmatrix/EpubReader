@@ -1,5 +1,4 @@
-﻿using System.Text.Encodings.Web;
-using EpubReader.Models;
+﻿using EpubReader.Models;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
