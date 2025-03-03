@@ -56,20 +56,22 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
-			ebook.CurrentChapter = item.CurrentChapter;
-			Books.Add(ebook);
+			item.CoverImage = ebook.CoverImage;
+			Books.Add(item);
 		}
-    }
+	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book Book)
+    public static async Task GotoBookPage(Book book)
     {
-		if(Book is null)
+		if(book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
-			var navigationParams = new Dictionary<string, object>
+		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
+		Book.CurrentChapter = book.CurrentChapter;
+		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
         };
@@ -83,7 +85,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
-        });
+        }).ConfigureAwait(false);
 		if(result is null)
 		{
 			logger.Info("No file selected");
@@ -109,6 +111,9 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
 		ebook.FilePath = filePath;
 		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
+		ebook.Css.Clear();
+		ebook.Chapters.Clear();
+		ebook.Images.Clear();
 		Books.Add(ebook);
 	}
 
