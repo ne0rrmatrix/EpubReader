@@ -98,8 +98,8 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("Error opening ebook");
 			return;
 		}
-		var exists = bookData.Any(x => x.Title == ebook.Title);
-		if (exists)
+
+		if (bookData.Any(x => x.Title == ebook.Title))
 		{
 			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
 			logger.Info("Book already exists in library");
