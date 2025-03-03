@@ -56,20 +56,22 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
-			ebook.CurrentChapter = item.CurrentChapter;
-			Books.Add(ebook);
+			item.CoverImage = ebook.CoverImage;
+			Books.Add(item);
 		}
-    }
+	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book Book)
+    public static async Task GotoBookPage(Book book)
     {
-		if(Book is null)
+		if(book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
-			var navigationParams = new Dictionary<string, object>
+		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
+		Book.CurrentChapter = book.CurrentChapter;
+		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
         };
@@ -83,15 +85,23 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
-        });
+        }).ConfigureAwait(false);
 		if(result is null)
 		{
 			logger.Info("No file selected");
 			return;
 		}
 		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false);
-		var exists = bookData.Any(x => x.FilePath == result.FileName);
-		if (exists)
+		
+		// Open the epub file
+		var ebook = EbookService.OpenEbook(result.FullPath);
+		if (ebook is null)
+		{
+			logger.Info("Error opening ebook");
+			return;
+		}
+
+		if (bookData.Any(x => x.Title == ebook.Title))
 		{
 			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
 			logger.Info("Book already exists in library");
@@ -99,16 +109,11 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		}
 
 		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
-		// Open the epub file
-		var ebook = EbookService.OpenEbook(filePath);
-		if (ebook is null)
-		{
-			logger.Info("Error opening ebook");
-			return;
-		}
-		
 		ebook.FilePath = filePath;
 		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
+		ebook.Css.Clear();
+		ebook.Chapters.Clear();
+		ebook.Images.Clear();
 		Books.Add(ebook);
 	}
 

@@ -11,16 +11,15 @@ public static partial class InjectIntoHtml
 	static string jpg => "image/jpeg";
 	static string png => "image/png";
 	static string gif => "image/gif";
-	public static string InjectAllCss(string html, Book book, Settings settings)
+	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
 		{
 			return string.Empty;
 		}
 
-		var cssContent = BuildCssContent(html, book, settings);
 		html = RemoveExistingStyleTags(html);
-		html = InjectCss(html, cssContent);
+		html = InjectCss(html, book, settings);
 		html = ReplaceImageUrls(html, book.Images);
 		html = InjectJavascript(html, disableScroll + jsButtons);
 		html = AddDivContainer(html);
@@ -28,23 +27,31 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
-	static string BuildCssContent(string html, Book book, Settings settings)
+	static string InjectCss(string html, Book book, Settings settings)
 	{
 		var css = new StringBuilder(style);
 		var cssList = ExtractCssFileNames(html);
 
 		foreach (var cssFile in cssList.Select(item => book.Css.Find(x => item.Contains(x.FileName))))
 		{
-			css.Append(ReplaceCssImageUrls(cssFile?.Content, book.Images));
+			css.Append(ReplaceImageUrls(cssFile?.Content, book.Images));
 		}
 
 		var styleTag = new StringBuilder();
 		styleTag.Append(GenerateCSSFromString(settings));
 		styleTag.Append(css);
 
-		return styleTag.ToString();
+		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+		if (headEndTagIndex >= 0)
+		{
+			html = html.Insert(headEndTagIndex, $"<style>{styleTag}</style>");
+		}
+		else
+		{
+			html = $"<style>{css}</style>" + html;
+		}
+		return html;
 	}
-
 	static List<string> ExtractCssFileNames(string html)
 	{
 		const string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
@@ -69,79 +76,55 @@ public static partial class InjectIntoHtml
             }}";
 	}
 
-	static string InjectCss(string html, string css)
+	static string ReplaceImageUrls(string? inputString, List<Models.Image> images)
 	{
-		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
-		if (headEndTagIndex >= 0)
-		{
-			html = html.Insert(headEndTagIndex, $"<style>{css}</style>");
-		}
-		else
-		{
-			html = $"<style>{css}</style>" + html;
-		}
-		return html;
-	}
-	static string ReplaceCssImageUrls(string? css, List<Models.Image> images)
-	{
-		if (string.IsNullOrEmpty(css))
+		if (string.IsNullOrEmpty(inputString))
 		{
 			return string.Empty;
 		}
 		foreach (var image in images)
 		{
-			css = ReplaceCssImageUrl(css, image.FileName, image.ImageUrl);
+			inputString = ReplaceImageUrl(inputString, image.FileName, image.ImageUrl);
 		}
-		return css;
+		return inputString;
 	}
 
-	public static string ReplaceCssImageUrl(string css, string imageName, string base64String)
+	static string ReplaceImageUrl(string inputString, string imageName, string imageString)
 	{
-		base64String = $"data:{GetMimeType(imageName)};base64,{base64String}";
+		var base64String = $"data:{GetMimeType(imageName)};base64,{imageString}";
 		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
-		string pattern = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
-		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
-		string modifiedCss = Regex.Replace(css, pattern, replacement, RegexOptions.IgnoreCase, regexTimeout);
-		return modifiedCss;
-	}
 
-	static string ReplaceImageUrls(string html, List<Models.Image> images)
-	{
-		foreach (var image in images)
-		{
-			html = ReplaceImageUrl(html, image.FileName, image.ImageUrl);
-		}
-		return html;
-	}
-
-	static string ReplaceImageUrl(string htmlContent, string imageName, string newImageSource)
-	{
-		newImageSource = HtmlEncoder.Default.Encode(newImageSource);
-		newImageSource = $"data:{GetMimeType(imageName)};base64,{newImageSource}";
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
-		htmlContent = Regex.Replace(htmlContent, imgPattern, match =>
-		{
-			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, newImageSource);
-		}, RegexOptions.None, regexTimeout);
-
-		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>"; // For other img tags
-
-		htmlContent = Regex.Replace(htmlContent, imgPattern2, match =>
-		{
-			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, newImageSource);
-		}, RegexOptions.None, regexTimeout);
-
-
+		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
 		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
-		
-		htmlContent = Regex.Replace(htmlContent, svgPattern, match =>
+
+		string patternCss = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
+		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
+
+		inputString = Regex.Replace(inputString, patternCss, replacement, RegexOptions.IgnoreCase, regexTimeout);
+
+		var htmlEncodedString = HtmlEncoder.Default.Encode(imageString);
+		base64String = $"data:{GetMimeType(imageName)};base64,{htmlEncodedString}";
+	
+		inputString = Regex.Replace(inputString, imgPattern, match =>
 		{
 			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, newImageSource);
+			return originalTag.Replace(match.Groups[1].Value, base64String);
 		}, RegexOptions.None, regexTimeout);
-		return htmlContent;
+
+		inputString = Regex.Replace(inputString, imgPattern2, match =>
+		{
+			string originalTag = match.Value;
+			return originalTag.Replace(match.Groups[1].Value, base64String);
+		}, RegexOptions.None, regexTimeout);
+
+		inputString = Regex.Replace(inputString, svgPattern, match =>
+		{
+			string originalTag = match.Value;
+			return originalTag.Replace(match.Groups[1].Value, base64String);
+		}, RegexOptions.None, regexTimeout);
+		
+		return inputString;
 	}
 
 	static string InjectJavascript(string html, string javascript)
@@ -264,7 +247,7 @@ public static partial class InjectIntoHtml
 		container.style.justifyContent = 'center';
 		container.style.alignItems = 'center';
     
-		// Ensure body and html are set to use full viewport
+		// Ensure body and inputString are set to use full viewport
 		document.body.style.margin = '0';
 		document.body.style.padding = '0';
 		document.body.style.width = '100%';
