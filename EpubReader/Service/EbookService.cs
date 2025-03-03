@@ -48,7 +48,7 @@ public partial class EbookService
 			FileName = item.FileName ?? string.Empty
 		}));
 		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
-		images.AddRange(imageList.Select(item => GetImage(ResizeImageSharp(item.Content, 1080, 1920, 80), item.Href)));
+		images.AddRange(imageList.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.Href)));
 		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
 
 		Book books = new()
@@ -56,7 +56,7 @@ public partial class EbookService
 			Title = book.Title.Trim(),
 			Authors = authors,
 			FilePath = path,
-			CoverImage = book.CoverImage ?? imageItem?.Content ?? BitmapImageCover(book.Title),
+			CoverImage = book.CoverImage ?? imageItem?.Content ?? GenerateCoverImage(book.Title),
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
@@ -65,7 +65,7 @@ public partial class EbookService
 		return books;
 	}
 
-	static byte[] BitmapImageCover(string title)
+	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);
 		ICanvas canvas = bmp.Canvas;
@@ -110,7 +110,7 @@ public partial class EbookService
 		};
 	}
 
-	static byte[] ResizeImageSharp(byte[] imageData, int maxWidth, int maxHeight, int quality)
+	static byte[] ResizeImage(byte[] imageData, int maxWidth, int maxHeight, int quality)
 	{
 		// If the image is smaller than 500 bytes, return it as is
 		if (imageData.Length < 900000)

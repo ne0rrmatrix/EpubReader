@@ -11,7 +11,7 @@ public static partial class InjectIntoHtml
 	static string jpg => "image/jpeg";
 	static string png => "image/png";
 	static string gif => "image/gif";
-	public static string InjectAllCss(string html, Book book, Settings settings)
+	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
 		{

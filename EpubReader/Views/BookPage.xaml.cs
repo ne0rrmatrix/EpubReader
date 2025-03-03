@@ -13,7 +13,6 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.ViewModels;
 using MetroLog;
-using Syncfusion.Maui.Toolkit.Themes;
 
 namespace EpubReader.Views;
 
@@ -69,7 +68,7 @@ public partial class BookPage : ContentPage, IDisposable
 			Priority = index,
 			Command = new Command(() =>
 			{
-				var html = InjectIntoHtml.InjectAllCss(chapter.HtmlFile, book, settings);
+				var html = InjectIntoHtml.UpdateHtml(chapter.HtmlFile, book, settings);
 				Dispatcher.Dispatch(async () =>
 				{
 					EpubText.Source = new HtmlWebViewSource { Html = html };
@@ -108,7 +107,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 	}
 
-	async Task PreviousPage()
+	async void PreviousPage(object sender, EventArgs e)
 	{
 		if (book.CurrentChapter <= 0)
 		{
@@ -122,23 +121,13 @@ public partial class BookPage : ContentPage, IDisposable
 			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
 			isPreviousPage = true;
 			Dispatcher.Dispatch(async () => await UpdateWebView());
-		
+
 			return;
 		}
 		EpubText.Eval("prevPage()");
 	}
 
-	async void PreviousPage(object sender, EventArgs e)
-	{
-		await PreviousPage();
-	}
-
 	async void NextPage(object sender, EventArgs e)
-	{
-		await NextPage();
-	}
-
-	async Task NextPage()
 	{
 		if (book.CurrentChapter >= book.Chapters.Count)
 		{
@@ -175,15 +164,20 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 	}
 
-	public async void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
+	public void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
-		switch(e.Direction)
+		if(sender is null)
+		{
+			logger.Info("Sender is null");
+			return;
+		}
+		switch (e.Direction)
 		{
 			case SwipeDirection.Left:
-				await NextPage();
+				NextPage(sender, new EventArgs());
 				break;
 			case SwipeDirection.Right:
-				await PreviousPage();
+				PreviousPage(sender, new EventArgs());
 				break;
 			default:
 				var viewModel = (BookViewModel)BindingContext;
@@ -196,7 +190,7 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		Shimmer.IsActive = true;
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		var html = InjectIntoHtml.InjectAllCss(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		var html = InjectIntoHtml.UpdateHtml(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
 		if(isPreviousPage)
@@ -204,7 +198,6 @@ public partial class BookPage : ContentPage, IDisposable
 			await GotoEnd();
 		}
 	}
-
 
 	protected virtual void Dispose(bool disposing)
 	{
