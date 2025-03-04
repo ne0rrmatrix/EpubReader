@@ -92,8 +92,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			return;
 		}
 		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false);
-		
-		// Open the epub file
 		var ebook = EbookService.OpenEbook(result.FullPath);
 		if (ebook is null)
 		{
@@ -149,19 +147,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
             OnPropertyChanged(nameof(Books));
         }
     }
-	public async Task<Book?> GetBook(string fileName, CancellationToken cancellationToken = default)
-	{
-		var bookData = await db.GetBook(fileName, cancellationToken).ConfigureAwait(false);
-		var book = EbookService.OpenEbook(fileName);
-		if (book is null)
-		{
-			logger.Info("Book is null");
-			return null;
-		}
-		book.CurrentChapter = bookData.CurrentChapter;
-		book.CurrentPage = bookData.CurrentPage;
-		return book;
-	}
 
 	public static async Task<FileResult?> PickAndShow(PickOptions options)
     {

@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using EpubReader.Service;
+using SQLite;
 
 namespace EpubReader.Models;
 
@@ -12,4 +13,5 @@ public class Settings
 	public int FontSize { get; set; }
 	public string BackgroundColor { get; set; } = string.Empty;
 	public string TextColor { get; set; } = string.Empty;
+	public EbookColor EbookColor { get; set; } = EbookColor.Default;
 }

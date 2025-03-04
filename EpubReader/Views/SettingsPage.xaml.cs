@@ -52,6 +52,10 @@ public partial class SettingsPage : Popup, IDisposable
 		else
 		{
 			SystemThemeSwitch.IsToggled = settings.IsSystemMode;
+			fontSize = settings.FontSize;
+			FontSizeSlider.Value = fontSize;
+			FontPicker.SelectedItem = Fonts.Find(x => x.FontFamily == settings.FontFamily);
+			ThemePicker.SelectedItem = settings.EbookColor;
 		}
 	}
 
@@ -59,7 +63,7 @@ public partial class SettingsPage : Popup, IDisposable
     {
 		var selectedTheme = ThemePicker.SelectedItem;
 		var settings = await db.GetSettings(cancellationTokenSource.Token);
-
+		
 		(settings.BackgroundColor, settings.TextColor, _) = selectedTheme switch
 		{
 			EbookColor.Dark => EbookColorScheme.GetColorSchemeString(EbookColor.Dark),
@@ -75,7 +79,7 @@ public partial class SettingsPage : Popup, IDisposable
         {
             return;
         }
-
+		settings.EbookColor = (EbookColor)selectedTheme;
 		await db.SaveSettings(settings, CancellationToken.None);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
