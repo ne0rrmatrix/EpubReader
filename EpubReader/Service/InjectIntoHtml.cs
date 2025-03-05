@@ -21,7 +21,7 @@ public static partial class InjectIntoHtml
 		html = RemoveExistingStyleTags(html);
 		html = InjectCss(html, book, settings);
 		html = ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, disableScroll + jsButtons);
+		html = InjectJavascript(html, disableScroll + jsButtons + adjustTextSize);
 		html = AddDivContainer(html);
 
 		return html;
@@ -220,9 +220,102 @@ public static partial class InjectIntoHtml
 
         #scrollContainer p {
             text-align: justify;
-            margin-left: 2em;
-            margin-right: 2em;
+            margin-left: 1em;
+            margin-right: 1em;
         }";
+
+	static readonly string adjustTextSize = @"
+		/**
+		* Apply multiple styles to an element
+		* @param {Object} options - Style options to apply
+		* @param {string|number} [options.fontSize] - Font size to apply
+		* @param {string} [options.backgroundColor] - Background color to apply
+		* @param {string} [options.textColor] - Text color to apply
+		* @param {HTMLElement|string} [target='body'] - Target element or selector
+		* @returns {boolean} - True if successful, false if failed
+		*/
+	function applyStyles(options = {}, target = 'body') {
+		try {
+			// Find the target element if a selector string was provided
+			let element = target;
+			if (typeof target === 'string') {
+				element = document.querySelector(target);
+			}
+        
+			// Make sure element exists
+			if (!element) {
+				console.error('Target element not found:', target);
+				return false;
+			}
+        
+			// Apply font size if provided (using different methods to ensure it works)
+			if (options.fontSize !== undefined) {
+				let fontSize = options.fontSize;
+            
+				// Convert to string with px if it's a number
+				if (typeof fontSize === 'number') {
+					fontSize = fontSize + 'px';
+				}
+            
+				// Add px if it's just a number as string
+				if (/^\d+$/.test(fontSize)) {
+					fontSize = fontSize + 'px';
+				}
+            
+				// Method 1: Using setProperty with !important flag
+				element.style.setProperty('font-size', fontSize, 'important');
+            
+				// Method 2: Using inline style attribute with !important
+				const currentStyles = element.getAttribute('style') || '';
+				const fontSizePattern = /font-size\s*:\s*[^;]+;?/g;
+				const newStyles = currentStyles.replace(fontSizePattern, '');
+				element.setAttribute('style', `${newStyles} font-size: ${fontSize} !important;`);
+            
+				// Method 3: Add a custom stylesheet rule with highest specificity
+				let styleSheet = document.getElementById('custom-styles');
+				if (!styleSheet) {
+					styleSheet = document.createElement('style');
+					styleSheet.id = 'custom-styles';
+					document.head.appendChild(styleSheet);
+				}
+            
+				// Create a high-specificity selector for the element
+				let selector;
+				if (target === 'body') {
+					selector = 'body';
+				} else if (element.id) {
+					selector = `#${element.id}`;
+				} else if (element.className) {
+					// Convert class list to a high-specificity selector
+					selector = '.' + element.className.split(' ').join('.');
+				} else {
+					// Create a unique ID if there's no good selector
+					const uniqueId = 'custom-styled-' + Math.random().toString(36).substr(2, 9);
+					element.id = uniqueId;
+					selector = `#${uniqueId}`;
+				}
+            
+				// Add the rule to the stylesheet
+				const cssRule = `${selector} { font-size: ${fontSize} !important; }`;
+				styleSheet.textContent += cssRule;
+			}
+        
+			// Apply background color if provided
+			if (options.backgroundColor !== undefined) {
+				element.style.setProperty('background-color', options.backgroundColor, 'important');
+			}
+        
+			// Apply text color if provided
+			if (options.textColor !== undefined) {
+				element.style.setProperty('color', options.textColor, 'important');
+			}
+        
+			return true;
+		} catch (error) {
+			console.error('Error applying styles:', error);
+			return false;
+		}
+	}";
 
 	static readonly string jsButtons = @"
 		window.addEventListener('load', () => adjustSvgToScreen(true));
@@ -254,7 +347,8 @@ public static partial class InjectIntoHtml
 		document.body.style.height = '100vh';
 		document.documentElement.style.width = '100%';
 		document.documentElement.style.height = '100%';
-	}
+		}
+
         function nextPage() {
             document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
         }
@@ -262,6 +356,25 @@ public static partial class InjectIntoHtml
         function prevPage() {
             document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
         }
+		
+		function scrollToEnd() {
+			const scrollContainer = document.getElementById(""scrollContainer"");
+    
+			if (!scrollContainer) {
+				console.error('scrollContainer element not found');
+				return;
+			}
+    
+			// Alternative method: get all columns and scroll to the last one
+			const totalWidth = scrollContainer.scrollWidth;
+			const viewportWidth = scrollContainer.clientWidth;
+    
+			// Force scroll to the maximum possible position
+			scrollContainer.scrollLeft = 999999; // Large value forces scroll to end
+    
+			// Log for debugging
+			console.log(`Total width: ${totalWidth}, Viewport: ${viewportWidth}, Max scroll: ${totalWidth - viewportWidth}`);
+		}
 
         function isHorizontalScrollAtStart() {
             var element = document.getElementById(""scrollContainer"");

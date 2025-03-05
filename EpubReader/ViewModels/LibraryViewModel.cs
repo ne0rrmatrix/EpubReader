@@ -52,25 +52,23 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		{
 			Books.Clear();
 		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
-			item.CoverImage = ebook.CoverImage;
-			Books.Add(item);
+			ebook.CurrentChapter = item.CurrentChapter;
+			Books.Add(ebook);
 		}
 	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book book)
+    public static async Task GotoBookPage(Book Book)
     {
-		if(book is null)
+		if(Book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
-		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
-		Book.CurrentChapter = book.CurrentChapter;
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
@@ -91,7 +89,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false);
+		var bookData = await db.GetAllBooks(cancellationToken);
 		var ebook = EbookService.OpenEbook(result.FullPath);
 		if (ebook is null)
 		{
@@ -108,10 +106,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 
 		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
 		ebook.FilePath = filePath;
-		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
-		ebook.Css.Clear();
-		ebook.Chapters.Clear();
-		ebook.Images.Clear();
+		await db.SaveBookData(ebook, cancellationToken);
 		Books.Add(ebook);
 	}
 
@@ -141,7 +136,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         {
             logger.Info("Removing book");
             FileService.DeleteFile(book.FilePath);
-			await db.RemoveBook(book, cancellationToken).ConfigureAwait(false);
+			await db.RemoveBook(book, cancellationToken);
 			Books.Remove(book);
             logger.Info("Book removed from library.");
             OnPropertyChanged(nameof(Books));
