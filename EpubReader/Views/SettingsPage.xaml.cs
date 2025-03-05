@@ -72,14 +72,11 @@ public partial class SettingsPage : Popup, IDisposable
 	async void RemoveAllSettings(object sender, EventArgs e)
 	{
 		await db.RemoveAllSettings(CancellationToken.None);
-		var settings = new Models.Settings
-		{
-			FontSize = 16,
-			FontFamily = "Times New Roman",
-			BackgroundColor = "#FFFFFF",
-			TextColor = "#000000"
-		};
+		var settings = new Settings();
 		await db.SaveSettings(settings, CancellationToken.None);
+		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		FontSizeSlider.Value = settings.FontSize;
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 		logger.Info("Settings removed");
 	}
