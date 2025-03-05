@@ -2,39 +2,25 @@ using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
-using EpubReader.Service;
+using EpubReader.Models;
+using EpubReader.ViewModels;
+using ExCSS;
 using MetroLog;
 
 namespace EpubReader.Views;
 
 public partial class SettingsPage : Popup, IDisposable
 {
-	int fontSize = 0;
 	readonly CancellationTokenSource cancellationTokenSource;
 	readonly Task loadTask;
 	bool disposedValue;
-	readonly List<EbookFonts> fonts = [
-		new EbookFonts { FontFamily = "Arial" },
-		new EbookFonts { FontFamily = "Times New Roman" },
-		new EbookFonts { FontFamily = "Verdana" },
-		new EbookFonts { FontFamily = "Courier New" },
-		new EbookFonts { FontFamily = "Georgia" },
-		new EbookFonts { FontFamily = "Tahoma" },
-		new EbookFonts { FontFamily = "Trebuchet MS" },
-		new EbookFonts { FontFamily = "Comic Sans MS" },
-		new EbookFonts { FontFamily = "Lucida Sans Unicode" },
-		new EbookFonts { FontFamily = "Helvetica" }
-	];
-	public List<EbookFonts> Fonts => fonts;
-	readonly List<EbookColor> colors;
-	public List<EbookColor> Colors => colors;
-	IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
-	public SettingsPage()
+	readonly IDb db;
+	public SettingsPage(SettingsPageViewModel viewModel, IDb db)
 	{
         InitializeComponent();
-		colors = [.. Enum.GetValues<EbookColor>()];
-		BindingContext = this;
+		BindingContext = viewModel;
+		this.db = db;
 		cancellationTokenSource = new CancellationTokenSource();
 		loadTask = LoadSettings(cancellationTokenSource.Token);
 		if (loadTask.IsFaulted)
@@ -45,96 +31,56 @@ public partial class SettingsPage : Popup, IDisposable
 	async Task LoadSettings(CancellationToken cancellationToken = default)
 	{
 		var settings = await db.GetSettings(cancellationToken);
-		if (Dispatcher.IsDispatchRequired)
+		FontSizeSlider.Value = settings.FontSize;
+		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+	}
+	async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
+	{
+		if((int)e.NewValue == 0)
 		{
-			Dispatcher.Dispatch(() => SystemThemeSwitch.IsToggled = settings.IsSystemMode);
+			return;
 		}
-		else
-		{
-			SystemThemeSwitch.IsToggled = settings.IsSystemMode;
-		}
+		var settings = await db.GetSettings(CancellationToken.None);
+		settings.FontSize = (int)e.NewValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	async void OnApplyColorChanged(object sender, EventArgs e)
-    {
+	async void OnApplyChanges(object sender, EventArgs e)
+	{
+		var settings = await db.GetSettings(CancellationToken.None);
 		var selectedTheme = ThemePicker.SelectedItem;
-		var settings = await db.GetSettings(cancellationTokenSource.Token);
-
-		(settings.BackgroundColor, settings.TextColor, _) = selectedTheme switch
+		if (selectedTheme is ColorScheme scheme)
 		{
-			EbookColor.Dark => EbookColorScheme.GetColorSchemeString(EbookColor.Dark),
-			EbookColor.Sepia => EbookColorScheme.GetColorSchemeString(EbookColor.Sepia),
-			EbookColor.Forest => EbookColorScheme.GetColorSchemeString(EbookColor.Forest),
-			EbookColor.Ocean => EbookColorScheme.GetColorSchemeString(EbookColor.Ocean),
-			EbookColor.Sand => EbookColorScheme.GetColorSchemeString(EbookColor.Sand),
-			EbookColor.Charcoal => EbookColorScheme.GetColorSchemeString(EbookColor.Charcoal),
-			EbookColor.Vintage => EbookColorScheme.GetColorSchemeString(EbookColor.Vintage),
-			_ => EbookColorScheme.GetColorSchemeString(EbookColor.Default),
-		};
-		if (string.IsNullOrEmpty(settings.BackgroundColor) || string.IsNullOrEmpty(settings.TextColor))
-        {
-            return;
-        }
+			settings.BackgroundColor = scheme.BackgroundColor;
+			settings.TextColor = scheme.TextColor;
+			settings.ColorScheme = scheme.Name;
+			logger.Info($"Changing color scheme to: {scheme.Name}");
+		}
 
+		selectedTheme = FontPicker.SelectedItem;
+		if (selectedTheme is EbookFonts font)
+		{
+			settings.FontFamily = font.FontFamily;
+			logger.Info($"Chaging Font to: {font.FontFamily}");
+		}
 		await db.SaveSettings(settings, CancellationToken.None);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-    async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
-    {
-		var settings = await db.GetSettings(CancellationToken.None);
-		if (fontSize == (int)e.NewValue)
-        {
-            return;
-        }
-        fontSize = (int)e.NewValue;
-		settings.FontSize = fontSize;
-		await db.SaveSettings(settings);
+	async void RemoveAllSettings(object sender, EventArgs e)
+	{
+		await db.RemoveAllSettings(CancellationToken.None);
+		var settings = new Settings();
+		await db.SaveSettings(settings, CancellationToken.None);
+		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		FontSizeSlider.Value = settings.FontSize;
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		logger.Info("Settings removed");
 	}
 
-    async void OnFontChange(object sender, EventArgs e)
-    {
-		var settings = await db.GetSettings(CancellationToken.None);
-		var selectedTheme = FontPicker.SelectedItem;
-		if(selectedTheme is not EbookFonts font)
-		{
-			logger.Info("Selected font is null");
-			return;
-		}
-
-		settings.FontFamily = font.FontFamily;
-		logger.Info($"Chaging Font to: {font.FontFamily}");
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-	}
-
-    async void OnSystemThemeSwitchToggled(object sender, ToggledEventArgs e)
-    {
-		var settings = await db.GetSettings(CancellationToken.None);
-		settings.IsSystemMode = e.Value;
-		await db.SaveSettings(settings);
-		if (!settings.IsSystemMode)
-		{
-			return;
-		}
-		if (Application.Current?.RequestedTheme == AppTheme.Dark)
-		{
-			var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Dark);
-			settings.BackgroundColor = BackgroundColor;
-			settings.TextColor = TextColor;
-		}
-		else
-		{
-			var (BackgroundColor, TextColor, _) = EbookColorScheme.GetColorSchemeString(EbookColor.Default);
-			settings.BackgroundColor = BackgroundColor;
-			settings.TextColor = TextColor;
-		}
-
-		await db.SaveSettings(settings);
-		logger.Info("System theme changed");
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-	}
 	protected virtual void Dispose(bool disposing)
 	{
 		if (!disposedValue)
@@ -153,14 +99,5 @@ public partial class SettingsPage : Popup, IDisposable
 	{
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
-	}
-
-	async void RemoveAllSettings(object sender, EventArgs e)
-	{
-		await db.RemoveAllSettings(CancellationToken.None);
-		var settings = new Models.Settings();
-		await db.SaveSettings(settings, CancellationToken.None);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-		logger.Info("Settings removed");
 	}
 }

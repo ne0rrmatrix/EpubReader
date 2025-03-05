@@ -44,6 +44,10 @@ public partial class EbookService
 	
 		foreach (var navPoint in navMap.NavPoints)
 		{	
+			if (navPoint.ContentSrc is null)
+			{
+				continue;
+			}
 			var chapter = html.Find(x => x.Href == navPoint.ContentSrc) ?? html.Find(x => navPoint.ContentSrc.Contains(x.Href));
 			if (chapter is not null && chapter.AbsolutePath.Contains("_split_000.xhtml"))
 			{

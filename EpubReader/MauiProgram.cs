@@ -11,10 +11,7 @@ using MetroLog.Targets;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-
-#if DEBUG
 using Microsoft.Extensions.Logging;
-#endif
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
@@ -40,6 +37,11 @@ public static class MauiProgram
 #if IOS || MACCATALYST
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
+#endif
+#if ANDROID
+			Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
+	  nameof(Android.Webkit.WebView.WebViewClient),
+	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
 #endif
 		});
 
@@ -71,8 +73,8 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-        builder.Services.AddSingleton<IDb, Db>();
-        LoggerFactory.Initialize(config);
+        builder.Services.AddSingleton<IDb, Db>();		
+		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 
 		builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
@@ -80,6 +82,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 
+		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("//LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("//BookPage");
 		return builder.Build();

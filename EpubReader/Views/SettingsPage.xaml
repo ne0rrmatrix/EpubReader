@@ -7,8 +7,8 @@
     xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:page="clr-namespace:EpubReader.Views"
-    xmlns:service="clr-namespace:EpubReader.Service"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
     Size="400,600">
 
@@ -34,7 +34,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid.ColumnDefinitions>
@@ -74,21 +74,8 @@
             x:Name="FontPicker"
             Grid.Row="4"
             HeightRequest="40"
-            ItemDisplayBinding="{Binding FontFamily, x:DataType=service:EbookFonts}"
-            ItemsSource="{Binding Fonts, x:DataType=page:SettingsPage}"
-            SelectedIndexChanged="OnFontChange" />
-
-        <Label
-            Grid.Row="5"
-            FontAttributes="Bold"
-            FontSize="Medium"
-            HorizontalOptions="Center"
-            Text="Use System Theme" />
-
-        <Switch
-            x:Name="SystemThemeSwitch"
-            Grid.Row="6"
-            Toggled="OnSystemThemeSwitchToggled" />
+            ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EbookFonts}"
+            ItemsSource="{Binding Fonts, x:DataType=viewModel:SettingsPageViewModel}" />
 
         <Label
             Grid.Row="7"
@@ -102,23 +89,21 @@
             Title="Choose a theme"
             Grid.Row="8"
             HeightRequest="70"
-            IsEnabled="{Binding Source={x:Reference SystemThemeSwitch}, Path=IsToggled, x:DataType={x:Type Switch}, Converter={StaticResource InverseBooleanConverter}}"
-            ItemsSource="{Binding Colors, x:DataType=page:SettingsPage}"
-            SelectedIndexChanged="OnApplyColorChanged" />
-
-        <Label
+            ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
+            ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}" />
+        <Button
             Grid.Row="9"
-            FontAttributes="Bold"
-            FontSize="Small"
-            HorizontalOptions="Center"
-            Text="Reset Settings" />
+            Clicked="OnApplyChanges"
+            HeightRequest="45"
+            Text="Apply Changes"
+            WidthRequest="120" />
+
         <Button
             Grid.Row="10"
             Clicked="RemoveAllSettings"
             HeightRequest="45"
             Text="Reset"
             WidthRequest="120" />
-
     </Grid>
 
 </mct:Popup>

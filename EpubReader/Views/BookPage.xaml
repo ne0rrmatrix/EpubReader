@@ -12,10 +12,6 @@
     x:DataType="viewModels:BookViewModel"
     Loaded="CurrentPage_Loaded">
 
-    <ContentPage.BindingContext>
-        <viewModels:BookViewModel />
-    </ContentPage.BindingContext>
-
     <ContentPage.ToolbarItems>
         <ToolbarItem
             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
@@ -49,6 +45,8 @@
                 <WebView
                     x:Name="EpubText"
                     Grid.Row="0"
+                    Navigated="OnEpubText_Navigated"
+                    Navigating="EpubText_Navigating"
                     Scale="1">
                     <WebView.GestureRecognizers>
                         <OnPlatform x:TypeArguments="SwipeGestureRecognizer">

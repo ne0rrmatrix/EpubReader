@@ -22,41 +22,37 @@ public partial class BookPage : ContentPage, IDisposable
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	bool isPreviousPage = false;
-	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly IDb db;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	Book book = new();
 	Settings settings = new();
 	bool disposedValue;
 
-	public BookPage(BookViewModel viewModel)
+	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		this.db = db;
 #if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
 #endif
 	}
 
-	void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book;
-		settings = ((BookViewModel)BindingContext).Settings;
+		settings = await db.GetSettings(CancellationToken.None);
 
-		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
-		if (!OperatingSystem.IsAndroid())
-		{
-			EpubText.Navigated += OnEpubText_Navigated;
-		}
 
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		Dispatcher.Dispatch(async () => await UpdateWebView());
+		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
 	async void OnSettingsClicked()
 	{
-		settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
-		Dispatcher.Dispatch(async () => await UpdateWebView());
+		settings = await db.GetSettings(CancellationToken.None);
+		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', fontSize: {settings.FontSize}, backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -74,7 +70,7 @@ public partial class BookPage : ContentPage, IDisposable
 					EpubText.Source = new HtmlWebViewSource { Html = html };
 					book.CurrentChapter = index;
 					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-					await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+					await db.SaveBookData(book, CancellationToken.None);
 				});
 			})
 		};
@@ -84,7 +80,6 @@ public partial class BookPage : ContentPage, IDisposable
 	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
 	{
 		base.OnNavigatedFrom(args);
-		ArgumentNullException.ThrowIfNull(Application.Current);
 
 		EpubText.Navigating -= EpubText_Navigating;
 		EpubText.Navigated -= OnEpubText_Navigated;
@@ -97,6 +92,11 @@ public partial class BookPage : ContentPage, IDisposable
 	void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}");
+		if (isPreviousPage)
+		{
+			EpubText.Eval("scrollToEnd()");
+			isPreviousPage = false;
+		}
 	}
 
 	static void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
@@ -109,18 +109,13 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void PreviousPage(object sender, EventArgs e)
 	{
-		if (book.CurrentChapter <= 0)
-		{
-			logger.Info("Start of book");
-			return;
-		}
 		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontalScrollAtStart()");
-		if (result.Equals("true"))
+		if (result.Equals("true") && book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
-			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
+			await db.SaveBookData(book, CancellationToken.None);
 			isPreviousPage = true;
-			Dispatcher.Dispatch(async () => await UpdateWebView());
+			Dispatcher.Dispatch(() => UpdateWebView());
 
 			return;
 		}
@@ -129,40 +124,17 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void NextPage(object sender, EventArgs e)
 	{
-		if (book.CurrentChapter >= book.Chapters.Count)
-		{
-			logger.Info("End of book");
-			return;
-		}
 		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
-		if (result.Equals("true"))
+		if (result.Equals("true") && book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
-			await db.SaveBookData(book, CancellationToken.None).ConfigureAwait(false);
-			Dispatcher.Dispatch(async () => await UpdateWebView());
+			await db.SaveBookData(book, CancellationToken.None);
+			Dispatcher.Dispatch(() => UpdateWebView());
 			return;
 		}
 		EpubText.Eval("nextPage()");
 	}
 
-	async Task GotoEnd()
-	{
-		try
-		{
-			var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
-			if (result.Equals("true"))
-			{
-				isPreviousPage = false;
-				return;
-			}
-			EpubText.Eval("nextPage()");
-			await GotoEnd();
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex.Message);
-		}
-	}
 
 	public void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
@@ -186,17 +158,13 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 	}
 
-	async Task UpdateWebView()
+	void UpdateWebView()
 	{
 		Shimmer.IsActive = true;
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		var html = InjectIntoHtml.UpdateHtml(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
-		if(isPreviousPage)
-		{
-			await GotoEnd();
-		}
 	}
 
 	protected virtual void Dispose(bool disposing)
