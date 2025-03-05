@@ -231,6 +231,7 @@ public static partial class InjectIntoHtml
 		* @param {string|number} [options.fontSize] - Font size to apply
 		* @param {string} [options.backgroundColor] - Background color to apply
 		* @param {string} [options.textColor] - Text color to apply
+		* @param {string} [options.fontFamily] - Font family to apply
 		* @param {HTMLElement|string} [target='body'] - Target element or selector
 		* @returns {boolean} - True if successful, false if failed
 		*/
@@ -241,36 +242,36 @@ public static partial class InjectIntoHtml
 			if (typeof target === 'string') {
 				element = document.querySelector(target);
 			}
-        
+    
 			// Make sure element exists
 			if (!element) {
 				console.error('Target element not found:', target);
 				return false;
 			}
-        
+    
 			// Apply font size if provided (using different methods to ensure it works)
 			if (options.fontSize !== undefined) {
 				let fontSize = options.fontSize;
-            
+        
 				// Convert to string with px if it's a number
 				if (typeof fontSize === 'number') {
 					fontSize = fontSize + 'px';
 				}
-            
+        
 				// Add px if it's just a number as string
 				if (/^\d+$/.test(fontSize)) {
 					fontSize = fontSize + 'px';
 				}
-            
+        
 				// Method 1: Using setProperty with !important flag
 				element.style.setProperty('font-size', fontSize, 'important');
-            
+        
 				// Method 2: Using inline style attribute with !important
 				const currentStyles = element.getAttribute('style') || '';
 				const fontSizePattern = /font-size\s*:\s*[^;]+;?/g;
 				const newStyles = currentStyles.replace(fontSizePattern, '');
 				element.setAttribute('style', `${newStyles} font-size: ${fontSize} !important;`);
-            
+        
 				// Method 3: Add a custom stylesheet rule with highest specificity
 				let styleSheet = document.getElementById('custom-styles');
 				if (!styleSheet) {
@@ -278,7 +279,7 @@ public static partial class InjectIntoHtml
 					styleSheet.id = 'custom-styles';
 					document.head.appendChild(styleSheet);
 				}
-            
+        
 				// Create a high-specificity selector for the element
 				let selector;
 				if (target === 'body') {
@@ -294,22 +295,53 @@ public static partial class InjectIntoHtml
 					element.id = uniqueId;
 					selector = `#${uniqueId}`;
 				}
-            
+        
 				// Add the rule to the stylesheet
 				const cssRule = `${selector} { font-size: ${fontSize} !important; }`;
 				styleSheet.textContent += cssRule;
 			}
-        
+    
 			// Apply background color if provided
 			if (options.backgroundColor !== undefined) {
 				element.style.setProperty('background-color', options.backgroundColor, 'important');
 			}
-        
+    
 			// Apply text color if provided
 			if (options.textColor !== undefined) {
 				element.style.setProperty('color', options.textColor, 'important');
 			}
-        
+    
+			// Apply font family if provided
+			if (options.fontFamily !== undefined) {
+				element.style.setProperty('font-family', options.fontFamily, 'important');
+			
+				// Also apply font family using the custom stylesheet for maximum specificity
+				let styleSheet = document.getElementById('custom-styles');
+				if (!styleSheet) {
+					styleSheet = document.createElement('style');
+					styleSheet.id = 'custom-styles';
+					document.head.appendChild(styleSheet);
+				}
+			
+				// Use the same selector logic as for font size
+				let selector;
+				if (target === 'body') {
+					selector = 'body';
+				} else if (element.id) {
+					selector = `#${element.id}`;
+				} else if (element.className) {
+					selector = '.' + element.className.split(' ').join('.');
+				} else {
+					const uniqueId = element.id || ('custom-styled-' + Math.random().toString(36).substr(2, 9));
+					if (!element.id) element.id = uniqueId;
+					selector = `#${uniqueId}`;
+				}
+			
+				// Add the font-family rule to the stylesheet
+				const cssRule = `${selector} { font-family: ${options.fontFamily} !important; }`;
+				styleSheet.textContent += cssRule;
+			}
+    
 			return true;
 		} catch (error) {
 			console.error('Error applying styles:', error);

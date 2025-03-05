@@ -19,22 +19,18 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; }
 
-	[ObservableProperty]
-	public partial Settings Settings { get; set; }
 	readonly IPopupService popupService;
 	public BookViewModel(IPopupService popupService)
 	{
-		Settings = new();
 		this.popupService = popupService;
 		IsNavMenuVisible = true;
 		Press();
 	}
-	public async void ApplyQueryAttributes(IDictionary<string, object> query)
+	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
 			Book = book;
-			Settings = await db.GetSettings(CancellationToken.None).ConfigureAwait(false);
 		}
 	}
 

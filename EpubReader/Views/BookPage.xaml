@@ -45,6 +45,8 @@
                 <WebView
                     x:Name="EpubText"
                     Grid.Row="0"
+                    Navigated="OnEpubText_Navigated"
+                    Navigating="EpubText_Navigating"
                     Scale="1">
                     <WebView.GestureRecognizers>
                         <OnPlatform x:TypeArguments="SwipeGestureRecognizer">

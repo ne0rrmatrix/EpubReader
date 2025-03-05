@@ -38,14 +38,12 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	}
 
-	void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book;
-		settings = ((BookViewModel)BindingContext).Settings;
+		settings = await db.GetSettings(CancellationToken.None);
 
-		EpubText.Navigating += EpubText_Navigating;
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
-		EpubText.Navigated += OnEpubText_Navigated;
 
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 		Dispatcher.Dispatch(() => UpdateWebView());
@@ -54,7 +52,7 @@ public partial class BookPage : ContentPage, IDisposable
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontSize: {settings.FontSize}, backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
+		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', fontSize: {settings.FontSize}, backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
