@@ -52,7 +52,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 		{
 			Books.Clear();
 		}
-		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
@@ -89,7 +89,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = await db.GetAllBooks(cancellationToken);
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
 		var ebook = EbookService.OpenEbook(result.FullPath);
 		if (ebook is null)
 		{
@@ -106,7 +106,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 
 		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
 		ebook.FilePath = filePath;
-		await db.SaveBookData(ebook, cancellationToken);
+		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 		Books.Add(ebook);
 	}
 
@@ -127,7 +127,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 
 		var snackbar = Snackbar.Make(text, null, actionButtonText, duration, snackbarOptions);
 
-		await snackbar.Show(cancellationToken);
+		await snackbar.Show(cancellationToken).ConfigureAwait(false);
 	}
     [RelayCommand]
     async Task RemoveBook(Book book, CancellationToken cancellationToken = default)

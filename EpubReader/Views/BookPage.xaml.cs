@@ -109,13 +109,8 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void PreviousPage(object sender, EventArgs e)
 	{
-		if (book.CurrentChapter <= 0)
-		{
-			logger.Info("Start of book");
-			return;
-		}
 		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontalScrollAtStart()");
-		if (result.Equals("true"))
+		if (result.Equals("true") && book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
 			await db.SaveBookData(book, CancellationToken.None);
@@ -129,13 +124,8 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void NextPage(object sender, EventArgs e)
 	{
-		if (book.CurrentChapter >= book.Chapters.Count)
-		{
-			logger.Info("End of book");
-			return;
-		}
 		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
-		if (result.Equals("true"))
+		if (result.Equals("true") && book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
 			await db.SaveBookData(book, CancellationToken.None);

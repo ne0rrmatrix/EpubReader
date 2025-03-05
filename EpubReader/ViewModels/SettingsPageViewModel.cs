@@ -5,7 +5,7 @@ namespace EpubReader.ViewModels;
 public partial class SettingsPageViewModel : BaseViewModel
 {
 	readonly List<EbookFonts> fonts = [
-	new EbookFonts { FontFamily = "Arial" },
+		new EbookFonts { FontFamily = "Arial" },
 		new EbookFonts { FontFamily = "Times New Roman" },
 		new EbookFonts { FontFamily = "Verdana" },
 		new EbookFonts { FontFamily = "Courier New" },
