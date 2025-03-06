@@ -25,26 +25,16 @@ public static partial class InjectIntoHtml
 		html = AddDivContainer(html);
 		return html;
 	}
-    public static string FilterCalibreCss(string? cssString)
-    {
-        if (string.IsNullOrEmpty(cssString))
-        {
-            return string.Empty;
-        }
-        string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
-        Regex regex = new(regexPattern, RegexOptions.None, regexTimeout);
-
-        return regex.Replace(cssString, string.Empty); // Replace matches with empty string
-    }
+   
 	static string InjectCss(string html, Book book, Settings settings)
 	{
 		var css = new StringBuilder(style);
-		var cssList = ExtractCssFileNames(html);
-
-		foreach (var cssFile in cssList.Select(item => book.Css.Find(x => item.Contains(x.FileName))))
+		
+		foreach (var cssFile in book.Css)
 		{
-			var temp = FilterCalibreCss(cssFile?.Content);
-			css.Append(ReplaceImageUrls(temp, book.Images));
+			var filteredCSS = FilterCalibreCss(cssFile.Content);
+			filteredCSS = RemoveCssProperties(filteredCSS);
+			css.Append(ReplaceImageUrls(filteredCSS, book.Images));
 		}
 		
 		var styleTag = new StringBuilder();
@@ -58,18 +48,50 @@ public static partial class InjectIntoHtml
 		}
 		else
 		{
-			html = $"<style>{css}</style>" + html;
+			html = $"<style>{styleTag}</style>" + html;
 		}
+
 		return html;
 	}
-	static List<string> ExtractCssFileNames(string html)
-	{
-		const string pattern = @"<link\s+href=""([^""]+\.css)""\s+rel=""stylesheet""";
-		var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase, regexTimeout);
 
-		return [.. matches.Select(match => Path.GetFileName(match.Groups[1].Value))];
+	static string FilterCalibreCss(string? cssString)
+	{
+		if (string.IsNullOrEmpty(cssString))
+		{
+			return string.Empty;
+		}
+		string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
+		Regex regex = new(regexPattern, RegexOptions.None, regexTimeout);
+
+		return regex.Replace(cssString, string.Empty); // Replace matches with empty string
 	}
 
+	static string RemoveCssProperties(string htmlString)
+	{
+		// Generated Regex for matching CSS rules
+		var cssRuleRegex = new Regex(@"((?:p|body|html)(?:\s*,\s*(?:p|body|html))*)(\s*\{[^}]*\})", RegexOptions.IgnoreCase | RegexOptions.Singleline, regexTimeout);
+
+		// Generated Regex for removing margin, padding, and text-indent
+		var propertyRemovalRegex = new Regex(@"(^|\s|\;)\s*(margin|padding|text-indent)\s*:[^;]*;?", RegexOptions.IgnoreCase, regexTimeout);
+
+		// Generated Regex for cleaning up semicolons and whitespace
+		var semicolonCleanupRegex = new Regex(@"\s*;\s*}", RegexOptions.Compiled, regexTimeout);
+		var emptyBlockCleanupRegex = new Regex(@"{\s*}", RegexOptions.Compiled, regexTimeout);
+		var multipleSpaceCleanupRegex = new Regex(@"\s{2,}", RegexOptions.Compiled, regexTimeout);
+
+		return cssRuleRegex.Replace(htmlString, match =>
+		{
+			string selectors = match.Groups[1].Value;
+			string cssBlock = match.Groups[2].Value;
+
+			cssBlock = propertyRemovalRegex.Replace(cssBlock, "$1");
+			cssBlock = semicolonCleanupRegex.Replace(cssBlock, " }");
+			cssBlock = emptyBlockCleanupRegex.Replace(cssBlock, "{ }");
+			cssBlock = multipleSpaceCleanupRegex.Replace(cssBlock, " ");
+
+			return selectors + cssBlock;
+		});
+	}
 	static string GenerateCSSFromString(Settings settings)
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor) && settings.FontSize <= 0 && string.IsNullOrEmpty(settings.FontFamily))
@@ -199,12 +221,6 @@ public static partial class InjectIntoHtml
 
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
-
-	[GeneratedRegex("font-size:\\s*\\d+px\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex FontSizeRegex();
-
-	[GeneratedRegex("font-family:\\s*[^;]+?\\s*;", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex FontFamilyRegex();
 
 	static readonly string disableScroll = @"
         window.addEventListener('wheel', function(event) {

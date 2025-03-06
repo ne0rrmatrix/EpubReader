@@ -4,7 +4,6 @@ using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.ViewModels;
-using ExCSS;
 using MetroLog;
 
 namespace EpubReader.Views;
@@ -47,28 +46,6 @@ public partial class SettingsPage : Popup, IDisposable
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	async void OnApplyChanges(object sender, EventArgs e)
-	{
-		var settings = await db.GetSettings(CancellationToken.None);
-		var selectedTheme = ThemePicker.SelectedItem;
-		if (selectedTheme is ColorScheme scheme)
-		{
-			settings.BackgroundColor = scheme.BackgroundColor;
-			settings.TextColor = scheme.TextColor;
-			settings.ColorScheme = scheme.Name;
-			logger.Info($"Changing color scheme to: {scheme.Name}");
-		}
-
-		selectedTheme = FontPicker.SelectedItem;
-		if (selectedTheme is EbookFonts font)
-		{
-			settings.FontFamily = font.FontFamily;
-			logger.Info($"Chaging Font to: {font.FontFamily}");
-		}
-		await db.SaveSettings(settings, CancellationToken.None);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-	}
-
 	async void RemoveAllSettings(object sender, EventArgs e)
 	{
 		await db.RemoveAllSettings(CancellationToken.None);
@@ -99,5 +76,37 @@ public partial class SettingsPage : Popup, IDisposable
 	{
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
+	}
+
+	async void ThemePicker_SelectedIndexChanged(object sender, EventArgs e)
+	{
+		var settings = await db.GetSettings(CancellationToken.None);
+		var selectedTheme = ThemePicker.SelectedItem;
+		if (selectedTheme is not ColorScheme scheme || settings.ColorScheme == scheme.Name)
+		{
+			return;
+		}
+		
+		settings.BackgroundColor = scheme.BackgroundColor;
+		settings.TextColor = scheme.TextColor;
+		settings.ColorScheme = scheme.Name;
+		logger.Info($"Changing color scheme to: {scheme.Name}");
+		await db.SaveSettings(settings, CancellationToken.None);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+	}
+
+	async void FontPicker_SelectedIndexChanged(object sender, EventArgs e)
+	{
+		var settings = await db.GetSettings(CancellationToken.None);
+		var selectedTheme = FontPicker.SelectedItem;
+		if (selectedTheme is not EbookFonts font || settings.FontFamily == font.FontFamily)
+		{
+			return;
+		}
+
+		settings.FontFamily = font.FontFamily;
+		logger.Info($"Chaging Font to: {font.FontFamily}");
+		await db.SaveSettings(settings, CancellationToken.None);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 }

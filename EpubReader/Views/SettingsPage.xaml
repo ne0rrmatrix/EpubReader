@@ -75,7 +75,8 @@
             Grid.Row="4"
             HeightRequest="40"
             ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EbookFonts}"
-            ItemsSource="{Binding Fonts, x:DataType=viewModel:SettingsPageViewModel}" />
+            ItemsSource="{Binding Fonts, x:DataType=viewModel:SettingsPageViewModel}"
+            SelectedIndexChanged="FontPicker_SelectedIndexChanged" />
 
         <Label
             Grid.Row="7"
@@ -90,13 +91,8 @@
             Grid.Row="8"
             HeightRequest="70"
             ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
-            ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}" />
-        <Button
-            Grid.Row="9"
-            Clicked="OnApplyChanges"
-            HeightRequest="45"
-            Text="Apply Changes"
-            WidthRequest="120" />
+            ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}"
+            SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
 
         <Button
             Grid.Row="10"
