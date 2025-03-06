@@ -21,7 +21,7 @@ public static partial class InjectIntoHtml
 		html = RemoveExistingStyleTags(html);
 		html = InjectCss(html, book, settings);
 		html = ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, disableScroll + jsButtons + adjustTextSize);
+		html = InjectJavascript(html, disableScroll + jsButtons + adjustTextSize + adjustFontSize);
 		html = AddDivContainer(html);
 		return html;
 	}
@@ -46,7 +46,7 @@ public static partial class InjectIntoHtml
 			var temp = FilterCalibreCss(cssFile?.Content);
 			css.Append(ReplaceImageUrls(temp, book.Images));
 		}
-
+		
 		var styleTag = new StringBuilder();
 		styleTag.Append(GenerateCSSFromString(settings));
 		styleTag.Append(css);
@@ -81,9 +81,11 @@ public static partial class InjectIntoHtml
             body {{
                 {(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
                 {(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
-                {(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
-                {(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
-            }}";
+               	{(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
+            }}
+			p {{ 
+				{(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
+			}}";
 	}
 
 	static string ReplaceImageUrls(string? inputString, List<Models.Image> images)
@@ -233,6 +235,19 @@ public static partial class InjectIntoHtml
             margin-left: 1em;
             margin-right: 1em;
         }";
+	static readonly string adjustFontSize = @"
+		function changeTextStyle(fontSize) {
+			// Select all paragraphs and spans in the document
+			const textElements = document.querySelectorAll('p');
+	
+			// Apply the styles to each element
+			textElements.forEach(element => {
+			  // Set font size if provided
+			  if (fontSize) {
+				element.style.setProperty('font-size', fontSize + 'px', 'important');
+			  }
+			});
+		}";
 
 	static readonly string adjustTextSize = @"
 		/**
