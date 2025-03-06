@@ -52,7 +52,8 @@ public partial class BookPage : ContentPage, IDisposable
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', fontSize: {settings.FontSize}, backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
+		await EpubText.EvaluateJavaScriptAsync($"changeTextStyle({settings.FontSize})");
+		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
