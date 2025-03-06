@@ -23,10 +23,19 @@ public static partial class InjectIntoHtml
 		html = ReplaceImageUrls(html, book.Images);
 		html = InjectJavascript(html, disableScroll + jsButtons + adjustTextSize);
 		html = AddDivContainer(html);
-
 		return html;
 	}
+    public static string FilterCalibreCss(string? cssString)
+    {
+        if (string.IsNullOrEmpty(cssString))
+        {
+            return string.Empty;
+        }
+        string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
+        Regex regex = new(regexPattern, RegexOptions.None, regexTimeout);
 
+        return regex.Replace(cssString, string.Empty); // Replace matches with empty string
+    }
 	static string InjectCss(string html, Book book, Settings settings)
 	{
 		var css = new StringBuilder(style);
@@ -34,7 +43,8 @@ public static partial class InjectIntoHtml
 
 		foreach (var cssFile in cssList.Select(item => book.Css.Find(x => item.Contains(x.FileName))))
 		{
-			css.Append(ReplaceImageUrls(cssFile?.Content, book.Images));
+			var temp = FilterCalibreCss(cssFile?.Content);
+			css.Append(ReplaceImageUrls(temp, book.Images));
 		}
 
 		var styleTag = new StringBuilder();
