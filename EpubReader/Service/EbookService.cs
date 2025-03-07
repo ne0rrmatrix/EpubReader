@@ -36,20 +36,23 @@ public partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		
+		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList();
+		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items;
 		foreach (var item in book.Content.Html.Local)
 		{
 			var chapter = new Chapter
 			{
 				HtmlFile = item.Content,
 				FileName = item.FilePath,
-				Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ?? string.Empty,
+				Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ??
+				epub2Nav?.Find(x => x.Content.Source == Path.GetFileName(item.FilePath))?.NavigationLabels[0]?.Text ??
+				epub3Nav?.Find(x => x.Anchor?.Href == Path.GetFileName(item.FilePath))?.Anchor?.Text ??string.Empty,
 			};
 			chapters.Add(chapter);
 		}
-		var imageItem = book.Content.Images.Local.MaxBy(x => x.Content.Length);
+		
 		authors.AddRange(book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author }));
-		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.FilePath)));
+		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 80), item.FilePath)));
 		css.AddRange(book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.Content }));
 
 		Book books = new()
@@ -57,7 +60,7 @@ public partial class EbookService
 			Title = book.Title.Trim(),
 			Authors = authors,
 			FilePath = path,
-			CoverImage = book.CoverImage ?? imageItem?.Content ?? GenerateCoverImage(book.Title),
+			CoverImage = book.CoverImage ?? GenerateCoverImage(book.Title),
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
@@ -105,12 +108,12 @@ public partial class EbookService
 		string base64 = Convert.ToBase64String(imageByte);
 		return new Models.Image
 		{
-			FileName = href,
+			FileName = Path.GetFileName(href),
 			ImageUrl = base64
 		};
 	}
 
-	static byte[] ResizeImage(byte[] imageData, int maxWidth, int maxHeight, int quality)
+	static byte[] ResizeImage(byte[] imageData, int quality)
 	{
 		// If the image is smaller than 500 bytes, return it as is
 		if (imageData.Length < 900000)
@@ -120,7 +123,6 @@ public partial class EbookService
 		using MemoryStream ms = new(imageData);
 		using Image image = Image.Load(ms);
 		using MemoryStream resizedMs = new();
-		image.Mutate(x => x.Resize(maxWidth, maxHeight));
 		image.Save(resizedMs, new JpegEncoder { Quality = quality });
 		return resizedMs.ToArray();
 	}

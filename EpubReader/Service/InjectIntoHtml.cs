@@ -17,6 +17,7 @@ public static partial class InjectIntoHtml
 		{
 			return string.Empty;
 		}
+		html = FixImageTags(html);
 		html = RemoveScriptAndStyleTags(html);
 		html = RemoveExistingStyleTags(html);
 		html = InjectCss(html, book, settings);
@@ -25,11 +26,41 @@ public static partial class InjectIntoHtml
 		html = AddDivContainer(html);
 		return html;
 	}
-   
+
+	static bool HasParagraphsRegex(string htmlString)
+	{
+		// This pattern looks for opening <p> tags with optional attributes
+		return HasParagraphs().IsMatch(htmlString);
+	}
+	static string FixImageTags(string inputString)
+	{
+		// Regex to find <img> tags with height="100%"
+		string pattern = @"<img(?=[^>]*height\s*=\s*""100%""[^>]*)([^>]*)>";
+
+		// Replace the matched <img> tags, removing the height attribute.
+		string result = Regex.Replace(inputString, pattern, match =>
+		{
+			string imgTag = match.Value;
+
+			// Remove height="100%" using another regex.
+			string cleanedImgTag = CleanedTag().Replace(imgTag, "");
+
+			return cleanedImgTag;
+		});
+		if (string.IsNullOrEmpty(result))
+		{
+			return inputString;
+		}
+		return result;
+	}
 	static string InjectCss(string html, Book book, Settings settings)
 	{
 		var css = new StringBuilder(style);
-		
+		if (!HasParagraphsRegex(html))
+		{
+			css.Append(imageStyle);
+		}
+
 		foreach (var cssFile in book.Css)
 		{
 			var filteredCSS = FilterCalibreCss(cssFile.Content);
@@ -124,43 +155,142 @@ public static partial class InjectIntoHtml
 	}
 
 	static string ReplaceImageUrl(string inputString, string imageName, string imageString)
-	{
+	{	
 		var base64String = $"data:{GetMimeType(imageName)};base64,{imageString}";
+
+		// For HTML encoded version
+		var htmlEncodedString = HtmlEncoder.Default.Encode(imageString);
+		var htmlEncodedBase64String = $"data:{GetMimeType(imageName)};base64,{htmlEncodedString}";
+
 		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
+		string escapedFullImageName = Regex.Escape(imageName);
 
-		string imgPattern = $@"<img[^>]*src=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
+		// HTML img tag pattern
+		string imgPattern = $@"<img[^>]*src=[""']([^""']*{escapedFullImageName}[^""']*)[""'][^>]*>";
 		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
-		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{imageName}[^""']*)[""'][^>]*>";
 
+		// SVG image pattern - improved to better match XML
+		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{escapedFullImageName})[""'][^>]*>";
+
+		// Generic SVG pattern to catch other cases
+		string svgGenericPattern = @"<image[^>]*xlink:href=[""']([^""']*)[""'][^>]*>";
+
+		// CSS pattern
 		string patternCss = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
 		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
 
+		// Replace CSS backgrounds
 		inputString = Regex.Replace(inputString, patternCss, replacement, RegexOptions.IgnoreCase, regexTimeout);
 
-		var htmlEncodedString = HtmlEncoder.Default.Encode(imageString);
-		base64String = $"data:{GetMimeType(imageName)};base64,{htmlEncodedString}";
-	
+		// Replace HTML img tags
 		inputString = Regex.Replace(inputString, imgPattern, match =>
 		{
 			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, base64String);
+			string fileName = ExtractFilenameFromImgTag(originalTag);
+
+			if (!IsMatchingFilename(fileName, imageName))
+			{
+				return originalTag;
+			}
+
+			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
 		}, RegexOptions.None, regexTimeout);
 
 		inputString = Regex.Replace(inputString, imgPattern2, match =>
 		{
 			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, base64String);
+			string fileName = ExtractFilenameFromImgTag(originalTag);
+
+			if (!IsMatchingFilename(fileName, imageName))
+			{
+				return originalTag;
+			}
+
+			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
 		}, RegexOptions.None, regexTimeout);
 
+		// Replace SVG image references with specific pattern
 		inputString = Regex.Replace(inputString, svgPattern, match =>
 		{
 			string originalTag = match.Value;
 			return originalTag.Replace(match.Groups[1].Value, base64String);
-		}, RegexOptions.None, regexTimeout);
-		
+		}, RegexOptions.IgnoreCase, regexTimeout);
+
+		// Handle SVG with generic pattern
+		inputString = Regex.Replace(inputString, svgGenericPattern, match =>
+		{
+			string originalTag = match.Value;
+			string fileName = ExtractFilenameFromSvgTag(match.Groups[1].Value);
+
+			if (!IsMatchingFilename(fileName, imageName))
+			{
+				return originalTag;
+			}
+
+			return originalTag.Replace(match.Groups[1].Value, base64String);
+		}, RegexOptions.IgnoreCase, regexTimeout);
+
 		return inputString;
 	}
 
+	static string ExtractFilenameFromSvgTag(string href)
+	{
+		return Path.GetFileName(href.TrimEnd('/'));
+	}
+
+	static bool IsMatchingFilename(string filename1, string filename2)
+	{
+		if (string.IsNullOrEmpty(filename1) || string.IsNullOrEmpty(filename2))
+		{
+			return false;
+		}
+
+		return string.Equals(
+			Path.GetFileName(filename1.TrimEnd('/')),
+			Path.GetFileName(filename2.TrimEnd('/')),
+			StringComparison.OrdinalIgnoreCase
+		);
+	}
+
+	static string ExtractFilenameFromImgTag(string imgTagString)
+	{
+		try
+		{
+			// Find the src attribute
+			int srcIndex = imgTagString.IndexOf("src=\"");
+			if (srcIndex == -1)
+			{
+				return string.Empty;
+			}
+
+			// Move to the start of the path
+			srcIndex += 5; // Length of 'src="'
+
+			// Find the closing quote
+			int endIndex = imgTagString.IndexOf('"', srcIndex);
+			if (endIndex == -1)
+			{
+				return string.Empty;
+			}
+
+			// Extract the full path
+			string fullPath = imgTagString[srcIndex..endIndex];
+
+			// Get the filename (everything after the last slash or backslash)
+			int lastSlashIndex = Math.Max(fullPath.LastIndexOf('/'), fullPath.LastIndexOf('\\'));
+
+			if (lastSlashIndex == -1)
+			{
+				return fullPath; // No slash found, the path is just the filename
+			}
+
+			return fullPath[(lastSlashIndex + 1)..];
+		}
+		catch
+		{
+			return string.Empty;
+		}
+	}
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -234,6 +364,12 @@ public static partial class InjectIntoHtml
 		return StyleTagRegex().Replace(html, string.Empty);
 	}
 
+	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex HasParagraphs();
+
+	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex CleanedTag();
+
 	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex WithoutStyles();
 
@@ -251,7 +387,7 @@ public static partial class InjectIntoHtml
         window.addEventListener('touchmove', function(event) {
             event.preventDefault();
         }, { passive: false });";
-
+	
 	static readonly string style = @"
         ::-webkit-scrollbar {
             display: none;
@@ -260,7 +396,7 @@ public static partial class InjectIntoHtml
         * {
             -webkit-touch-callout: none;
         }
-
+		
         #scrollContainer {
             columns: 1;
             overflow-x: auto;
@@ -272,7 +408,7 @@ public static partial class InjectIntoHtml
             margin-left: 1em;
             margin-right: 1em;
         }";
-
+	
 	static readonly string adjustFontSize = @"
 		function changeTextStyle(fontSize) {
 			// Select all paragraphs and spans in the document
@@ -285,6 +421,40 @@ public static partial class InjectIntoHtml
 				element.style.setProperty('font-size', fontSize + 'px', 'important');
 			  }
 			});
+		}";
+
+	static readonly string imageStyle = @"
+		.image_full {
+		text-align: center;
+		}
+    
+		.image_full img {
+		  display: block;
+		  margin: 0 auto;
+		  max-width: 100%;
+		  height: 100vh;
+		}
+    
+		/* New CSS for cover_image */
+		.cover_image {
+		  text-align: center;
+		}
+    
+		.cover_image img {
+		  display: block;
+		  margin: 0 auto;
+		  max-width: 100%;
+		  height: 100vh;
+		}
+
+		/* Optional: if you need to set the image to inline-block */
+		.cover-image img {
+		  display: inline-block;
+		}
+		img {
+		  max-width: 100vw; /* Ensures the image doesn't exceed the page width */
+		  height: 100vh; /* Maintains aspect ratio by scaling height proportionally */
+		  display: block; /* Removes extra space below inline images */
 		}";
 
 	static readonly string adjustTextSize = @"
@@ -411,7 +581,7 @@ public static partial class InjectIntoHtml
 			return false;
 		}
 	}";
-
+	
 	static readonly string jsButtons = @"
 		window.addEventListener('load', () => adjustSvgToScreen(true));
 
@@ -420,7 +590,7 @@ public static partial class InjectIntoHtml
 		const svg = document.querySelector('svg');
     
 		if (!svg) return;
-    
+		
 		// Set appropriate preserveAspectRatio
 		if (preserveAspect) {
 			// 'xMidYMid meet' maintains aspect ratio and centers the image
