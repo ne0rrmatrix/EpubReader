@@ -6,6 +6,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using Image = SixLabors.ImageSharp.Image;
 using SizeF = Microsoft.Maui.Graphics.SizeF;
+using VersOne.Epub;
 
 namespace EpubReader.Service;
 
@@ -23,68 +24,43 @@ public partial class EbookService
 		List<Author> authors = [];
 		List<Css> css = [];
 		List<Models.Image> images = [];
-
-		EpubCore.EpubBook book;
+		
+		EpubBook book;
 
 		try
 		{
-			book = EpubCore.EpubReader.Read(path);
+			book = VersOne.Epub.EpubReader.ReadBook(path);
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		
-		var navMap = book.Format?.Ncx?.NavMap ?? new();
-		var toc = book.TableOfContents.ToList();
-		var html = book.Resources.Html.ToList();
-		var imageList = book.Resources.Images.ToList();
-		var imageItem = imageList.MaxBy(x => x.Content.Length);
-	
-		foreach (var navPoint in navMap.NavPoints)
-		{	
-			if (navPoint.ContentSrc is null)
-			{
-				continue;
-			}
-			var chapter = html.Find(x => x.Href == navPoint.ContentSrc) ?? html.Find(x => navPoint.ContentSrc.Contains(x.Href));
-			if (chapter is not null && chapter.AbsolutePath.Contains("_split_000.xhtml"))
-			{
-				chapter = html.Find(x => x.AbsolutePath == chapter.AbsolutePath.Replace("_split_000.xhtml", "_split_001.xhtml"));
-			}
-			
-			if (chapter is not null)
-			{
-				chapters.Add(new Chapter
-				{
-					Title = navPoint.NavLabelText ?? string.Empty,
-					HtmlFile = chapter.TextContent ?? string.Empty,
-					FileName = chapter.FileName ?? string.Empty
-				});
-			}
-		}
-		
-		if (navMap.NavPoints.Count <= 1)
+		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList();
+		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items;
+		foreach (var item in book.Content.Html.Local)
 		{
-			chapters.AddRange(html.Select(chapter => new Chapter
+			var chapter = new Chapter
 			{
-				Title = toc.Find(x => x.AbsolutePath == chapter.AbsolutePath)?.Title ?? string.Empty,
-				HtmlFile = chapter.TextContent ?? string.Empty,
-				FileName = chapter.FileName ?? string.Empty
-			}));
+				HtmlFile = item.Content,
+				FileName = item.FilePath,
+				Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ??
+				epub2Nav?.Find(x => x.Content.Source == Path.GetFileName(item.FilePath))?.NavigationLabels[0]?.Text ??
+				epub3Nav?.Find(x => x.Anchor?.Href == Path.GetFileName(item.FilePath))?.Anchor?.Text ??string.Empty,
+			};
+			chapters.Add(chapter);
 		}
 		
-		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
-		images.AddRange(imageList.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.Href)));
-		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
+		authors.AddRange(book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author }));
+		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 80), item.FilePath)));
+		css.AddRange(book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.Content }));
 
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = authors,
 			FilePath = path,
-			CoverImage = book.CoverImage ?? imageItem?.Content ?? GenerateCoverImage(book.Title),
+			CoverImage = book.CoverImage ?? GenerateCoverImage(book.Title),
 			Chapters = [.. chapters],
 			Images = [.. images],
 			Css = css,
@@ -132,12 +108,12 @@ public partial class EbookService
 		string base64 = Convert.ToBase64String(imageByte);
 		return new Models.Image
 		{
-			FileName = href,
+			FileName = Path.GetFileName(href),
 			ImageUrl = base64
 		};
 	}
 
-	static byte[] ResizeImage(byte[] imageData, int maxWidth, int maxHeight, int quality)
+	static byte[] ResizeImage(byte[] imageData, int quality)
 	{
 		// If the image is smaller than 500 bytes, return it as is
 		if (imageData.Length < 900000)
@@ -147,7 +123,6 @@ public partial class EbookService
 		using MemoryStream ms = new(imageData);
 		using Image image = Image.Load(ms);
 		using MemoryStream resizedMs = new();
-		image.Mutate(x => x.Resize(maxWidth, maxHeight));
 		image.Save(resizedMs, new JpegEncoder { Quality = quality });
 		return resizedMs.ToArray();
 	}
