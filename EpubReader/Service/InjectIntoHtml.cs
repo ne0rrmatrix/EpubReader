@@ -46,7 +46,8 @@ public static partial class InjectIntoHtml
 			string cleanedImgTag = CleanedTag().Replace(imgTag, "");
 
 			return cleanedImgTag;
-		});
+		}, RegexOptions.None, regexTimeout);
+
 		if (string.IsNullOrEmpty(result))
 		{
 			return inputString;
