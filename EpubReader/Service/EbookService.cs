@@ -6,6 +6,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using Image = SixLabors.ImageSharp.Image;
 using SizeF = Microsoft.Maui.Graphics.SizeF;
+using VersOne.Epub;
 
 namespace EpubReader.Service;
 
@@ -23,12 +24,12 @@ public partial class EbookService
 		List<Author> authors = [];
 		List<Css> css = [];
 		List<Models.Image> images = [];
-
-		EpubCore.EpubBook book;
+		
+		EpubBook book;
 
 		try
 		{
-			book = EpubCore.EpubReader.Read(path);
+			book = VersOne.Epub.EpubReader.ReadBook(path);
 		}
 		catch (Exception ex)
 		{
@@ -36,48 +37,20 @@ public partial class EbookService
 			return null;
 		}
 		
-		var navMap = book.Format?.Ncx?.NavMap ?? new();
-		var toc = book.TableOfContents.ToList();
-		var html = book.Resources.Html.ToList();
-		var imageList = book.Resources.Images.ToList();
-		var imageItem = imageList.MaxBy(x => x.Content.Length);
-	
-		foreach (var navPoint in navMap.NavPoints)
-		{	
-			if (navPoint.ContentSrc is null)
-			{
-				continue;
-			}
-			var chapter = html.Find(x => x.Href == navPoint.ContentSrc) ?? html.Find(x => navPoint.ContentSrc.Contains(x.Href));
-			if (chapter is not null && chapter.AbsolutePath.Contains("_split_000.xhtml"))
-			{
-				chapter = html.Find(x => x.AbsolutePath == chapter.AbsolutePath.Replace("_split_000.xhtml", "_split_001.xhtml"));
-			}
-			
-			if (chapter is not null)
-			{
-				chapters.Add(new Chapter
-				{
-					Title = navPoint.NavLabelText ?? string.Empty,
-					HtmlFile = chapter.TextContent ?? string.Empty,
-					FileName = chapter.FileName ?? string.Empty
-				});
-			}
-		}
-		
-		if (navMap.NavPoints.Count <= 1)
+		foreach (var item in book.Content.Html.Local)
 		{
-			chapters.AddRange(html.Select(chapter => new Chapter
+			var chapter = new Chapter
 			{
-				Title = toc.Find(x => x.AbsolutePath == chapter.AbsolutePath)?.Title ?? string.Empty,
-				HtmlFile = chapter.TextContent ?? string.Empty,
-				FileName = chapter.FileName ?? string.Empty
-			}));
+				HtmlFile = item.Content,
+				FileName = item.FilePath,
+				Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ?? string.Empty,
+			};
+			chapters.Add(chapter);
 		}
-		
-		authors.AddRange(book.Authors.Where(author => author is not null).Select(author => new Author { Name = author }));
-		images.AddRange(imageList.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.Href)));
-		css.AddRange(book.Resources.Css.Select(style => new Css { FileName = Path.GetFileName(style.FileName), Content = style.TextContent }));
+		var imageItem = book.Content.Images.Local.MaxBy(x => x.Content.Length);
+		authors.AddRange(book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author }));
+		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 1080, 1920, 80), item.FilePath)));
+		css.AddRange(book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.Content }));
 
 		Book books = new()
 		{

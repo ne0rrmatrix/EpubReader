@@ -17,7 +17,7 @@ public static partial class InjectIntoHtml
 		{
 			return string.Empty;
 		}
-
+		html = RemoveScriptAndStyleTags(html);
 		html = RemoveExistingStyleTags(html);
 		html = InjectCss(html, book, settings);
 		html = ReplaceImageUrls(html, book.Images);
@@ -174,7 +174,22 @@ public static partial class InjectIntoHtml
 		}
 		return html;
 	}
+	static string RemoveScriptAndStyleTags(string htmlString)
+	{
+		if (string.IsNullOrEmpty(htmlString))
+		{
+			return htmlString;
+		}
 
+		// Remove script tags with all their attributes and content
+		string withoutScripts = WithoutScripts().Replace(htmlString, string.Empty);
+
+		// Remove style tags with all their attributes and content
+		string withoutStyles = WithoutStyles().Replace(withoutScripts, string.Empty);
+
+		// Return the cleaned string
+		return withoutStyles.Trim();
+	}
 	static string AddDivContainer(string html)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -219,6 +234,12 @@ public static partial class InjectIntoHtml
 		return StyleTagRegex().Replace(html, string.Empty);
 	}
 
+	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex WithoutStyles();
+
+	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex WithoutScripts();
+
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
 
@@ -251,6 +272,7 @@ public static partial class InjectIntoHtml
             margin-left: 1em;
             margin-right: 1em;
         }";
+
 	static readonly string adjustFontSize = @"
 		function changeTextStyle(fontSize) {
 			// Select all paragraphs and spans in the document
@@ -276,7 +298,7 @@ public static partial class InjectIntoHtml
 		* @param {HTMLElement|string} [target='body'] - Target element or selector
 		* @returns {boolean} - True if successful, false if failed
 		*/
-	function applyStyles(options = {}, target = 'body') {
+		function applyStyles(options = {}, target = 'body') {
 		try {
 			// Find the target element if a selector string was provided
 			let element = target;

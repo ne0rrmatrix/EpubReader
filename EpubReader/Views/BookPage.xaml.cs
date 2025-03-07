@@ -58,6 +58,10 @@ public partial class BookPage : ContentPage, IDisposable
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
+		if (string.IsNullOrEmpty(chapter.Title))
+		{
+			return;
+		}
 		var toolbarItem = new ToolbarItem
 		{
 			Text = chapter.Title,
