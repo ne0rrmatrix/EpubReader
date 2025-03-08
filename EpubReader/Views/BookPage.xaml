@@ -27,6 +27,12 @@
             <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}">
                 <Grid.GestureRecognizers>
                     <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                        <On Platform="MacCatalyst">
+                            <TapGestureRecognizer
+                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                                Command="{Binding PressCommand}"
+                                NumberOfTapsRequired="2" />
+                        </On>
                         <On Platform="WinUI">
                             <TapGestureRecognizer
                                 BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
@@ -67,8 +73,10 @@
                     Clicked="PreviousPage"
                     HorizontalOptions="Start"
                     IsEnabled="{OnPlatform WinUI=true,
+                                           MacCatalyst=true,
                                            Default=false}"
                     IsVisible="{OnPlatform WinUI=true,
+                                           MacCatalyst=true,
                                            Default=false}"
                     Source="{AppThemeBinding Dark=arrow_back.png,
                                              Light=arrow_back_lightmode.png}"
@@ -79,6 +87,8 @@
                     FontSize="20"
                     HorizontalOptions="Center"
                     IsVisible="{OnPlatform WinUI=true,
+                                           MacCatalyst=true,
+                                           iOS={Binding IsNavMenuVisible},
                                            Android={Binding IsNavMenuVisible}}" />
                 <ImageButton
                     Grid.Row="1"
@@ -87,8 +97,10 @@
                     Clicked="NextPage"
                     HorizontalOptions="End"
                     IsEnabled="{OnPlatform WinUI=true,
+                                           MacCatalyst=true,
                                            Default=false}"
                     IsVisible="{OnPlatform WinUI=true,
+                                           MacCatalyst=true,
                                            Default=false}"
                     Source="{AppThemeBinding Dark=arrow_forward.png,
                                              Light=arrow_forward_lightmode.png}"

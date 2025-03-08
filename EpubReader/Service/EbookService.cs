@@ -36,21 +36,18 @@ public partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
+		
 		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList();
 		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items;
-		foreach (var item in book.Content.Html.Local)
+
+		chapters.AddRange(book.Content.Html.Local.Select(item => new Chapter
 		{
-			var chapter = new Chapter
-			{
-				HtmlFile = item.Content,
-				FileName = item.FilePath,
-				Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ??
-				epub2Nav?.Find(x => x.Content.Source == Path.GetFileName(item.FilePath))?.NavigationLabels[0]?.Text ??
-				epub3Nav?.Find(x => x.Anchor?.Href == Path.GetFileName(item.FilePath))?.Anchor?.Text ??string.Empty,
-			};
-			chapters.Add(chapter);
-		}
-		
+			HtmlFile = item.Content,
+			FileName = item.FilePath,
+			Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ??
+			epub2Nav?.Find(x => x.Content.Source == Path.GetFileName(item.FilePath))?.NavigationLabels[0]?.Text ??
+			epub3Nav?.Find(x => x.Anchor?.Href == Path.GetFileName(item.FilePath))?.Anchor?.Text ?? string.Empty,
+		}));
 		authors.AddRange(book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author }));
 		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 80), item.FilePath)));
 		css.AddRange(book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.Content }));
