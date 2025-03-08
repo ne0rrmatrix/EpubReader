@@ -39,7 +39,6 @@ public static partial class InjectIntoHtml
 		html = ReplaceImageUrls(html, book.Images);
 		html = InjectJavascript(html, disableScroll + buttonNavigation + adjustTextSizeAndStyle + adjustFontSize + adjustSVGImages);
 		html = AddDivContainer(html);
-		System.Diagnostics.Debug.WriteLine(html);
 		return html;
 	}
 

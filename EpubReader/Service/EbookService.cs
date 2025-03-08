@@ -10,12 +10,9 @@ using VersOne.Epub;
 
 namespace EpubReader.Service;
 
-public partial class EbookService
+public static partial class EbookService
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
-	protected EbookService()
-	{
-	}
 
 	public static Book? OpenEbook(string path)
 	{
@@ -37,16 +34,11 @@ public partial class EbookService
 			return null;
 		}
 		
-		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList();
-		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items;
-
 		chapters.AddRange(book.Content.Html.Local.Select(item => new Chapter
 		{
 			HtmlFile = item.Content,
 			FileName = item.FilePath,
-			Title = book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ??
-			epub2Nav?.Find(x => x.Content.Source == Path.GetFileName(item.FilePath))?.NavigationLabels[0]?.Text ??
-			epub3Nav?.Find(x => x.Anchor?.Href == Path.GetFileName(item.FilePath))?.Anchor?.Text ?? string.Empty,
+			Title = GetTitle(book, item) ?? book.Navigation?.Find(x => x.Link?.ContentFilePath == item.FilePath)?.Title ?? string.Empty,
 		}));
 		authors.AddRange(book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author }));
 		images.AddRange(book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.Content, 80), item.FilePath)));
@@ -65,6 +57,19 @@ public partial class EbookService
 		return books;
 	}
 
+	static string? GetTitle(EpubBook book, EpubLocalTextContentFile item)
+	{
+		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList();
+		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items;
+		var fileName = Path.GetFileName(item.FilePath);
+		return book.Schema.Package.EpubVersion switch
+		{
+			VersOne.Epub.Schema.EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text,
+			VersOne.Epub.Schema.EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			VersOne.Epub.Schema.EpubVersion.EPUB_3_1 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			_ => null,
+		};
+	}
 	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);

@@ -1,7 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Maui.Core.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
@@ -11,7 +10,7 @@ using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
-public partial class LibraryViewModel : BaseViewModel, IDisposable
+public partial class LibraryViewModel : BaseViewModel
 {
 	readonly Task loadTask;
 	readonly CancellationTokenSource? cancellationtokensource;
@@ -34,9 +33,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
    
 	public LibraryViewModel()
     {
-#if ANDROID
-		StatusBar.SetColor(Color.FromArgb("#3E8EED"));
-#endif
 		cancellationtokensource = new CancellationTokenSource();
 		loadTask = LoadBooks(cancellationtokensource.Token);
 		
@@ -132,16 +128,13 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
     [RelayCommand]
     async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
     {
-        if (book is not null)
-        {
-            logger.Info("Removing book");
-            FileService.DeleteFile(book.FilePath);
-			await db.RemoveBook(book, cancellationToken);
-			Books.Remove(book);
-            logger.Info("Book removed from library.");
-            OnPropertyChanged(nameof(Books));
-        }
-    }
+		logger.Info("Removing book");
+		FileService.DeleteFile(book.FilePath);
+		await db.RemoveBook(book, cancellationToken);
+		Books.Remove(book);
+		logger.Info("Book removed from library.");
+		OnPropertyChanged(nameof(Books));
+	}
 
 	public static async Task<FileResult?> PickAndShow(PickOptions options)
     {
@@ -156,7 +149,7 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
         }
     }
 
-	protected virtual void Dispose(bool disposing)
+	protected override void Dispose(bool disposing)
 	{
 		if (!disposedValue)
 		{
@@ -167,11 +160,6 @@ public partial class LibraryViewModel : BaseViewModel, IDisposable
 			}
 			disposedValue = true;
 		}
-	}
-
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
+		base.Dispose(disposing);
 	}
 }

@@ -2,7 +2,7 @@
 
 namespace EpubReader.Service;
 
-public static class FileService
+public static partial class FileService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
     public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
