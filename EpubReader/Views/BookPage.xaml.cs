@@ -85,7 +85,6 @@ public partial class BookPage : ContentPage, IDisposable
 	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
 	{
 		base.OnNavigatedFrom(args);
-
 		EpubText.Navigating -= EpubText_Navigating;
 		EpubText.Navigated -= OnEpubText_Navigated;
 

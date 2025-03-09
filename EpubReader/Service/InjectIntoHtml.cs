@@ -385,12 +385,14 @@ public static partial class InjectIntoHtml
     #scrollContainer {{
         columns: {columns};
         overflow-x: auto;
-        height: 100vh;
+		margin-top: 1em;
+        height: 95vh;
+		
     }}
 
-    #scrollContainer p {{
+    #scrollContainer p, h1, h2, h3, h4 {{
         text-align: justify;
-        margin-left: 1em;
+		margin-left: 1em;
         margin-right: 1em;
     }}";
 	}

@@ -51,20 +51,21 @@ public partial class LibraryViewModel : BaseViewModel
 		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
 		foreach (var item in bookData)
 		{
-			var ebook = EbookService.OpenEbook(item.FilePath) ?? throw new InvalidOperationException();
+			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
 			ebook.CurrentChapter = item.CurrentChapter;
 			Books.Add(ebook);
 		}
 	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book Book)
+    public static async Task GotoBookPage(Book book)
     {
-		if(Book is null)
+		if(book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
+		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
@@ -86,10 +87,11 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
-		var ebook = EbookService.OpenEbook(result.FullPath);
+		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
 			logger.Info("Error opening ebook");
+			await ShowSnackBar("Error opening Book.", "OK", cancellationToken);
 			return;
 		}
 

@@ -3,20 +3,38 @@ using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
+using VersOne.Epub;
+using VersOne.Epub.Schema;
 using Image = SixLabors.ImageSharp.Image;
 using SizeF = Microsoft.Maui.Graphics.SizeF;
-using VersOne.Epub;
 
 namespace EpubReader.Service;
 
 public static partial class EbookService
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
-
+	public static Book? GetListing(string path)
+	{
+		EpubBook book;
+		try
+		{
+			book = VersOne.Epub.EpubReader.ReadBook(path);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error opening ebook: {ex.Message}");
+			return null;
+		}
+		return new Book
+		{
+			Title = book.Title,
+			CoverImage = book.CoverImage ?? GenerateCoverImage(book.Title),
+			FilePath = path,
+		};
+	}
+	
 	public static Book? OpenEbook(string path)
 	{
-
 		List<Chapter> chapters = [];
 		List<Author> authors = [];
 		List<Css> css = [];
@@ -33,7 +51,7 @@ public static partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		
+
 		chapters.AddRange(book.Content.Html.Local.Select(item => new Chapter
 		{
 			HtmlFile = item.Content,
@@ -64,12 +82,13 @@ public static partial class EbookService
 		var fileName = Path.GetFileName(item.FilePath);
 		return book.Schema.Package.EpubVersion switch
 		{
-			VersOne.Epub.Schema.EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text,
-			VersOne.Epub.Schema.EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
-			VersOne.Epub.Schema.EpubVersion.EPUB_3_1 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text,
+			EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			EpubVersion.EPUB_3_1 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
 			_ => null,
 		};
 	}
+
 	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);
@@ -105,6 +124,7 @@ public static partial class EbookService
 			HorizontalAlignment.Center, VerticalAlignment.Center, TextFlow.OverflowBounds);
 		return bmp.Image.AsBytes(ImageFormat.Jpeg);
 	}
+
 	static Models.Image GetImage(byte[] imageByte, string href)
 	{
 		string base64 = Convert.ToBase64String(imageByte);
