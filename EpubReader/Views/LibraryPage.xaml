@@ -75,6 +75,8 @@
                                 Grid.Row="1"
                                 Margin="8,4,8,8"
                                 Aspect="AspectFit"
+                                CacheDuration="30"
+                                DownsampleToViewSize="True"
                                 HeightRequest="{StaticResource CardHeight}"
                                 HorizontalOptions="Center"
                                 Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">

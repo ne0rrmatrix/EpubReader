@@ -48,7 +48,7 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			Books.Clear();
 		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
@@ -76,57 +76,45 @@ public partial class LibraryViewModel : BaseViewModel
     [RelayCommand]
     async Task Add(CancellationToken cancellationToken = default)
     {
+		string message = string.Empty;
         var result = await PickAndShow(new PickOptions
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
-        }).ConfigureAwait(false);
+        });
 		if(result is null)
 		{
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
 		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
-			logger.Info("Error opening ebook");
-			await ShowSnackBar("Error opening Book.", "OK", cancellationToken);
+			message = "Error opening Book.";
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+			logger.Info(message);
 			return;
 		}
 
 		if (bookData.Any(x => x.Title == ebook.Title))
 		{
-			await ShowSnackBar("Book already exists in library", "OK", cancellationToken);
-			logger.Info("Book already exists in library");
+			message = "Book already exists in library";
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+			logger.Info(message);
 			return;
 		}
 
-		var filePath = await FileService.SaveFile(result).ConfigureAwait(false);
+		var filePath = await FileService.SaveFile(result);
 		ebook.FilePath = filePath;
-		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
+		await db.SaveBookData(ebook, cancellationToken);
 		Books.Add(ebook);
+
+		message = "Book added to library";
+		await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+		logger.Info(message);
 	}
 
-	static async Task ShowSnackBar(string text, string actionButtonText, CancellationToken cancellationToken = default)
-	{
-		var snackbarOptions = new SnackbarOptions
-		{
-			BackgroundColor = Colors.Red,
-			TextColor = Colors.White,
-			ActionButtonTextColor = Colors.Yellow,
-			CornerRadius = new CornerRadius(10),
-			Font = Font.SystemFontOfSize(14),
-			ActionButtonFont = Font.SystemFontOfSize(14),
-			CharacterSpacing = 0.5
-		};
-
-		TimeSpan duration = TimeSpan.FromSeconds(3);
-
-		var snackbar = Snackbar.Make(text, null, actionButtonText, duration, snackbarOptions);
-
-		await snackbar.Show(cancellationToken).ConfigureAwait(false);
-	}
     [RelayCommand]
     async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
     {

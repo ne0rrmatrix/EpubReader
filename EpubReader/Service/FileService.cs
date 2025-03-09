@@ -30,7 +30,6 @@ public static partial class FileService
 
     public static async Task<string> SaveFile(FileResult result)
     {
-		string fileName = string.Empty;
 		try
 		{
 			if (Directory.Exists(SaveDirectory))
@@ -45,18 +44,18 @@ public static partial class FileService
 
 			using Stream fileStream = await result.OpenReadAsync();
 			using StreamReader reader = new(fileStream);
-			fileName = GetFileName(result.FileName);
+			var fileName = GetFileName(result.FileName);
 			using FileStream output = File.Create(fileName);
 			await fileStream.CopyToAsync(output);
 			fileStream.Seek(0, SeekOrigin.Begin);
 			FileStream.Synchronized(output);
 			logger.Info($"File saved: {fileName}");
+			return fileName;
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving file: {ex.Message}");
 			return string.Empty;
 		}
-        return fileName;
     }
 }
