@@ -2,7 +2,7 @@
 using AndroidX.Core.View;
 
 namespace EpubReader.Service;
-public static class StatusBarExtensions
+public static partial class StatusBarExtensions
 {
 	public static void SetStatusBarsHidden(bool hidden)
 	{
