@@ -28,7 +28,7 @@ public static partial class FileService
         return Path.Combine(SaveDirectory, filename);
     }
 
-    public static async Task<string> SaveFile(FileResult result)
+    public static async Task SaveFile(FileResult result)
     {
 		try
 		{
@@ -50,12 +50,10 @@ public static partial class FileService
 			fileStream.Seek(0, SeekOrigin.Begin);
 			FileStream.Synchronized(output);
 			logger.Info($"File saved: {fileName}");
-			return fileName;
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving file: {ex.Message}");
-			return string.Empty;
 		}
     }
 }

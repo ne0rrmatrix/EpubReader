@@ -48,7 +48,7 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			Books.Clear();
 		}
-		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
@@ -65,6 +65,7 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info("Book is null");
 			return;
 		}
+
 		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
 		var navigationParams = new Dictionary<string, object>
         {
@@ -81,18 +82,18 @@ public partial class LibraryViewModel : BaseViewModel
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
-        });
+        }).ConfigureAwait(false);
 		if(result is null)
 		{
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = await db.GetAllBooks(cancellationToken) ?? [];
+		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
 		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
 			message = "Error opening Book.";
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+			await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
 			logger.Info(message);
 			return;
 		}
@@ -100,18 +101,18 @@ public partial class LibraryViewModel : BaseViewModel
 		if (bookData.Any(x => x.Title == ebook.Title))
 		{
 			message = "Book already exists in library";
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+			await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
 			logger.Info(message);
 			return;
 		}
 
-		var filePath = await FileService.SaveFile(result);
-		ebook.FilePath = filePath;
-		await db.SaveBookData(ebook, cancellationToken);
+		ebook.FilePath = FileService.GetFileName(result.FileName);
+		await FileService.SaveFile(result).ConfigureAwait(false);
+		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 		Books.Add(ebook);
 
 		message = "Book added to library";
-		await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken);
+		await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
 		logger.Info(message);
 	}
 
@@ -120,7 +121,7 @@ public partial class LibraryViewModel : BaseViewModel
     {
 		logger.Info("Removing book");
 		FileService.DeleteFile(book.FilePath);
-		await db.RemoveBook(book, cancellationToken);
+		await db.RemoveBook(book, cancellationToken).ConfigureAwait(false);
 		Books.Remove(book);
 		logger.Info("Book removed from library.");
 		OnPropertyChanged(nameof(Books));

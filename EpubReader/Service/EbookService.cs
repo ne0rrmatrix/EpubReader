@@ -54,6 +54,7 @@ public static partial class EbookService
 		return new Book
 		{
 			Title = book.Title,
+			FilePath = path,
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
@@ -79,7 +80,7 @@ public static partial class EbookService
 			FilePath = path,
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 			Chapters = GetChapters([.. book.Content.Html.Local], book),
-			Images = [.. book.Content.Images.Local.Select(item => GetImage(ResizeImage(item.ReadContent(), 80), item.FilePath))],
+			Images = [.. book.Content.Images.Local.Select(item => GetImage(item.ReadContent(), item.FilePath))],
 			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.ReadContent() })],
 		};
 		return books;
@@ -105,7 +106,7 @@ public static partial class EbookService
 		return result;
 	}
 
-	static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	 static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		List<Chapter> chapters =
 		[
@@ -146,7 +147,7 @@ public static partial class EbookService
 		}
 		return chapters;
 	}
-
+	 
 	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);
@@ -185,25 +186,21 @@ public static partial class EbookService
 
 	static Models.Image GetImage(byte[] imageByte, string href)
 	{
-		string base64 = Convert.ToBase64String(imageByte);
+		var quality = 100;
+		var size = Convert.ToDouble(imageByte.Length) / 1024;
+		if ((size) > 300)
+		{
+			quality = 50;
+		}
+		using MemoryStream ms = new(imageByte);
+		using Image image = Image.Load(ms);
+		using MemoryStream resizedMs = new();
+		image.Save(resizedMs, new JpegEncoder { Quality =quality });
+		string base64 = Convert.ToBase64String(resizedMs.ToArray());
 		return new Models.Image
 		{
 			FileName = Path.GetFileName(href),
 			ImageUrl = base64
 		};
-	}
-
-	static byte[] ResizeImage(byte[] imageData, int quality)
-	{
-		// If the image is smaller than 500 bytes, return it as is
-		if (imageData.Length < 900000)
-		{
-			return imageData;
-		}
-		using MemoryStream ms = new(imageData);
-		using Image image = Image.Load(ms);
-		using MemoryStream resizedMs = new();
-		image.Save(resizedMs, new JpegEncoder { Quality = quality });
-		return resizedMs.ToArray();
 	}
 }
