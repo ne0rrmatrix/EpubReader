@@ -1,7 +1,6 @@
 ﻿using EpubReader.Models;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
-using SixLabors.ImageSharp;
 using SkiaSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
@@ -166,7 +165,7 @@ public static partial class EbookService
 		SizeF textSize = canvas.GetStringSize(title, font, fontSize);
 
 		// Draw a rectangle to hold the string
-		Microsoft.Maui.Graphics.Point point = new(
+		Point point = new(
 			x: (bmp.Width - textSize.Width) / 2,
 			y: (bmp.Height - textSize.Height) / 2);
 		Rect myTextRectangle = new(point, textSize);
@@ -181,7 +180,7 @@ public static partial class EbookService
 		canvas.FontColor = Colors.White;
 		canvas.DrawString(title, myTextRectangle,
 			HorizontalAlignment.Center, VerticalAlignment.Center, TextFlow.OverflowBounds);
-		return bmp.Image.AsBytes(Microsoft.Maui.Graphics.ImageFormat.Jpeg);
+		return bmp.Image.AsBytes(ImageFormat.Jpeg);
 	}
 
 	static Models.Image GetImage(byte[] imageByte, string href)
