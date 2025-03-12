@@ -2,11 +2,10 @@
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
+using SkiaSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
-using Image = SixLabors.ImageSharp.Image;
 using SizeF = Microsoft.Maui.Graphics.SizeF;
 
 namespace EpubReader.Service;
@@ -108,32 +107,20 @@ public static partial class EbookService
 
 	 static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
-		List<Chapter> chapters =
-		[
-			.. chaptersRef.Where(item => !item.FilePath.Contains("_split_")).Select(item => new Chapter
-			{
-				HtmlFile = item.ReadContent(),
-				FileName = item.FilePath,
-				Title = GetTitle(book, item) ?? string.Empty,
-			}),
-		];
 		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
 		{
-			chapters = [];
-			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
-			{
-				var temp = item.FilePath.Replace("_split_000", "_split_001");
-				EpubLocalTextContentFileRef? epubLocalFile = chaptersRef.Find(x => x.FilePath == temp);
-				chapters.Add(new Chapter
-				{
-					HtmlFile = epubLocalFile?.ReadContent() ?? string.Empty,
-					FileName = epubLocalFile?.FilePath ?? string.Empty,
-					Title = GetTitle(book, item) ?? string.Empty,
-				});
-			}
-			return chapters;
+			return
+				[
+					.. chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")).Select(item => new Chapter
+					{
+						HtmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty,
+						FileName = ReplaceChapter(chaptersRef, item)?.FilePath ?? string.Empty,
+						Title = GetTitle(book, item) ?? string.Empty,
+					}),
+				];
 		}
-		if (chapters.Count < 3)
+
+		if (chaptersRef.Where(item => !item.FilePath.Contains("_split_")).ToList().Count < 3)
 		{
 			return
 			[
@@ -145,9 +132,22 @@ public static partial class EbookService
 				}),
 			];
 		}
-		return chapters;
+		return
+			[
+				.. chaptersRef.Where(item => !item.FilePath.Contains("_split_")).Select(item => new Chapter
+				{
+					HtmlFile = item.ReadContent(),
+					FileName = item.FilePath,
+					Title = GetTitle(book, item) ?? string.Empty,
+				}),
+			];
 	}
 	 
+	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
+	{
+		var temp = item.FilePath.Replace("_split_000", "_split_001");
+		return chaptersRef.Find(x => x.FilePath == temp);
+	}
 	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);
@@ -181,7 +181,7 @@ public static partial class EbookService
 		canvas.FontColor = Colors.White;
 		canvas.DrawString(title, myTextRectangle,
 			HorizontalAlignment.Center, VerticalAlignment.Center, TextFlow.OverflowBounds);
-		return bmp.Image.AsBytes(ImageFormat.Jpeg);
+		return bmp.Image.AsBytes(Microsoft.Maui.Graphics.ImageFormat.Jpeg);
 	}
 
 	static Models.Image GetImage(byte[] imageByte, string href)
@@ -193,9 +193,10 @@ public static partial class EbookService
 			quality = 50;
 		}
 		using MemoryStream ms = new(imageByte);
-		using Image image = Image.Load(ms);
+		
+		using SKImage image = SKImage.FromEncodedData(ms.ToArray());
 		using MemoryStream resizedMs = new();
-		image.Save(resizedMs, new JpegEncoder { Quality =quality });
+		image.Encode(SKEncodedImageFormat.Jpeg, quality).SaveTo(resizedMs);
 		string base64 = Convert.ToBase64String(resizedMs.ToArray());
 		return new Models.Image
 		{

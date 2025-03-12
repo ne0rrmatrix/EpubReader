@@ -26,6 +26,7 @@ public static partial class InjectIntoHtml
 	static string jpg => "image/jpeg";
 	static string png => "image/png";
 	static string gif => "image/gif";
+	static string webp => "image/webp";
 	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -367,6 +368,7 @@ public static partial class InjectIntoHtml
 			".jpeg" => jpg,
 			".png" => png,
 			".gif" => gif,
+			".webp" => webp,
 			_ => jpg
 		};
 	}
