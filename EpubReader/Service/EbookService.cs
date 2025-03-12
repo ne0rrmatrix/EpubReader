@@ -1,10 +1,12 @@
 ﻿using EpubReader.Models;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
+using SixLabors.ImageSharp;
 using SkiaSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
+using Point = Microsoft.Maui.Graphics.Point;
 using SizeF = Microsoft.Maui.Graphics.SizeF;
 
 namespace EpubReader.Service;
@@ -70,14 +72,14 @@ public static partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-
+		
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
-			Chapters = GetChapters([.. book.Content.Html.Local], book),
+			Chapters = GetChapters([.. book.GetReadingOrder().ToList()], book),
 			Images = [.. book.Content.Images.Local.Select(item => GetImage(item.ReadContent(), item.FilePath))],
 			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.ReadContent() })],
 		};
@@ -91,8 +93,8 @@ public static partial class EbookService
 		var fileName = Path.GetFileName(item?.FilePath) ?? string.Empty;
 		var result = book.Schema.Package.EpubVersion switch
 		{
-			EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text,
-			EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text ?? epub2Nav?.Find(x => Path.GetFileName(x.Content.Source?.Split('#')[0]) == fileName)?.NavigationLabels[0]?.Text,
+			EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text ?? epub3Nav?.Find(x => Path.GetFileName(x.Anchor?.Href)?.Split('#')[0] == fileName)?.Anchor?.Text,
 			EpubVersion.EPUB_3_1 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
 			_ => book.GetNavigation()?.Find(x => x.Link?.ContentFilePath == item?.FilePath)?.Title,
 		};
@@ -185,22 +187,96 @@ public static partial class EbookService
 
 	static Models.Image GetImage(byte[] imageByte, string href)
 	{
-		var quality = 100;
-		var size = Convert.ToDouble(imageByte.Length) / 1024;
-		if ((size) > 300)
+		const int maxSizeKB = 300;
+		var sizeKB = imageByte.Length / 1024;
+
+		// Fast path: if image is already small enough, return as-is without any processing
+		if (sizeKB < maxSizeKB)
 		{
-			quality = 50;
+			return new Models.Image
+			{
+				FileName = Path.GetFileName(href),
+				ImageUrl = Convert.ToBase64String(imageByte)
+			};
 		}
-		using MemoryStream ms = new(imageByte);
-		
-		using SKImage image = SKImage.FromEncodedData(ms.ToArray());
-		using MemoryStream resizedMs = new();
-		image.Encode(SKEncodedImageFormat.Jpeg, quality).SaveTo(resizedMs);
-		string base64 = Convert.ToBase64String(resizedMs.ToArray());
-		return new Models.Image
+
+		try
 		{
-			FileName = Path.GetFileName(href),
-			ImageUrl = base64
-		};
+			// For larger images, use the SKData and SKImage approach which is more reliable
+			using var skData = SKData.CreateCopy(imageByte);
+			using var originalImage = SKImage.FromEncodedData(skData);
+
+			if (originalImage is null)
+			{
+				System.Diagnostics.Debug.WriteLine($"Failed to process image: {href}");
+				// Fallback to original if we can't process the image
+				return new Models.Image
+				{
+					FileName = Path.GetFileName(href),
+					ImageUrl = Convert.ToBase64String(imageByte)
+				};
+			}
+
+			// Determine quality and scale based on size
+			int quality = 75;
+			float scale = 1.0f;
+
+			if (sizeKB > 1000)
+			{
+				scale = 0.5f;
+				quality = 60;
+			}
+			else if (sizeKB > 600)
+			{
+				scale = 0.7f;
+				quality = 70;
+			}
+
+			// Process the image - either just compress or resize and compress
+			SKImage resultImage;
+
+			if (scale < 1.0f)
+			{
+				// We need to resize
+				var originalBitmap = SKBitmap.FromImage(originalImage);
+				int newWidth = (int)(originalBitmap.Width * scale);
+				int newHeight = (int)(originalBitmap.Height * scale);
+
+				using var scaledBitmap = new SKBitmap(newWidth, newHeight);
+				if (originalBitmap.ScalePixels(scaledBitmap, SKFilterQuality.Medium))
+				{
+					resultImage = SKImage.FromBitmap(scaledBitmap);
+				}
+				else
+				{
+					// If scaling fails, just use the original
+					resultImage = originalImage;
+				}
+			}
+			else
+			{
+				// Just use original dimensions
+				resultImage = originalImage;
+			}
+
+			// Encode with compression
+			using var encodedData = resultImage.Encode(SKEncodedImageFormat.Jpeg, quality);
+			byte[] finalImageBytes = encodedData.ToArray();
+
+			return new Models.Image
+			{
+				FileName = Path.GetFileName(href),
+				ImageUrl = Convert.ToBase64String(finalImageBytes)
+			};
+		}
+		catch (Exception)
+		{
+			// If anything fails, return the original image
+			return new Models.Image
+			{
+				FileName = Path.GetFileName(href),
+				ImageUrl = Convert.ToBase64String(imageByte)
+			};
+		}
 	}
 }

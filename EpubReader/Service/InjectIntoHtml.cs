@@ -2,21 +2,25 @@
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using EpubReader.Models;
+using HtmlAgilityPack;
 
 namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
-	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"@import\s+url\(['""](.+?)['""]\)", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex StyleSheet();
+
+	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex HasParagraphs();
 
-	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex CleanedTag();
 
-	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex WithoutStyles();
 
-	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex WithoutScripts();
 
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
@@ -27,6 +31,8 @@ public static partial class InjectIntoHtml
 	static string png => "image/png";
 	static string gif => "image/gif";
 	static string webp => "image/webp";
+	static string jpeg => "image/jpeg";
+	
 	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -63,7 +69,7 @@ public static partial class InjectIntoHtml
 			string cleanedImgTag = CleanedTag().Replace(imgTag, "");
 
 			return cleanedImgTag;
-		}, RegexOptions.None, regexTimeout);
+		}, RegexOptions.Compiled, regexTimeout);
 
 		if (string.IsNullOrEmpty(result))
 		{
@@ -71,6 +77,7 @@ public static partial class InjectIntoHtml
 		}
 		return result;
 	}
+
 	static string InjectCss(string html, Book book, Settings settings)
 	{
 		int numberOfColumns = 1;
@@ -84,12 +91,13 @@ public static partial class InjectIntoHtml
 		{
 			css.Append(imageStyle);
 		}
-
-		foreach (var cssFile in book.Css)
+		var images = ExtractCssFiles(html);
+		foreach (var item in images)
 		{
-			var filteredCSS = FilterCalibreCss(cssFile.Content);
+			var file = book.Css.FirstOrDefault(x => x.FileName == Path.GetFileName(item)) ?? throw new InvalidOperationException("Css file not found");
+			var filteredCSS = FilterCalibreCss(file.Content);
 			filteredCSS = RemoveCssProperties(filteredCSS);
-			css.Append(ReplaceImageUrls(filteredCSS, book.Images));
+			css.Append(ReplaceCssUrls(filteredCSS, book.Images));
 		}
 		
 		var styleTag = new StringBuilder();
@@ -105,6 +113,65 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
+	static List<string> ExtractImageUrls(string html)
+	{
+		var htmlDoc = new HtmlDocument();
+		htmlDoc.LoadHtml(html);
+
+		// Find all img tags
+		var imgNodes = htmlDoc.DocumentNode.SelectNodes("//img");
+
+		// If no images found, return empty list
+		if (imgNodes == null)
+		{
+			return [];
+		}
+
+		// Extract the src attribute from each image
+		List<string> imageUrls = [.. imgNodes
+			.Select(node => node.GetAttributeValue("src", string.Empty))
+			.Where(src => !string.IsNullOrEmpty(src))];
+
+		return imageUrls;
+	}
+
+	static List<string> ExtractCssFiles(string htmlString)
+	{
+		List<string> cssFiles = [];
+
+		// Load HTML document
+		HtmlDocument doc = new();
+		doc.LoadHtml(htmlString);
+
+		// Find all link tags with rel="stylesheet"
+		var linkNodes = doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']");
+		if (linkNodes != null)
+		{
+			foreach (var link in linkNodes)
+			{
+				string href = link.GetAttributeValue("href", "");
+				if (!string.IsNullOrEmpty(href))
+				{
+					cssFiles.Add(href);
+				}
+			}
+		}
+
+		// Find @import statements in style tags
+		var styleNodes = doc.DocumentNode.SelectNodes("//style");
+		if (styleNodes is not null)
+		{
+			cssFiles.AddRange(from style in styleNodes
+							  let styleContent = style.InnerHtml// Use regex to find @import url statements
+							  let matches = StyleSheet().Matches(styleContent)
+							  from Match match in matches
+							  where match.Groups.Count > 1
+							  select match.Groups[1].Value);
+		}
+
+		return cssFiles;
+	}
+
 	static string FilterCalibreCss(string? cssString)
 	{
 		if (string.IsNullOrEmpty(cssString))
@@ -112,7 +179,7 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 		string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
-		Regex regex = new(regexPattern, RegexOptions.None, regexTimeout);
+		Regex regex = new(regexPattern, RegexOptions.Compiled, regexTimeout);
 
 		return regex.Replace(cssString, string.Empty); // Replace matches with empty string
 	}
@@ -143,6 +210,7 @@ public static partial class InjectIntoHtml
 			return selectors + cssBlock;
 		});
 	}
+
 	static string GenerateCSSFromString(Settings settings)
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor) && settings.FontSize <= 0 && string.IsNullOrEmpty(settings.FontFamily))
@@ -161,7 +229,66 @@ public static partial class InjectIntoHtml
 			}}";
 	}
 
+	static List<string> ExtractImageFilenamesFromSvg(string htmlContent)
+	{
+		var imageFilenames = new List<string>();
+		var htmlDoc = new HtmlDocument();
+
+		// Load the HTML content
+		htmlDoc.LoadHtml(htmlContent);
+
+		// Find all SVG nodes
+		var svgNodes = htmlDoc.DocumentNode.SelectNodes("//svg");
+
+		if (svgNodes != null)
+		{
+			foreach (var svgNode in svgNodes)
+			{
+				// Find all image elements within each SVG
+				var imageNodes = svgNode.SelectNodes(".//image");
+
+				if (imageNodes != null)
+				{
+					foreach (var imageNode in imageNodes)
+					{
+						// Get the xlink:href attribute which contains the image filename
+						var xlinkHref = imageNode.GetAttributeValue("xlink:href", null!);
+
+						if (!string.IsNullOrEmpty(xlinkHref))
+						{
+							// Extract just the filename from the path if needed
+							string filename = Path.GetFileName(xlinkHref);
+							imageFilenames.Add(filename);
+						}
+					}
+				}
+			}
+		}
+
+		return imageFilenames;
+	}
+
 	static string ReplaceImageUrls(string? inputString, List<Models.Image> images)
+	{
+		if (string.IsNullOrEmpty(inputString))
+		{
+			return string.Empty;
+		}
+		var temp = ExtractImageUrls(inputString);
+		var svgImages = ExtractImageFilenamesFromSvg(inputString);
+		temp.AddRange(svgImages);
+		foreach (var item in temp)
+		{
+			System.Diagnostics.Debug.WriteLine(item);
+			var fileName = Path.GetFileName(item);
+			var image = images.FirstOrDefault(x => x.FileName == fileName);
+			inputString = ReplaceImageUrl(inputString, fileName, image?.ImageUrl ?? "");
+		}
+		
+		return inputString;
+	}
+
+	static string ReplaceCssUrls(string? inputString, List<Models.Image> images)
 	{
 		if (string.IsNullOrEmpty(inputString))
 		{
@@ -169,20 +296,33 @@ public static partial class InjectIntoHtml
 		}
 		foreach (var image in images)
 		{
-			inputString = ReplaceImageUrl(inputString, image.FileName, image.ImageUrl);
+			inputString = ReplaceCssImageUrl(inputString, image.FileName, image.ImageUrl);
 		}
 		return inputString;
 	}
 
+	static string ReplaceCssImageUrl(string inputString, string imageName, string imageString)
+	{
+		var base64String = $"data:{GetMimeType(imageName)};base64,{imageString}";
+		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
+
+		// CSS pattern
+		string patternCss = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
+		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
+
+		// Replace CSS backgrounds
+		inputString = Regex.Replace(inputString, patternCss, replacement, RegexOptions.IgnoreCase, regexTimeout);
+		return inputString;
+	}
+
 	static string ReplaceImageUrl(string inputString, string imageName, string imageString)
-	{	
+	{
 		var base64String = $"data:{GetMimeType(imageName)};base64,{imageString}";
 
 		// For HTML encoded version
 		var htmlEncodedString = HtmlEncoder.Default.Encode(imageString);
 		var htmlEncodedBase64String = $"data:{GetMimeType(imageName)};base64,{htmlEncodedString}";
 
-		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
 		string escapedFullImageName = Regex.Escape(imageName);
 
 		// HTML img tag pattern
@@ -194,13 +334,6 @@ public static partial class InjectIntoHtml
 
 		// Generic SVG pattern to catch other cases
 		string svgGenericPattern = @"<image[^>]*xlink:href=[""']([^""']*)[""'][^>]*>";
-
-		// CSS pattern
-		string patternCss = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
-		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
-
-		// Replace CSS backgrounds
-		inputString = Regex.Replace(inputString, patternCss, replacement, RegexOptions.IgnoreCase, regexTimeout);
 
 		// Replace HTML img tags
 		inputString = Regex.Replace(inputString, imgPattern, match =>
@@ -214,7 +347,7 @@ public static partial class InjectIntoHtml
 			}
 
 			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
-		}, RegexOptions.None, regexTimeout);
+		}, RegexOptions.Compiled, regexTimeout);
 
 		inputString = Regex.Replace(inputString, imgPattern2, match =>
 		{
@@ -227,7 +360,7 @@ public static partial class InjectIntoHtml
 			}
 
 			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
-		}, RegexOptions.None, regexTimeout);
+		}, RegexOptions.Compiled, regexTimeout);
 
 		// Replace SVG image references with specific pattern
 		inputString = Regex.Replace(inputString, svgPattern, match =>
@@ -306,6 +439,7 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 	}
+
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -316,6 +450,7 @@ public static partial class InjectIntoHtml
 
 		return html;
 	}
+
 	static string RemoveScriptAndStyleTags(string htmlString)
 	{
 		if (string.IsNullOrEmpty(htmlString))
@@ -332,6 +467,7 @@ public static partial class InjectIntoHtml
 		// Return the cleaned string
 		return withoutStyles.Trim();
 	}
+
 	static string AddDivContainer(string html)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -359,13 +495,14 @@ public static partial class InjectIntoHtml
 
 		return result.ToString();
 	}
+
 	static string GetMimeType(string fileName)
 	{
 		var fileExtension = Path.GetExtension(fileName);
 		return fileExtension switch
 		{
 			".jpg" => jpg,
-			".jpeg" => jpg,
+			".jpeg" => jpeg,
 			".png" => png,
 			".gif" => gif,
 			".webp" => webp,
@@ -491,7 +628,7 @@ public static partial class InjectIntoHtml
 				}
         
 				// Add px if it's just a number as string
-				if (/^\d+$/.test(fontSize)) {
+				if (/^\d+$/.image(fontSize)) {
 					fontSize = fontSize + 'px';
 				}
         
