@@ -7,10 +7,26 @@ namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
+	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex HasParagraphs();
+
+	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex CleanedTag();
+
+	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex WithoutStyles();
+
+	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex WithoutScripts();
+
+	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex StyleTagRegex();
+
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
 	static string jpg => "image/jpeg";
 	static string png => "image/png";
 	static string gif => "image/gif";
+	static string webp => "image/webp";
 	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -19,10 +35,10 @@ public static partial class InjectIntoHtml
 		}
 		html = FixImageTags(html);
 		html = RemoveScriptAndStyleTags(html);
-		html = RemoveExistingStyleTags(html);
+		html = StyleTagRegex().Replace(html, string.Empty);
 		html = InjectCss(html, book, settings);
 		html = ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, disableScroll + jsButtons + adjustTextSize + adjustFontSize);
+		html = InjectJavascript(html, disableScroll + buttonNavigation + adjustTextSizeAndStyle + adjustFontSize + adjustSVGImages);
 		html = AddDivContainer(html);
 		return html;
 	}
@@ -32,6 +48,7 @@ public static partial class InjectIntoHtml
 		// This pattern looks for opening <p> tags with optional attributes
 		return HasParagraphs().IsMatch(htmlString);
 	}
+
 	static string FixImageTags(string inputString)
 	{
 		// Regex to find <img> tags with height="100%"
@@ -56,7 +73,13 @@ public static partial class InjectIntoHtml
 	}
 	static string InjectCss(string html, Book book, Settings settings)
 	{
-		var css = new StringBuilder(style);
+		int numberOfColumns = 1;
+		if ((OperatingSystem.IsWindows() || OperatingSystem.IsMacCatalyst()) && HasParagraphsRegex(html))
+		{
+			numberOfColumns = 2;
+		}
+
+		var css = new StringBuilder(GetStyle(numberOfColumns));
 		if (!HasParagraphsRegex(html))
 		{
 			css.Append(imageStyle);
@@ -77,10 +100,6 @@ public static partial class InjectIntoHtml
 		if (headEndTagIndex >= 0)
 		{
 			html = html.Insert(headEndTagIndex, $"<style>{styleTag}</style>");
-		}
-		else
-		{
-			html = $"<style>{styleTag}</style>" + html;
 		}
 
 		return html;
@@ -221,7 +240,7 @@ public static partial class InjectIntoHtml
 		inputString = Regex.Replace(inputString, svgGenericPattern, match =>
 		{
 			string originalTag = match.Value;
-			string fileName = ExtractFilenameFromSvgTag(match.Groups[1].Value);
+			string fileName = Path.GetFileName(match.Groups[1].Value.TrimEnd('/'));
 
 			if (!IsMatchingFilename(fileName, imageName))
 			{
@@ -233,12 +252,7 @@ public static partial class InjectIntoHtml
 
 		return inputString;
 	}
-
-	static string ExtractFilenameFromSvgTag(string href)
-	{
-		return Path.GetFileName(href.TrimEnd('/'));
-	}
-
+	
 	static bool IsMatchingFilename(string filename1, string filename2)
 	{
 		if (string.IsNullOrEmpty(filename1) || string.IsNullOrEmpty(filename2))
@@ -299,10 +313,7 @@ public static partial class InjectIntoHtml
 		{
 			html = html.Insert(headEndTagIndex, $@"<script>{javascript}</script>");
 		}
-		else
-		{
-			html = $"<script>{javascript}</script>" + html;
-		}
+
 		return html;
 	}
 	static string RemoveScriptAndStyleTags(string htmlString)
@@ -348,7 +359,7 @@ public static partial class InjectIntoHtml
 
 		return result.ToString();
 	}
-	public static string GetMimeType(string fileName)
+	static string GetMimeType(string fileName)
 	{
 		var fileExtension = Path.GetExtension(fileName);
 		return fileExtension switch
@@ -357,28 +368,36 @@ public static partial class InjectIntoHtml
 			".jpeg" => jpg,
 			".png" => png,
 			".gif" => gif,
+			".webp" => webp,
 			_ => jpg
 		};
 	}
-	static string RemoveExistingStyleTags(string html)
+
+	static string GetStyle(int columns)
 	{
-		return StyleTagRegex().Replace(html, string.Empty);
+		return $@"
+    ::-webkit-scrollbar {{
+        display: none;
+    }}
+
+    * {{
+        -webkit-touch-callout: none;
+    }}
+	
+    #scrollContainer {{
+        columns: {columns};
+        overflow-x: auto;
+		margin-top: 1em;
+        height: 95vh;
+		
+    }}
+
+    #scrollContainer p, h1, h2, h3, h4 {{
+        text-align: justify;
+		margin-left: 1em;
+        margin-right: 1em;
+    }}";
 	}
-
-	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex HasParagraphs();
-
-	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex CleanedTag();
-
-	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex WithoutStyles();
-
-	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex WithoutScripts();
-
-	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex StyleTagRegex();
 
 	static readonly string disableScroll = @"
         window.addEventListener('wheel', function(event) {
@@ -388,28 +407,7 @@ public static partial class InjectIntoHtml
         window.addEventListener('touchmove', function(event) {
             event.preventDefault();
         }, { passive: false });";
-	
-	static readonly string style = @"
-        ::-webkit-scrollbar {
-            display: none;
-        }
 
-        * {
-            -webkit-touch-callout: none;
-        }
-		
-        #scrollContainer {
-            columns: 1;
-            overflow-x: auto;
-            height: 100vh;
-        }
-
-        #scrollContainer p {
-            text-align: justify;
-            margin-left: 1em;
-            margin-right: 1em;
-        }";
-	
 	static readonly string adjustFontSize = @"
 		function changeTextStyle(fontSize) {
 			// Select all paragraphs and spans in the document
@@ -458,7 +456,7 @@ public static partial class InjectIntoHtml
 		  display: block; /* Removes extra space below inline images */
 		}";
 
-	static readonly string adjustTextSize = @"
+	static readonly string adjustTextSizeAndStyle = @"
 		/**
 		* Apply multiple styles to an element
 		* @param {Object} options - Style options to apply
@@ -582,8 +580,8 @@ public static partial class InjectIntoHtml
 			return false;
 		}
 	}";
-	
-	static readonly string jsButtons = @"
+
+	static readonly string adjustSVGImages = @"
 		window.addEventListener('load', () => adjustSvgToScreen(true));
 
 		function adjustSvgToScreen(preserveAspect = true) {
@@ -613,8 +611,9 @@ public static partial class InjectIntoHtml
 		document.body.style.height = '100vh';
 		document.documentElement.style.width = '100%';
 		document.documentElement.style.height = '100%';
-		}
+		}";
 
+	static readonly string buttonNavigation = @"
         function nextPage() {
             document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
         }

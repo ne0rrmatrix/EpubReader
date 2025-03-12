@@ -2,7 +2,7 @@
 
 namespace EpubReader.Service;
 
-public static class FileService
+public static partial class FileService
 {
     static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
     public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
@@ -28,9 +28,8 @@ public static class FileService
         return Path.Combine(SaveDirectory, filename);
     }
 
-    public static async Task<string> SaveFile(FileResult result)
+    public static async Task SaveFile(FileResult result)
     {
-		string fileName = string.Empty;
 		try
 		{
 			if (Directory.Exists(SaveDirectory))
@@ -45,7 +44,7 @@ public static class FileService
 
 			using Stream fileStream = await result.OpenReadAsync();
 			using StreamReader reader = new(fileStream);
-			fileName = GetFileName(result.FileName);
+			var fileName = GetFileName(result.FileName);
 			using FileStream output = File.Create(fileName);
 			await fileStream.CopyToAsync(output);
 			fileStream.Seek(0, SeekOrigin.Begin);
@@ -55,8 +54,6 @@ public static class FileService
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving file: {ex.Message}");
-			return string.Empty;
 		}
-        return fileName;
     }
 }
