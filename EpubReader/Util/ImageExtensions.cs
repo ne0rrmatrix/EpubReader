@@ -175,7 +175,7 @@ public static partial class ImageExtensions
 		var imgNodes = htmlDoc.DocumentNode.SelectNodes("//img");
 
 		// If no images found, return empty list
-		if (imgNodes == null)
+		if (imgNodes is null)
 		{
 			return [];
 		}
