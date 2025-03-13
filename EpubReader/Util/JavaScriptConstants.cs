@@ -69,7 +69,7 @@ public static class JavaScriptConstants
 				}
         
 				// Add px if it's just a number as string
-				if (/^\d+$/.image(fontSize)) {
+				if (/^\d+$/.test(fontSize)) {
 					fontSize = fontSize + 'px';
 				}
         
