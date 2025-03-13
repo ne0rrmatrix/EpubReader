@@ -89,11 +89,12 @@ public static partial class InjectIntoHtml
 		// Remove each pattern from the CSS content
 		foreach (var pattern in projectGuttenBurgStyles)
 		{
-			cssContent = Regex.Replace(cssContent, pattern, string.Empty);
+			cssContent = Regex.Replace(cssContent, pattern, string.Empty, RegexOptions.None, regexTimeout);
 		}
 
 		return cssContent;
 	}
+
 	static bool HasParagraphsRegex(string htmlString)
 	{
 		// This pattern looks for opening <p> tags with optional attributes
