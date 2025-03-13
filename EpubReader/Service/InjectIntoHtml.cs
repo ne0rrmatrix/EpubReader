@@ -26,6 +26,15 @@ public static partial class InjectIntoHtml
 
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
 
+	static readonly string[] projectGuttenBurgStyles =
+		[
+			@"\.xhtml_center\s*\{[^}]*\}\s*",
+			@"\.xhtml_center\s+table\s*\{[^}]*\}\s*",
+			@"body\s*\{\s*text-align:\s*justify[^}]*\}\s*",
+			@"@media\s+screen\s*\{[^}]*body\s*\{[^}]*\}[^}]*\}\s*",
+			@"\.pagedjs_page_content\s*>\s*div\s*\{[^}]*\}\s*"
+		];
+
 	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -39,9 +48,52 @@ public static partial class InjectIntoHtml
 		html = ImageExtensions.ReplaceImageUrls(html, book.Images);
 		html = InjectJavascript(html, JavaScriptConstants.DisableScroll + JavaScriptConstants.ButtonNavigation + JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
 		html = AddDivContainer(html);
+		html = RemoveGuttenBurgStyles(html);
 		return html;
 	}
 
+	static string RemoveGuttenBurgStyles(string htmlContent)
+	{
+		// Create HTML document
+		var doc = new HtmlDocument();
+		doc.LoadHtml(htmlContent);
+
+		// Find all style tags
+		var styleTags = doc.DocumentNode.SelectNodes("//style");
+
+		if (styleTags != null)
+		{
+			foreach (var styleTag in styleTags)
+			{
+				string cssContent = styleTag.InnerHtml;
+
+				// Remove the specific CSS styles using regex
+				cssContent = RemoveSpecificCssRules(cssContent);
+
+				// Update the style tag content
+				styleTag.InnerHtml = cssContent;
+
+				// If style tag is now empty, remove it
+				if (string.IsNullOrWhiteSpace(styleTag.InnerHtml))
+				{
+					styleTag.Remove();
+				}
+			}
+		}
+
+		return doc.DocumentNode.OuterHtml;
+	}
+
+	static string RemoveSpecificCssRules(string cssContent)
+	{
+		// Remove each pattern from the CSS content
+		foreach (var pattern in projectGuttenBurgStyles)
+		{
+			cssContent = Regex.Replace(cssContent, pattern, string.Empty);
+		}
+
+		return cssContent;
+	}
 	static bool HasParagraphsRegex(string htmlString)
 	{
 		// This pattern looks for opening <p> tags with optional attributes
