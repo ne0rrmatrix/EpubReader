@@ -89,7 +89,7 @@ public static partial class InjectIntoHtml
 		// Remove each pattern from the CSS content
 		foreach (var pattern in projectGuttenBurgStyles)
 		{
-			cssContent = Regex.Replace(cssContent, pattern, string.Empty, RegexOptions.None, regexTimeout);
+			cssContent = Regex.Replace(cssContent, pattern, string.Empty, RegexOptions.Compiled, regexTimeout);
 		}
 
 		return cssContent;

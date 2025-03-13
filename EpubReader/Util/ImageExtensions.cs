@@ -10,6 +10,10 @@ public static partial class ImageExtensions
 	private static partial Regex CleanedTag();
 
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
+
+	static readonly string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
+
+	static readonly string svgGenericPattern = @"<image[^>]*xlink:href=[""']([^""']*)[""'][^>]*>";
 	static string jpg => "image/jpeg";
 	static string png => "image/png";
 	static string gif => "image/gif";
@@ -107,13 +111,9 @@ public static partial class ImageExtensions
 
 		// HTML img tag pattern
 		string imgPattern = $@"<img[^>]*src=[""']([^""']*{escapedFullImageName}[^""']*)[""'][^>]*>";
-		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
-
+		
 		// SVG image pattern - improved to better match XML
 		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{escapedFullImageName})[""'][^>]*>";
-
-		// Generic SVG pattern to catch other cases
-		string svgGenericPattern = @"<image[^>]*xlink:href=[""']([^""']*)[""'][^>]*>";
 
 		// Replace HTML img tags
 		inputString = Regex.Replace(inputString, imgPattern, match =>
