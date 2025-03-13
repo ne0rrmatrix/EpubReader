@@ -1,46 +1,98 @@
 ﻿using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using EpubReader.Models;
+using EpubReader.Util;
+using HtmlAgilityPack;
+using ImageExtensions = EpubReader.Util.ImageExtensions;
 
 namespace EpubReader.Service;
 
 public static partial class InjectIntoHtml
 {
-	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"@import\s+url\(['""](.+?)['""]\)", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
+	private static partial Regex StyleSheet();
+
+	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex HasParagraphs();
 
-	[GeneratedRegex(@"\s*height\s*=\s*""100%""", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex CleanedTag();
-
-	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex WithoutStyles();
 
-	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.None, matchTimeoutMilliseconds: 20000)]
+	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex WithoutScripts();
 
 	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleTagRegex();
 
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
-	static string jpg => "image/jpeg";
-	static string png => "image/png";
-	static string gif => "image/gif";
-	static string webp => "image/webp";
+
+	static readonly string[] projectGuttenBurgStyles =
+		[
+			@"\.xhtml_center\s*\{[^}]*\}\s*",
+			@"\.xhtml_center\s+table\s*\{[^}]*\}\s*",
+			@"body\s*\{\s*text-align:\s*justify[^}]*\}\s*",
+			@"@media\s+screen\s*\{[^}]*body\s*\{[^}]*\}[^}]*\}\s*",
+			@"\.pagedjs_page_content\s*>\s*div\s*\{[^}]*\}\s*"
+		];
+
 	public static string UpdateHtml(string html, Book book, Settings settings)
 	{
 		if (string.IsNullOrEmpty(html))
 		{
 			return string.Empty;
 		}
-		html = FixImageTags(html);
+		html = ImageExtensions.FixImageTags(html);
 		html = RemoveScriptAndStyleTags(html);
 		html = StyleTagRegex().Replace(html, string.Empty);
 		html = InjectCss(html, book, settings);
-		html = ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, disableScroll + buttonNavigation + adjustTextSizeAndStyle + adjustFontSize + adjustSVGImages);
+		html = ImageExtensions.ReplaceImageUrls(html, book.Images);
+		html = InjectJavascript(html, JavaScriptConstants.DisableScroll + JavaScriptConstants.ButtonNavigation + JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
 		html = AddDivContainer(html);
+		html = RemoveGuttenBurgStyles(html);
 		return html;
+	}
+
+	static string RemoveGuttenBurgStyles(string htmlContent)
+	{
+		// Create HTML document
+		var doc = new HtmlDocument();
+		doc.LoadHtml(htmlContent);
+
+		// Find all style tags
+		var styleTags = doc.DocumentNode.SelectNodes("//style");
+
+		if (styleTags != null)
+		{
+			foreach (var styleTag in styleTags)
+			{
+				string cssContent = styleTag.InnerHtml;
+
+				// Remove the specific CSS styles using regex
+				cssContent = RemoveSpecificCssRules(cssContent);
+
+				// Update the style tag content
+				styleTag.InnerHtml = cssContent;
+
+				// If style tag is now empty, remove it
+				if (string.IsNullOrWhiteSpace(styleTag.InnerHtml))
+				{
+					styleTag.Remove();
+				}
+			}
+		}
+
+		return doc.DocumentNode.OuterHtml;
+	}
+
+	static string RemoveSpecificCssRules(string cssContent)
+	{
+		// Remove each pattern from the CSS content
+		foreach (var pattern in projectGuttenBurgStyles)
+		{
+			cssContent = Regex.Replace(cssContent, pattern, string.Empty, RegexOptions.Compiled, regexTimeout);
+		}
+
+		return cssContent;
 	}
 
 	static bool HasParagraphsRegex(string htmlString)
@@ -49,28 +101,6 @@ public static partial class InjectIntoHtml
 		return HasParagraphs().IsMatch(htmlString);
 	}
 
-	static string FixImageTags(string inputString)
-	{
-		// Regex to find <img> tags with height="100%"
-		string pattern = @"<img(?=[^>]*height\s*=\s*""100%""[^>]*)([^>]*)>";
-
-		// Replace the matched <img> tags, removing the height attribute.
-		string result = Regex.Replace(inputString, pattern, match =>
-		{
-			string imgTag = match.Value;
-
-			// Remove height="100%" using another regex.
-			string cleanedImgTag = CleanedTag().Replace(imgTag, "");
-
-			return cleanedImgTag;
-		}, RegexOptions.None, regexTimeout);
-
-		if (string.IsNullOrEmpty(result))
-		{
-			return inputString;
-		}
-		return result;
-	}
 	static string InjectCss(string html, Book book, Settings settings)
 	{
 		int numberOfColumns = 1;
@@ -79,17 +109,18 @@ public static partial class InjectIntoHtml
 			numberOfColumns = 2;
 		}
 
-		var css = new StringBuilder(GetStyle(numberOfColumns));
+		var css = new StringBuilder(StyleSheetConstants.GetStyle(numberOfColumns));
 		if (!HasParagraphsRegex(html))
 		{
-			css.Append(imageStyle);
+			css.Append(StyleSheetConstants.ImageStyle);
 		}
-
-		foreach (var cssFile in book.Css)
+		var images = ExtractCssFiles(html);
+		foreach (var item in images)
 		{
-			var filteredCSS = FilterCalibreCss(cssFile.Content);
+			var file = book.Css.FirstOrDefault(x => x.FileName == Path.GetFileName(item)) ?? throw new InvalidOperationException("Css file not found");
+			var filteredCSS = FilterCalibreCss(file.Content);
 			filteredCSS = RemoveCssProperties(filteredCSS);
-			css.Append(ReplaceImageUrls(filteredCSS, book.Images));
+			css.Append(ImageExtensions.ReplaceCssUrls(filteredCSS, book.Images));
 		}
 		
 		var styleTag = new StringBuilder();
@@ -105,6 +136,43 @@ public static partial class InjectIntoHtml
 		return html;
 	}
 
+	static List<string> ExtractCssFiles(string htmlString)
+	{
+		List<string> cssFiles = [];
+
+		// Load HTML document
+		HtmlDocument doc = new();
+		doc.LoadHtml(htmlString);
+
+		// Find all link tags with rel="stylesheet"
+		var linkNodes = doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']");
+		if (linkNodes != null)
+		{
+			foreach (var link in linkNodes)
+			{
+				string href = link.GetAttributeValue("href", "");
+				if (!string.IsNullOrEmpty(href))
+				{
+					cssFiles.Add(href);
+				}
+			}
+		}
+
+		// Find @import statements in style tags
+		var styleNodes = doc.DocumentNode.SelectNodes("//style");
+		if (styleNodes is not null)
+		{
+			cssFiles.AddRange(from style in styleNodes
+							  let styleContent = style.InnerHtml// Use regex to find @import url statements
+							  let matches = StyleSheet().Matches(styleContent)
+							  from Match match in matches
+							  where match.Groups.Count > 1
+							  select match.Groups[1].Value);
+		}
+
+		return cssFiles;
+	}
+
 	static string FilterCalibreCss(string? cssString)
 	{
 		if (string.IsNullOrEmpty(cssString))
@@ -112,7 +180,7 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 		string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
-		Regex regex = new(regexPattern, RegexOptions.None, regexTimeout);
+		Regex regex = new(regexPattern, RegexOptions.Compiled, regexTimeout);
 
 		return regex.Replace(cssString, string.Empty); // Replace matches with empty string
 	}
@@ -143,6 +211,7 @@ public static partial class InjectIntoHtml
 			return selectors + cssBlock;
 		});
 	}
+
 	static string GenerateCSSFromString(Settings settings)
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor) && settings.FontSize <= 0 && string.IsNullOrEmpty(settings.FontFamily))
@@ -160,152 +229,7 @@ public static partial class InjectIntoHtml
 				{(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
 			}}";
 	}
-
-	static string ReplaceImageUrls(string? inputString, List<Models.Image> images)
-	{
-		if (string.IsNullOrEmpty(inputString))
-		{
-			return string.Empty;
-		}
-		foreach (var image in images)
-		{
-			inputString = ReplaceImageUrl(inputString, image.FileName, image.ImageUrl);
-		}
-		return inputString;
-	}
-
-	static string ReplaceImageUrl(string inputString, string imageName, string imageString)
-	{	
-		var base64String = $"data:{GetMimeType(imageName)};base64,{imageString}";
-
-		// For HTML encoded version
-		var htmlEncodedString = HtmlEncoder.Default.Encode(imageString);
-		var htmlEncodedBase64String = $"data:{GetMimeType(imageName)};base64,{htmlEncodedString}";
-
-		string escapedImageName = Regex.Escape(Path.GetFileNameWithoutExtension(imageName));
-		string escapedFullImageName = Regex.Escape(imageName);
-
-		// HTML img tag pattern
-		string imgPattern = $@"<img[^>]*src=[""']([^""']*{escapedFullImageName}[^""']*)[""'][^>]*>";
-		string imgPattern2 = @"<img[^>]*src=[""']([^""']*)[""'][^>]*>";
-
-		// SVG image pattern - improved to better match XML
-		string svgPattern = $@"<image[^>]*xlink:href=[""']([^""']*{escapedFullImageName})[""'][^>]*>";
-
-		// Generic SVG pattern to catch other cases
-		string svgGenericPattern = @"<image[^>]*xlink:href=[""']([^""']*)[""'][^>]*>";
-
-		// CSS pattern
-		string patternCss = $@"background:\s*url\(\s*['""]?([^'""]*/)*{escapedImageName}(\.[a-zA-Z]+)?['""]?\s*\)\s*(no-repeat\s*50%\s*)?;";
-		string replacement = $"background-image: url({base64String});\nbackground-repeat: no-repeat;\nbackground-position: 50%;";
-
-		// Replace CSS backgrounds
-		inputString = Regex.Replace(inputString, patternCss, replacement, RegexOptions.IgnoreCase, regexTimeout);
-
-		// Replace HTML img tags
-		inputString = Regex.Replace(inputString, imgPattern, match =>
-		{
-			string originalTag = match.Value;
-			string fileName = ExtractFilenameFromImgTag(originalTag);
-
-			if (!IsMatchingFilename(fileName, imageName))
-			{
-				return originalTag;
-			}
-
-			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
-		}, RegexOptions.None, regexTimeout);
-
-		inputString = Regex.Replace(inputString, imgPattern2, match =>
-		{
-			string originalTag = match.Value;
-			string fileName = ExtractFilenameFromImgTag(originalTag);
-
-			if (!IsMatchingFilename(fileName, imageName))
-			{
-				return originalTag;
-			}
-
-			return originalTag.Replace(match.Groups[1].Value, htmlEncodedBase64String);
-		}, RegexOptions.None, regexTimeout);
-
-		// Replace SVG image references with specific pattern
-		inputString = Regex.Replace(inputString, svgPattern, match =>
-		{
-			string originalTag = match.Value;
-			return originalTag.Replace(match.Groups[1].Value, base64String);
-		}, RegexOptions.IgnoreCase, regexTimeout);
-
-		// Handle SVG with generic pattern
-		inputString = Regex.Replace(inputString, svgGenericPattern, match =>
-		{
-			string originalTag = match.Value;
-			string fileName = Path.GetFileName(match.Groups[1].Value.TrimEnd('/'));
-
-			if (!IsMatchingFilename(fileName, imageName))
-			{
-				return originalTag;
-			}
-
-			return originalTag.Replace(match.Groups[1].Value, base64String);
-		}, RegexOptions.IgnoreCase, regexTimeout);
-
-		return inputString;
-	}
 	
-	static bool IsMatchingFilename(string filename1, string filename2)
-	{
-		if (string.IsNullOrEmpty(filename1) || string.IsNullOrEmpty(filename2))
-		{
-			return false;
-		}
-
-		return string.Equals(
-			Path.GetFileName(filename1.TrimEnd('/')),
-			Path.GetFileName(filename2.TrimEnd('/')),
-			StringComparison.OrdinalIgnoreCase
-		);
-	}
-
-	static string ExtractFilenameFromImgTag(string imgTagString)
-	{
-		try
-		{
-			// Find the src attribute
-			int srcIndex = imgTagString.IndexOf("src=\"");
-			if (srcIndex == -1)
-			{
-				return string.Empty;
-			}
-
-			// Move to the start of the path
-			srcIndex += 5; // Length of 'src="'
-
-			// Find the closing quote
-			int endIndex = imgTagString.IndexOf('"', srcIndex);
-			if (endIndex == -1)
-			{
-				return string.Empty;
-			}
-
-			// Extract the full path
-			string fullPath = imgTagString[srcIndex..endIndex];
-
-			// Get the filename (everything after the last slash or backslash)
-			int lastSlashIndex = Math.Max(fullPath.LastIndexOf('/'), fullPath.LastIndexOf('\\'));
-
-			if (lastSlashIndex == -1)
-			{
-				return fullPath; // No slash found, the path is just the filename
-			}
-
-			return fullPath[(lastSlashIndex + 1)..];
-		}
-		catch
-		{
-			return string.Empty;
-		}
-	}
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -316,6 +240,7 @@ public static partial class InjectIntoHtml
 
 		return html;
 	}
+
 	static string RemoveScriptAndStyleTags(string htmlString)
 	{
 		if (string.IsNullOrEmpty(htmlString))
@@ -332,6 +257,7 @@ public static partial class InjectIntoHtml
 		// Return the cleaned string
 		return withoutStyles.Trim();
 	}
+
 	static string AddDivContainer(string html)
 	{
 		if (string.IsNullOrEmpty(html))
@@ -359,302 +285,4 @@ public static partial class InjectIntoHtml
 
 		return result.ToString();
 	}
-	static string GetMimeType(string fileName)
-	{
-		var fileExtension = Path.GetExtension(fileName);
-		return fileExtension switch
-		{
-			".jpg" => jpg,
-			".jpeg" => jpg,
-			".png" => png,
-			".gif" => gif,
-			".webp" => webp,
-			_ => jpg
-		};
-	}
-
-	static string GetStyle(int columns)
-	{
-		return $@"
-    ::-webkit-scrollbar {{
-        display: none;
-    }}
-
-    * {{
-        -webkit-touch-callout: none;
-    }}
-	
-    #scrollContainer {{
-        columns: {columns};
-        overflow-x: auto;
-		margin-top: 1em;
-        height: 95vh;
-		
-    }}
-
-    #scrollContainer p, h1, h2, h3, h4 {{
-        text-align: justify;
-		margin-left: 1em;
-        margin-right: 1em;
-    }}";
-	}
-
-	static readonly string disableScroll = @"
-        window.addEventListener('wheel', function(event) {
-            event.preventDefault();
-        }, { passive: false });
-
-        window.addEventListener('touchmove', function(event) {
-            event.preventDefault();
-        }, { passive: false });";
-
-	static readonly string adjustFontSize = @"
-		function changeTextStyle(fontSize) {
-			// Select all paragraphs and spans in the document
-			const textElements = document.querySelectorAll('p');
-	
-			// Apply the styles to each element
-			textElements.forEach(element => {
-			  // Set font size if provided
-			  if (fontSize) {
-				element.style.setProperty('font-size', fontSize + 'px', 'important');
-			  }
-			});
-		}";
-
-	static readonly string imageStyle = @"
-		.image_full {
-		text-align: center;
-		}
-    
-		.image_full img {
-		  display: block;
-		  margin: 0 auto;
-		  max-width: 100%;
-		  height: 100vh;
-		}
-    
-		/* New CSS for cover_image */
-		.cover_image {
-		  text-align: center;
-		}
-    
-		.cover_image img {
-		  display: block;
-		  margin: 0 auto;
-		  max-width: 100%;
-		  height: 100vh;
-		}
-
-		/* Optional: if you need to set the image to inline-block */
-		.cover-image img {
-		  display: inline-block;
-		}
-		img {
-		  max-width: 100vw; /* Ensures the image doesn't exceed the page width */
-		  height: 100vh; /* Maintains aspect ratio by scaling height proportionally */
-		  display: block; /* Removes extra space below inline images */
-		}";
-
-	static readonly string adjustTextSizeAndStyle = @"
-		/**
-		* Apply multiple styles to an element
-		* @param {Object} options - Style options to apply
-		* @param {string|number} [options.fontSize] - Font size to apply
-		* @param {string} [options.backgroundColor] - Background color to apply
-		* @param {string} [options.textColor] - Text color to apply
-		* @param {string} [options.fontFamily] - Font family to apply
-		* @param {HTMLElement|string} [target='body'] - Target element or selector
-		* @returns {boolean} - True if successful, false if failed
-		*/
-		function applyStyles(options = {}, target = 'body') {
-		try {
-			// Find the target element if a selector string was provided
-			let element = target;
-			if (typeof target === 'string') {
-				element = document.querySelector(target);
-			}
-    
-			// Make sure element exists
-			if (!element) {
-				console.error('Target element not found:', target);
-				return false;
-			}
-    
-			// Apply font size if provided (using different methods to ensure it works)
-			if (options.fontSize !== undefined) {
-				let fontSize = options.fontSize;
-        
-				// Convert to string with px if it's a number
-				if (typeof fontSize === 'number') {
-					fontSize = fontSize + 'px';
-				}
-        
-				// Add px if it's just a number as string
-				if (/^\d+$/.test(fontSize)) {
-					fontSize = fontSize + 'px';
-				}
-        
-				// Method 1: Using setProperty with !important flag
-				element.style.setProperty('font-size', fontSize, 'important');
-        
-				// Method 2: Using inline style attribute with !important
-				const currentStyles = element.getAttribute('style') || '';
-				const fontSizePattern = /font-size\s*:\s*[^;]+;?/g;
-				const newStyles = currentStyles.replace(fontSizePattern, '');
-				element.setAttribute('style', `${newStyles} font-size: ${fontSize} !important;`);
-        
-				// Method 3: Add a custom stylesheet rule with highest specificity
-				let styleSheet = document.getElementById('custom-styles');
-				if (!styleSheet) {
-					styleSheet = document.createElement('style');
-					styleSheet.id = 'custom-styles';
-					document.head.appendChild(styleSheet);
-				}
-        
-				// Create a high-specificity selector for the element
-				let selector;
-				if (target === 'body') {
-					selector = 'body';
-				} else if (element.id) {
-					selector = `#${element.id}`;
-				} else if (element.className) {
-					// Convert class list to a high-specificity selector
-					selector = '.' + element.className.split(' ').join('.');
-				} else {
-					// Create a unique ID if there's no good selector
-					const uniqueId = 'custom-styled-' + Math.random().toString(36).substr(2, 9);
-					element.id = uniqueId;
-					selector = `#${uniqueId}`;
-				}
-        
-				// Add the rule to the stylesheet
-				const cssRule = `${selector} { font-size: ${fontSize} !important; }`;
-				styleSheet.textContent += cssRule;
-			}
-    
-			// Apply background color if provided
-			if (options.backgroundColor !== undefined) {
-				element.style.setProperty('background-color', options.backgroundColor, 'important');
-			}
-    
-			// Apply text color if provided
-			if (options.textColor !== undefined) {
-				element.style.setProperty('color', options.textColor, 'important');
-			}
-    
-			// Apply font family if provided
-			if (options.fontFamily !== undefined) {
-				element.style.setProperty('font-family', options.fontFamily, 'important');
-			
-				// Also apply font family using the custom stylesheet for maximum specificity
-				let styleSheet = document.getElementById('custom-styles');
-				if (!styleSheet) {
-					styleSheet = document.createElement('style');
-					styleSheet.id = 'custom-styles';
-					document.head.appendChild(styleSheet);
-				}
-			
-				// Use the same selector logic as for font size
-				let selector;
-				if (target === 'body') {
-					selector = 'body';
-				} else if (element.id) {
-					selector = `#${element.id}`;
-				} else if (element.className) {
-					selector = '.' + element.className.split(' ').join('.');
-				} else {
-					const uniqueId = element.id || ('custom-styled-' + Math.random().toString(36).substr(2, 9));
-					if (!element.id) element.id = uniqueId;
-					selector = `#${uniqueId}`;
-				}
-			
-				// Add the font-family rule to the stylesheet
-				const cssRule = `${selector} { font-family: ${options.fontFamily} !important; }`;
-				styleSheet.textContent += cssRule;
-			}
-    
-			return true;
-		} catch (error) {
-			console.error('Error applying styles:', error);
-			return false;
-		}
-	}";
-
-	static readonly string adjustSVGImages = @"
-		window.addEventListener('load', () => adjustSvgToScreen(true));
-
-		function adjustSvgToScreen(preserveAspect = true) {
-		// Get the SVG element
-		const svg = document.querySelector('svg');
-    
-		if (!svg) return;
-		
-		// Set appropriate preserveAspectRatio
-		if (preserveAspect) {
-			// 'xMidYMid meet' maintains aspect ratio and centers the image
-			svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-		}
-    
-		// Make sure the container div takes full available space
-		const container = svg.parentElement;
-		container.style.width = '100%';
-		container.style.height = '100%';
-		container.style.display = 'flex';
-		container.style.justifyContent = 'center';
-		container.style.alignItems = 'center';
-    
-		// Ensure body and inputString are set to use full viewport
-		document.body.style.margin = '0';
-		document.body.style.padding = '0';
-		document.body.style.width = '100%';
-		document.body.style.height = '100vh';
-		document.documentElement.style.width = '100%';
-		document.documentElement.style.height = '100%';
-		}";
-
-	static readonly string buttonNavigation = @"
-        function nextPage() {
-            document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
-        }
-
-        function prevPage() {
-            document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
-        }
-		
-		function scrollToEnd() {
-			const scrollContainer = document.getElementById(""scrollContainer"");
-    
-			if (!scrollContainer) {
-				console.error('scrollContainer element not found');
-				return;
-			}
-    
-			// Alternative method: get all columns and scroll to the last one
-			const totalWidth = scrollContainer.scrollWidth;
-			const viewportWidth = scrollContainer.clientWidth;
-    
-			// Force scroll to the maximum possible position
-			scrollContainer.scrollLeft = 999999; // Large value forces scroll to end
-    
-			// Log for debugging
-			console.log(`Total width: ${totalWidth}, Viewport: ${viewportWidth}, Max scroll: ${totalWidth - viewportWidth}`);
-		}
-
-        function isHorizontalScrollAtStart() {
-            var element = document.getElementById(""scrollContainer"");
-            if (!element) {
-                return false;
-            }
-            return element.scrollLeft === 0;
-        }
-
-        function isHorizontallyScrolledToEnd() {
-            var element = document.getElementById(""scrollContainer"");
-            if (!element) {
-                return false;
-            }
-            const maxScrollLeft = element.scrollWidth - element.clientWidth;
-            return Math.abs(element.scrollLeft - maxScrollLeft) <= 1;
-        }";
 }
