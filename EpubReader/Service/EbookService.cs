@@ -200,8 +200,35 @@ public static partial class EbookService
 			};
 		}
 
+		// Determine quality and quality based on size
+		int quality = 75;
+		float scale = 1.0f;
+
+		if (sizeKB > 1000)
+		{
+			scale = 0.5f;
+			quality = 60;
+		}
+		else if (sizeKB > 600)
+		{
+			scale = 0.7f;
+			quality = 70;
+		}
+
 		try
 		{
+			if (OperatingSystem.IsAndroid())
+			{
+#if ANDROID
+				var image = ResizeImageAndroid(imageByte, quality, scale);
+				return new Models.Image
+				{
+					FileName = Path.GetFileName(href),
+					ImageUrl = Convert.ToBase64String(image)
+				};
+#endif
+			}
+
 			// For larger images, use the SKData and SKImage approach which is more reliable
 			using var skData = SKData.CreateCopy(imageByte);
 			using var originalImage = SKImage.FromEncodedData(skData);
@@ -217,27 +244,11 @@ public static partial class EbookService
 				};
 			}
 
-			// Determine quality and scale based on size
-			int quality = 75;
-			float scale = 1.0f;
-
-			if (sizeKB > 1000)
-			{
-				scale = 0.5f;
-				quality = 60;
-			}
-			else if (sizeKB > 600)
-			{
-				scale = 0.7f;
-				quality = 70;
-			}
-
-			// Process the image - either just compress or resize and compress
 			SKImage resultImage;
 
 			if (scale < 1.0f)
 			{
-				// We need to resize
+				// We need to quality
 				var originalBitmap = SKBitmap.FromImage(originalImage);
 				int newWidth = (int)(originalBitmap.Width * scale);
 				int newHeight = (int)(originalBitmap.Height * scale);
@@ -279,4 +290,42 @@ public static partial class EbookService
 			};
 		}
 	}
+
+#if ANDROID
+	static (int width, int height) GetImageDimensions(byte[] imageBytes)
+	{
+		using (SKBitmap bitmap = SKBitmap.Decode(imageBytes))
+		{
+			if (bitmap != null)
+			{
+				return (bitmap.Width, bitmap.Height);
+			}
+		}
+
+		return (0, 0); // Return zeros if decoding failed
+	}
+	
+	static byte[] ResizeImageAndroid (byte[] imageData, int quality, float scale)
+	{
+		// Load the bitmap
+		Android.Graphics.Bitmap? originalImage = Android.Graphics.BitmapFactory.DecodeByteArray (imageData, 0, imageData.Length);
+		Android.Graphics.Bitmap? resizedImage;
+		if (scale < 1.0f && originalImage is not null)
+		{
+			// We need to quality
+			int newWidth = (int)(originalImage.Width * scale);
+			int newHeight = (int)(originalImage.Height * scale);
+			resizedImage = Android.Graphics.Bitmap.CreateScaledBitmap(originalImage, newWidth, newHeight, false);
+		}
+		else
+		{
+			// Get the dimensions of the image
+			var (width, height) = GetImageDimensions(imageData);
+			resizedImage = Android.Graphics.Bitmap.CreateScaledBitmap(originalImage!, width, height, false);
+		}
+		using MemoryStream ms = new();
+		resizedImage?.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg!, quality, ms);
+		return ms.ToArray();
+	}
+#endif
 }
