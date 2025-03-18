@@ -13,6 +13,7 @@ It supports images embedded with support for CSS styles that are embedded in boo
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ne0rrmatrix_EpubReader&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ne0rrmatrix_EpubReader)
 
+First public beta of app can be found here: https://github.com/ne0rrmatrix/EpubReader/releases/tag/0.0.1
 ### Images ###
 
 Windows:
