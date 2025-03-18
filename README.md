@@ -10,6 +10,7 @@ It also supports epubs that are broken and out of spec. Most ebooks
 work but some that are out of spec do have some issues. 
 
 It supports images embedded with support for CSS styles that are embedded in book.
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ne0rrmatrix_EpubReader&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ne0rrmatrix_EpubReader)
 
 ### Images ###
