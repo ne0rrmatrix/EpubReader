@@ -78,7 +78,7 @@
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
     <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
     <PackageReference Include="VersOne.Epub" Version="3.3.3" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.40" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="11.1.0" />
 		<PackageReference Include="CommunityToolkit.Maui.Core" Version="11.1.0" />
