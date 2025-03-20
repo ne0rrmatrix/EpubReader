@@ -26,4 +26,7 @@ public class Book
 
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
+
+	[Ignore]
+	public List<EpubFonts> Fonts { get; set; } = [];
 }

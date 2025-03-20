@@ -93,18 +93,36 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 	}
 
-	void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
+	async void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}");
 		if (isPreviousPage)
 		{
-			EpubText.Eval("scrollToEnd()");
+			await EpubText.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
 			isPreviousPage = false;
 		}
 	}
 
-	static void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
+	void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
+		var urlParts = e.Url.Split('.');
+		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		{
+			var funcToCall = urlParts[1].Split("?");
+			var methodName = funcToCall[0][..^1];
+			var parameters = funcToCall[1];
+			e.Cancel = true;
+			System.Diagnostics.Debug.WriteLine($"Method Name: {methodName}");
+			System.Diagnostics.Debug.WriteLine($"Parameters: {parameters}");
+			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
+			{
+				NextPage(this, new EventArgs());
+			}
+			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+			{
+				PreviousPage(this, new EventArgs());
+			}
+		}
 		if (e.Url.Contains("http://") || e.Url.Contains("https://") || e.Url.Contains("file:"))
 		{
 			e.Cancel = true;
@@ -113,30 +131,23 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void PreviousPage(object sender, EventArgs e)
 	{
-		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontalScrollAtStart()");
-		if (result.Equals("true") && book.CurrentChapter > 0)
+		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
 			await db.SaveBookData(book, CancellationToken.None);
 			isPreviousPage = true;
 			Dispatcher.Dispatch(() => UpdateWebView());
-
-			return;
 		}
-		EpubText.Eval("prevPage()");
 	}
 
 	async void NextPage(object sender, EventArgs e)
 	{
-		var result = await EpubText.EvaluateJavaScriptAsync("isHorizontallyScrolledToEnd()");
-		if (result.Equals("true") && book.CurrentChapter < book.Chapters.Count - 1)
+		if (book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
 			await db.SaveBookData(book, CancellationToken.None);
 			Dispatcher.Dispatch(() => UpdateWebView());
-			return;
 		}
-		EpubText.Eval("nextPage()");
 	}
 
 

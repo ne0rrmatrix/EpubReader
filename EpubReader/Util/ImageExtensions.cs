@@ -1,6 +1,7 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using SixLabors.ImageSharp;
 
 namespace EpubReader.Util;
 
@@ -19,7 +20,13 @@ public static partial class ImageExtensions
 	static string gif => "image/gif";
 	static string webp => "image/webp";
 	static string jpeg => "image/jpeg";
-
+	/*
+	static readonly Dictionary<string, string> mimeTypeMappings = new(StringComparer.OrdinalIgnoreCase)
+	{
+		{ ".ttf", "font/ttf" },
+		{ ".otf", "font/otf" },
+	};
+	*/
 	/// <summary>
 	/// Replaces image URLs in HTML with base64 encoded images.
 	/// </summary>
@@ -91,6 +98,78 @@ public static partial class ImageExtensions
 		}
 		return inputString;
 	}
+	/*
+	public static string ReplaceFontsWithBase64(string cssString, List<EpubFonts> fonts)
+	{
+		if (string.IsNullOrEmpty(cssString) || fonts == null || fonts.Count == 0)
+		{
+			return cssString;
+		}
+
+		// More robust pattern that handles more varied syntax
+		string pattern = @"src\s*:\s*url\s*\(\s*['""]?(.*?\.(?:ttf|otf|woff|woff2))['""]?\s*\)";
+
+		string evaluator(Match match)
+		{
+			string originalUrl = match.Value;
+			string filePath = match.Groups[1].Value;
+
+			if (string.IsNullOrEmpty(filePath))
+			{
+				return originalUrl;
+			}
+
+			// Extract just the filename from the relative path
+			string fileName = Path.GetFileName(filePath);
+
+			// Get extension and normalize it to lowercase for comparison
+			string extension = Path.GetExtension(fileName).ToLowerInvariant();
+
+			// Find matching font - case insensitive comparison
+			EpubFonts? matchingFont = fonts.FirstOrDefault(f =>
+				string.Equals(f.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+			if (matchingFont is not null && matchingFont.Content is not null && matchingFont.Content.Length > 0)
+			{
+				string base64String = Convert.ToBase64String(matchingFont.Content);
+				if (mimeTypeMappings.TryGetValue(extension, out string? mimeType))
+				{
+					return $"src: local('{matchingFont.FontFamily}'),local('{matchingFont.FontFamily}'), url(data:{mimeType};base64,{base64String}) format('{mimeType}');";
+				}
+				else
+				{
+					// If the extension is not recognized, still try to embed as generic data
+					return $"src: local('{matchingFont.FontFamily}'),local('{matchingFont.FontFamily}'), url(data:application/octet-stream;base64,{base64String}) format('{mimeType}');";
+				}
+			}
+
+			return originalUrl; // Return the original URL if no matching font/image is found
+		}
+
+		return Regex.Replace(cssString, pattern, evaluator, RegexOptions.IgnoreCase);
+	}
+
+	public static void DebugFontReplacement(List<EpubFonts> fonts)
+	{
+		foreach (var font in fonts)
+		{
+			string extension = Path.GetExtension(font.FileName).ToLowerInvariant();
+			System.Diagnostics.Debug.WriteLine($"Font: {font.FileName}, Extension: {extension}, Family: {font.FontFamily}, Content Length: {font.Content?.Length ?? 0}");
+
+			if (extension == ".ttf")
+			{
+				if (mimeTypeMappings.TryGetValue(extension, out string? mimeType))
+				{
+					System.Diagnostics.Debug.WriteLine($"TTF MIME type found: {mimeType}");
+				}
+				else
+				{
+					System.Diagnostics.Debug.WriteLine("No MIME type mapping found for TTF");
+				}
+			}
+		}
+	}
+	*/
 
 	/// <summary>
 	/// Replaces image URLs in the input string with base64 encoded images.

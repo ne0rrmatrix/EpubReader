@@ -67,22 +67,6 @@
                         </OnPlatform>
                     </WebView.GestureRecognizers>
                 </WebView>
-
-                <ImageButton
-                    Grid.Row="1"
-                    Margin="30,0,0,0"
-                    Background="Transparent"
-                    Clicked="PreviousPage"
-                    HorizontalOptions="Start"
-                    IsEnabled="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    Source="{AppThemeBinding Dark=arrow_back.png,
-                                             Light=arrow_back_lightmode.png}"
-                    WidthRequest="40" />
                 <Label
                     x:Name="PageLabel"
                     Grid.Row="1"
@@ -92,22 +76,6 @@
                                            MacCatalyst=true,
                                            iOS={Binding IsNavMenuVisible},
                                            Android={Binding IsNavMenuVisible}}" />
-                <ImageButton
-                    Grid.Row="1"
-                    Margin="0,0,30,0"
-                    Background="Transparent"
-                    Clicked="NextPage"
-                    HorizontalOptions="End"
-                    IsEnabled="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    Source="{AppThemeBinding Dark=arrow_forward.png,
-                                             Light=arrow_forward_lightmode.png}"
-                    WidthRequest="40" />
-
             </Grid>
         </shimmer:SfShimmer.Content>
     </shimmer:SfShimmer>

@@ -42,13 +42,20 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 		html = ImageExtensions.FixImageTags(html);
-		html = RemoveScriptAndStyleTags(html);
-		html = StyleTagRegex().Replace(html, string.Empty);
+		//html = RemoveScriptAndStyleTags(html);
+		//html = StyleTagRegex().Replace(html, string.Empty);
 		html = InjectCss(html, book, settings);
 		html = ImageExtensions.ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, JavaScriptConstants.DisableScroll + JavaScriptConstants.ButtonNavigation + JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
-		html = AddDivContainer(html);
+		//html = InjectJavascript(html, JavaScriptConstants.DisableScroll + JavaScriptConstants.ButtonNavigation + JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
+		html = InjectJavascript(html, JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
+		//html = AddDivContainer(html);
 		html = RemoveGuttenBurgStyles(html);
+		//byte[] htm = Encoding.UTF8.GetBytes(html);
+		//html = Encoding.UTF8.GetString(htm);
+		//html = ExtractBody(html);
+		html = html.Replace("\"", "&quot;");
+		html = HtmlBase(html);
+		//System.Diagnostics.Debug.WriteLine(html);
 		return html;
 	}
 
@@ -94,35 +101,34 @@ public static partial class InjectIntoHtml
 
 		return cssContent;
 	}
-
+	
 	static bool HasParagraphsRegex(string htmlString)
 	{
 		// This pattern looks for opening <p> tags with optional attributes
 		return HasParagraphs().IsMatch(htmlString);
 	}
-
+	
 	static string InjectCss(string html, Book book, Settings settings)
 	{
-		int numberOfColumns = 1;
-		if ((OperatingSystem.IsWindows() || OperatingSystem.IsMacCatalyst()) && HasParagraphsRegex(html))
-		{
-			numberOfColumns = 2;
-		}
+		//int numberOfColumns = 1;
 
-		var css = new StringBuilder(StyleSheetConstants.GetStyle(numberOfColumns));
+		var css = new StringBuilder(StyleSheetConstants.RadiumCssConfig);
 		if (!HasParagraphsRegex(html))
 		{
 			css.Append(StyleSheetConstants.ImageStyle);
 		}
+		css.Append(StyleSheetConstants.RadiumCssBefore);
+		css.Append(StyleSheetConstants.RadiumCssAfter);
 		var images = ExtractCssFiles(html);
 		foreach (var item in images)
 		{
 			var file = book.Css.FirstOrDefault(x => x.FileName == Path.GetFileName(item)) ?? throw new InvalidOperationException("Css file not found");
 			var filteredCSS = FilterCalibreCss(file.Content);
 			filteredCSS = RemoveCssProperties(filteredCSS);
+			//filteredCSS = ImageExtensions.ReplaceFontsWithBase64(filteredCSS, book.Fonts);
 			css.Append(ImageExtensions.ReplaceCssUrls(filteredCSS, book.Images));
 		}
-		
+
 		var styleTag = new StringBuilder();
 		styleTag.Append(GenerateCSSFromString(settings));
 		styleTag.Append(css);
@@ -229,7 +235,7 @@ public static partial class InjectIntoHtml
 				{(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
 			}}";
 	}
-	
+
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -258,31 +264,145 @@ public static partial class InjectIntoHtml
 		return withoutStyles.Trim();
 	}
 
-	static string AddDivContainer(string html)
+	static string HtmlBase(string html)
 	{
-		if (string.IsNullOrEmpty(html))
-		{
-			return html;
-		}
+		return $@"
+		<!doctype html>
+		<html lang=""en"">
+		<head>
+		  <title>Test</title>
+		  <meta charset=""UTF-8"" />
+		  <meta name=""viewport"" content=""width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"">
+		  <style type=""text/css"">
+			html, body {{
+			  margin: 0; 
+			  padding: 0; 
+			  box-sizing: border-box;
+			}}
+    
+			body {{
+			  display: flex;
+			  height: 100vh;
+			  width: 100%;
+			  align-items: center;
+			  justify-content: center;
+			}}
+    
+			iframe {{
+			  width: 90vw;
+			  max-width: 100%;
+			  height: 90vh;
+			  max-height: 100%;
+			  border: 0;
+			  -webkit-user-select: none;
+			  -moz-user-select: none;
+			  -ms-user-select: none;
+			  user-select: none;
+			  /* May help later with Reading modes so that bg can be applied to whole page
+				 You need to allowtransparency on the iframe though (and sanitize authors’ CSS) */
+			  background-color: transparent;
+			}}
 
-		const string openingBodyRegex = @"<body\s*([^>]*)>";
-		const string closingBodyRegex = @"</body>";
+			.rcss-input {{
+			  position: absolute;
+			  top: 0;
+			  background-color: rgba(255, 255, 255, 0.5);
+			  padding: 0.5rem;
+			}}
+		  </style>
+		</head>
+		<body>
+<iframe title=""Book"" id=""page""  srcdoc=""{html}""></iframe>
+		<script type=""text/javascript"">
+			document.addEventListener(""DOMContentLoaded"", function() {{
+			  const frame = document.getElementById(""page"");
+  
+			  const scrollLeft = () => {{
+				const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue(""column-gap""));
+				frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
+			  }};
 
-		var openingBodyMatch = Regex.Match(html, openingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
-		var closingBodyMatch = Regex.Match(html, closingBodyRegex, RegexOptions.IgnoreCase, regexTimeout);
+			  const scrollRight = () => {{
+				const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue(""column-gap""));
+				frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
+			  }};
 
-		if (!openingBodyMatch.Success || !closingBodyMatch.Success)
-		{
-			return html;
-		}
+			  document.body.addEventListener(""click"", function(e) {{
+				e.preventDefault();
+				if (e.clientX > (window.innerWidth / 2)) {{
+				  if(isHorizontallyScrolledToEnd()) {{
+					window.location.href = 'https://runcsharp.next?true';
+					return;
+				}}
+				  scrollRight();
+				}} else {{
+					if(isHorizontalScrollAtStart()) {{
+						window.location.href = 'https://runcsharp.prev?true';
+						return;
+					}}
+				  scrollLeft();
+				}}
+			  }});
 
-		var result = new StringBuilder();
-		result.Append(html.AsSpan(0, openingBodyMatch.Index + openingBodyMatch.Length));
-		result.Append("<div id=\"scrollContainer\">");
-		result.Append(html.AsSpan(openingBodyMatch.Index + openingBodyMatch.Length, closingBodyMatch.Index - (openingBodyMatch.Index + openingBodyMatch.Length)));
-		result.Append("</div></body>");
-		result.Append(html.AsSpan(closingBodyMatch.Index + closingBodyMatch.Length));
-
-		return result.ToString();
+			  document.body.addEventListener(""keydown"", function(e) {{
+				if (e.keyCode == ""39"") {{
+				  if(isHorizontallyScrolledToEnd()) {{
+					window.location.href = 'https://runcsharp.next?true';
+					return;
+				}}
+				  scrollRight();
+				}} else if (e.keyCode == ""37"") {{
+					if(isHorizontalScrollAtStart()) {{
+						window.location.href = 'https://runcsharp.prev?true';
+						return;	
+					}}
+				  scrollLeft();
+				}}
+			  }});
+			}});
+			
+			function isHorizontallyScrolledToEnd() {{
+				var frame = document.getElementById(""page"");
+				if (!frame.contentWindow) {{
+					window.location.href = 'https://runcsharp.next?false';
+					return false;
+				}}
+				console.log(""isHorizontallyScrolledToEnd"");
+				const contentDoc = frame.contentWindow.document.documentElement;
+				const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
+				return Math.abs(frame.contentWindow.scrollX - maxScrollLeft) <= 10;
+			}}
+			
+			function isHorizontalScrollAtStart() {{
+				var frame = document.getElementById(""page"");
+				if (!frame.contentWindow) {{
+					console.log(""frame.contentWindow is null"");
+					return false;
+				}}
+					console.log(frame.contentWindow.scrollX);
+				return frame.contentWindow.scrollX <= 0;
+			}}
+			function scrollToHorizontalEnd() {{
+			  const frame = document.getElementById(""page"");
+			  window.location.href = 'https://runcsharp.test?true';
+			  if (frame && frame.contentWindow && frame.contentWindow.document.readyState === 'complete') {{
+				const contentDoc = frame.contentWindow.document.documentElement;
+				const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
+				frame.contentWindow.scrollTo(maxScrollLeft, 0);
+				window.location.href = 'https://runcsharp.test1?true';
+			  }} else if (frame) {{
+				// Iframe might not be loaded yet, wait for the 'load' event
+				frame.onload = function() {{
+					window.location.href = 'https://runcsharp.OnLoad?false';
+				  scrollToHorizontalEnd(frame); // Call the function again when loaded
+				  frame.onload = null; // Remove the event listener after it's executed once
+				}};
+			  }} else {{
+				console.error(""Iframe element not provided."");
+			  }}
+			}}
+		</script>
+	</body>
+	</html>";
 	}
 }

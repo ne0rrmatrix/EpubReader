@@ -78,6 +78,7 @@ public static partial class EbookService
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
+			Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = Path.GetFileName(font.FilePath), Content = font.ReadContentAsBytes(), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath) })],
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 			Chapters = GetChapters([.. book.GetReadingOrder().ToList()], book),
 			Images = [.. book.Content.Images.Local.Select(item => GetImage(item.ReadContent(), item.FilePath))],

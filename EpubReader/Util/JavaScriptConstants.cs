@@ -3,18 +3,6 @@
 public static class JavaScriptConstants
 {
 	/// <summary>
-	/// Disable scrolling on the web view.
-	/// </summary>
-	public static readonly string DisableScroll = @"
-        window.addEventListener('wheel', function(event) {
-            event.preventDefault();
-        }, { passive: false });
-
-        window.addEventListener('touchmove', function(event) {
-            event.preventDefault();
-        }, { passive: false });";
-
-	/// <summary>
 	/// Adjust the font size of the text in the web view.
 	/// </summary>
 	public static readonly string AdjustFontSize = @"
@@ -193,52 +181,4 @@ public static class JavaScriptConstants
 		document.documentElement.style.width = '100%';
 		document.documentElement.style.height = '100%';
 		}";
-
-	/// <summary>
-	/// JavaScript function for button navigation.
-	/// </summary>
-	public static readonly string ButtonNavigation = @"
-        function nextPage() {
-            document.getElementById(""scrollContainer"").scrollLeft += window.visualViewport.width;
-        }
-
-        function prevPage() {
-            document.getElementById(""scrollContainer"").scrollLeft -= window.visualViewport.width;
-        }
-		
-		function scrollToEnd() {
-			const scrollContainer = document.getElementById(""scrollContainer"");
-    
-			if (!scrollContainer) {
-				console.error('scrollContainer element not found');
-				return;
-			}
-    
-			// Alternative method: get all columns and scroll to the last one
-			const totalWidth = scrollContainer.scrollWidth;
-			const viewportWidth = scrollContainer.clientWidth;
-    
-			// Force scroll to the maximum possible position
-			scrollContainer.scrollLeft = 999999; // Large value forces scroll to end
-    
-			// Log for debugging
-			console.log(`Total width: ${totalWidth}, Viewport: ${viewportWidth}, Max scroll: ${totalWidth - viewportWidth}`);
-		}
-
-        function isHorizontalScrollAtStart() {
-            var element = document.getElementById(""scrollContainer"");
-            if (!element) {
-                return false;
-            }
-            return element.scrollLeft === 0;
-        }
-
-        function isHorizontallyScrolledToEnd() {
-            var element = document.getElementById(""scrollContainer"");
-            if (!element) {
-                return false;
-            }
-            const maxScrollLeft = element.scrollWidth - element.clientWidth;
-            return Math.abs(element.scrollLeft - maxScrollLeft) <= 1;
-        }";
 }
