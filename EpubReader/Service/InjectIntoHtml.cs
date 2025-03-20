@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
 using EpubReader.Models;
 using EpubReader.Util;
 using HtmlAgilityPack;
@@ -14,15 +15,6 @@ public static partial class InjectIntoHtml
 
 	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex HasParagraphs();
-
-	[GeneratedRegex(@"<style[^>]*?>[\s\S]*?</style>|<style[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex WithoutStyles();
-
-	[GeneratedRegex(@"<script[^>]*?>[\s\S]*?</script>|<script[^>]*?/>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex WithoutScripts();
-
-	[GeneratedRegex("<style[^>]*>.*?</style>", RegexOptions.Singleline, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex StyleTagRegex();
 
 	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
 
@@ -42,20 +34,12 @@ public static partial class InjectIntoHtml
 			return string.Empty;
 		}
 		html = ImageExtensions.FixImageTags(html);
-		//html = RemoveScriptAndStyleTags(html);
-		//html = StyleTagRegex().Replace(html, string.Empty);
 		html = InjectCss(html, book, settings);
 		html = ImageExtensions.ReplaceImageUrls(html, book.Images);
-		//html = InjectJavascript(html, JavaScriptConstants.DisableScroll + JavaScriptConstants.ButtonNavigation + JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
 		html = InjectJavascript(html, JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
-		//html = AddDivContainer(html);
 		html = RemoveGuttenBurgStyles(html);
-		//byte[] htm = Encoding.UTF8.GetBytes(html);
-		//html = Encoding.UTF8.GetString(htm);
-		//html = ExtractBody(html);
-		html = html.Replace("\"", "&quot;");
+		html = HttpUtility.HtmlEncode(html);
 		html = HtmlBase(html);
-		//System.Diagnostics.Debug.WriteLine(html);
 		return html;
 	}
 
@@ -110,8 +94,6 @@ public static partial class InjectIntoHtml
 	
 	static string InjectCss(string html, Book book, Settings settings)
 	{
-		//int numberOfColumns = 1;
-
 		var css = new StringBuilder(StyleSheetConstants.RadiumCssConfig);
 		if (!HasParagraphsRegex(html))
 		{
@@ -245,23 +227,6 @@ public static partial class InjectIntoHtml
 		}
 
 		return html;
-	}
-
-	static string RemoveScriptAndStyleTags(string htmlString)
-	{
-		if (string.IsNullOrEmpty(htmlString))
-		{
-			return htmlString;
-		}
-
-		// Remove script tags with all their attributes and content
-		string withoutScripts = WithoutScripts().Replace(htmlString, string.Empty);
-
-		// Remove style tags with all their attributes and content
-		string withoutStyles = WithoutStyles().Replace(withoutScripts, string.Empty);
-
-		// Return the cleaned string
-		return withoutStyles.Trim();
 	}
 
 	static string HtmlBase(string html)

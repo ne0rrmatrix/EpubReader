@@ -112,8 +112,6 @@ public partial class BookPage : ContentPage, IDisposable
 			var methodName = funcToCall[0][..^1];
 			var parameters = funcToCall[1];
 			e.Cancel = true;
-			System.Diagnostics.Debug.WriteLine($"Method Name: {methodName}");
-			System.Diagnostics.Debug.WriteLine($"Parameters: {parameters}");
 			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
 				NextPage(this, new EventArgs());
