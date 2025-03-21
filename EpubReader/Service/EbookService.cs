@@ -1,4 +1,5 @@
-﻿using EpubReader.Models;
+﻿using System.IO.Compression;
+using EpubReader.Models;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
@@ -72,13 +73,25 @@ public static partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		
+		List<EpubFonts> fonts = new();
+		foreach (var item in book.Content.AllFiles.Local.ToList())
+		{
+			if(item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
+			{
+				EpubFonts Font = new();
+				Font.Content = item.ReadContentAsBytes();
+				Font.FileName = Path.GetFileName(item.FilePath);
+				Font.FontFamily = Path.GetFileNameWithoutExtension(item.FilePath);
+				fonts.Add(Font);
+			}
+		}
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
-			Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = Path.GetFileName(font.FilePath), Content = font.ReadContentAsBytes(), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath) })],
+			//Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = Path.GetFileName(font.FilePath), Content = font.ReadContentAsBytes(), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath) })],
+			Fonts = fonts,
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 			Chapters = GetChapters([.. book.GetReadingOrder().ToList()], book),
 			Images = [.. book.Content.Images.Local.Select(item => GetImage(item.ReadContent(), item.FilePath))],

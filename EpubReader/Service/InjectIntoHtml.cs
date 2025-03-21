@@ -107,7 +107,7 @@ public static partial class InjectIntoHtml
 			var file = book.Css.FirstOrDefault(x => x.FileName == Path.GetFileName(item)) ?? throw new InvalidOperationException("Css file not found");
 			var filteredCSS = FilterCalibreCss(file.Content);
 			filteredCSS = RemoveCssProperties(filteredCSS);
-			//filteredCSS = ImageExtensions.ReplaceFontsWithBase64(filteredCSS, book.Fonts);
+			filteredCSS = ImageExtensions.ReplaceFontsWithBase64(filteredCSS, book.Fonts);
 			css.Append(ImageExtensions.ReplaceCssUrls(filteredCSS, book.Images));
 		}
 

@@ -1,5 +1,7 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using System.Web;
+using EpubReader.Models;
 using HtmlAgilityPack;
 using SixLabors.ImageSharp;
 
@@ -20,13 +22,7 @@ public static partial class ImageExtensions
 	static string gif => "image/gif";
 	static string webp => "image/webp";
 	static string jpeg => "image/jpeg";
-	/*
-	static readonly Dictionary<string, string> mimeTypeMappings = new(StringComparer.OrdinalIgnoreCase)
-	{
-		{ ".ttf", "font/ttf" },
-		{ ".otf", "font/otf" },
-	};
-	*/
+
 	/// <summary>
 	/// Replaces image URLs in HTML with base64 encoded images.
 	/// </summary>
@@ -54,7 +50,7 @@ public static partial class ImageExtensions
 		}
 		return result;
 	}
-
+	
 	/// <summary>
 	/// Replaces image URLs in HTML with local image URLs.
 	/// </summary>
@@ -98,7 +94,7 @@ public static partial class ImageExtensions
 		}
 		return inputString;
 	}
-	/*
+
 	public static string ReplaceFontsWithBase64(string cssString, List<EpubFonts> fonts)
 	{
 		if (string.IsNullOrEmpty(cssString) || fonts == null || fonts.Count == 0)
@@ -106,8 +102,7 @@ public static partial class ImageExtensions
 			return cssString;
 		}
 
-		// More robust pattern that handles more varied syntax
-		string pattern = @"src\s*:\s*url\s*\(\s*['""]?(.*?\.(?:ttf|otf|woff|woff2))['""]?\s*\)";
+		string pattern = @"src\s*:\s*url\s*\(\s*['""]?(.*?\.(?i:ttf|otf|woff|woff2))['""]?\s*\)";
 
 		string evaluator(Match match)
 		{
@@ -122,9 +117,9 @@ public static partial class ImageExtensions
 			// Extract just the filename from the relative path
 			string fileName = Path.GetFileName(filePath);
 
-			// Get extension and normalize it to lowercase for comparison
-			string extension = Path.GetExtension(fileName).ToLowerInvariant();
-
+			// Get extension
+			string extension = Path.GetExtension(fileName);
+	
 			// Find matching font - case insensitive comparison
 			EpubFonts? matchingFont = fonts.FirstOrDefault(f =>
 				string.Equals(f.FileName, fileName, StringComparison.OrdinalIgnoreCase));
@@ -132,14 +127,15 @@ public static partial class ImageExtensions
 			if (matchingFont is not null && matchingFont.Content is not null && matchingFont.Content.Length > 0)
 			{
 				string base64String = Convert.ToBase64String(matchingFont.Content);
+				base64String = HttpUtility.UrlEncode(base64String);
+				if(base64String.Length > 600000)
+				{
+					return originalUrl;
+				}
+				// Case-insensitive extension lookup
 				if (mimeTypeMappings.TryGetValue(extension, out string? mimeType))
 				{
-					return $"src: local('{matchingFont.FontFamily}'),local('{matchingFont.FontFamily}'), url(data:{mimeType};base64,{base64String}) format('{mimeType}');";
-				}
-				else
-				{
-					// If the extension is not recognized, still try to embed as generic data
-					return $"src: local('{matchingFont.FontFamily}'),local('{matchingFont.FontFamily}'), url(data:application/octet-stream;base64,{base64String}) format('{mimeType}');";
+					return $"src: url('data:{mimeType};charset=utf-8;base64,{base64String}') format('{GetFormatName(mimeType)}');";
 				}
 			}
 
@@ -148,28 +144,6 @@ public static partial class ImageExtensions
 
 		return Regex.Replace(cssString, pattern, evaluator, RegexOptions.IgnoreCase);
 	}
-
-	public static void DebugFontReplacement(List<EpubFonts> fonts)
-	{
-		foreach (var font in fonts)
-		{
-			string extension = Path.GetExtension(font.FileName).ToLowerInvariant();
-			System.Diagnostics.Debug.WriteLine($"Font: {font.FileName}, Extension: {extension}, Family: {font.FontFamily}, Content Length: {font.Content?.Length ?? 0}");
-
-			if (extension == ".ttf")
-			{
-				if (mimeTypeMappings.TryGetValue(extension, out string? mimeType))
-				{
-					System.Diagnostics.Debug.WriteLine($"TTF MIME type found: {mimeType}");
-				}
-				else
-				{
-					System.Diagnostics.Debug.WriteLine("No MIME type mapping found for TTF");
-				}
-			}
-		}
-	}
-	*/
 
 	/// <summary>
 	/// Replaces image URLs in the input string with base64 encoded images.
@@ -243,6 +217,18 @@ public static partial class ImageExtensions
 		}, RegexOptions.IgnoreCase, regexTimeout);
 
 		return inputString;
+	}
+
+	static string GetFormatName(string mimeType)
+	{
+		return mimeType switch
+		{
+			"font/ttf" => "truetype",
+			"font/otf" => "opentype",
+			"font/woff" => "woff",
+			"font/woff2" => "woff2",
+			_ => "truetype" // default fallback
+		};
 	}
 
 	static List<string> ExtractImageUrls(string html)
@@ -373,6 +359,14 @@ public static partial class ImageExtensions
 
 		return imageFilenames;
 	}
+
+	static readonly Dictionary<string, string> mimeTypeMappings = new(StringComparer.OrdinalIgnoreCase)
+	{
+		{ ".ttf", "font/ttf" },
+		{ ".otf", "font/otf" },
+		{ ".woff", "font/woff" },
+		{ ".woff2", "font/woff2" }
+	};
 
 	static string GetMimeType(string fileName)
 	{
