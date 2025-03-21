@@ -73,15 +73,17 @@ public static partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		List<EpubFonts> fonts = new();
+		List<EpubFonts> fonts = [];
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
 			if(item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
 			{
-				EpubFonts Font = new();
-				Font.Content = item.ReadContentAsBytes();
-				Font.FileName = Path.GetFileName(item.FilePath);
-				Font.FontFamily = Path.GetFileNameWithoutExtension(item.FilePath);
+				EpubFonts Font = new()
+				{
+					Content = item.ReadContentAsBytes(),
+					FileName = Path.GetFileName(item.FilePath),
+					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
+				};
 				fonts.Add(Font);
 			}
 		}

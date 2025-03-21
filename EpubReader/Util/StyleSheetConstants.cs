@@ -1263,14 +1263,7 @@ public static class StyleSheetConstants
 		  max-width:var(--RS__maxMediaWidth);
 		  box-sizing:var(--RS__boxSizingTable);
 		}";
-	/*
-	public static string CssFont(string fontName, string base64Font, string mimeType) => $@"
-    .{fontName} {{
-        font-family: '{fontName}';
-		src: local('{fontName}'),local('{fontName}'), url(data:{mimeType};base64,{base64Font}) format('{mimeType}');
-    }}
-	";
-	*/
+
 	/// <summary>
 	/// Sets the style for the scroll container.
 	/// </summary>

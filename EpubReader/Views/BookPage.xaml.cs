@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
+using EpubReader.Message;
 using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Service;
@@ -23,7 +24,6 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	bool isPreviousPage = false;
 	readonly IDb db;
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	Book book = new();
 	Settings settings = new();
 	bool disposedValue;
@@ -42,18 +42,48 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = await db.GetSettings(CancellationToken.None);
-
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => OnMessageReceived(r,m));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 		Dispatcher.Dispatch(() => UpdateWebView());
 	}
 
+	void OnMessageReceived(object r, JavaScriptMessage m)
+	{
+		if(m.Value.ToString().Contains("next"))
+		{
+			NextPage(r, new EventArgs());
+		}
+		if (m.Value.ToString().Contains("prev"))
+		{
+			PreviousPage(r, new EventArgs());
+		}
+	}
+
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-		await EpubText.EvaluateJavaScriptAsync($"changeTextStyle({settings.FontSize})");
-		await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
+		/*
+		if (settings.FontSize != 0)
+		{
+			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__fontSize, {settings.FontSize}");
+		}
+		if (!string.IsNullOrEmpty(settings.FontFamily))
+		{
+			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__fontFamily, {settings.FontFamily}");
+		}
+		if (!string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__backgroundColor, {settings.BackgroundColor}");
+		}
+		if (!string.IsNullOrEmpty(settings.TextColor))
+		{
+			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__textColor, {settings.TextColor}");
+		}
+		await EpubText.EvaluateJavaScriptAsync($"setCssVariable(root.style.setProperty(\"--USER__appearance\", \"readium-sepia-on\");\r\n)");
+		//await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
+		*/
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -69,7 +99,7 @@ public partial class BookPage : ContentPage, IDisposable
 			Priority = index,
 			Command = new Command(() =>
 			{
-				var html = InjectIntoHtml.UpdateHtml(chapter.HtmlFile, book, settings);
+				var html = InjectIntoHtml.UpdateHtml(chapter.HtmlFile, book);
 				Dispatcher.Dispatch(async () =>
 				{
 					EpubText.Source = new HtmlWebViewSource { Html = html };
@@ -99,19 +129,22 @@ public partial class BookPage : ContentPage, IDisposable
 		if (isPreviousPage)
 		{
 			await EpubText.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
-			isPreviousPage = false;
 		}
 	}
 
+#if ANDROID || IOS || MACCATALYST
+	static void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
+	{
+#else
 	void EpubText_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
+#endif
+#if WINDOWS
 		var urlParts = e.Url.Split('.');
 		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
-			var parameters = funcToCall[1];
-			e.Cancel = true;
 			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
 				NextPage(this, new EventArgs());
@@ -121,7 +154,8 @@ public partial class BookPage : ContentPage, IDisposable
 				PreviousPage(this, new EventArgs());
 			}
 		}
-		if (e.Url.Contains("http://") || e.Url.Contains("https://") || e.Url.Contains("file:"))
+#endif
+		if (e.Url.Contains("http://") || e.Url.Contains("https://"))
 		{
 			e.Cancel = true;
 		}
@@ -134,6 +168,10 @@ public partial class BookPage : ContentPage, IDisposable
 			book.CurrentChapter--;
 			await db.SaveBookData(book, CancellationToken.None);
 			isPreviousPage = true;
+			Dispatcher.Dispatch(() => UpdateWebView());
+		}
+		else
+		{
 			Dispatcher.Dispatch(() => UpdateWebView());
 		}
 	}
@@ -153,21 +191,12 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		if(sender is null)
 		{
-			logger.Info("Sender is null");
 			return;
 		}
-		switch (e.Direction)
+		if (e.Direction == SwipeDirection.Up)
 		{
-			case SwipeDirection.Left:
-				NextPage(sender, new EventArgs());
-				break;
-			case SwipeDirection.Right:
-				PreviousPage(sender, new EventArgs());
-				break;
-			default:
-				var viewModel = (BookViewModel)BindingContext;
-				viewModel.Press();
-				break;
+			var viewModel = (BookViewModel)BindingContext;
+			viewModel.Press();
 		}
 	}
 
@@ -175,7 +204,7 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		Shimmer.IsActive = true;
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		var html = InjectIntoHtml.UpdateHtml(book.Chapters[book.CurrentChapter].HtmlFile, book, settings);
+		var html = InjectIntoHtml.UpdateHtml(book.Chapters[book.CurrentChapter].HtmlFile, book);
 		EpubText.Source = new HtmlWebViewSource { Html = html };
 		Shimmer.IsActive = false;
 	}

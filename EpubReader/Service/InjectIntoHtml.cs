@@ -13,106 +13,38 @@ public static partial class InjectIntoHtml
 	[GeneratedRegex(@"@import\s+url\(['""](.+?)['""]\)", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
 	private static partial Regex StyleSheet();
 
-	[GeneratedRegex(@"<p(\s[^>]*)?>", RegexOptions.Compiled, matchTimeoutMilliseconds: 20000)]
-	private static partial Regex HasParagraphs();
-
-	static readonly TimeSpan regexTimeout = TimeSpan.FromSeconds(20);
-
-	static readonly string[] projectGuttenBurgStyles =
-		[
-			@"\.xhtml_center\s*\{[^}]*\}\s*",
-			@"\.xhtml_center\s+table\s*\{[^}]*\}\s*",
-			@"body\s*\{\s*text-align:\s*justify[^}]*\}\s*",
-			@"@media\s+screen\s*\{[^}]*body\s*\{[^}]*\}[^}]*\}\s*",
-			@"\.pagedjs_page_content\s*>\s*div\s*\{[^}]*\}\s*"
-		];
-
-	public static string UpdateHtml(string html, Book book, Settings settings)
+	public static string UpdateHtml(string html, Book book)
 	{
 		if (string.IsNullOrEmpty(html))
 		{
 			return string.Empty;
 		}
-		html = ImageExtensions.FixImageTags(html);
-		html = InjectCss(html, book, settings);
+		html = InjectCss(html, book);
 		html = ImageExtensions.ReplaceImageUrls(html, book.Images);
-		html = InjectJavascript(html, JavaScriptConstants.AdjustTextSizeAndStyle + JavaScriptConstants.AdjustFontSize + JavaScriptConstants.AdjustSVGImages);
-		html = RemoveGuttenBurgStyles(html);
+		html = InjectJavascript(html, JavaScriptConstants.AdjustSVGImages);
 		html = HttpUtility.HtmlEncode(html);
 		html = HtmlBase(html);
 		return html;
 	}
 
-	static string RemoveGuttenBurgStyles(string htmlContent)
-	{
-		// Create HTML document
-		var doc = new HtmlDocument();
-		doc.LoadHtml(htmlContent);
-
-		// Find all style tags
-		var styleTags = doc.DocumentNode.SelectNodes("//style");
-
-		if (styleTags != null)
-		{
-			foreach (var styleTag in styleTags)
-			{
-				string cssContent = styleTag.InnerHtml;
-
-				// Remove the specific CSS styles using regex
-				cssContent = RemoveSpecificCssRules(cssContent);
-
-				// Update the style tag content
-				styleTag.InnerHtml = cssContent;
-
-				// If style tag is now empty, remove it
-				if (string.IsNullOrWhiteSpace(styleTag.InnerHtml))
-				{
-					styleTag.Remove();
-				}
-			}
-		}
-
-		return doc.DocumentNode.OuterHtml;
-	}
-
-	static string RemoveSpecificCssRules(string cssContent)
-	{
-		// Remove each pattern from the CSS content
-		foreach (var pattern in projectGuttenBurgStyles)
-		{
-			cssContent = Regex.Replace(cssContent, pattern, string.Empty, RegexOptions.Compiled, regexTimeout);
-		}
-
-		return cssContent;
-	}
-	
-	static bool HasParagraphsRegex(string htmlString)
-	{
-		// This pattern looks for opening <p> tags with optional attributes
-		return HasParagraphs().IsMatch(htmlString);
-	}
-	
-	static string InjectCss(string html, Book book, Settings settings)
+	static string InjectCss(string html, Book book)
 	{
 		var css = new StringBuilder(StyleSheetConstants.RadiumCssConfig);
-		if (!HasParagraphsRegex(html))
-		{
-			css.Append(StyleSheetConstants.ImageStyle);
-		}
 		css.Append(StyleSheetConstants.RadiumCssBefore);
 		css.Append(StyleSheetConstants.RadiumCssAfter);
 		var images = ExtractCssFiles(html);
+		bool hasOpenSourceFonts = false;
 		foreach (var item in images)
 		{
 			var file = book.Css.FirstOrDefault(x => x.FileName == Path.GetFileName(item)) ?? throw new InvalidOperationException("Css file not found");
-			var filteredCSS = FilterCalibreCss(file.Content);
-			filteredCSS = RemoveCssProperties(filteredCSS);
-			filteredCSS = ImageExtensions.ReplaceFontsWithBase64(filteredCSS, book.Fonts);
+			hasOpenSourceFonts = FontDeclarationValidator.ContainsOpenSourceFontAlternatives(file.Content);
+			var filteredCSS = ImageExtensions.ReplaceFontsWithBase64(file.Content, book.Fonts);
 			css.Append(ImageExtensions.ReplaceCssUrls(filteredCSS, book.Images));
 		}
 
+		System.Diagnostics.Trace.TraceInformation($"CSS contains proper open source font alternatives: {hasOpenSourceFonts}");
+
 		var styleTag = new StringBuilder();
-		styleTag.Append(GenerateCSSFromString(settings));
 		styleTag.Append(css);
 
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -161,63 +93,6 @@ public static partial class InjectIntoHtml
 		return cssFiles;
 	}
 
-	static string FilterCalibreCss(string? cssString)
-	{
-		if (string.IsNullOrEmpty(cssString))
-		{
-			return string.Empty;
-		}
-		string regexPattern = @"\.calibre(1)?\s*\{[^}]*\}";
-		Regex regex = new(regexPattern, RegexOptions.Compiled, regexTimeout);
-
-		return regex.Replace(cssString, string.Empty); // Replace matches with empty string
-	}
-
-	static string RemoveCssProperties(string htmlString)
-	{
-		// Generated Regex for matching CSS rules
-		var cssRuleRegex = new Regex(@"((?:p|body|html)(?:\s*,\s*(?:p|body|html))*)(\s*\{[^}]*\})", RegexOptions.IgnoreCase | RegexOptions.Singleline, regexTimeout);
-
-		// Generated Regex for removing margin, padding, and text-indent
-		var propertyRemovalRegex = new Regex(@"(^|\s|\;)\s*(margin|padding|text-indent)\s*:[^;]*;?", RegexOptions.IgnoreCase, regexTimeout);
-
-		// Generated Regex for cleaning up semicolons and whitespace
-		var semicolonCleanupRegex = new Regex(@"\s*;\s*}", RegexOptions.Compiled, regexTimeout);
-		var emptyBlockCleanupRegex = new Regex(@"{\s*}", RegexOptions.Compiled, regexTimeout);
-		var multipleSpaceCleanupRegex = new Regex(@"\s{2,}", RegexOptions.Compiled, regexTimeout);
-
-		return cssRuleRegex.Replace(htmlString, match =>
-		{
-			string selectors = match.Groups[1].Value;
-			string cssBlock = match.Groups[2].Value;
-
-			cssBlock = propertyRemovalRegex.Replace(cssBlock, "$1");
-			cssBlock = semicolonCleanupRegex.Replace(cssBlock, " }");
-			cssBlock = emptyBlockCleanupRegex.Replace(cssBlock, "{ }");
-			cssBlock = multipleSpaceCleanupRegex.Replace(cssBlock, " ");
-
-			return selectors + cssBlock;
-		});
-	}
-
-	static string GenerateCSSFromString(Settings settings)
-	{
-		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor) && settings.FontSize <= 0 && string.IsNullOrEmpty(settings.FontFamily))
-		{
-			return string.Empty;
-		}
-
-		return $@"
-            body {{
-                {(string.IsNullOrEmpty(settings.BackgroundColor) ? "" : $"background-color: {settings.BackgroundColor};")}
-                {(string.IsNullOrEmpty(settings.TextColor) ? "" : $"color: {settings.TextColor};")}
-               	{(string.IsNullOrEmpty(settings.FontFamily) ? "" : $"font-family: {settings.FontFamily};")}
-            }}
-			p {{ 
-				{(settings.FontSize > 0 ? $"font-size: {settings.FontSize}px !important;" : "")}
-			}}";
-	}
-
 	static string InjectJavascript(string html, string javascript)
 	{
 		int headEndTagIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -254,7 +129,7 @@ public static partial class InjectIntoHtml
 			}}
     
 			iframe {{
-			  width: 90vw;
+			  width: 80vw;
 			  max-width: 100%;
 			  height: 90vh;
 			  max-height: 100%;
@@ -268,11 +143,6 @@ public static partial class InjectIntoHtml
 			  background-color: transparent;
 			}}
 
-			.rcss-input {{
-			  position: absolute;
-			  top: 0;
-			  background-color: rgba(255, 255, 255, 0.5);
-			  padding: 0.5rem;
 			}}
 		  </style>
 		</head>
@@ -281,7 +151,7 @@ public static partial class InjectIntoHtml
 		<script type=""text/javascript"">
 			document.addEventListener(""DOMContentLoaded"", function() {{
 			  const frame = document.getElementById(""page"");
-  
+
 			  const scrollLeft = () => {{
 				const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue(""column-gap""));
 				frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
@@ -325,11 +195,10 @@ public static partial class InjectIntoHtml
 				}}
 			  }});
 			}});
-			
+
 			function isHorizontallyScrolledToEnd() {{
 				var frame = document.getElementById(""page"");
 				if (!frame.contentWindow) {{
-					window.location.href = 'https://runcsharp.next?false';
 					return false;
 				}}
 				console.log(""isHorizontallyScrolledToEnd"");
@@ -349,16 +218,13 @@ public static partial class InjectIntoHtml
 			}}
 			function scrollToHorizontalEnd() {{
 			  const frame = document.getElementById(""page"");
-			  window.location.href = 'https://runcsharp.test?true';
 			  if (frame && frame.contentWindow && frame.contentWindow.document.readyState === 'complete') {{
 				const contentDoc = frame.contentWindow.document.documentElement;
 				const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
 				frame.contentWindow.scrollTo(maxScrollLeft, 0);
-				window.location.href = 'https://runcsharp.test1?true';
 			  }} else if (frame) {{
 				// Iframe might not be loaded yet, wait for the 'load' event
 				frame.onload = function() {{
-					window.location.href = 'https://runcsharp.OnLoad?false';
 				  scrollToHorizontalEnd(frame); // Call the function again when loaded
 				  frame.onload = null; // Remove the event listener after it's executed once
 				}};

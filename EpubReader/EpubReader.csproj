@@ -72,6 +72,8 @@
 	</PropertyGroup>
 	
 	<ItemGroup>
+   
+    <PackageReference Include="HarfBuzzSharp" Version="8.3.0.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.0" />
    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
@@ -91,10 +93,14 @@
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
 	</ItemGroup>
   
+  <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.0.1" />
+  </ItemGroup>
+  
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	</PropertyGroup>
-  
+
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst' and $(Configuration) == 'Debug'">
 		<RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
 	</PropertyGroup>
