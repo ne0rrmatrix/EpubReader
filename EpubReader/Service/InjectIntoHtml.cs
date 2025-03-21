@@ -147,7 +147,7 @@ public static partial class InjectIntoHtml
 		  </style>
 		</head>
 		<body>
-<iframe title=""Book"" id=""page""  srcdoc=""{html}""></iframe>
+<iframe title=""Book"" id=""page""  srcdoc=""{html}""  allowtransparency=""true"" scrolling=""no""></iframe>
 		<script type=""text/javascript"">
 			document.addEventListener(""DOMContentLoaded"", function() {{
 			  const frame = document.getElementById(""page"");

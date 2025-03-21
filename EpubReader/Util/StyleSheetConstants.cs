@@ -2,6 +2,7 @@
 
 public static class StyleSheetConstants
 {
+	#region Defaults
 	public const string RadiumCSSDefaults = @"
 		/*
 		 * Readium CSS (v. 2.0.0-beta.6)
@@ -152,7 +153,8 @@ public static class StyleSheetConstants
 		  padding:4px;
 		  border:1px solid currentcolor;
 		}";
-
+	#endregion
+	#region Config
 	public const string RadiumCssConfig = @"
 		/* Readium CSS 
 		   Config module
@@ -202,7 +204,9 @@ public static class StyleSheetConstants
 		/* Direction i.e. ltr and rtl */
 		@custom-selector :--ltr [dir=""ltr""];
 		@custom-selector :--rtl [dir=""rtl""];";
+	#endregion
 
+	#region After
 	public const string RadiumCssAfter = @"
 		/*
 			* Readium CSS (v. 2.0.0-beta.6)
@@ -822,7 +826,9 @@ public static class StyleSheetConstants
 			font-size:calc(1rem * var(--USER__typeScale)) !important;
 			}
 		}";
+	#endregion
 
+	#region Before
 	public const string RadiumCssBefore = @"
 		/*
 		 * Readium CSS (v. 2.0.0-beta.6)
@@ -1263,41 +1269,5 @@ public static class StyleSheetConstants
 		  max-width:var(--RS__maxMediaWidth);
 		  box-sizing:var(--RS__boxSizingTable);
 		}";
-
-	/// <summary>
-	/// Sets the style for the scroll container.
-	/// </summary>
-	public static readonly string ImageStyle = @"
-		.image_full {
-		text-align: center;
-		}
-    
-		.image_full img {
-		  display: block;
-		  margin: 0 auto;
-		  max-width: 100%;
-		  height: 100vh;
-		}
-    
-		/* New CSS for cover_image */
-		.cover_image {
-		  text-align: center;
-		}
-    
-		.cover_image img {
-		  display: block;
-		  margin: 0 auto;
-		  max-width: 100%;
-		  height: 100vh;
-		}
-
-		/* Optional: if you need to set the image to inline-block */
-		.cover-image img {
-		  display: inline-block;
-		}
-		img {
-		  max-width: 100vw; /* Ensures the image doesn't exceed the page width */
-		  height: 100vh; /* Maintains aspect ratio by scaling height proportionally */
-		  display: block; /* Removes extra space below inline images */
-		}";
+	#endregion
 }
