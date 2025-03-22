@@ -64,28 +64,38 @@ public partial class BookPage : ContentPage, IDisposable
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-		/*
-		if (settings.FontSize != 0)
+		
+		List<string> background = GetProperty(settings.SetBackgroundColor);
+		List<string> text = GetProperty(settings.SetTextColor);
+		if(background.Count > 1)
 		{
-			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__fontSize, {settings.FontSize}");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{background[0]}', '{background[1]}')");
+			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
 		}
-		if (!string.IsNullOrEmpty(settings.FontFamily))
+		if (text.Count > 1)
 		{
-			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__fontFamily, {settings.FontFamily}");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{text[0]}', '{text[1]}')");
 		}
-		if (!string.IsNullOrEmpty(settings.BackgroundColor))
+		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
+		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize*10}%')");
+		if (isPreviousPage)
 		{
-			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__backgroundColor, {settings.BackgroundColor}");
+			isPreviousPage = false;
+			await EpubText.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
 		}
-		if (!string.IsNullOrEmpty(settings.TextColor))
-		{
-			await EpubText.EvaluateJavaScriptAsync($"setCssVariable(--USER__textColor, {settings.TextColor}");
-		}
-		await EpubText.EvaluateJavaScriptAsync($"setCssVariable(root.style.setProperty(\"--USER__appearance\", \"readium-sepia-on\");\r\n)");
-		//await EpubText.EvaluateJavaScriptAsync($"applyStyles({{ fontFamily: '{settings.FontFamily}', backgroundColor: '{settings.BackgroundColor}', textColor: '{settings.TextColor}' }});");
-		*/
 	}
 
+	static List<string> GetProperty(string key)
+	{
+		var temp = key.Split(":");
+		if (temp.Length > 1)
+		{
+			return [temp[0], temp[1]];
+		}
+		return [];
+	}
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
 		if (string.IsNullOrEmpty(chapter.Title))
@@ -123,13 +133,10 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 	}
 
-	async void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
+	void OnEpubText_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		Dispatcher.Dispatch(() => PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}");
-		if (isPreviousPage)
-		{
-			await EpubText.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
-		}
+		OnSettingsClicked();
 	}
 
 #if ANDROID || IOS || MACCATALYST

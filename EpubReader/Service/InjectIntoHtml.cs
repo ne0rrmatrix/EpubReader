@@ -119,7 +119,14 @@ public static partial class InjectIntoHtml
 			  padding: 0; 
 			  box-sizing: border-box;
 			}}
-    
+			:root {{
+			--background-color: #ffffff; /* Default value */
+			}}
+
+			html, body {{
+			  background-color: var(--background-color);
+			}}
+
 			body {{
 			  display: flex;
 			  height: 100vh;
@@ -219,9 +226,11 @@ public static partial class InjectIntoHtml
 			function scrollToHorizontalEnd() {{
 			  const frame = document.getElementById(""page"");
 			  if (frame && frame.contentWindow && frame.contentWindow.document.readyState === 'complete') {{
-				const contentDoc = frame.contentWindow.document.documentElement;
-				const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
+				const contentDoc = frame.contentDocument || frame.contentWindow.document;
+				const maxScrollLeft = contentDoc.documentElement.scrollWidth;
+				console.log(maxScrollLeft);
 				frame.contentWindow.scrollTo(maxScrollLeft, 0);
+				return true;
 			  }} else if (frame) {{
 				// Iframe might not be loaded yet, wait for the 'load' event
 				frame.onload = function() {{
@@ -230,7 +239,23 @@ public static partial class InjectIntoHtml
 				}};
 			  }} else {{
 				console.error(""Iframe element not provided."");
+				return false;
 			  }}
+			}}
+
+			function setReadiumProperty(property, value) {{
+				var root = document.getElementById(""page"").contentWindow.document.documentElement;
+				console.log(property, value);
+				root.style.setProperty(property, value);
+			}}
+
+			function UnsetReadiumProperty(property) {{
+				var root = document.getElementById(""page"").contentWindow.document.documentElement;
+				root.style.removeProperty(property);
+			}}
+			
+			function setBackgroundColor(color) {{
+				document.documentElement.style.setProperty('--background-color', color);
 			}}
 		</script>
 	</body>

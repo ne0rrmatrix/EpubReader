@@ -270,7 +270,8 @@ public static partial class EbookService
 				int newHeight = (int)(originalBitmap.Height * scale);
 
 				using var scaledBitmap = new SKBitmap(newWidth, newHeight);
-				if (originalBitmap.ScalePixels(scaledBitmap, SKFilterQuality.Medium))
+				SKSamplingOptions samplingOptions = new(resampler: SKCubicResampler.Mitchell);
+				if (originalBitmap.ScalePixels(scaledBitmap, samplingOptions))
 				{
 					resultImage = SKImage.FromBitmap(scaledBitmap);
 				}
