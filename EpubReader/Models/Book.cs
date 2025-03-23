@@ -11,6 +11,7 @@ public class Book
 	public string Title { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
 	public int CurrentChapter { get; set; } = 0;
+	public string WWWPath { get; set; } = string.Empty;
 
 	[Ignore]
 	public List<Chapter> Chapters { get; set; } = [];

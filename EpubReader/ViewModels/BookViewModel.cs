@@ -11,11 +11,15 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using CommunityToolkit.Maui.Core;
+using Microsoft.Maui.Storage;
+using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
+	[ObservableProperty]
+	public partial string Path { get; set; } = string.Empty;
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; }
 
@@ -31,6 +35,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
 			Book = book;
+			Path = book.WWWPath;
 		}
 	}
 

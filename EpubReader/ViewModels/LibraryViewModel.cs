@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
+using EpubReader.Util;
 using Font = Microsoft.Maui.Font;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
@@ -66,7 +67,7 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 
-		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
+		var Book = await EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }

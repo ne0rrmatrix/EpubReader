@@ -50,13 +50,13 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <WebView
+                <HybridWebView
                     x:Name="EpubText"
                     Grid.Row="0"
-                    Navigated="OnEpubText_Navigated"
-                    Navigating="EpubText_Navigating"
+                    DefaultFile="index.html"
+                    HybridRoot="{Binding Path}"
                     Scale="1">
-                    <WebView.GestureRecognizers>
+                    <HybridWebView.GestureRecognizers>
                         <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
                             <On Platform="Android">
                                 <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
@@ -65,8 +65,9 @@
                                 <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
                             </On>
                         </OnPlatform>
-                    </WebView.GestureRecognizers>
-                </WebView>
+                    </HybridWebView.GestureRecognizers>
+                </HybridWebView>
+
                 <Label
                     x:Name="PageLabel"
                     Grid.Row="1"

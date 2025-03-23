@@ -1,5 +1,13 @@
 ﻿using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using CommunityToolkit.Maui.Behaviors;
+using CommunityToolkit.Maui.Core.Primitives;
+using CommunityToolkit.Mvvm.DependencyInjection;
 using EpubReader.Models;
+using EpubReader.Util;
+using HtmlAgilityPack;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
@@ -14,6 +22,13 @@ namespace EpubReader.Service;
 
 public static partial class EbookService
 {
+	static string wWWpath = string.Empty;
+	static readonly List<string> styleTemp =
+		[
+			"ReadiumCSS-before.css",
+			"ReadiumCSS-after.css",
+			"ReadiumCSS-config.css"
+		];
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
 	static readonly EpubReaderOptions options = new()
 	{
@@ -60,33 +75,40 @@ public static partial class EbookService
 		};
 	}
 
-	public static Book? OpenEbook(string path)
+	public static async Task<Book?> OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
 		EpubBookRef book;
 		try
 		{
-			book = VersOne.Epub.EpubReader.OpenBook(path, options);
+			book = await VersOne.Epub.EpubReader.OpenBookAsync(path, options);
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
+		var file = FileService.ValidateAndFixFileName(Path.GetFileNameWithoutExtension(book.Title.Trim()));
+		wWWpath = FileService.ValidateAndFixDirectoryName(Path.Combine(FileService.WWWDirectory, file));
+		System.Diagnostics.Debug.WriteLine(wWWpath);
+		Directory.CreateDirectory(wWWpath);
 		List<EpubFonts> fonts = [];
+
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
 			if(item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
 			{
+				var tempFile = TempFileCreator.CreateTempFile(await item.ReadContentAsBytesAsync(), Path.GetFileName(item.FilePath), wWWpath);
 				EpubFonts Font = new()
 				{
-					Content = item.ReadContentAsBytes(),
-					FileName = Path.GetFileName(item.FilePath),
-					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
+					Content = await item.ReadContentAsBytesAsync(),
+					FileName = tempFile,
+					FontFamily = Path.GetFileNameWithoutExtension(tempFile)
 				};
 				fonts.Add(Font);
 			}
 		}
+		
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
@@ -94,14 +116,40 @@ public static partial class EbookService
 			FilePath = path,
 			//Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = Path.GetFileName(font.FilePath), Content = font.ReadContentAsBytes(), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath) })],
 			Fonts = fonts,
-			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
-			Chapters = GetChapters([.. book.GetReadingOrder().ToList()], book),
-			Images = [.. book.Content.Images.Local.Select(item => GetImage(item.ReadContent(), item.FilePath))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = style.ReadContent() })],
+			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
+			WWWPath = wWWpath,
+			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
+			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = TempFileCreator.CreateTempFile(FilePathExtensions.SetFontFilenames(style.ReadContent()), Path.GetFileName(style.FilePath), wWWpath), Content = style.ReadContent() })],
 		};
+		await CreateJavaScriptAndCssFiles();
 		return books;
 	}
 
+	static async Task CreateJavaScriptAndCssFiles()
+	{
+		if (File.Exists(Path.Combine(wWWpath, "index.html")))
+		{
+			return;
+		}
+		await CopyFiles("ReadiumCSS-before.css");
+		await CopyFiles("ReadiumCSS-after.css");
+		await CopyFiles("ReadiumCSS-config.css");
+		await CopyFiles("ReadiumCSS-default.css");
+		await CopyFiles("favicon.ico");
+		await CopyFiles("HybridWebView.js");
+		await CopyFiles("EpubText.css");
+		await CopyFiles("EpubText.js");
+		await CopyFiles("index.html");
+	}
+
+	static async Task CopyFiles(string sourceFile)
+	{
+		using var stream = await FileSystem.OpenAppPackageFileAsync(sourceFile);
+		using var reader = new StreamReader(stream);
+		var content = await reader.ReadToEndAsync();
+		await File.WriteAllBytesAsync(Path.Combine(wWWpath, Path.GetFileName(sourceFile)), Encoding.UTF8.GetBytes(content));
+	}
 	static string? GetTitle(EpubBookRef book, EpubLocalTextContentFileRef? item)
 	{
 		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
@@ -124,42 +172,75 @@ public static partial class EbookService
 
 	 static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
+		var chapters = new List<Chapter>();
+		var doc = new HtmlDocument();
 		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
 		{
-			return
-				[
-					.. chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")).Select(item => new Chapter
-					{
-						HtmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty,
-						FileName = ReplaceChapter(chaptersRef, item)?.FilePath ?? string.Empty,
-						Title = GetTitle(book, item) ?? string.Empty,
-					}),
-				];
+			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
+			{
+				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
+				doc.LoadHtml(htmlFile);
+				htmlFile = ProcessHtml(htmlFile, doc);
+				var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+				var title = GetTitle(book, item) ?? string.Empty;
+				
+				chapters.Add(new Chapter
+				{
+					HtmlFile = htmlFile ?? string.Empty,
+					FileName = fileName,
+					Title = title,
+				});
+			}
+			return chapters;
 		}
-
+		
 		if (chaptersRef.Where(item => !item.FilePath.Contains("_split_")).ToList().Count < 3)
 		{
-			return
-			[
-				.. chaptersRef.Select(item => new Chapter
+			foreach (var item in chaptersRef)
+			{
+				var htmlFile = item.ReadContent();
+				doc.LoadHtml(htmlFile);
+				htmlFile = ProcessHtml(htmlFile, doc);
+				var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+				var title = GetTitle(book, item) ?? string.Empty;
+				chapters.Add(new Chapter
 				{
-					HtmlFile = item.ReadContent(),
-					FileName = item.FilePath,
-					Title = GetTitle(book, item) ?? string.Empty,
-				}),
-			];
+					HtmlFile = htmlFile ?? string.Empty,
+					FileName = fileName,
+					Title = title,
+				});
+			}
+			return chapters;
 		}
-		return
-			[
-				.. chaptersRef.Where(item => !item.FilePath.Contains("_split_")).Select(item => new Chapter
-				{
-					HtmlFile = item.ReadContent(),
-					FileName = item.FilePath,
-					Title = GetTitle(book, item) ?? string.Empty,
-				}),
-			];
+		foreach (var item in chaptersRef.Where(item => !item.FilePath.Contains("_split_")))
+		{
+			var htmlFile = item.ReadContent();
+			doc.LoadHtml(htmlFile);
+			htmlFile = ProcessHtml(htmlFile, doc);
+			var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+
+			var title = GetTitle(book, item) ?? string.Empty;
+			chapters.Add(new Chapter
+			{
+				HtmlFile = htmlFile ?? string.Empty,
+				FileName = fileName,
+				Title = title,
+			});
+		}
+		return chapters;
 	}
-	 
+
+	static string ProcessHtml(string htmlFile, HtmlDocument doc)
+	{
+		doc.LoadHtml(htmlFile);
+		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(doc);
+		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
+		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, styleTemp);
+		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
+		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
+		return htmlFile;
+	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
 	{
 		var temp = item.FilePath.Replace("_split_000", "_split_001");
@@ -201,148 +282,13 @@ public static partial class EbookService
 		return bmp.Image.AsBytes(ImageFormat.Jpeg);
 	}
 
-	static Models.Image GetImage(byte[] imageByte, string href)
+	static Models.Image GetImage(byte[] imageByte, string fileName)
 	{
-		const int maxSizeKB = 300;
-		var sizeKB = imageByte.Length / 1024;
-
-		// Fast path: if image is already small enough, return as-is without any processing
-		if (sizeKB < maxSizeKB)
+		var tempFile = TempFileCreator.CreateTempFile(imageByte, fileName, wWWpath);
+		return new Models.Image
 		{
-			return new Models.Image
-			{
-				FileName = Path.GetFileName(href),
-				ImageUrl = Convert.ToBase64String(imageByte)
-			};
-		}
-
-		// Determine quality and quality based on size
-		int quality = 75;
-		float scale = 1.0f;
-
-		if (sizeKB > 1000)
-		{
-			scale = 0.5f;
-			quality = 60;
-		}
-		else if (sizeKB > 600)
-		{
-			scale = 0.7f;
-			quality = 70;
-		}
-
-		try
-		{
-			if (OperatingSystem.IsAndroid())
-			{
-#if ANDROID
-				var image = ResizeImageAndroid(imageByte, quality, scale);
-				return new Models.Image
-				{
-					FileName = Path.GetFileName(href),
-					ImageUrl = Convert.ToBase64String(image)
-				};
-#endif
-			}
-
-			// For larger images, use the SKData and SKImage approach which is more reliable
-			using var skData = SKData.CreateCopy(imageByte);
-			using var originalImage = SKImage.FromEncodedData(skData);
-
-			if (originalImage is null)
-			{
-				System.Diagnostics.Debug.WriteLine($"Failed to process image: {href}");
-				// Fallback to original if we can't process the image
-				return new Models.Image
-				{
-					FileName = Path.GetFileName(href),
-					ImageUrl = Convert.ToBase64String(imageByte)
-				};
-			}
-
-			SKImage resultImage;
-
-			if (scale < 1.0f)
-			{
-				// We need to quality
-				var originalBitmap = SKBitmap.FromImage(originalImage);
-				int newWidth = (int)(originalBitmap.Width * scale);
-				int newHeight = (int)(originalBitmap.Height * scale);
-
-				using var scaledBitmap = new SKBitmap(newWidth, newHeight);
-				SKSamplingOptions samplingOptions = new(resampler: SKCubicResampler.Mitchell);
-				if (originalBitmap.ScalePixels(scaledBitmap, samplingOptions))
-				{
-					resultImage = SKImage.FromBitmap(scaledBitmap);
-				}
-				else
-				{
-					// If scaling fails, just use the original
-					resultImage = originalImage;
-				}
-			}
-			else
-			{
-				// Just use original dimensions
-				resultImage = originalImage;
-			}
-
-			// Encode with compression
-			using var encodedData = resultImage.Encode(SKEncodedImageFormat.Jpeg, quality);
-			byte[] finalImageBytes = encodedData.ToArray();
-
-			return new Models.Image
-			{
-				FileName = Path.GetFileName(href),
-				ImageUrl = Convert.ToBase64String(finalImageBytes)
-			};
-		}
-		catch (Exception)
-		{
-			// If anything fails, return the original image
-			return new Models.Image
-			{
-				FileName = Path.GetFileName(href),
-				ImageUrl = Convert.ToBase64String(imageByte)
-			};
-		}
+			FileName = tempFile,
+			Content = imageByte,
+		};
 	}
-
-#if ANDROID
-	static (int width, int height) GetImageDimensions(byte[] imageBytes)
-	{
-		using (SKBitmap bitmap = SKBitmap.Decode(imageBytes))
-		{
-			if (bitmap != null)
-			{
-				return (bitmap.Width, bitmap.Height);
-			}
-		}
-
-		return (0, 0); // Return zeros if decoding failed
-	}
-	
-	static byte[] ResizeImageAndroid (byte[] imageData, int quality, float scale)
-	{
-		// Load the bitmap
-		Android.Graphics.Bitmap? originalImage = Android.Graphics.BitmapFactory.DecodeByteArray (imageData, 0, imageData.Length);
-		Android.Graphics.Bitmap? resizedImage;
-		if (scale < 1.0f && originalImage is not null)
-		{
-			// We need to quality
-			int newWidth = (int)(originalImage.Width * scale);
-			int newHeight = (int)(originalImage.Height * scale);
-			resizedImage = Android.Graphics.Bitmap.CreateScaledBitmap(originalImage, newWidth, newHeight, false);
-		}
-		else
-		{
-			// Get the dimensions of the image
-			var (width, height) = GetImageDimensions(imageData);
-			resizedImage = Android.Graphics.Bitmap.CreateScaledBitmap(originalImage!, width, height, false);
-		}
-		using MemoryStream ms = new();
-		resizedImage?.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg!, quality, ms);
-		return ms.ToArray();
-	}
-#endif
 }

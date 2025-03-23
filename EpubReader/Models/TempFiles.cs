@@ -1,7 +1,6 @@
 ﻿namespace EpubReader.Models;
-
-public class Image
+public class TempFiles
 {
 	public string FileName { get; set; } = string.Empty;
-	public byte[] Content { get; set; } = [];
+	public string FilePath { get; set; } = string.Empty;
 }
