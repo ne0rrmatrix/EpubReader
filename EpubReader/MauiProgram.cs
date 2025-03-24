@@ -38,6 +38,13 @@ public static class MauiProgram
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
+			/*
+#if ANDROID
+			Microsoft.Maui.Handlers.HybridWebViewHandler.Mapper.ModifyMapping(
+	  nameof(Android.Webkit.WebView.WebViewClient),
+	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
+#endif
+						*/
 		});
 
 		var config = new LoggingConfiguration();
@@ -68,7 +75,7 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 		builder.Services.AddHybridWebViewDeveloperTools();
 #endif
-
+		AppContext.SetSwitch("HybridWebView.InvokeJavaScriptThrowsExceptions", true);
 		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);

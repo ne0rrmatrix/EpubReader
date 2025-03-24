@@ -14,13 +14,13 @@ public static partial class HtmlAgilityPackExtensions
 		// XPath to find all <link> tags with rel="stylesheet"
 		var linkNodes = doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']");
 
-		if (linkNodes != null)
+		if (linkNodes is not null)
 		{
 			foreach (var linkNode in linkNodes)
 			{
 				// Get the value of the href attribute
 				var hrefAttribute = linkNode.Attributes["href"];
-				if (hrefAttribute != null)
+				if (hrefAttribute is not null)
 				{
 					var fileName = Path.GetFileName(hrefAttribute.Value);
 					cssFiles.Add(fileName);
@@ -36,7 +36,7 @@ public static partial class HtmlAgilityPackExtensions
 		// Regular expression to match <link> tags with rel="stylesheet"
 		string cssLinkPattern = @"<link\s+[^>]*rel=[""']stylesheet[""'][^>]*>";
 		// Remove all matches from the HTML content
-		string cleanedHtml = Regex.Replace(htmlContent, cssLinkPattern, string.Empty, RegexOptions.IgnoreCase);
+		string cleanedHtml = Regex.Replace(htmlContent, cssLinkPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return RemoveEmptyLines(cleanedHtml);
 	}
 
@@ -74,36 +74,43 @@ public static partial class HtmlAgilityPackExtensions
 	}
 	public static string UpdateImageUrl(string html)
 	{
-		XDocument doc = XDocument.Parse(html);
-		XNamespace xlink = "http://www.w3.org/1999/xlink";
-
-		var imageElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "image");
-		if (imageElement != null)
+		try
 		{
-			string? originalUrl = imageElement.Attribute(xlink + "href")?.Value;
-			if (originalUrl != null)
-			{
-				string fileName = Path.GetFileName(originalUrl);
-				imageElement.SetAttributeValue(xlink + "href", fileName);
-			}
-		}
+			XDocument doc = XDocument.Parse(html);
+			XNamespace xlink = "http://www.w3.org/1999/xlink";
 
-		return doc.ToString();
+			var imageElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "image");
+			if (imageElement is not null)
+			{
+				string? originalUrl = imageElement.Attribute(xlink + "href")?.Value;
+				if (originalUrl is not null)
+				{
+					string fileName = Path.GetFileName(originalUrl);
+					imageElement.SetAttributeValue(xlink + "href", fileName);
+				}
+			}
+
+			return doc.ToString();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Trace.TraceInformation(ex.Message);
+			return html;
+		}
+		
 	}
 	public static string RemoveKoboHacks(string html)
 	{
 		string pattern = @"<style[^>]*id=""kobostylehacks""[^>]*>.*?</style>";
-		return Regex.Replace(html, pattern, string.Empty, RegexOptions.Singleline);
+		return Regex.Replace(html, pattern, string.Empty, RegexOptions.Singleline, matchTimeout: TimeSpan.FromSeconds(10));
 	}
 
 	public static string UpdateImagePathsForCSSFiles(string cssContent)
 	{
-		System.Diagnostics.Debug.WriteLine($"Replacing URLs in CSS content: {cssContent}");
 		return CssContentFilter().Replace(cssContent, match =>
 		{
 			string url = match.Groups[1].Value;
 			string fileName = Path.GetFileName(url);
-			System.Diagnostics.Debug.WriteLine($"Replacing URL '{url}' with file name '{fileName}'");
 			return $"url('{fileName}')";
 		});
 	}

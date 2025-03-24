@@ -20,7 +20,7 @@ public static class FilePathExtensions
 			}
 
 			return match.Value;
-		});
+		}, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 	}
 
 	public static string UpdateSvgLinks(string html)
@@ -34,7 +34,7 @@ public static class FilePathExtensions
 			string fullPath = match.Groups[1].Value;
 			string fileName = Path.GetFileName(fullPath);
 			return match.Value.Replace(fullPath, fileName);
-		});
+		}, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 
 		// Pattern to match the 'data' attribute in <object> tags and 'xlink:href' in <image> tags
 		string pattern1 = @"(data|xlink:href)=""([^""]*\.svg|[^""]*\.png)""";
@@ -46,7 +46,7 @@ public static class FilePathExtensions
 			string filePath = match.Groups[2].Value;
 			string fileName = Path.GetFileName(filePath);
 			return $"{attributeName}=\"{fileName}\"";
-		});
+		}, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return html;
 	}
 

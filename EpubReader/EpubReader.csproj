@@ -75,20 +75,20 @@
     <PackageReference Include="HarfBuzzSharp" Version="8.3.0.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.0" />
    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="9.0.60-ci.main.25172.1" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="9.0.60-ci.main.25172.1" />
     <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
     <PackageReference Include="VersOne.Epub" Version="3.3.3" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.60-ci.main.25172.1" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.3" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="11.1.0" />
 		<PackageReference Include="CommunityToolkit.Maui.Core" Version="11.1.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-		<PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.3" />
-		<PackageReference Include="System.ServiceModel.Syndication" Version="9.0.2" />
+		<PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.4" />
+		<PackageReference Include="System.ServiceModel.Syndication" Version="9.0.3" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
-		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.10" />
+		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
 	</ItemGroup>
   
@@ -99,7 +99,7 @@
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	</PropertyGroup>
-
+  
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst' and $(Configuration) == 'Debug'">
 		<RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
 	</PropertyGroup>
