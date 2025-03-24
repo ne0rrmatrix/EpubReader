@@ -1,6 +1,6 @@
-﻿document.addEventListener("DOMContentLoaded", function() {
+﻿document.addEventListener("DOMContentLoaded",async function() {
   const frame = document.getElementById("page");
-
+    await window.HybridWebView.InvokeDotNet('LoadIframe');
   const scrollLeft = () => {
     const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
     frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
@@ -15,13 +15,13 @@
     e.preventDefault();
     if (e.clientX > (window.innerWidth / 2)) {
       if(isHorizontallyScrolledToEnd()) {
-         await window.HybridWebView.InvokeDotNet('DoSyncWork');
+         await window.HybridWebView.InvokeDotNet('NextPage');
         return;
       }
       scrollRight();
     } else {
       if(isHorizontalScrollAtStart()) {
-           await window.HybridWebView.InvokeDotNet('DoSomeWork1');
+           await window.HybridWebView.InvokeDotNet('PrevPage');
         return;
       }
       scrollLeft();
@@ -31,19 +31,31 @@
   document.body.addEventListener("keydown",async function(e) {
     if (e.key == "ArrowRight") {
       if(isHorizontallyScrolledToEnd()) {
-         await window.HybridWebView.InvokeDotNet('DoSyncWork');
+         await window.HybridWebView.InvokeDotNet('NextPage');
         return;
       }
       scrollRight();
     } else if (e.key == "ArrowLeft") {
       if(isHorizontalScrollAtStart()) {
-           await window.HybridWebView.InvokeDotNet('DoSomeWork1');
+          await window.HybridWebView.InvokeDotNet('PrevPage');
         return;
       }
       scrollLeft();
     }
   });
 });
+
+let isPreviousPage = false;
+let iframe = document.getElementById("page");
+iframe.onload = function () {
+    if (isPreviousPage) {
+        scrollToHorizontalEnd();
+        isPreviousPage = false;
+    }
+};
+function setPreviousPage() {
+    isPreviousPage = true;
+}
 
 function isHorizontallyScrolledToEnd() {
   const frame = document.getElementById("page");

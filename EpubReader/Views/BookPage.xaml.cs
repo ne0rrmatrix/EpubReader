@@ -9,13 +9,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
-using EpubReader.Message;
 using EpubReader.Messages;
 using EpubReader.Models;
-using EpubReader.Service;
 using EpubReader.ViewModels;
-using MetroLog;
-using Microsoft.Maui.Storage;
 
 namespace EpubReader.Views;
 
@@ -47,10 +43,6 @@ public partial class BookPage : ContentPage, IDisposable
 		settings = await db.GetSettings(CancellationToken.None);
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-		await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		Shimmer.IsActive = false;
 	}
 
 	async void OnSettingsClicked()
@@ -118,31 +110,6 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 	}
 
-	async void PreviousPage(object sender, EventArgs e)
-	{
-		if (book.CurrentChapter > 0)
-		{
-			book.CurrentChapter--;
-			await db.SaveBookData(book, CancellationToken.None);
-			var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
-			await EpubText.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		}
-	}
-
-	async void NextPage(object sender, EventArgs e)
-	{
-		if (book.CurrentChapter < book.Chapters.Count - 1)
-		{
-			book.CurrentChapter++;
-			await db.SaveBookData(book, CancellationToken.None);
-			var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		}
-	}
-
 	public void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
 		if(sender is null)
@@ -175,14 +142,38 @@ public partial class BookPage : ContentPage, IDisposable
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
 	}
-	public void DoSyncWork()
+	public async Task PrevPage()
 	{
-		Debug.WriteLine("DoSyncWork");
-		NextPage(this, new EventArgs());
+		Debug.WriteLine("PrevPage");
+		if (book.CurrentChapter > 0)
+		{
+			book.CurrentChapter--;
+			await db.SaveBookData(book, CancellationToken.None);
+			var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
+			await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		}
+		
 	}
-	public void DoSomeWork1()
+	public async Task NextPage()
 	{
-		Debug.WriteLine("DoSomeWork1");
-		PreviousPage(this, new EventArgs());
+		Debug.WriteLine("NextPage");
+		if (book.CurrentChapter < book.Chapters.Count - 1)
+		{
+			book.CurrentChapter++;
+			await db.SaveBookData(book, CancellationToken.None);
+			var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+			await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
+			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		}
+	}
+	public async Task LoadIframe()
+	{
+		Debug.WriteLine("LoadIframe");
+		var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		await EpubText.EvaluateJavaScriptAsync($"setIframeSource(\"{file}\")");
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		Shimmer.IsActive = false;
 	}
 }

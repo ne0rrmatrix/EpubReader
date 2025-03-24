@@ -6,13 +6,11 @@ using CommunityToolkit.Maui.PlatformConfiguration.AndroidSpecific;
 
 #endif
 
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
-using CommunityToolkit.Maui.Core;
-using Microsoft.Maui.Storage;
-using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 

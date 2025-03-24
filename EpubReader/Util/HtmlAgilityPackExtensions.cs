@@ -4,7 +4,7 @@ using HtmlAgilityPack;
 
 namespace EpubReader.Util;
 
-public static class HtmlAgilityPackExtensions
+public static partial class HtmlAgilityPackExtensions
 {
 	public static List<string> GetCssFiles(this HtmlDocument doc)
 	{
@@ -60,9 +60,24 @@ public static class HtmlAgilityPackExtensions
 		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, cssLinks.ToString());
 		return RemoveEmptyLines(updatedHtmlContent);
 	}
+
 	static string RemoveEmptyLines(string input)
 	{
 		var lines = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 		return string.Join(Environment.NewLine, lines);
 	}
+	public static string UpdateImagePathsForCSSFiles(string cssContent)
+	{
+		System.Diagnostics.Debug.WriteLine($"Replacing URLs in CSS content: {cssContent}");
+		return CssContentFilter().Replace(cssContent, match =>
+		{
+			string url = match.Groups[1].Value;
+			string fileName = Path.GetFileName(url);
+			System.Diagnostics.Debug.WriteLine($"Replacing URL '{url}' with file name '{fileName}'");
+			return $"url('{fileName}')";
+		});
+	}
+
+	[GeneratedRegex(@"url\(['""]?(.*?)['""]?\)", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
+	private static partial Regex CssContentFilter();
 }

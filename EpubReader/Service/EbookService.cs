@@ -1,17 +1,10 @@
-﻿using System.IO.Compression;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using CommunityToolkit.Maui.Behaviors;
-using CommunityToolkit.Maui.Core.Primitives;
-using CommunityToolkit.Mvvm.DependencyInjection;
+﻿using System.Text;
 using EpubReader.Models;
 using EpubReader.Util;
 using HtmlAgilityPack;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
-using SkiaSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
@@ -120,7 +113,7 @@ public static partial class EbookService
 			WWWPath = wWWpath,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = TempFileCreator.CreateTempFile(FilePathExtensions.SetFontFilenames(style.ReadContent()), Path.GetFileName(style.FilePath), wWWpath), Content = style.ReadContent() })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = TempFileCreator.CreateTempFile(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())), Path.GetFileName(style.FilePath), wWWpath), Content = style.ReadContent() })],
 		};
 		await CreateJavaScriptAndCssFiles();
 		return books;
