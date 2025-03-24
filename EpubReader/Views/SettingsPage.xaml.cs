@@ -101,7 +101,7 @@ public partial class SettingsPage : Popup, IDisposable
 	{
 		var settings = await db.GetSettings(CancellationToken.None);
 		var selectedTheme = FontPicker.SelectedItem;
-		if (selectedTheme is not EbookFonts font || settings.FontFamily == font.FontFamily)
+		if (selectedTheme is not EpubFonts font || settings.FontFamily == font.FontFamily)
 		{
 			return;
 		}

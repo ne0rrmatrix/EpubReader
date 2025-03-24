@@ -16,7 +16,7 @@ namespace EpubReader.Service;
 public static partial class EbookService
 {
 	static string wWWpath = string.Empty;
-	static readonly List<string> styleTemp =
+	static readonly List<string> cssImports =
 		[
 			"ReadiumCSS-before.css",
 			"ReadiumCSS-after.css",
@@ -83,32 +83,14 @@ public static partial class EbookService
 		}
 		var file = FileService.ValidateAndFixFileName(Path.GetFileNameWithoutExtension(book.Title.Trim()));
 		wWWpath = FileService.ValidateAndFixDirectoryName(Path.Combine(FileService.WWWDirectory, file));
-		System.Diagnostics.Debug.WriteLine(wWWpath);
 		Directory.CreateDirectory(wWWpath);
-		List<EpubFonts> fonts = [];
 
-		foreach (var item in book.Content.AllFiles.Local.ToList())
-		{
-			if(item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
-			{
-				var tempFile = TempFileCreator.CreateTempFile(await item.ReadContentAsBytesAsync(), Path.GetFileName(item.FilePath), wWWpath);
-				EpubFonts Font = new()
-				{
-					Content = await item.ReadContentAsBytesAsync(),
-					FileName = tempFile,
-					FontFamily = Path.GetFileNameWithoutExtension(tempFile)
-				};
-				fonts.Add(Font);
-			}
-		}
-		
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
-			//Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = Path.GetFileName(font.FilePath), Content = font.ReadContentAsBytes(), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath) })],
-			Fonts = fonts,
+			Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = TempFileCreator.CreateTempFile(font.ReadContentAsBytes(), Path.GetFileName(font.FilePath), wWWpath), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath), Content = font.ReadContentAsBytes() })],
 			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
 			WWWPath = wWWpath,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
@@ -225,11 +207,13 @@ public static partial class EbookService
 
 	static string ProcessHtml(string htmlFile, HtmlDocument doc)
 	{
+		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
 		doc.LoadHtml(htmlFile);
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(doc);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
-		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, styleTemp);
+		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssImports);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		return htmlFile;

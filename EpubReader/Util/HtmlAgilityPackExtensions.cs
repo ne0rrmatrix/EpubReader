@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using HtmlAgilityPack;
 
 namespace EpubReader.Util;
@@ -53,6 +54,11 @@ public static partial class HtmlAgilityPackExtensions
 		StringBuilder cssLinks = new();
 		foreach (string cssFile in cssFiles)
 		{
+			// Skip Kobo-specific CSS files
+			if (cssFile.StartsWith("kobo"))
+			{
+				continue;
+			}
 			cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
 		}
 
@@ -66,6 +72,30 @@ public static partial class HtmlAgilityPackExtensions
 		var lines = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 		return string.Join(Environment.NewLine, lines);
 	}
+	public static string UpdateImageUrl(string html)
+	{
+		XDocument doc = XDocument.Parse(html);
+		XNamespace xlink = "http://www.w3.org/1999/xlink";
+
+		var imageElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "image");
+		if (imageElement != null)
+		{
+			string? originalUrl = imageElement.Attribute(xlink + "href")?.Value;
+			if (originalUrl != null)
+			{
+				string fileName = Path.GetFileName(originalUrl);
+				imageElement.SetAttributeValue(xlink + "href", fileName);
+			}
+		}
+
+		return doc.ToString();
+	}
+	public static string RemoveKoboHacks(string html)
+	{
+		string pattern = @"<style[^>]*id=""kobostylehacks""[^>]*>.*?</style>";
+		return Regex.Replace(html, pattern, string.Empty, RegexOptions.Singleline);
+	}
+
 	public static string UpdateImagePathsForCSSFiles(string cssContent)
 	{
 		System.Diagnostics.Debug.WriteLine($"Replacing URLs in CSS content: {cssContent}");
