@@ -30,4 +30,6 @@ public class Book
 
 	[Ignore]
 	public List<EpubFonts> Fonts { get; set; } = [];
+	[Ignore]
+	public List<SharedEpubFiles> Files { get; set; } = [];
 }

@@ -49,11 +49,11 @@ public partial class BookPage : ContentPage, IDisposable
 		this.db = db;
 #if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => OnJavaScriptMessageReceived(r,m));
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => OnJavaScriptMessageReceived(m));
 #endif
 	}
-
-	async void OnJavaScriptMessageReceived(object sender ,JavaScriptMessage m)
+#if ANDROID
+	async void OnJavaScriptMessageReceived(JavaScriptMessage m)
 	{
 		System.Diagnostics.Debug.WriteLine("runcsharp found");
 		if(m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
@@ -68,6 +68,7 @@ public partial class BookPage : ContentPage, IDisposable
 			await Prev();
 		}
 	}
+#endif
 
 #if WINDOWS
 	void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
@@ -80,10 +81,12 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		System.Diagnostics.Debug.WriteLine("CoreWebView2Initialized");
 		webView2.CoreWebView2.Settings.AreDevToolsEnabled = true;
-		webView2.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
+		webView2.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+		webView2.CoreWebView2.Settings.IsReputationCheckingRequired = false;
+		//webView2.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
 		webView2.CoreWebView2.Settings.AreHostObjectsAllowed = true;
 		webView2.CoreWebView2.Settings.IsWebMessageEnabled = true;
-		webView2.CoreWebView2.Settings.IsBuiltInErrorPageEnabled = true;
+		//webView2.CoreWebView2.Settings.IsBuiltInErrorPageEnabled = true;
 		webView2.CoreWebView2.Settings.IsScriptEnabled = true;
 		webView2.CoreWebView2.AddWebResourceRequestedFilter("*", Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
 		webView2.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
@@ -108,7 +111,10 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 		var filename = Path.GetFileName(url);
+		//System.Diagnostics.Debug.WriteLine(filename);
+		var temp = book.Files.FirstOrDefault(f => f.FileName == filename)?.HTMLContent ?? string.Empty;
 
+		System.Diagnostics.Debug.WriteLine(temp);
 		string mimeType = ThreadSafeFileWriter.GetMimeType(filename);
 		if (!ThreadSafeFileWriter.FileExists(filename))
 		{
@@ -117,7 +123,6 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 		Stream contentStream = ThreadSafeFileWriter.ReadFileStream(filename);
-
 		var reader = new StreamReader(contentStream);
 		var memoryStream = new MemoryStream();
 		reader.BaseStream.CopyTo(memoryStream);
@@ -128,6 +133,7 @@ public partial class BookPage : ContentPage, IDisposable
 		System.Diagnostics.Debug.WriteLine($"Content Length: {bytes.Length}");
 
 		var headers = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
+		/*
 		if (e.Request.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
 		{
 			CoreWebView2WebResourceResponse response1 = webView2.CoreWebView2.Environment.CreateWebResourceResponse(
@@ -139,7 +145,7 @@ public partial class BookPage : ContentPage, IDisposable
 			e.Response = response1;
 			return; // Important to return here for OPTIONS requests
 		}
-
+		*/
 		CoreWebView2WebResourceResponse response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(
 			memoryStream.AsRandomAccessStream(), // Content stream
 			200,          // Status code (OK)
@@ -262,9 +268,9 @@ public partial class BookPage : ContentPage, IDisposable
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 #if WINDOWS
 		var platformView = EpubText.Handler?.PlatformView;
-		if (platformView is Microsoft.UI.Xaml.Controls.WebView2 webView2)
+		if (platformView is Microsoft.UI.Xaml.Controls.WebView2 webView3)
 		{
-			this.webView2 = webView2;
+			this.webView2 = webView3;
 			System.Diagnostics.Debug.WriteLine("WebView2 is available");
 			webView2.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
 			await webView2.EnsureCoreWebView2Async();
@@ -275,9 +281,8 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 #endif
 	}
-	void OnSettingsClicked()
+	async void OnSettingsClicked()
 	{
-		/*
 		settings = await db.GetSettings(CancellationToken.None);
 
 		List<string> background = GetProperty(settings.SetBackgroundColor);
@@ -295,7 +300,6 @@ public partial class BookPage : ContentPage, IDisposable
 		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
-		*/
 	}
 
 	static List<string> GetProperty(string key)

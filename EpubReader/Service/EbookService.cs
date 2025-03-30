@@ -22,6 +22,18 @@ public static partial class EbookService
 			"ReadiumCSS-after.css",
 			"ReadiumCSS-config.css"
 		];
+
+	static readonly List<string> requiredFiles =
+		[
+			"ReadiumCSS-default.css",
+			"ReadiumCSS-before.css",
+			"ReadiumCSS-after.css",
+			"ReadiumCSS-config.css",
+		    "index.html",
+			"favicon.ico",
+			"EpubText.css",
+			"EpubText.js",
+		];
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
 	static readonly EpubReaderOptions options = new()
 	{
@@ -84,12 +96,21 @@ public static partial class EbookService
 		var file = FileService.ValidateAndFixFileName(Path.GetFileNameWithoutExtension(book.Title.Trim()));
 		wWWpath = FileService.ValidateAndFixDirectoryName(Path.Combine(FileService.WWWDirectory, file));
 		Directory.CreateDirectory(wWWpath);
-
+	    var list = new List<SharedEpubFiles>();
+		requiredFiles.ForEach(async file =>
+		{
+			var sharedFile = await GetSharedFiles(file);
+			if (sharedFile is not null)
+			{
+				list.Add(sharedFile);
+			}
+		});
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
+			Files = list,
 			Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = TempFileCreator.CreateTempFile(font.ReadContentAsBytes(), Path.GetFileName(font.FilePath), wWWpath), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath), Content = font.ReadContentAsBytes() })],
 			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
 			WWWPath = wWWpath,
@@ -100,7 +121,25 @@ public static partial class EbookService
 		await CreateJavaScriptAndCssFiles();
 		return books;
 	}
-
+	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
+	{
+		var exists = await FileSystem.AppPackageFileExistsAsync(fileName);
+		if(!exists)
+		{
+			return null;
+		}
+		var stream = await FileSystem.OpenAppPackageFileAsync(fileName);
+		var reader = new StreamReader(stream);
+		var memoryStream = new MemoryStream();
+		await reader.BaseStream.CopyToAsync(memoryStream);
+		var bytes = memoryStream.ToArray();
+		var htmlFile = Encoding.UTF8.GetString(bytes);
+		return new SharedEpubFiles
+		{
+			FileName = Path.GetFileName(fileName),
+			HTMLContent = htmlFile,
+		};
+	}
 	static async Task CreateJavaScriptAndCssFiles()
 	{
 		if (File.Exists(Path.Combine(wWWpath, "index.html")))
