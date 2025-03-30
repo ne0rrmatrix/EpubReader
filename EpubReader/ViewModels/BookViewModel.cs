@@ -10,14 +10,18 @@ using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
+using EpubReader.Util;
 using EpubReader.Service;
 
 namespace EpubReader.ViewModels;
 
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
+	static readonly string url = "https://demo/index.html";
+	
 	[ObservableProperty]
-	public partial string Path { get; set; } = string.Empty;
+	public partial WebViewSource? Source { get; set; }
+	
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; }
 
@@ -33,7 +37,11 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
 			Book = book;
-			Path = book.WWWPath;
+			ThreadSafeFileWriter.Path = book.WWWPath;
+			Source = new UrlWebViewSource
+			{
+				Url = url,
+			};
 		}
 	}
 

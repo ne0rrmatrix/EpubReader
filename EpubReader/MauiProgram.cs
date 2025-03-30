@@ -38,14 +38,12 @@ public static class MauiProgram
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
-			/*
+		});
 #if ANDROID
-			Microsoft.Maui.Handlers.HybridWebViewHandler.Mapper.ModifyMapping(
+		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
 #endif
-						*/
-		});
 
 		var config = new LoggingConfiguration();
 #if RELEASE

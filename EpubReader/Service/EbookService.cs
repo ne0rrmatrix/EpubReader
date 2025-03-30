@@ -112,7 +112,6 @@ public static partial class EbookService
 		await CopyFiles("ReadiumCSS-config.css");
 		await CopyFiles("ReadiumCSS-default.css");
 		await CopyFiles("favicon.ico");
-		await CopyFiles("HybridWebView.js");
 		await CopyFiles("EpubText.css");
 		await CopyFiles("EpubText.js");
 		await CopyFiles("index.html");

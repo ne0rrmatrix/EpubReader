@@ -1,5 +1,11 @@
-﻿using Android.Graphics;
+﻿using System.Text;
+using Android.Graphics;
 using Android.Webkit;
+using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Messages;
+using EpubReader.Platforms.Android;
+using EpubReader.Service;
+using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
@@ -8,34 +14,89 @@ namespace EpubReader;
 
 class CustomWebViewClient : WebViewClient
 {
-	readonly Microsoft.Maui.Controls.HybridWebView webView;
-	public CustomWebViewClient(IHybridWebViewHandler handler)
+	readonly Microsoft.Maui.Controls.WebView webView;
+
+	public CustomWebViewClient(IWebViewHandler handler)
 	{
-		if (handler is null)
-		{
-			throw new InvalidOperationException(nameof(handler));
-		}
-			webView = handler.VirtualView as Microsoft.Maui.Controls.HybridWebView ?? throw new InvalidOperationException($"{nameof(Microsoft.Maui.Controls.HybridWebView)} cannot be null");
-		handler.PlatformView.Settings.AllowFileAccess = true;
-		handler.PlatformView.Settings.AllowFileAccessFromFileURLs = true;
-		handler.PlatformView.Settings.AllowUniversalAccessFromFileURLs = true;
-		handler.PlatformView.Settings.AllowContentAccess = true;
 		handler.PlatformView.Settings.DomStorageEnabled = true;
-		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
 		handler.PlatformView.Settings.JavaScriptEnabled = true;
+		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
+		handler.PlatformView.Settings.AllowContentAccess = true;
+		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
 		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
-		handler.PlatformView.Settings.SaveFormData = true;
-		handler.PlatformView.Settings.UseWideViewPort = true;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
-		handler.VirtualView.HybridRoot
+		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
 	}
-	public override bool ShouldOverrideUrlLoading(Android.Webkit.WebView? view, IWebResourceRequest? request)
+	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
-		return base.ShouldOverrideUrlLoading(view, request);
+		var url = request?.Url?.ToString() ?? string.Empty;
+
+		if (url.StartsWith("data:text/html"))
+		{
+			System.Diagnostics.Debug.WriteLine("ShouldInterceptRequest: Load web page data from page that is loaded using string value.");
+			return base.ShouldInterceptRequest(view, request);
+		}
+
+		string path = System.IO.Path.GetFileName(request?.Url?.ToString())?.TrimEnd('/') ?? string.Empty;
+
+		if (ThreadSafeFileWriter.FileExists(path))
+		{
+			System.Diagnostics.Debug.WriteLine($"File exists: {path}");
+			string mimeType = ThreadSafeFileWriter.GetMimeType(path);
+			System.Diagnostics.Debug.WriteLine("Path: " + path);
+			Stream contentStream = ThreadSafeFileWriter.ReadFileStream(path);
+
+			var response = WebResourceResponseHelper.CreateFromHtmlString(contentStream, mimeType, 200, "OK");
+			return response;
+
+		}
+		System.Diagnostics.Debug.WriteLine($"Path: {path}");
+		System.Diagnostics.Debug.WriteLine(url);
+		System.Diagnostics.Debug.WriteLine("Returning base");
+		return base.ShouldInterceptRequest(view, request);
 	}
 
-	public override void OnPageStarted(Android.Webkit.WebView? view, string? url, Bitmap? favicon)
+	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
+		System.Diagnostics.Debug.WriteLine("Function: ShouldOverrideUrlLoading has been called");
+		var path = request?.Url?.ToString() ?? string.Empty;
+		if (request is null || request.Url is null)
+		{
+			return true;
+		}
+
+		if (path.Contains("runcsharp"))
+		{
+			System.Diagnostics.Debug.WriteLine("runcsharp found");
+			var urlParts = path.Split('.');
+			if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+			{
+				var funcToCall = urlParts[1].Split("?");
+				var methodName = funcToCall[0][..^1];
+				if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
+				{
+					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
+				}
+				if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+				{
+					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
+				}
+			}
+			return true;
+		}
+		//return base.ShouldOverrideUrlLoading(view, request);
+		return false;
+	}
+
+	public override void OnPageStarted(global::Android.Webkit.WebView? view, string? url, Bitmap? favicon)
+	{
+		System.Diagnostics.Debug.WriteLine("Function: OnPageStarted has been called");
+		if (url is null || url.Contains("runcsharp"))
+		{
+			return;
+		}
+		System.Diagnostics.Debug.WriteLine("OnPageStarted: Load web page or data.");
+		System.Diagnostics.Debug.WriteLine($"URL: {url}");
 		base.OnPageStarted(view, url, favicon);
 		var navigatedEventArgs = new WebNavigatingEventArgs(
 		WebNavigationEvent.NewPage,
@@ -55,6 +116,11 @@ class CustomWebViewClient : WebViewClient
 
 	public override void OnPageFinished(global::Android.Webkit.WebView? view, string? url)
 	{
+		System.Diagnostics.Debug.WriteLine("Function: OnPageFinished has been called");
+		if (url is null || url.Contains("runcsharp"))
+		{
+			return;
+		}
 		base.OnPageFinished(view, url);
 		var navigatedEventArgs = new WebNavigatedEventArgs(
 		WebNavigationEvent.NewPage,
