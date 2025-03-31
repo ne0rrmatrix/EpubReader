@@ -87,7 +87,8 @@ public partial class Db : IDb
 		}
 
 		logger.Info("Updating settings");
-		await db.UpdateAsync(settings).WaitAsync(cancellationToken);
+		await db.DeleteAsync(item).WaitAsync(cancellationToken);
+		await db.InsertAsync(settings).WaitAsync(cancellationToken);
 	}
 
 	public async Task SaveBookData(Book book, CancellationToken cancellationToken = default)
@@ -107,7 +108,8 @@ public partial class Db : IDb
 		}
 
 		logger.Info("Updating book");
-		await db.UpdateAsync(book).WaitAsync(cancellationToken);
+		await db.DeleteAsync(item).WaitAsync(cancellationToken);
+		await db.InsertAsync(book).WaitAsync(cancellationToken);
 	}
 
 	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)

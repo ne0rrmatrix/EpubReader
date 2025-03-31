@@ -39,7 +39,7 @@ public static partial class HtmlAgilityPackExtensions
 		string cleanedHtml = Regex.Replace(htmlContent, cssLinkPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return RemoveEmptyLines(cleanedHtml);
 	}
-
+	
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
 	{
 		// Find the closing </head> tag
@@ -54,6 +54,11 @@ public static partial class HtmlAgilityPackExtensions
 		StringBuilder cssLinks = new();
 		foreach (string cssFile in cssFiles)
 		{
+			// Skip calibre-specific CSS files
+			if (cssFile.Contains(".calibre"))
+			{
+				continue;
+			}
 			// Skip Kobo-specific CSS files
 			if (cssFile.StartsWith("kobo"))
 			{

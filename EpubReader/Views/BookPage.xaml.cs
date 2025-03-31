@@ -29,7 +29,6 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
-
 	bool loadIndex = true;
 #if WINDOWS
 	WebView2? webView2;
@@ -73,79 +72,45 @@ public partial class BookPage : ContentPage, IDisposable
 #if WINDOWS
 	void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
 	{
-		var viewModel = BindingContext as BookViewModel ?? throw new InvalidOperationException("BindingContext is not WebViewPageViewModel");
-		if (webView2 is null)
-		{
-			System.Diagnostics.Debug.WriteLine("WebView2 is null after trying to initialize it.");
-			return;
-		}
-		System.Diagnostics.Debug.WriteLine("CoreWebView2Initialized");
+		ArgumentNullException.ThrowIfNull(webView2);
 		webView2.CoreWebView2.Settings.AreDevToolsEnabled = true;
 		webView2.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
 		webView2.CoreWebView2.Settings.IsReputationCheckingRequired = false;
-		//webView2.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
 		webView2.CoreWebView2.Settings.AreHostObjectsAllowed = true;
 		webView2.CoreWebView2.Settings.IsWebMessageEnabled = true;
-		//webView2.CoreWebView2.Settings.IsBuiltInErrorPageEnabled = true;
 		webView2.CoreWebView2.Settings.IsScriptEnabled = true;
 		webView2.CoreWebView2.AddWebResourceRequestedFilter("*", Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
 		webView2.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
+		webView2.CoreWebView2.FrameNavigationCompleted += CoreWebView2_FrameNavigationCompleted;
+	}
+
+	async void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+	{
+		System.Diagnostics.Debug.WriteLine("FrameNavigationCompleted");
+		if(args.IsSuccess && args.WebErrorStatus == 0)
+		{
+			System.Diagnostics.Debug.WriteLine("FrameNavigationCompleted: Success");
+			await EpubText.EvaluateJavaScriptAsync($"document.body.style.backgroundColor = '{settings.BackgroundColor}'");
+			await EpubText.EvaluateJavaScriptAsync($"document.body.style.color = '{settings.TextColor}'");
+		}
 	}
 
 	void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
 	{
-		if (webView2 is null)
-		{
-			System.Diagnostics.Debug.WriteLine("WebView2 is null in CoreWebView2_WebResourceRequested");
-			return;
-		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("WebView2 is not null in CoreWebView2_WebResourceRequested");
-		}
+		ArgumentNullException.ThrowIfNull(webView2);
 		var url = e.Request.Uri ?? string.Empty;
-		if (url.Contains("https://runcsharp"))
-		{
-			System.Diagnostics.Debug.WriteLine("runcsharp found");
-			e.Response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-			return;
-		}
 		var filename = Path.GetFileName(url);
-		//System.Diagnostics.Debug.WriteLine(filename);
-		var temp = book.Files.FirstOrDefault(f => f.FileName == filename)?.HTMLContent ?? string.Empty;
-
-		System.Diagnostics.Debug.WriteLine(temp);
-		string mimeType = ThreadSafeFileWriter.GetMimeType(filename);
-		if (!ThreadSafeFileWriter.FileExists(filename))
+		if (url.Contains("https://runcsharp") || !ThreadSafeFileWriter.FileExists(filename))
 		{
-			System.Diagnostics.Debug.WriteLine($"File {filename} does not exist");
 			e.Response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
 			return;
 		}
+
 		Stream contentStream = ThreadSafeFileWriter.ReadFileStream(filename);
 		var reader = new StreamReader(contentStream);
 		var memoryStream = new MemoryStream();
 		reader.BaseStream.CopyTo(memoryStream);
-		var bytes = memoryStream.ToArray();
-
-		System.Diagnostics.Debug.WriteLine($"WebResourceRequested: {url}");
-		System.Diagnostics.Debug.WriteLine($"MIME Type: {mimeType}");
-		System.Diagnostics.Debug.WriteLine($"Content Length: {bytes.Length}");
-
 		var headers = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
-		/*
-		if (e.Request.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
-		{
-			CoreWebView2WebResourceResponse response1 = webView2.CoreWebView2.Environment.CreateWebResourceResponse(
-				null, // No content for OPTIONS
-				204,  // No Content
-				"OK",
-				headers
-			);
-			e.Response = response1;
-			return; // Important to return here for OPTIONS requests
-		}
-		*/
 		CoreWebView2WebResourceResponse response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(
 			memoryStream.AsRandomAccessStream(), // Content stream
 			200,          // Status code (OK)
@@ -160,7 +125,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 	protected override void OnDisappearing()
 	{
-		System.Diagnostics.Debug.WriteLine("OnDisappearing");
 		if (BindingContext is BookViewModel viewModel)
 		{
 			System.Diagnostics.Debug.WriteLine("Disposing ViewModel");
@@ -172,12 +136,7 @@ public partial class BookPage : ContentPage, IDisposable
 			System.Diagnostics.Debug.WriteLine("Disposing WebView2");
 			webView2.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("WebView2 is null when being disposed");
-		}
 #endif
-		System.Diagnostics.Debug.WriteLine("Calling base.OnDisappearing in WebViewPage");
 		base.OnDisappearing();
 	}
 	
@@ -200,64 +159,45 @@ public partial class BookPage : ContentPage, IDisposable
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
+			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
 			await db.SaveBookData(book, CancellationToken.None);
-			System.Diagnostics.Debug.WriteLine($"Loading page {book.Chapters[book.CurrentChapter].FileName}");
 			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 			await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
+			
 			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		}
 	}
 	
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
-		
-		if (loadIndex)
+		if (!loadIndex)
 		{
-			loadIndex = false;
-			System.Diagnostics.Debug.WriteLine($"Page has loaded successfully.");
-			System.Diagnostics.Debug.WriteLine($"Loading page {book.Chapters[book.CurrentChapter].FileName}");
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			var result = await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			if (result is null)
-			{
-				System.Diagnostics.Debug.WriteLine("Result is null");
-			}
-			else
-			{
-				System.Diagnostics.Debug.WriteLine($"Iframe Page {pageToLoad} loaded: {result}");
-				//Shimmer.IsVisible = false;
-			}
+			return;
 		}
-		
+		loadIndex = false;
+		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 	}
 
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
 	{
-		
-		if (e.Url.Contains("runcsharp"))
+		var urlParts = e.Url.Split('.');
+		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			e.Cancel = true;
-			System.Diagnostics.Debug.WriteLine("runcsharp found");
-			var urlParts = e.Url.Split('.');
-			if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+			var funcToCall = urlParts[1].Split("?");
+			var methodName = funcToCall[0][..^1];
+			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
-				var funcToCall = urlParts[1].Split("?");
-				var methodName = funcToCall[0][..^1];
-				if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-				{
-					System.Diagnostics.Debug.WriteLine("Next");
-					await Next();
-				}
-				if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-				{
-					System.Diagnostics.Debug.WriteLine("Prev");
-					await Prev();
-				}
+				System.Diagnostics.Debug.WriteLine("Next");
+				await Next();
+			}
+			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+			{
+				System.Diagnostics.Debug.WriteLine("weview_Navigating GotoLastPage");
+				await Prev();
 			}
 		}
-		
-		System.Diagnostics.Debug.WriteLine($"Navigating to {e.Url}");
 	}
 
 	async void CurrentPage_Loaded(object sender, EventArgs e)
@@ -275,31 +215,39 @@ public partial class BookPage : ContentPage, IDisposable
 			webView2.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
 			await webView2.EnsureCoreWebView2Async();
 		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("WebView2 is not available");
-		}
 #endif
 	}
 	async void OnSettingsClicked()
 	{
 		settings = await db.GetSettings(CancellationToken.None);
-
+		System.Diagnostics.Debug.WriteLine("Settings clicked");
+		/*
+		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
+		/*
 		List<string> background = GetProperty(settings.SetBackgroundColor);
 		List<string> text = GetProperty(settings.SetTextColor);
-		if (background.Count > 1)
+		if (!string.IsNullOrEmpty(settings.BackgroundColor) && !string.IsNullOrEmpty(settings.TextColor))
 		{
+			System.Diagnostics.Debug.WriteLine($"Setting background color to {background[0]} {background[1]}");
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{background[0]}', '{background[1]}')");
-			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--User__backgroundColor', '{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--User__textColor', '{settings.TextColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"document.body.style.backgroundColor = '{settings.BackgroundColor}'");
 		}
 		if (text.Count > 1)
 		{
+			System.Diagnostics.Debug.WriteLine($"Setting color to {text[0]} {text[1]}");
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{text[0]}', '{text[1]}')");
 		}
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
+				
+		//await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
+		//await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
+		//await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--User__backgroundColor', '{settings.BackgroundColor}')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--User__textColor', '{settings.TextColor}')");
+		//await EpubText.EvaluateJavaScriptAsync($"document.body.style.backgroundColor = '{settings.BackgroundColor}'");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
+		*/
 	}
 
 	static List<string> GetProperty(string key)

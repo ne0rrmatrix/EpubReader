@@ -84,7 +84,6 @@ class CustomWebViewClient : WebViewClient
 			}
 			return true;
 		}
-		//return base.ShouldOverrideUrlLoading(view, request);
 		return false;
 	}
 

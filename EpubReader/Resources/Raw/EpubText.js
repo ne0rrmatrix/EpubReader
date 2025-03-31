@@ -1,10 +1,33 @@
 ﻿document.addEventListener("DOMContentLoaded", function () {
     const frame = document.getElementById("page");
+    function isHorizontalScrollAtStart() {
+        const frame = document.getElementById("page");
+        if (!frame.contentWindow) {
+            console.log("frame.contentWindow is null");
+            return false;
+        }
+        return frame.contentWindow.scrollX <= 0;
+    }
+
+    function isHorizontallyScrolledToEnd() {
+        const frame = document.getElementById("page");
+        if (!frame.contentWindow) {
+            return false;
+        }
+        console.log("isHorizontallyScrolledToEnd");
+        const contentDoc = frame.contentWindow.document.documentElement;
+        const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
+        return Math.abs(frame.contentWindow.scrollX - maxScrollLeft) <= 30;
+    }
+
+  
+
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
     };
 
+   
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
@@ -56,32 +79,22 @@ function setPreviousPage() {
     isPreviousPage = true;
 }
 
-function isHorizontallyScrolledToEnd() {
-    const frame = document.getElementById("page");
-    if (!frame.contentWindow) {
+function loadPage(page) {
+    let frame = document.getElementById("page");
+    if (frame == null) {
+        console.log("Frame not found");
         return false;
     }
-    console.log("isHorizontallyScrolledToEnd");
-    const contentDoc = frame.contentWindow.document.documentElement;
-    const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
-    return Math.abs(frame.contentWindow.scrollX - maxScrollLeft) <= 30;
-}
-
-function isHorizontalScrollAtStart() {
-    const frame = document.getElementById("page");
-    if (!frame.contentWindow) {
-        console.log("frame.contentWindow is null");
-        return false;
-    }
-    console.log(frame.contentWindow.scrollX);
-    return frame.contentWindow.scrollX <= 0;
+    console.log("Frame found. Loading page:", page);
+    frame.setAttribute('src', page); // Fixed: 'page' was in quotes, should be the variable
+    return true;
 }
 function scrollToHorizontalEnd() {
     const frame = document.getElementById("page");
     if (frame?.contentWindow && frame.contentWindow.document.readyState === 'complete') {
         const contentDoc = frame.contentDocument || frame.contentWindow.document;
         const maxScrollLeft = contentDoc.documentElement.scrollWidth;
-        console.log(maxScrollLeft);
+        console.log("Scrolling to end of container.");
         frame.contentWindow.scrollTo(maxScrollLeft, 0);
         return true;
     } else if (frame) {
@@ -93,15 +106,4 @@ function scrollToHorizontalEnd() {
     } else {
         console.error("Iframe element not provided.");
     }
-}
-function loadPage(page) {
-    let frame = document.getElementById("page");
-    if (frame == null) {
-        console.log("Frame not found");
-        return false;
-    }
-    console.log("Frame found. Loading page:", page);
-    isPreviousPage = false;
-    frame.setAttribute('src', page); // Fixed: 'page' was in quotes, should be the variable
-    return true;
 }
