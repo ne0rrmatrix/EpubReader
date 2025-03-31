@@ -58,15 +58,16 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book book)
+    public async Task GotoBookPage(Book book)
     {
 		if(book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
-
+		var temp = await db.GetBook(book.Title) ?? throw new InvalidOperationException();
 		var Book = await EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
+		Book.CurrentChapter = temp.CurrentChapter;
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }

@@ -204,6 +204,7 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		book = ((BookViewModel)BindingContext).Book;
 		settings = await db.GetSettings(CancellationToken.None);
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 #if WINDOWS
@@ -275,10 +276,10 @@ public partial class BookPage : ContentPage, IDisposable
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
+					await db.SaveBookData(book, CancellationToken.None);
 					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await EpubText.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
-					await db.SaveBookData(book, CancellationToken.None);
 				});
 			})
 		};

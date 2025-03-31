@@ -14,14 +14,6 @@ indent_size = 4
 [*.{cs,csx,vb,vbx}]
 indent_style = tab
 indent_size = 4
-dotnet_style_operator_placement_when_wrapping = beginning_of_line
-tab_width = 4
-end_of_line = crlf
-dotnet_style_coalesce_expression = true:suggestion
-dotnet_style_null_propagation = true:suggestion
-dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
-dotnet_style_prefer_auto_properties = true:silent
-dotnet_style_object_initializer = true:suggestion
 
 # Code files
 [*.sln]
@@ -70,7 +62,7 @@ dotnet_diagnostic.CA1063.severity = error
 dotnet_diagnostic.CA1001.severity = error
 
 # Add braces (IDE0011)
-csharp_prefer_braces = true:silent
+csharp_prefer_braces = true
 dotnet_diagnostic.IDE0011.severity = error
 
 # Pattern matching
@@ -102,7 +94,7 @@ dotnet_naming_symbols.public_symbols.applicable_accessibilities = public, intern
 dotnet_naming_style.first_word_upper_case_style.capitalization = first_word_upper
 
 dotnet_naming_rule.public_members_must_be_capitalized.symbols   = public_symbols
-dotnet_naming_rule.public_members_must_be_capitalized.style = first_word_upper_case_style
+dotnet_naming_rule.public_members_must_be_capitalized.style    = first_word_upper_case_style
 dotnet_naming_rule.public_members_must_be_capitalized.severity = suggestion
 
 ## Instance fields are camelCase
@@ -118,7 +110,7 @@ dotnet_naming_style.instance_field_style.required_prefix =
 ## Static fields are camelCase
 dotnet_naming_rule.static_fields_should_be_camel_case.severity = error
 dotnet_naming_rule.static_fields_should_be_camel_case.symbols = static_fields
-dotnet_naming_rule.static_fields_should_be_camel_case.style = instance_field_style
+dotnet_naming_rule.static_fields_should_be_camel_case.style = static_field_style
 
 dotnet_naming_symbols.static_fields.applicable_kinds = field
 dotnet_naming_symbols.static_fields.required_modifiers = static
@@ -160,18 +152,3 @@ dotnet_diagnostic.MVMTK0042.severity = error
 
 # XC0045: Binding Property not found
 dotnet_diagnostic.XC0045.severity = error
-csharp_indent_labels = one_less_than_current
-csharp_using_directive_placement = outside_namespace:silent
-csharp_prefer_simple_using_statement = true:suggestion
-csharp_style_prefer_method_group_conversion = true:silent
-csharp_style_prefer_top_level_statements = true:silent
-csharp_style_prefer_primary_constructors = true:suggestion
-csharp_prefer_system_threading_lock = true:suggestion
-csharp_style_expression_bodied_methods = false:silent
-csharp_style_expression_bodied_constructors = false:silent
-csharp_style_expression_bodied_operators = false:silent
-csharp_style_expression_bodied_properties = true:silent
-csharp_style_expression_bodied_indexers = true:silent
-csharp_style_expression_bodied_accessors = true:silent
-csharp_style_expression_bodied_lambdas = true:silent
-csharp_style_expression_bodied_local_functions = false:silent
