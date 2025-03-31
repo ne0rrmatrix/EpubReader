@@ -54,7 +54,7 @@ public static class FilePathExtensions
 	{
 		string pattern = @"url\((['""]?)([^'""\)]*?\.(woff2?|ttf|otf|eot))\1\)";
 		MatchEvaluator evaluator = new(ReplaceFontPath);
-		string modifiedCss = Regex.Replace(cssContent, pattern, evaluator, RegexOptions.IgnoreCase);
+		string modifiedCss = Regex.Replace(cssContent, pattern, evaluator, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(10));
 		return modifiedCss;
 	}
 
