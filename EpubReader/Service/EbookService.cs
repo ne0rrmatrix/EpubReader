@@ -22,7 +22,7 @@ public static partial class EbookService
 			"ReadiumCSS-after.css",
 			"ReadiumCSS-config.css"
 		];
-
+	
 	static readonly List<string> requiredFiles =
 		[
 			"ReadiumCSS-default.css",
@@ -130,7 +130,7 @@ public static partial class EbookService
 			WWWPath = wWWpath,
 			Chapters = GetChapters([.. book.GetReadingOrder()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules( FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
 		};
 		return books;
 	}

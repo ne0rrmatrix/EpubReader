@@ -56,12 +56,12 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			// Skip calibre-specific CSS files
 			if (cssFile.Contains(".calibre"))
-			{
+	{
 				continue;
-			}
+		}
 			// Skip Kobo-specific CSS files
 			if (cssFile.StartsWith("kobo"))
-			{
+		{
 				continue;
 			}
 			cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
@@ -120,6 +120,24 @@ public static partial class HtmlAgilityPackExtensions
 		});
 	}
 
+	public static string RemoveCalibreAndKoboRules(string cssText)
+	{
+		// First remove all .calibre rules
+		string pattern1 = @"\.calibre\w*\s*{[^{}]*}";
+		string intermediate = Regex.Replace(cssText, pattern1, string.Empty);
+
+		// Then remove all .kobo rules
+		string pattern2 = @"\.kobo\w*\s*{[^{}]*}";
+		string result = Regex.Replace(intermediate, pattern2, string.Empty);
+
+		// Clean up any consecutive newlines
+		result = CleanNewLines().Replace(result, Environment.NewLine);
+
+		return result;
+	}
+
 	[GeneratedRegex(@"url\(['""]?(.*?)['""]?\)", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
 	private static partial Regex CssContentFilter();
+	[GeneratedRegex(@"(\r?\n){2,}", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
+	private static partial Regex CleanNewLines();
 }
