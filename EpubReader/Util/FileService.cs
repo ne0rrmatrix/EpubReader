@@ -5,35 +5,28 @@ namespace EpubReader.Util;
 public static partial class FileService
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
-    public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
+	public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
 	public static readonly string WWWDirectory = Path.Combine(SaveDirectory, "wwwroot");
 
 	public static string ValidateAndFixDirectoryName(string directoryName)
 	{
-		// Get invalid path characters
 		char[] invalidChars = Path.GetInvalidPathChars();
-
-		// Replace invalid characters with an underscore
 		foreach (char invalidChar in invalidChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
 		}
 		directoryName = directoryName.Replace(" ", "").Trim();
-		// Return the fixed directory name
 		return directoryName;
 	}
-	
+
 	public static string ValidateAndFixFileName(string fileName)
 	{
-		// Get invalid file name characters
 		char[] invalidChars = Path.GetInvalidFileNameChars();
-		// Replace invalid characters with an underscore
 		foreach (char invalidChar in invalidChars)
 		{
 			fileName = fileName.Replace(invalidChar, '_');
 		}
 		fileName = fileName.Replace(" ", "").Trim();
-		// Return the fixed file name
 		return fileName;
 	}
 	public static void DeleteDirectory(string directoryName)
@@ -52,29 +45,29 @@ public static partial class FileService
 		}
 	}
 	public static void DeleteFile(string fileName)
-    {
-        try
-        {
-            if (File.Exists(fileName))
-            {
-                File.Delete(fileName);
-                logger.Info($"Deleted file {fileName}");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Error deleting file: {fileName}, Messsage: {ex.Message}");
-        }
-    }
+	{
+		try
+		{
+			if (File.Exists(fileName))
+			{
+				File.Delete(fileName);
+				logger.Info($"Deleted file {fileName}");
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error deleting file: {fileName}, Messsage: {ex.Message}");
+		}
+	}
 
-    public static string GetFileName(string name)
-    {
-        var filename = Path.GetFileName(name);
-        return Path.Combine(SaveDirectory, filename);
-    }
+	public static string GetFileName(string name)
+	{
+		var filename = Path.GetFileName(name);
+		return Path.Combine(SaveDirectory, filename);
+	}
 
-    public static async Task SaveFile(FileResult result)
-    {
+	public static async Task SaveFile(FileResult result)
+	{
 		try
 		{
 			if (Directory.Exists(SaveDirectory))
@@ -100,5 +93,27 @@ public static partial class FileService
 		{
 			logger.Error($"Error saving file: {ex.Message}");
 		}
-    }
+	}
+
+	public static string GetMimeType(string fileName)
+	{
+		var extension = Path.GetExtension(fileName).ToLowerInvariant();
+
+		return extension switch
+		{
+			".xhtml" => "application/xhtml+xml",
+			".html" or ".htm" => "text/html",
+			".css" => "text/css",
+			".ico" => "image/x-icon",
+			".js" => "application/javascript",
+			".json" => "application/json",
+			".png" => "image/png",
+			".jpg" or ".jpeg" => "image/jpeg",
+			".gif" => "image/gif",
+			".svg" => "image/svg+xml",
+			".pdf" => "application/pdf",
+			".txt" => "text/plain",
+			_ => "application/octet-stream"
+		};
+	}
 }

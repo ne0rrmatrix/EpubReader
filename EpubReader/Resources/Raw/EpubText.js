@@ -107,3 +107,21 @@ function scrollToHorizontalEnd() {
         console.error("Iframe element not provided.");
     }
 }
+function setReadiumProperty(property, value) {
+        let root = document.getElementById("page").contentWindow.document.documentElement;
+        console.log(property, value);
+        root.style.setProperty(property, value);
+}
+
+function UnsetReadiumProperty(property) {
+        let root = document.getElementById("page").contentWindow.document.documentElement;
+        root.style.removeProperty(property);
+}
+
+function setBackgroundColor(color) {
+        document.documentElement.style.setProperty('--background-color', color);
+}
+
+document.getElementById("page").addEventListener("load", function () {
+    window.location.href = 'https://runcsharp.pageLoad?true';
+});

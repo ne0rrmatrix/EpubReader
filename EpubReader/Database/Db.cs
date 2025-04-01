@@ -5,152 +5,132 @@ using SQLite;
 
 namespace EpubReader.Database;
 
-public partial class Db : IDb
+public partial class Db : IDb, IDisposable
 {
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.db");
-	SQLiteAsyncConnection? db;
-
+	readonly SQLiteConnection db;
+	bool disposedValue;
 	public const SQLiteOpenFlags Flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
 
 	public Db()
 	{
-	}
-
-	async Task Init(CancellationToken cancellationToken = default)
-	{
-		if (db is not null)
-		{
-			return;
-		}
-		if (!File.Exists(DbPath))
+		if(!Directory.Exists(Util.FileService.SaveDirectory))
 		{
 			Directory.CreateDirectory(Util.FileService.SaveDirectory);
 		}
-
-		db = new SQLiteAsyncConnection(DbPath, Flags);
-
+		db = new SQLiteConnection(DbPath, Flags);
 		logger.Info("Database created");
-		await db.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
+		db.CreateTable<Settings>();
 		logger.Info("Settings Table created");
-		await db.CreateTableAsync<Book>().WaitAsync(cancellationToken);
+		db.CreateTable<Book>();
 		logger.Info("Book Table created");
 	}
+	
 
-	public async Task<Settings> GetSettings(CancellationToken cancellationToken = default)
+	public Settings? GetSettings()
 	{
-		await Init(cancellationToken);
-		if (db is null)
+		if (db == null)
 		{
-			return new Settings();
+			logger.Info("Database is null");
+			return null;
 		}
-
-		return await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken) ?? new Settings();
+		return db.Table<Settings>().FirstOrDefault() ?? new();
 	}
 
-	public async Task<List<Book>> GetAllBooks(CancellationToken cancellationToken = default)
+	public List<Book>? GetAllBooks()
 	{
-		await Init(cancellationToken);
-		if (db is null)
+		if(db is null)
 		{
-			return [];
+			logger.Info("Database is null");
+			return null;
 		}
-
-		return await db.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
+		return db?.Table<Book>().ToList();
 	}
 
-	public async Task<Book> GetBook(string title, CancellationToken cancellationToken = default)
+	public Book? GetBook(string title)
 	{
-		await Init(cancellationToken);
 		if (db is null)
 		{
-			return new Book();
+			logger.Info("Database is null");
+			return null;
 		}
-
-		return await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == title).WaitAsync(cancellationToken) ?? new Book();
+		return db.Table<Book>().Where(x => x.Title == title).FirstOrDefault();
 	}
 
-	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
+	public void SaveSettings(Settings settings)
 	{
-		await Init(cancellationToken);
 		if (db is null)
 		{
 			return;
 		}
-
-		var item = await db.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
-		if (item is null)
+		var item = db.Table<Settings>().FirstOrDefault();
+		if (item is not null)
 		{
 			logger.Info("Inserting settings");
-			await db.InsertAsync(settings).WaitAsync(cancellationToken);
+			db.Delete(item);
+			db.Insert(settings);
 			return;
 		}
 
 		logger.Info("Updating settings");
-		await db.DeleteAsync(item).WaitAsync(cancellationToken);
-		await db.InsertAsync(settings).WaitAsync(cancellationToken);
+		db.Insert(settings);
 	}
 
-	public async Task SaveBookData(Book book, CancellationToken cancellationToken = default)
+	public void SaveBookData(Book book)
 	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			return;
-		}
-
-		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
+		var item = db.Table<Book>().Where(x => x.Title == book.Title).FirstOrDefault();
 		if (item is null)
 		{
 			logger.Info("Inserting book");
-			await db.InsertAsync(book).WaitAsync(cancellationToken);
+			db.Insert(book);
 			return;
 		}
 
 		logger.Info("Updating book");
-		await db.DeleteAsync(item).WaitAsync(cancellationToken);
-		await db.InsertAsync(book).WaitAsync(cancellationToken);
+		db.Delete(item);
+		db.Insert(book);
 	}
 
-	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)
+	public void RemoveAllSettings()
 	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			return;
-		}
-
 		logger.Info("Removing all settings");
-		await db.DeleteAllAsync<Settings>().WaitAsync(cancellationToken);
+		db.DeleteAll<Settings>();
 	}
 
-	public async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
+	public void RemoveBook(Book book)
 	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			return;
-		}
-
-		var item = await db.Table<Book>().FirstOrDefaultAsync(x => x.Title == book.Title).WaitAsync(cancellationToken);
+		var item = db.Table<Book>().Where(x => x.Title == book.Title);
 		if (item is null)
 		{
 			return;
 		}
 
 		logger.Info("Removing book");
-		await db.DeleteAsync(item).WaitAsync(cancellationToken);
+		db.Delete(item);
 	}
 
-	public async Task RemoveAllBooks(CancellationToken cancellationToken = default)
+	public void RemoveAllBooks()
 	{
-		await Init(cancellationToken);
-		if (db is null)
-		{
-			return;
-		}
-
 		logger.Info("Removing all books");
-		await db.DeleteAllAsync<Book>().WaitAsync(cancellationToken);
+		db.DeleteAll<Book>();
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+				db?.Dispose();
+			}
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

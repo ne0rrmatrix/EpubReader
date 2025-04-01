@@ -80,13 +80,13 @@ public static partial class EbookService
 		};
 	}
 
-	public static async Task<Book?> OpenEbook(string path)
+	public static Book? OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
 		EpubBookRef book;
 		try
 		{
-			book = await VersOne.Epub.EpubReader.OpenBookAsync(path, options);
+			book = VersOne.Epub.EpubReader.OpenBook(path, options);
 		}
 		catch (Exception ex)
 		{
@@ -105,20 +105,33 @@ public static partial class EbookService
 				list.Add(sharedFile);
 			}
 		});
+		List<EpubFonts> fonts = [];
+		foreach (var item in book.Content.AllFiles.Local.ToList())
+		{
+			if (item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
+			{
+				EpubFonts Font = new()
+				{
+					Content = item.ReadContentAsBytes(),
+					FileName = Path.GetFileName(item.FilePath),
+					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
+				};
+				fonts.Add(Font);
+			}
+		}
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
 			Authors = [.. book.AuthorList.Where(author => author is not null).Select(author => new Author { Name = author })],
 			FilePath = path,
 			Files = list,
-			Fonts = [.. book.Content.Fonts.Local.Select(font => new EpubFonts { FileName = TempFileCreator.CreateTempFile(font.ReadContentAsBytes(), Path.GetFileName(font.FilePath), wWWpath), FontFamily = Path.GetFileNameWithoutExtension(font.FilePath), Content = font.ReadContentAsBytes() })],
-			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
+			Fonts = fonts,
+			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 			WWWPath = wWWpath,
-			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
+			Chapters = GetChapters([.. book.GetReadingOrder()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = TempFileCreator.CreateTempFile(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())), Path.GetFileName(style.FilePath), wWWpath), Content = style.ReadContent() })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
 		};
-		await CreateJavaScriptAndCssFiles();
 		return books;
 	}
 	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
@@ -140,29 +153,7 @@ public static partial class EbookService
 			HTMLContent = htmlFile,
 		};
 	}
-	static async Task CreateJavaScriptAndCssFiles()
-	{
-		if (File.Exists(Path.Combine(wWWpath, "index.html")))
-		{
-			return;
-		}
-		await CopyFiles("ReadiumCSS-before.css");
-		await CopyFiles("ReadiumCSS-after.css");
-		await CopyFiles("ReadiumCSS-config.css");
-		await CopyFiles("ReadiumCSS-default.css");
-		await CopyFiles("favicon.ico");
-		await CopyFiles("EpubText.css");
-		await CopyFiles("EpubText.js");
-		await CopyFiles("index.html");
-	}
 
-	static async Task CopyFiles(string sourceFile)
-	{
-		using var stream = await FileSystem.OpenAppPackageFileAsync(sourceFile);
-		using var reader = new StreamReader(stream);
-		var content = await reader.ReadToEndAsync();
-		await File.WriteAllBytesAsync(Path.Combine(wWWpath, Path.GetFileName(sourceFile)), Encoding.UTF8.GetBytes(content));
-	}
 	static string? GetTitle(EpubBookRef book, EpubLocalTextContentFileRef? item)
 	{
 		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
@@ -194,7 +185,7 @@ public static partial class EbookService
 				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
 				doc.LoadHtml(htmlFile);
 				htmlFile = ProcessHtml(htmlFile, doc);
-				var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+				var fileName =  Path.GetFileName(item.FilePath);
 				var title = GetTitle(book, item) ?? string.Empty;
 				
 				chapters.Add(new Chapter
@@ -214,7 +205,7 @@ public static partial class EbookService
 				var htmlFile = item.ReadContent();
 				doc.LoadHtml(htmlFile);
 				htmlFile = ProcessHtml(htmlFile, doc);
-				var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+				var fileName = Path.GetFileName(item.FilePath);
 				var title = GetTitle(book, item) ?? string.Empty;
 				chapters.Add(new Chapter
 				{
@@ -230,7 +221,7 @@ public static partial class EbookService
 			var htmlFile = item.ReadContent();
 			doc.LoadHtml(htmlFile);
 			htmlFile = ProcessHtml(htmlFile, doc);
-			var fileName = TempFileCreator.CreateTempFile(htmlFile, Path.GetFileName(item.FilePath), wWWpath);
+			var fileName = Path.GetFileName(item.FilePath);
 
 			var title = GetTitle(book, item) ?? string.Empty;
 			chapters.Add(new Chapter
@@ -299,10 +290,9 @@ public static partial class EbookService
 
 	static Models.Image GetImage(byte[] imageByte, string fileName)
 	{
-		var tempFile = TempFileCreator.CreateTempFile(imageByte, fileName, wWWpath);
 		return new Models.Image
 		{
-			FileName = tempFile,
+			FileName = fileName,
 			Content = imageByte,
 		};
 	}

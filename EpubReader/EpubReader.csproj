@@ -89,6 +89,11 @@
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
+    <PackageReference Include="MimeTypes" Version="2.5.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    
 	</ItemGroup>
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">

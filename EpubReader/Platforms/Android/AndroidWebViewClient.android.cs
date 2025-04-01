@@ -1,10 +1,8 @@
-﻿using System.Text;
-using Android.Graphics;
+﻿using Android.Graphics;
 using Android.Webkit;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
 using EpubReader.Platforms.Android;
-using EpubReader.Service;
 using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
@@ -15,7 +13,7 @@ namespace EpubReader;
 class CustomWebViewClient : WebViewClient
 {
 	readonly Microsoft.Maui.Controls.WebView webView;
-
+	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
 	{
 		handler.PlatformView.Settings.DomStorageEnabled = true;
@@ -30,29 +28,25 @@ class CustomWebViewClient : WebViewClient
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
-
-		if (url.StartsWith("data:text/html"))
+		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
 		{
-			System.Diagnostics.Debug.WriteLine("ShouldInterceptRequest: Load web page data from page that is loaded using string value.");
 			return base.ShouldInterceptRequest(view, request);
 		}
 
-		string path = System.IO.Path.GetFileName(request?.Url?.ToString())?.TrimEnd('/') ?? string.Empty;
-
-		if (ThreadSafeFileWriter.FileExists(path))
+		var filename = System.IO.Path.GetFileName(url);
+		var mimeType = FileService.GetMimeType(filename);
+		var text = streamExtensions.Content(filename);
+		if (text is not null)
 		{
-			System.Diagnostics.Debug.WriteLine($"File exists: {path}");
-			string mimeType = ThreadSafeFileWriter.GetMimeType(path);
-			System.Diagnostics.Debug.WriteLine("Path: " + path);
-			Stream contentStream = ThreadSafeFileWriter.ReadFileStream(path);
-
-			var response = WebResourceResponseHelper.CreateFromHtmlString(contentStream, mimeType, 200, "OK");
-			return response;
-
+			var stream = StreamExtensions.GetStream(text);
+			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
 		}
-		System.Diagnostics.Debug.WriteLine($"Path: {path}");
-		System.Diagnostics.Debug.WriteLine(url);
-		System.Diagnostics.Debug.WriteLine("Returning base");
+		var binary = streamExtensions.ByteContent(filename);
+		if (binary is not null)
+		{
+			var stream = StreamExtensions.GetStream(binary);
+			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
+		}
 		return base.ShouldInterceptRequest(view, request);
 	}
 
@@ -80,6 +74,10 @@ class CustomWebViewClient : WebViewClient
 				if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 				{
 					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
+				}
+				if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
+				{
+					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
 				}
 			}
 			return true;

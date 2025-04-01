@@ -12,8 +12,6 @@ using LoggerFactory = MetroLog.LoggerFactory;
 namespace EpubReader.ViewModels;
 public partial class LibraryViewModel : BaseViewModel
 {
-	readonly Task loadTask;
-	readonly CancellationTokenSource? cancellationtokensource;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
@@ -26,29 +24,13 @@ public partial class LibraryViewModel : BaseViewModel
 					{ DevicePlatform.Tizen, epub },
 					{ DevicePlatform.macOS, epub },
 			   });
-	bool disposedValue;
 
 	[ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; } = new();
    
 	public LibraryViewModel()
     {
-		cancellationtokensource = new CancellationTokenSource();
-		loadTask = LoadBooks(cancellationtokensource.Token);
-		
-		if (loadTask.IsFaulted)
-		{
-			logger.Error("Error loading books");
-		}
-	}
-
-	async Task LoadBooks(CancellationToken cancellationToken = default)
-	{
-		if(Books.Count > 0)
-		{
-			Books.Clear();
-		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		var bookData = db.GetAllBooks() ?? [];
 		foreach (var item in bookData)
 		{
 			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
@@ -65,8 +47,8 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info("Book is null");
 			return;
 		}
-		var temp = await db.GetBook(book.Title) ?? throw new InvalidOperationException();
-		var Book = await EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
+		var temp = db.GetBook(book.Title) ?? throw new InvalidOperationException();
+		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
 		Book.CurrentChapter = temp.CurrentChapter;
 		var navigationParams = new Dictionary<string, object>
         {
@@ -89,7 +71,7 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = await db.GetAllBooks(cancellationToken).ConfigureAwait(false) ?? [];
+		var bookData = db.GetAllBooks() ?? [];
 		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
@@ -109,7 +91,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 		ebook.FilePath = FileService.GetFileName(result.FileName);
 		await FileService.SaveFile(result).ConfigureAwait(false);
-		await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
+		db.SaveBookData(ebook);
 		Books.Add(ebook);
 
 		message = "Book added to library";
@@ -118,11 +100,11 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
     [RelayCommand]
-    async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
+    void RemoveBook(Book book)
     {
 		logger.Info("Removing book");
 		FileService.DeleteFile(book.FilePath);
-		await db.RemoveBook(book, cancellationToken).ConfigureAwait(false);
+		db.RemoveBook(book);
 		Books.Remove(book);
 		logger.Info("Book removed from library.");
 		OnPropertyChanged(nameof(Books));
@@ -141,17 +123,4 @@ public partial class LibraryViewModel : BaseViewModel
         }
     }
 
-	protected override void Dispose(bool disposing)
-	{
-		if (!disposedValue)
-		{
-			if (disposing)
-			{
-				cancellationtokensource?.Dispose();
-				loadTask.Dispose();
-			}
-			disposedValue = true;
-		}
-		base.Dispose(disposing);
-	}
 }

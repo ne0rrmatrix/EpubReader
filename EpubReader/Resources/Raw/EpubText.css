@@ -1,7 +1,12 @@
 ﻿html, body {
-margin: 0;
-padding: 0;
-box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    background-color: var(--background-color);
+}
+
+:root {
+--background-color: #ffffff; /* Default value */
 }
 
 body {
