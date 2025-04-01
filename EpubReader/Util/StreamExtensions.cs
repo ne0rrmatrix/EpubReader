@@ -40,6 +40,7 @@ public class StreamExtensions
 		}
 		fileName = Path.GetFileName(fileName);
 		return Book.Images.ToList().Find(f => f.FileName.Contains(fileName))?.Content
+			?? Book.Fonts.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 		   ?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.Content;
 	}
 
@@ -81,6 +82,16 @@ public class StreamExtensions
 			".svg" => "image/svg+xml",
 			".pdf" => "application/pdf",
 			".txt" => "text/plain",
+			".xml" => "application/xml",
+			".zip" => "application/zip",
+			".rar" => "application/x-rar-compressed",
+			".7z" => "application/x-7z-compressed",
+			".tar" => "application/x-tar",
+			".ttf" => "font/ttf",
+			".woff" => "font/woff",
+			".woff2" => "font/woff2",
+			".eot" => "application/vnd.ms-fontobject",
+			".otf" => "font/otf",
 			_ => "application/octet-stream"
 		};
 	}

@@ -121,6 +121,9 @@ function UnsetReadiumProperty(property) {
 function setBackgroundColor(color) {
         document.documentElement.style.setProperty('--background-color', color);
 }
+function UnsetBackgroundColor() {
+    document.documentElement.style.removeProperty('--background-color');
+}
 
 document.getElementById("page").addEventListener("load", function () {
     window.location.href = 'https://runcsharp.pageLoad?true';

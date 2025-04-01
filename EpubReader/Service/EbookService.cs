@@ -108,7 +108,7 @@ public static partial class EbookService
 		List<EpubFonts> fonts = [];
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
-			if (item.FilePath.Contains(".TTF") || item.FilePath.Contains(".OTF") || item.FilePath.Contains(".WOFF") || item.FilePath.Contains(".woff") || item.FilePath.Contains(".ttf") || item.FilePath.Contains(".otf"))
+			if (item.FilePath.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase))
 			{
 				EpubFonts Font = new()
 				{

@@ -12,6 +12,7 @@ namespace EpubReader;
 
 class CustomWebViewClient : WebViewClient
 {
+	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
@@ -59,26 +60,22 @@ class CustomWebViewClient : WebViewClient
 			return true;
 		}
 
-		if (path.Contains("runcsharp"))
+		if (path.Contains(csharp))
 		{
-			System.Diagnostics.Debug.WriteLine("runcsharp found");
 			var urlParts = path.Split('.');
-			if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+			var funcToCall = urlParts[1].Split("?");
+			var methodName = funcToCall[0][..^1];
+			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
-				var funcToCall = urlParts[1].Split("?");
-				var methodName = funcToCall[0][..^1];
-				if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-				{
-					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-				}
-				if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-				{
-					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-				}
-				if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-				{
-					WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-				}
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
+			}
+			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
+			}
+			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
 			}
 			return true;
 		}
@@ -87,13 +84,10 @@ class CustomWebViewClient : WebViewClient
 
 	public override void OnPageStarted(global::Android.Webkit.WebView? view, string? url, Bitmap? favicon)
 	{
-		System.Diagnostics.Debug.WriteLine("Function: OnPageStarted has been called");
-		if (url is null || url.Contains("runcsharp"))
+		if (url is null || url.Contains(csharp))
 		{
 			return;
 		}
-		System.Diagnostics.Debug.WriteLine("OnPageStarted: Load web page or data.");
-		System.Diagnostics.Debug.WriteLine($"URL: {url}");
 		base.OnPageStarted(view, url, favicon);
 		var navigatedEventArgs = new WebNavigatingEventArgs(
 		WebNavigationEvent.NewPage,
@@ -113,8 +107,7 @@ class CustomWebViewClient : WebViewClient
 
 	public override void OnPageFinished(global::Android.Webkit.WebView? view, string? url)
 	{
-		System.Diagnostics.Debug.WriteLine("Function: OnPageFinished has been called");
-		if (url is null || url.Contains("runcsharp"))
+		if (url is null || url.Contains(csharp))
 		{
 			return;
 		}

@@ -72,12 +72,11 @@ public partial class BookPage : ContentPage, IDisposable
 		webView2.CoreWebView2.FrameNavigationCompleted += CoreWebView2_FrameNavigationCompleted;
 	}
 
-	async void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+	void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
 	{
 		if(args.IsSuccess && args.WebErrorStatus == 0)
 		{
-			await EpubText.EvaluateJavaScriptAsync($"document.body.style.backgroundColor = '{settings.BackgroundColor}'");
-			await EpubText.EvaluateJavaScriptAsync($"document.body.style.color = '{settings.TextColor}'");
+			OnSettingsClicked();
 		}
 	}
 
@@ -221,32 +220,15 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		settings = db.GetSettings() ?? throw new InvalidOperationException("Settings is null");
 
-		List<string> background = GetProperty(settings.SetBackgroundColor);
-		List<string> text = GetProperty(settings.SetTextColor);
-		if (background.Count > 1)
-		{
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{background[0]}', '{background[1]}')");
-			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-		}
-		if (text.Count > 1)
-		{
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('{text[0]}', '{text[1]}')");
-		}
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
+		await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
 		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
 		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 	}
 
-	static List<string> GetProperty(string key)
-	{
-		var temp = key.Split(":");
-		if (temp.Length > 1)
-		{
-			return [temp[0], temp[1]];
-		}
-		return [];
-	}
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
 		if (string.IsNullOrEmpty(chapter.Title))

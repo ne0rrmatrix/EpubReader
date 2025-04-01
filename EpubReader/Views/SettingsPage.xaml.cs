@@ -58,8 +58,6 @@ public partial class SettingsPage : Popup
 		settings.BackgroundColor = scheme.BackgroundColor;
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
-		settings.SetTextColor = $"--USER__textColor: {settings.TextColor}";
-		settings.SetBackgroundColor = $"--USER__backgroundColor: {settings.BackgroundColor}";
 		logger.Info($"Changing color scheme to: {scheme.Name}");
 		db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));

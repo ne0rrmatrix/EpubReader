@@ -45,7 +45,7 @@ public partial class Db : IDb, IDisposable
 			logger.Info("Database is null");
 			return null;
 		}
-		return db?.Table<Book>().ToList();
+		return [.. db.Table<Book>()];
 	}
 
 	public Book? GetBook(string title)
@@ -107,7 +107,7 @@ public partial class Db : IDb, IDisposable
 		}
 
 		logger.Info("Removing book");
-		db.Delete(item);
+		db.Table<Book>().Delete(x => x.Title == book.Title);
 	}
 
 	public void RemoveAllBooks()
