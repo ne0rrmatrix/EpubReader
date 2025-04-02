@@ -24,6 +24,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
 		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
+		handler.PlatformView.Settings.UseWideViewPort = true;
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
 	}
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)

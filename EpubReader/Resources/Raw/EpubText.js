@@ -20,45 +20,28 @@
         return Math.abs(frame.contentWindow.scrollX - maxScrollLeft) <= 30;
     }
 
-  
-
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
     };
 
-   
+
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
     };
 
-    document.body.addEventListener("click",  function (e) {
-        e.preventDefault();
-        if (e.clientX > (window.innerWidth / 2)) {
+    window.addEventListener("message", function (event) {
+        if (event.data === "next") {
             if (isHorizontallyScrolledToEnd()) {
+                console.log("received scrollRight");
                 window.location.href = 'https://runcsharp.next?true';
                 return;
             }
             scrollRight();
-        } else {
+        } else if (event.data === "prev") {
             if (isHorizontalScrollAtStart()) {
-                window.location.href = 'https://runcsharp.prev?true';
-                return;
-            }
-            scrollLeft();
-        }
-    });
-
-    document.body.addEventListener("keydown", function (e) {
-        if (e.key == "ArrowRight") {
-            if (isHorizontallyScrolledToEnd()) {
-                window.location.href = 'https://runcsharp.next?true';
-                return;
-            }
-            scrollRight();
-        } else if (e.key == "ArrowLeft") {
-            if (isHorizontalScrollAtStart()) {
+                console.log("received scrollLeft");
                 window.location.href = 'https://runcsharp.prev?true';
                 return;
             }

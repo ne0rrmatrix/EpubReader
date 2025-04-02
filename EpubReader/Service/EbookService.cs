@@ -16,6 +16,11 @@ namespace EpubReader.Service;
 public static partial class EbookService
 {
 	static string wWWpath = string.Empty;
+	static readonly List<string> jsImports =
+		[
+			"Container.js",
+		];
+
 	static readonly List<string> cssImports =
 		[
 			"ReadiumCSS-before.css",
@@ -25,6 +30,7 @@ public static partial class EbookService
 	
 	static readonly List<string> requiredFiles =
 		[
+			"Container.js",
 			"ReadiumCSS-default.css",
 			"ReadiumCSS-before.css",
 			"ReadiumCSS-after.css",
@@ -34,7 +40,9 @@ public static partial class EbookService
 			"EpubText.css",
 			"EpubText.js",
 		];
+
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
+
 	static readonly EpubReaderOptions options = new()
 	{
 		BookCoverReaderOptions = new()
@@ -245,6 +253,8 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssImports);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
 		return htmlFile;
 	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
@@ -265,7 +275,7 @@ public static partial class EbookService
 		canvas.DrawRectangle(backgroundRectangle);
 
 		Microsoft.Maui.Graphics.Font font = new("Arial");
-		float fontSize = 60;
+		float fontSize = 24;
 		canvas.FontSize = fontSize;
 		SizeF textSize = canvas.GetStringSize(title, font, fontSize);
 

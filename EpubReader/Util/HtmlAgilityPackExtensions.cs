@@ -39,7 +39,37 @@ public static partial class HtmlAgilityPackExtensions
 		string cleanedHtml = Regex.Replace(htmlContent, cssLinkPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return RemoveEmptyLines(cleanedHtml);
 	}
-	
+
+	public static string AddCssLink(string htmlContent, string cssFile)
+	{
+		// Skip calibre-specific CSS files
+		if (cssFile.Contains(".calibre"))
+		{
+			return htmlContent;
+		}
+		// Skip Kobo-specific CSS files
+		if (cssFile.StartsWith("kobo"))
+		{
+			return htmlContent;
+		}
+		// Find the closing </head> tag
+		int headCloseTagIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+
+		if (headCloseTagIndex == -1)
+		{
+			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
+		}
+
+		// Create <link> tags for each CSS file
+		StringBuilder cssLinks = new();
+		
+		cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
+
+		// Insert the CSS links before the closing </head> tag
+		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, cssLinks.ToString());
+		return RemoveEmptyLines(updatedHtmlContent);
+	}
+
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
 	{
 		// Find the closing </head> tag
@@ -56,12 +86,12 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			// Skip calibre-specific CSS files
 			if (cssFile.Contains(".calibre"))
-	{
+			{
 				continue;
-		}
+			}
 			// Skip Kobo-specific CSS files
 			if (cssFile.StartsWith("kobo"))
-		{
+			{
 				continue;
 			}
 			cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
@@ -72,11 +102,34 @@ public static partial class HtmlAgilityPackExtensions
 		return RemoveEmptyLines(updatedHtmlContent);
 	}
 
+	public static string AddJsLinks(string htmlContent, List<string> jsFiles)
+	{
+		// Find the closing </head> tag
+		int headCloseTagIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+
+		if (headCloseTagIndex == -1)
+		{
+			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
+		}
+
+		// Create <link> tags for each CSS file
+		StringBuilder jsLinks = new();
+		foreach (string jsFile in jsFiles)
+		{
+			jsLinks.Append($"<script src=\"{jsFile}\"></script>\n");
+		}
+
+		// Insert the CSS links before the closing </head> tag
+		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, jsLinks.ToString());
+		return RemoveEmptyLines(updatedHtmlContent);
+	}
+
 	static string RemoveEmptyLines(string input)
 	{
 		var lines = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 		return string.Join(Environment.NewLine, lines);
 	}
+
 	public static string UpdateImageUrl(string html)
 	{
 		try
@@ -124,11 +177,11 @@ public static partial class HtmlAgilityPackExtensions
 	{
 		// First remove all .calibre rules
 		string pattern1 = @"\.calibre\w*\s*{[^{}]*}";
-		string intermediate = Regex.Replace(cssText, pattern1, string.Empty);
+		string intermediate = Regex.Replace(cssText, pattern1, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
 
 		// Then remove all .kobo rules
 		string pattern2 = @"\.kobo\w*\s*{[^{}]*}";
-		string result = Regex.Replace(intermediate, pattern2, string.Empty);
+		string result = Regex.Replace(intermediate, pattern2, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
 
 		// Clean up any consecutive newlines
 		result = CleanNewLines().Replace(result, Environment.NewLine);
