@@ -16,21 +16,17 @@ namespace EpubReader.Service;
 public static partial class EbookService
 {
 	static string wWWpath = string.Empty;
+	static readonly string fontPatch = "android-fonts-patch.css";
+
 	static readonly List<string> jsImports =
 		[
 			"Container.js",
-		];
-
-	static readonly List<string> cssImports =
-		[
-			"ReadiumCSS-before.css",
-			"ReadiumCSS-after.css",
-			"ReadiumCSS-config.css"
 		];
 	
 	static readonly List<string> requiredFiles =
 		[
 			"Container.js",
+			"android-fonts-patch.css",
 			"ReadiumCSS-default.css",
 			"ReadiumCSS-before.css",
 			"ReadiumCSS-after.css",
@@ -39,6 +35,14 @@ public static partial class EbookService
 			"favicon.ico",
 			"EpubText.css",
 			"EpubText.js",
+			"NimbusRoman.woff",
+			"NimbusRoman-Italic.woff",
+			"NimbusRoman-Bold.woff",
+			"NimbusRoman-BoldItalic.woff",
+			"NimbusSans.woff",
+			"NimbusSans-Italic.woff",
+			"NimbusSans-Bold.woff",
+			"NimbusSans-BoldItalic.woff"
 		];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
@@ -249,8 +253,14 @@ public static partial class EbookService
 		doc.LoadHtml(htmlFile);
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(doc);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
-		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssImports);
+		if(cssFiles.Count == 0)
+		{
+			htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-default.css");
+		}
+		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-after.css");
+		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);

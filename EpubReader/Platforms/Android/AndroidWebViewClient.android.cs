@@ -26,6 +26,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
 		handler.PlatformView.Settings.UseWideViewPort = true;
+		handler.PlatformView.Settings.TextZoom = 100;
 	}
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
