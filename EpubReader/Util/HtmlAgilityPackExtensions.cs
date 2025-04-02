@@ -69,7 +69,7 @@ public static partial class HtmlAgilityPackExtensions
 		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, cssLinks.ToString());
 		return RemoveEmptyLines(updatedHtmlContent);
 	}
-
+	
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
 	{
 		// Find the closing </head> tag

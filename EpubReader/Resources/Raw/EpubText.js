@@ -32,6 +32,9 @@
     };
 
     window.addEventListener("message", function (event) {
+        if (event.origin !== "https://demo") {
+            return;
+        }
         if (event.data === "next") {
             if (isHorizontallyScrolledToEnd()) {
                 console.log("received scrollRight");

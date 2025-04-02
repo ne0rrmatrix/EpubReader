@@ -210,7 +210,6 @@ public partial class BookPage : ContentPage, IDisposable
 		if (platformView is Microsoft.UI.Xaml.Controls.WebView2 webView3)
 		{
 			this.webView2 = webView3;
-			System.Diagnostics.Debug.WriteLine("WebView2 is available");
 			webView2.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
 			await webView2.EnsureCoreWebView2Async();
 		}
