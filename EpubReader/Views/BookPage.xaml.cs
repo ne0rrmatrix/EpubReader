@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.ViewModels;
+using Microsoft.Maui.Controls.Platform;
 
 #if WINDOWS
 using Microsoft.UI.Xaml.Controls;
@@ -223,18 +224,15 @@ public partial class BookPage : ContentPage, IDisposable
 			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		}
-		if (settings.FontSize > 0)
-		{
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
-		}
-		if (!string.IsNullOrEmpty(settings.BackgroundColor))
-		{
-			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
-		}
+		await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
 		if (!string.IsNullOrEmpty(settings.TextColor))
 		{
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
+		}
+		if (settings.FontSize > 0)
+		{
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 		}
 	}
 

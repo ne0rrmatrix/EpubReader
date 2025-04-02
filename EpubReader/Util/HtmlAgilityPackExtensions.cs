@@ -69,7 +69,14 @@ public static partial class HtmlAgilityPackExtensions
 		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, cssLinks.ToString());
 		return RemoveEmptyLines(updatedHtmlContent);
 	}
-	
+	public static string CheckAndRemoveKoboAndCalibreCss(string cssContent)
+	{
+		if (cssContent.Contains(".kobo") || cssContent.Contains(".calibre"))
+		{
+			return string.Empty;
+		}
+		return cssContent;
+	}
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
 	{
 		// Find the closing </head> tag

@@ -17,6 +17,7 @@ class CustomWebViewClient : WebViewClient
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
 	{
+		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
 		handler.PlatformView.Settings.DomStorageEnabled = true;
 		handler.PlatformView.Settings.JavaScriptEnabled = true;
 		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
@@ -25,7 +26,6 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
 		handler.PlatformView.Settings.UseWideViewPort = true;
-		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
 	}
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
