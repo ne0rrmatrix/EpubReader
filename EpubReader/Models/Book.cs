@@ -11,6 +11,7 @@ public class Book
 	public string Title { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
 	public int CurrentChapter { get; set; } = 0;
+	public string WWWPath { get; set; } = string.Empty;
 
 	[Ignore]
 	public List<Chapter> Chapters { get; set; } = [];
@@ -26,4 +27,9 @@ public class Book
 
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
+
+	[Ignore]
+	public List<EpubFonts> Fonts { get; set; } = [];
+	[Ignore]
+	public List<SharedEpubFiles> Files { get; set; } = [];
 }

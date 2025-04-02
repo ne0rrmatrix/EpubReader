@@ -1,0 +1,33 @@
+﻿html, body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--background-color);
+}
+
+:root {
+--background-color: transparent; /* Default value */
+}
+
+body {
+    height: 100vh;
+    width: 100%;
+    text-align: center;
+}
+
+iframe {
+    border: 0;
+    width: 80vw;
+    height: 95vh;
+    padding: 0 !important;
+    margin-left: 1em;
+    margin-right: 1em;
+    columns: 1;
+    column-fill: balance;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* May help later with Reading modes so that bg can be applied to whole page
+        You need to allowtransparency on the iframe though (and sanitize authors’ CSS) */
+    background-color: transparent;
+}

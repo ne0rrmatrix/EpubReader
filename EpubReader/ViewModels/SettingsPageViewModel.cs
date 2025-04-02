@@ -4,17 +4,17 @@ namespace EpubReader.ViewModels;
 
 public partial class SettingsPageViewModel : BaseViewModel
 {
-	readonly List<EbookFonts> fonts = [
-		new EbookFonts { FontFamily = "Arial" },
-		new EbookFonts { FontFamily = "Times New Roman" },
-		new EbookFonts { FontFamily = "Verdana" },
-		new EbookFonts { FontFamily = "Courier New" },
-		new EbookFonts { FontFamily = "Georgia" },
-		new EbookFonts { FontFamily = "Tahoma" },
-		new EbookFonts { FontFamily = "Trebuchet MS" },
-		new EbookFonts { FontFamily = "Comic Sans MS" },
-		new EbookFonts { FontFamily = "Lucida Sans Unicode" },
-		new EbookFonts { FontFamily = "Helvetica" }
+	readonly List<EpubFonts> fonts = [
+		new EpubFonts { FontFamily = "Arial" },
+		new EpubFonts { FontFamily = "Times New Roman" },
+		new EpubFonts { FontFamily = "Verdana" },
+		new EpubFonts { FontFamily = "Courier New" },
+		new EpubFonts { FontFamily = "Georgia" },
+		new EpubFonts { FontFamily = "Tahoma" },
+		new EpubFonts { FontFamily = "Trebuchet MS" },
+		new EpubFonts { FontFamily = "Comic Sans MS" },
+		new EpubFonts { FontFamily = "Lucida Sans Unicode" },
+		new EpubFonts { FontFamily = "Helvetica" }
 ];
 	readonly List<ColorScheme> colorSchemes =
 		[
@@ -28,7 +28,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 			new ColorScheme() { Name = "Vintage", BackgroundColor = "#f5f5dc", TextColor = "#000000" }
 		];
 	public List<ColorScheme> ColorSchemes => colorSchemes;
-	public List<EbookFonts> Fonts => fonts;
+	public List<EpubFonts> Fonts => fonts;
 	public SettingsPageViewModel()
 	{
 	}

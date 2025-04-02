@@ -12,6 +12,7 @@ using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
 using Microsoft.Extensions.Logging;
+using EpubReader.Util;
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
@@ -38,12 +39,12 @@ public static class MauiProgram
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
+		});
 #if ANDROID
-			Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
+		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
 #endif
-		});
 
 		var config = new LoggingConfiguration();
 #if RELEASE
@@ -71,12 +72,13 @@ public static class MauiProgram
             new MemoryTarget(2048));
 #if DEBUG
 		builder.Logging.AddDebug();
+		builder.Services.AddHybridWebViewDeveloperTools();
 #endif
-
-        builder.Services.AddSingleton<IDb, Db>();		
+		AppContext.SetSwitch("HybridWebView.InvokeJavaScriptThrowsExceptions", true);
+		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
-
+		builder.Services.AddSingleton<StreamExtensions>();
 		builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
         builder.Services.AddSingleton<IFilePicker>(FilePicker.Default);
         builder.Services.AddSingleton<AppShell>();

@@ -24,91 +24,57 @@
             Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <shimmer:SfShimmer x:Name="Shimmer" AnimationDuration="3000">
-        <shimmer:SfShimmer.Content>
-            <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
-                <Grid.GestureRecognizers>
-                    <OnPlatform x:TypeArguments="TapGestureRecognizer">
-                        <On Platform="MacCatalyst">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                        <On Platform="WinUI">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                    </OnPlatform>
-                </Grid.GestureRecognizers>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <WebView
-                    x:Name="EpubText"
-                    Grid.Row="0"
-                    Navigated="OnEpubText_Navigated"
-                    Navigating="EpubText_Navigating"
-                    Scale="1">
-                    <WebView.GestureRecognizers>
-                        <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
-                            <On Platform="Android">
-                                <SwipeGestureRecognizer Direction="Left,Right,Up,Down" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                            <On Platform="IOS">
-                                <SwipeGestureRecognizer Direction="Left,Right,Up,Down" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                        </OnPlatform>
-                    </WebView.GestureRecognizers>
-                </WebView>
+    <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
+        <Grid.GestureRecognizers>
+            <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                <On Platform="MacCatalyst">
+                    <TapGestureRecognizer
+                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                        Command="{Binding PressCommand}"
+                        NumberOfTapsRequired="2" />
+                </On>
+                <On Platform="WinUI">
+                    <TapGestureRecognizer
+                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                        Command="{Binding PressCommand}"
+                        NumberOfTapsRequired="2" />
+                </On>
+            </OnPlatform>
+        </Grid.GestureRecognizers>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <WebView
+            x:Name="EpubText"
+            Grid.Row="0"
+            Navigated="webView_Navigated"
+            Navigating="webView_Navigating"
+            Scale="1"
+            Source="{Binding Source}">
+            <WebView.GestureRecognizers>
+                <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
+                    <On Platform="Android">
+                        <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
+                    </On>
+                    <On Platform="IOS">
+                        <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
+                    </On>
+                </OnPlatform>
+            </WebView.GestureRecognizers>
+        </WebView>
 
-                <ImageButton
-                    Grid.Row="1"
-                    Margin="30,0,0,0"
-                    Background="Transparent"
-                    Clicked="PreviousPage"
-                    HorizontalOptions="Start"
-                    IsEnabled="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    Source="{AppThemeBinding Dark=arrow_back.png,
-                                             Light=arrow_back_lightmode.png}"
-                    WidthRequest="40" />
-                <Label
-                    x:Name="PageLabel"
-                    Grid.Row="1"
-                    FontSize="20"
-                    HorizontalOptions="Center"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           iOS={Binding IsNavMenuVisible},
-                                           Android={Binding IsNavMenuVisible}}" />
-                <ImageButton
-                    Grid.Row="1"
-                    Margin="0,0,30,0"
-                    Background="Transparent"
-                    Clicked="NextPage"
-                    HorizontalOptions="End"
-                    IsEnabled="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           Default=false}"
-                    Source="{AppThemeBinding Dark=arrow_forward.png,
-                                             Light=arrow_forward_lightmode.png}"
-                    WidthRequest="40" />
-
-            </Grid>
-        </shimmer:SfShimmer.Content>
-    </shimmer:SfShimmer>
+        <Label
+            x:Name="PageLabel"
+            Grid.Row="1"
+            FontSize="20"
+            HorizontalOptions="Center"
+            IsVisible="{OnPlatform WinUI=true,
+                                   MacCatalyst=true,
+                                   iOS={Binding IsNavMenuVisible},
+                                   Android={Binding IsNavMenuVisible}}" />
+    </Grid>
 </ContentPage>
