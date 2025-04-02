@@ -12,7 +12,7 @@
 window.addEventListener("keydown", function (e) {
     if (e.key == "ArrowRight") {
         console.log("ArrowRight sent to parent.");
-        window.parent.postMessage("next", "http://demo");
+        window.parent.postMessage("next", "https://demo");
     } else if (e.key == "ArrowLeft") {
         console.log("ArrowLeft sent to parent.");
         window.parent.postMessage("prev", "https://demo");

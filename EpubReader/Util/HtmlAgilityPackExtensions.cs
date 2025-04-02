@@ -48,7 +48,7 @@ public static partial class HtmlAgilityPackExtensions
 			return htmlContent;
 		}
 		// Skip Kobo-specific CSS files
-		if (cssFile.StartsWith("kobo"))
+		if (cssFile.Contains("kobo"))
 		{
 			return htmlContent;
 		}
