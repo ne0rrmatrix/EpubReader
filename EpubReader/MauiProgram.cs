@@ -2,17 +2,16 @@
 using CommunityToolkit.Maui.Storage;
 using EpubReader.Database;
 using EpubReader.Interfaces;
+using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
-using FFImageLoading.Maui;
 using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
+using Microsoft.Extensions.Logging;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-using Microsoft.Extensions.Logging;
-using EpubReader.Util;
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
@@ -27,7 +26,6 @@ public static class MauiProgram
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 		})
-		.UseFFImageLoading()
 		.UseMauiCommunityToolkit(options =>
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);

@@ -76,7 +76,6 @@
    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
-    <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
     <PackageReference Include="VersOne.Epub" Version="3.3.3" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.3" />
@@ -89,11 +88,6 @@
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
-    <PackageReference Include="MimeTypes" Version="2.5.2">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-    
 	</ItemGroup>
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
