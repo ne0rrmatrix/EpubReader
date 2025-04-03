@@ -170,6 +170,7 @@ public partial class BookPage : ContentPage, IDisposable
 		loadIndex = false;
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		Shimmer.IsActive = false;
 	}
 
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
