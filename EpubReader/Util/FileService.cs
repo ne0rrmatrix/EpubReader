@@ -1,4 +1,5 @@
 ﻿using MetroLog;
+using static SQLite.SQLite3;
 
 namespace EpubReader.Util;
 
@@ -6,20 +7,30 @@ public static partial class FileService
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
 	public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
-	public static readonly string WWWDirectory = Path.Combine(SaveDirectory, "wwwroot");
 
-	public static string ValidateAndFixDirectoryName(string directoryName)
+	static string ValidateAndFixDirectoryName(string directoryName)
 	{
 		char[] invalidChars = Path.GetInvalidPathChars();
 		foreach (char invalidChar in invalidChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
+			directoryName = directoryName.Replace("\\", "");
+			directoryName = directoryName.Replace("/", "");
+			directoryName = directoryName.Replace(":", "");
+			directoryName = directoryName.Replace("*", "");
+			directoryName = directoryName.Replace("?", "");
+			directoryName = directoryName.Replace("\"", "");
+			directoryName = directoryName.Replace("<", "");
+			directoryName = directoryName.Replace(">", "");
+			directoryName = directoryName.Replace("|", "");
+			directoryName = directoryName.Replace("$", "");
 		}
 		directoryName = directoryName.Replace(" ", "").Trim();
+		directoryName = Path.GetFileNameWithoutExtension(directoryName);
 		return directoryName;
 	}
 
-	public static string ValidateAndFixFileName(string fileName)
+	static string ValidateAndFixFileName(string fileName)
 	{
 		char[] invalidChars = Path.GetInvalidFileNameChars();
 		foreach (char invalidChar in invalidChars)
@@ -60,38 +71,49 @@ public static partial class FileService
 		}
 	}
 
-	public static string GetFileName(string name)
+	public static async Task<string> SaveImage(string bookName, byte[] imageBytes)
 	{
-		var filename = Path.GetFileName(name);
-		return Path.Combine(SaveDirectory, filename);
-	}
+		var partialPath = Path.GetFileNameWithoutExtension(bookName);
+		var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(partialPath));
+		if (!Directory.Exists(fullPath))
+		{
+			Directory.CreateDirectory(fullPath);
+		}
+		using var memoryStream = new MemoryStream(imageBytes);
+		IsImageExtension.IsImage(memoryStream, out var type);
 
-	public static async Task SaveFile(FileResult result)
+	     var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
+		var fileName = Path.Combine(fullPath, ValidateAndFixFileName(newfileName));
+		await File.WriteAllBytesAsync(fileName, imageBytes);
+		logger.Info($"Image saved: {bookName}");
+		return fileName;
+	}
+	
+	public static async Task<string> SaveFile(FileResult result, string bookName)
 	{
 		try
 		{
-			if (Directory.Exists(SaveDirectory))
+			bookName = Path.GetFileNameWithoutExtension(bookName);
+			var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(bookName));
+			if (!Directory.Exists(fullPath))
 			{
-				logger.Info("Directory exists");
-			}
-			else
-			{
-				logger.Info("Directory does not exist");
-				Directory.CreateDirectory(SaveDirectory);
+				Directory.CreateDirectory(fullPath);
 			}
 
 			using Stream fileStream = await result.OpenReadAsync();
 			using StreamReader reader = new(fileStream);
-			var fileName = GetFileName(result.FileName);
+			var fileName = Path.Combine(fullPath, ValidateAndFixFileName(result.FileName));
 			using FileStream output = File.Create(fileName);
 			await fileStream.CopyToAsync(output);
 			fileStream.Seek(0, SeekOrigin.Begin);
 			Stream.Synchronized(output);
 			logger.Info($"File saved: {fileName}");
+			return fileName;
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving file: {ex.Message}");
+			return string.Empty;
 		}
 	}
 

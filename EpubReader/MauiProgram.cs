@@ -72,7 +72,6 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 		builder.Services.AddHybridWebViewDeveloperTools();
 #endif
-		AppContext.SetSwitch("HybridWebView.InvokeJavaScriptThrowsExceptions", true);
 		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);

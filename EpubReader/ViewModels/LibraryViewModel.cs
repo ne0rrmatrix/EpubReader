@@ -35,6 +35,7 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
 			ebook.CurrentChapter = item.CurrentChapter;
+			ebook.CoverImagePath = item.CoverImagePath;
 			Books.Add(ebook);
 		}
 	}
@@ -89,8 +90,8 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 
-		ebook.FilePath = FileService.GetFileName(result.FileName);
-		await FileService.SaveFile(result).ConfigureAwait(false);
+		ebook.FilePath =  await FileService.SaveFile(result, ebook.Title).ConfigureAwait(false);
+		ebook.CoverImagePath = await FileService.SaveImage(ebook.Title, ebook.CoverImage).ConfigureAwait(false);
 		db.SaveBookData(ebook);
 		Books.Add(ebook);
 
@@ -104,6 +105,8 @@ public partial class LibraryViewModel : BaseViewModel
     {
 		logger.Info("Removing book");
 		FileService.DeleteFile(book.FilePath);
+		FileService.DeleteFile(book.CoverImagePath);
+		FileService.DeleteDirectory(book.Title);
 		db.RemoveBook(book);
 		Books.Remove(book);
 		logger.Info("Book removed from library.");
