@@ -18,7 +18,7 @@ public partial class SettingsPage : Popup
         InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-		settings = db.GetSettings() ?? throw new InvalidOperationException("Settings cannot be null.");
+		settings = db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);

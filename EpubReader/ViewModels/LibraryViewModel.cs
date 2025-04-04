@@ -26,31 +26,22 @@ public partial class LibraryViewModel : BaseViewModel
 			   });
 
 	[ObservableProperty]
-    public partial ObservableCollection<Book> Books { get; set; } = new();
+    public partial ObservableCollection<Book> Books { get; set; }
    
 	public LibraryViewModel()
     {
 		var bookData = db.GetAllBooks() ?? [];
-		foreach (var item in bookData)
-		{
-			var ebook = EbookService.GetListing(item.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
-			ebook.CurrentChapter = item.CurrentChapter;
-			ebook.CoverImagePath = item.CoverImagePath;
-			Books.Add(ebook);
-		}
+		Books = [.. bookData];
 	}
 
     [RelayCommand]
-    public async Task GotoBookPage(Book book)
+    public static async Task GotoBookPage(Book Book)
     {
-		if(book is null)
+		if(Book is null)
 		{
 			logger.Info("Book is null");
 			return;
 		}
-		var temp = db.GetBook(book.Title) ?? throw new InvalidOperationException();
-		var Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException();
-		Book.CurrentChapter = temp.CurrentChapter;
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
@@ -73,7 +64,7 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 		var bookData = db.GetAllBooks() ?? [];
-		var ebook = EbookService.GetListing(result.FullPath);
+		var ebook = EbookService.OpenEbook(result.FullPath) ?? throw new InvalidOperationException("Error opening ebook");
 		if (ebook is null)
 		{
 			message = "Error opening Book.";
@@ -103,10 +94,13 @@ public partial class LibraryViewModel : BaseViewModel
     [RelayCommand]
     void RemoveBook(Book book)
     {
-		logger.Info("Removing book");
-		FileService.DeleteFile(book.FilePath);
-		FileService.DeleteFile(book.CoverImagePath);
-		FileService.DeleteDirectory(book.Title);
+		logger.Info($"Removing book {book.FilePath}");
+		var directory = Path.GetDirectoryName(book.FilePath);
+		if(directory is not null)
+		{
+			Directory.Delete(directory, true);
+		}
+		
 		db.RemoveBook(book);
 		Books.Remove(book);
 		logger.Info("Book removed from library.");

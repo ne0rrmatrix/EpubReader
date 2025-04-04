@@ -4,7 +4,7 @@ namespace EpubReader.Interfaces;
 
 public interface IDb
 {
-	Book? GetBook(string title);
+	Book? GetBook(Book book);
 	List<Book>? GetAllBooks();
 	Settings? GetSettings();
 	void SaveBookData(Book book);

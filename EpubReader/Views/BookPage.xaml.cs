@@ -219,7 +219,7 @@ public partial class BookPage : ContentPage, IDisposable
 	}
 	async void OnSettingsClicked()
 	{
-		settings = db.GetSettings() ?? throw new InvalidOperationException("Settings is null");
+		settings = db.GetSettings() ?? new();
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
 		await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
 		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");

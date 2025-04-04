@@ -80,9 +80,8 @@ public static partial class FileService
 			Directory.CreateDirectory(fullPath);
 		}
 		using var memoryStream = new MemoryStream(imageBytes);
-		IsImageExtension.IsImage(memoryStream, out var type);
-
-	     var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
+		var type =ImageExtensions.GetFileExtension(memoryStream);
+		var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
 		var fileName = Path.Combine(fullPath, ValidateAndFixFileName(newfileName));
 		await File.WriteAllBytesAsync(fileName, imageBytes);
 		logger.Info($"Image saved: {bookName}");

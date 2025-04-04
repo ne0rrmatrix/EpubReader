@@ -1,90 +1,59 @@
 ﻿namespace EpubReader.Util;
-public static class IsImageExtension
+public static class ImageExtensions
 {
-	static readonly List<string> jpg = ["FF", "D8"];
-	static readonly List<string> bmp = ["42", "4D"];
-	static readonly List<string> gif = ["47", "49", "46"];
-	static readonly List<string> png = ["89", "50", "4E", "47", "0D", "0A", "1A", "0A"];
+	static readonly List<string> jpgSignature = ["FF", "D8"];
+	static readonly List<string> bmpSignature = ["42", "4D"];
+	static readonly List<string> gifSignature = ["47", "49", "46"];
+	static readonly List<string> pngSignature = ["89", "50", "4E", "47", "0D", "0A", "1A", "0A"];
 
-	public enum ImageType
+	const string jpgFirstByte = "FF";
+	const string bmpFirstByte = "42";
+	const string gifFirstByte = "47";
+	const string pngFirstByte = "89";
+
+	/// <summary>
+	/// Detects the file extension based on file content
+	/// </summary>
+	/// <param name="file">Path to the file</param>
+	/// <returns>File extension (jpg, bmp, gif, png) or empty string if not detected</returns>
+	public static string GetFileExtension(this string file)
 	{
-		JPG,
-		BMP,
-		GIF,
-		PNG,
-		NONE
-	}
-
-	const string jPG = "FF";
-	const string bMP = "42";
-	const string gIF = "47";
-	const string pNG = "89";
-
-	public static bool IsImage(this string file, out ImageType type)
-	{
-		type = ImageType.NONE;
-		if (string.IsNullOrWhiteSpace(file))
+		if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
 		{
-			return false;
-		}
-
-		if (!File.Exists(file))
-		{
-			return false;
+			return string.Empty;
 		}
 
 		using var stream = File.OpenRead(file);
-		return stream.IsImage(out type);
+		return stream.GetFileExtension();
 	}
 
-	public static bool IsImage(this Stream stream, out ImageType type)
+	/// <summary>
+	/// Detects the file extension based on stream content
+	/// </summary>
+	/// <param name="stream">Stream to analyze</param>
+	/// <returns>File extension (jpg, bmp, gif, png) or empty string if not detected</returns>
+	public static string GetFileExtension(this Stream stream)
 	{
-		type = ImageType.NONE;
 		stream.Seek(0, SeekOrigin.Begin);
-		string bit = stream.ReadByte().ToString("X2");
-		switch (bit)
+		string firstByte = stream.ReadByte().ToString("X2");
+
+		return firstByte switch
 		{
-			case jPG:
-				if (stream.IsImage(jpg))
-				{
-					type = ImageType.JPG;
-					return true;
-				}
-				break;
-			case bMP:
-				if (stream.IsImage(bmp))
-				{
-					type = ImageType.BMP;
-					return true;
-				}
-				break;
-			case gIF:
-				if (stream.IsImage(gif))
-				{
-					type = ImageType.GIF;
-					return true;
-				}
-				break;
-			case pNG:
-				if (stream.IsImage(png))
-				{
-					type = ImageType.PNG;
-					return true;
-				}
-				break;
-			default:
-				break;
-		}
-		return false;
+			jpgFirstByte when stream.MatchesSignature(jpgSignature) => "jpg",
+			bmpFirstByte when stream.MatchesSignature(bmpSignature) => "bmp",
+			gifFirstByte when stream.MatchesSignature(gifSignature) => "gif",
+			pngFirstByte when stream.MatchesSignature(pngSignature) => "png",
+			_ => string.Empty
+		};
 	}
 
-	public static bool IsImage(this Stream stream, List<string> comparer)
+	static bool MatchesSignature(this Stream stream, List<string> signature)
 	{
 		stream.Seek(0, SeekOrigin.Begin);
-		foreach (string c in comparer)
+		foreach (string expectedByte in signature)
 		{
-			string bit = stream.ReadByte().ToString("X2");
-			if (0 != string.Compare(bit, c))
+			string actualByte = stream.ReadByte().ToString("X2");
+			if (string.Compare(actualByte, expectedByte, StringComparison.OrdinalIgnoreCase) != 0)
 			{
 				return false;
 			}

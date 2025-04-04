@@ -7,11 +7,11 @@ namespace EpubReader.Database;
 
 public partial class Db : IDb, IDisposable
 {
-	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.db");
-	readonly SQLiteConnection db;
-	bool disposedValue;
-	public const SQLiteOpenFlags Flags = SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache;
+	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
+	readonly SQLiteConnection conn;
+	readonly SQLiteConnectionString options;
+	bool disposedValue;
 
 	public Db()
 	{
@@ -19,111 +19,89 @@ public partial class Db : IDb, IDisposable
 		{
 			Directory.CreateDirectory(Util.FileService.SaveDirectory);
 		}
-		db = new SQLiteConnection(DbPath, Flags);
+		options = new(DbPath, false);
+		conn = new SQLiteConnection(options);
 		logger.Info("Database created");
-		db.CreateTable<Settings>();
+		conn.CreateTable<Settings>();
 		logger.Info("Settings Table created");
-		db.CreateTable<Book>();
+		conn.CreateTable<Book>();
 		logger.Info("Book Table created");
 	}
 	
 
 	public Settings? GetSettings()
 	{
-		if (db == null)
-		{
-			logger.Info("Database is null");
-			return null;
-		}
-		return db.Table<Settings>().FirstOrDefault() ?? new();
+		var results = conn.Table<Settings>().ToList().FirstOrDefault();
+		return results;
 	}
 
-	public List<Book>? GetAllBooks()
+	public List<Book> GetAllBooks()
 	{
-		if(db is null)
-		{
-			logger.Info("Database is null");
-			return null;
-		}
-		return [.. db.Table<Book>()];
+		var results = conn.Table<Book>().ToList();
+		return results;
 	}
 
-	public Book? GetBook(string title)
+	public Book? GetBook(Book book)
 	{
-		if (db is null)
-		{
-			logger.Info("Database is null");
-			return null;
-		}
-		return db.Table<Book>().Where(x => x.Title == title).FirstOrDefault();
+		var result = conn.Table<Book>().FirstOrDefault(x => x.Id ==	book.Id);
+		conn.Close();
+		return result;
 	}
 
 	public void SaveSettings(Settings settings)
 	{
-		if (db is null)
+		var item = conn.Table<Settings>().ToList().Exists(x => x.Id == settings.Id);
+		if (item)
 		{
+			conn.Update(settings);
 			return;
 		}
-		var item = db.Table<Settings>().FirstOrDefault();
-		if (item is not null)
-		{
-			logger.Info("Inserting settings");
-			db.Delete(item);
-			db.Insert(settings);
-			return;
-		}
-
-		logger.Info("Updating settings");
-		db.Insert(settings);
+		logger.Info("Inserting settings");
+		conn.Insert(settings);
 	}
 
 	public void SaveBookData(Book book)
 	{
-		var item = db.Table<Book>().Where(x => x.Title == book.Title).FirstOrDefault();
-		if (item is null)
+		var item = conn.Table<Book>().ToList().Exists(x => x.Id == book.Id);
+		if (item)
 		{
-			logger.Info("Inserting book");
-			db.Insert(book);
+			conn.Update(book);
+			logger.Info("Updating book");
 			return;
 		}
-
-		logger.Info("Updating book");
-		db.Delete(item);
-		db.Insert(book);
+		logger.Info("Inserting book");
+		conn.Insert(book);
 	}
 
 	public void RemoveAllSettings()
 	{
 		logger.Info("Removing all settings");
-		db.DeleteAll<Settings>();
+		conn.DeleteAll<Settings>();
 	}
 
 	public void RemoveBook(Book book)
 	{
-		var item = db.Table<Book>().Where(x => x.Title == book.Title);
-		if (item is null)
-		{
-			return;
-		}
-
 		logger.Info("Removing book");
-		db.Table<Book>().Delete(x => x.Title == book.Title);
+		conn.Delete(book);
 	}
 
 	public void RemoveAllBooks()
 	{
 		logger.Info("Removing all books");
-		db.DeleteAll<Book>();
+		conn.DeleteAll<Book>();
 	}
 
 	protected virtual void Dispose(bool disposing)
 	{
 		if (!disposedValue)
 		{
-			if (disposing)
+			if (disposing && conn is not null)
 			{
-				db?.Dispose();
+				conn.Close();
+				conn.Dispose();
+				logger.Info("Database closed");
 			}
+
 			disposedValue = true;
 		}
 	}
