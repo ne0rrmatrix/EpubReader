@@ -141,10 +141,7 @@ public partial class BookPage : ContentPage, IDisposable
 		if(book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
-			db.SaveBookData(book);
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			await LoadPage();
 		}
 	}
 
@@ -153,14 +150,18 @@ public partial class BookPage : ContentPage, IDisposable
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
-			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
-			db.SaveBookData(book);
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			await LoadPage();
 		}
 	}
 	
+	async Task LoadPage()
+	{
+		await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
+		db.SaveBookData(book);
+		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+	}
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
 		if (!loadIndex)
@@ -202,7 +203,6 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		ArgumentNullException.ThrowIfNull(db);
 		settings = db.GetSettings() ?? new();
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
