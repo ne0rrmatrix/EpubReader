@@ -11,12 +11,6 @@
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
 
-    <ContentPage.Resources>
-        <ResourceDictionary>
-            <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
-        </ResourceDictionary>
-    </ContentPage.Resources>
-
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
@@ -60,23 +54,16 @@
                     <Border Style="{x:StaticResource EbookCardStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="{StaticResource CardHeight}" />
                             </Grid.RowDefinitions>
 
-                            <Label
-                                Grid.Row="0"
-                                HorizontalTextAlignment="Center"
-                                Style="{StaticResource EbookLabelText}"
-                                Text="{Binding Title}" />
-
                             <Image
-                                Grid.Row="1"
+                                Grid.Row="0"
                                 Margin="8,4,8,8"
                                 Aspect="AspectFit"
                                 HeightRequest="{StaticResource CardHeight}"
                                 HorizontalOptions="Center"
-                                Source="{Binding CoverImage, Mode=OneWay, Converter={StaticResource ByteArrayToImageSourceConverter}}">
+                                Source="{Binding CoverImagePath}">
 
                                 <FlyoutBase.ContextFlyout>
                                     <MenuFlyout>

@@ -1,5 +1,11 @@
 ﻿window.addEventListener("click", function (e) {
+    let target = e.target;
+    if (target.href) {
+        return;
+    }
+   
     e.preventDefault();
+   
     if (e.clientX > (window.innerWidth / 2)) {
         console.log("clicking next sent to parent.");
         window.parent.postMessage("next", "https://demo");

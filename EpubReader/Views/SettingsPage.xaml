@@ -3,7 +3,6 @@
     x:Class="EpubReader.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:EpubReader.Converters"
     xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:page="clr-namespace:EpubReader.Views"
@@ -12,11 +11,6 @@
     x:Name="CurrentPage"
     Size="400,600">
 
-    <mct:Popup.Resources>
-        <ResourceDictionary>
-            <local:InverseBooleanConverter x:Key="InverseBooleanConverter" />
-        </ResourceDictionary>
-    </mct:Popup.Resources>
 
     <Grid
         Padding="20"
