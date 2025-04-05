@@ -39,13 +39,13 @@ class CustomWebViewClient : WebViewClient
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
 		var text = streamExtensions.Content(filename);
-		if (text is not null)
+		if (text is not null && StreamExtensions.IsText(filename))
 		{
 			var stream = StreamExtensions.GetStream(text);
 			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
 		}
 		var binary = streamExtensions.ByteContent(filename);
-		if (binary is not null)
+		if (binary is not null && StreamExtensions.IsBinary(filename))
 		{
 			var stream = StreamExtensions.GetStream(binary);
 			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
