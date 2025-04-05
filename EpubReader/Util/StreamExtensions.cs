@@ -86,7 +86,6 @@ public class StreamExtensions
 			".zip" => "application/zip",
 			".rar" => "application/x-rar-compressed",
 			".7z" => "application/x-7z-compressed",
-			".TTF" => "font/ttf",
 			".tar" => "application/x-tar",
 			".ttf" => "font/ttf",
 			".woff" => "font/woff",
