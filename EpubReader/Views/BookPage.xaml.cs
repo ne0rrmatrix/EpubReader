@@ -141,6 +141,7 @@ public partial class BookPage : ContentPage, IDisposable
 		if(book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
+			db.UpdateBookMark(book);
 			await LoadPage();
 		}
 	}
@@ -150,6 +151,7 @@ public partial class BookPage : ContentPage, IDisposable
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
+			db.UpdateBookMark(book);
 			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPage();
 		}
@@ -157,7 +159,6 @@ public partial class BookPage : ContentPage, IDisposable
 	
 	async Task LoadPage()
 	{
-		db.UpdateBookMark(book);
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
