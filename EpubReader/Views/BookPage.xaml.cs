@@ -150,14 +150,14 @@ public partial class BookPage : ContentPage, IDisposable
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
+			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPage();
 		}
 	}
 	
 	async Task LoadPage()
 	{
-		await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
-		db.SaveBookData(book);
+		db.UpdateBookMark(book);
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
@@ -220,13 +220,13 @@ public partial class BookPage : ContentPage, IDisposable
 	async void OnSettingsClicked()
 	{
 		settings = db.GetSettings() ?? new();
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
-		await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
+			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
+			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -245,7 +245,7 @@ public partial class BookPage : ContentPage, IDisposable
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.SaveBookData(book);
+					db.UpdateBookMark(book);
 					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await EpubText.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");

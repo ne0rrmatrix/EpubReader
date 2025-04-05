@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:Models="clr-namespace:EpubReader.Models"
+    xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
@@ -57,10 +58,11 @@
                                 <RowDefinition Height="{StaticResource CardHeight}" />
                             </Grid.RowDefinitions>
 
-                            <Image
+                            <ffimage:CachedImage
                                 Grid.Row="0"
                                 Margin="8,4,8,8"
                                 Aspect="AspectFit"
+                                CacheDuration="1000000"
                                 HeightRequest="{StaticResource CardHeight}"
                                 HorizontalOptions="Center"
                                 Source="{Binding CoverImagePath}">
@@ -75,10 +77,10 @@
                                     </MenuFlyout>
                                 </FlyoutBase.ContextFlyout>
 
-                                <Image.GestureRecognizers>
+                                <ffimage:CachedImage.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
-                                </Image.GestureRecognizers>
-                            </Image>
+                                </ffimage:CachedImage.GestureRecognizers>
+                            </ffimage:CachedImage>
 
                         </Grid>
                     </Border>

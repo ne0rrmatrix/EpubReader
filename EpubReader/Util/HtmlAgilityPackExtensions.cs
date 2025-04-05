@@ -42,16 +42,6 @@ public static partial class HtmlAgilityPackExtensions
 
 	public static string AddCssLink(string htmlContent, string cssFile)
 	{
-		// Skip calibre-specific CSS files
-		if (cssFile.Contains(".calibre"))
-		{
-			return htmlContent;
-		}
-		// Skip Kobo-specific CSS files
-		if (cssFile.Contains("kobo"))
-		{
-			return htmlContent;
-		}
 		// Find the closing </head> tag
 		int headCloseTagIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
 
@@ -91,16 +81,6 @@ public static partial class HtmlAgilityPackExtensions
 		StringBuilder cssLinks = new();
 		foreach (string cssFile in cssFiles)
 		{
-			// Skip calibre-specific CSS files
-			if (cssFile.Contains(".calibre"))
-			{
-				continue;
-			}
-			// Skip Kobo-specific CSS files
-			if (cssFile.StartsWith("kobo"))
-			{
-				continue;
-			}
 			cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
 		}
 
@@ -190,9 +170,11 @@ public static partial class HtmlAgilityPackExtensions
 		string pattern2 = @"\.kobo\w*\s*{[^{}]*}";
 		string result = Regex.Replace(intermediate, pattern2, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
 
+		string pattern3 = @"\.calibre\d+\s*{[^{}]*}";
+		result = Regex.Replace(result, pattern3, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
+
 		// Clean up any consecutive newlines
 		result = CleanNewLines().Replace(result, Environment.NewLine);
-
 		return result;
 	}
 

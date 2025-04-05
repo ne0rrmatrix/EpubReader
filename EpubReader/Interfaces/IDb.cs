@@ -12,4 +12,5 @@ public interface IDb
 	void RemoveAllSettings();
 	void RemoveAllBooks();
 	void RemoveBook(Book book);
+	void UpdateBookMark(Book book);
 }

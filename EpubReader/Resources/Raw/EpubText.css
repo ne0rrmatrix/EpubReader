@@ -1,6 +1,9 @@
 ﻿html, body {
     margin: 0;
     padding: 0;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
     background-color: var(--background-color);
 }
 
@@ -9,20 +12,19 @@
 }
 
 body {
-    height: 100vh;
-    width: 100%;
-    text-align: center;
+    height: 90vh;
+    width: 100vw;
+    align-items: center;
+    justify-content: center;
+    -webkit-align-items: center;
+    -webkit-justify-content: center;
 }
 
 iframe {
     border: 0;
-    width: 80vw;
-    height: 95vh;
-    padding: 0 !important;
-    margin-left: 1em;
-    margin-right: 1em;
+    width: 100vw;
+    height: 90vh;
     columns: 1;
-    column-fill: balance;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;

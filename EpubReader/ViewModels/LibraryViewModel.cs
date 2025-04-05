@@ -30,18 +30,12 @@ public partial class LibraryViewModel : BaseViewModel
    
 	public LibraryViewModel()
     {
-		var bookData = db.GetAllBooks() ?? [];
-		Books = [.. bookData];
+		Books = [.. db.GetAllBooks() ?? []];
 	}
 
     [RelayCommand]
     public static async Task GotoBookPage(Book Book)
     {
-		if(Book is null)
-		{
-			logger.Info("Book is null");
-			return;
-		}
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
@@ -64,7 +58,7 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 		var bookData = db.GetAllBooks() ?? [];
-		var ebook = EbookService.OpenEbook(result.FullPath) ?? throw new InvalidOperationException("Error opening ebook");
+		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
 			message = "Error opening Book.";
@@ -80,7 +74,7 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info(message);
 			return;
 		}
-
+		
 		ebook.FilePath =  await FileService.SaveFile(result, ebook.Title).ConfigureAwait(false);
 		ebook.CoverImagePath = await FileService.SaveImage(ebook.Title, ebook.CoverImage).ConfigureAwait(false);
 		db.SaveBookData(ebook);

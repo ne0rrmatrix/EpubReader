@@ -14,7 +14,7 @@ class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
-	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
 	{
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));

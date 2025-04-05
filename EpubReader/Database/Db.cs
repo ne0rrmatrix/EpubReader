@@ -43,8 +43,7 @@ public partial class Db : IDb, IDisposable
 
 	public Book? GetBook(Book book)
 	{
-		var result = conn.Table<Book>().FirstOrDefault(x => x.Id ==	book.Id);
-		conn.Close();
+		var result = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
 		return result;
 	}
 
@@ -53,6 +52,7 @@ public partial class Db : IDb, IDisposable
 		var item = conn.Table<Settings>().ToList().Exists(x => x.Id == settings.Id);
 		if (item)
 		{
+			logger.Info("Updating settings");
 			conn.Update(settings);
 			return;
 		}
@@ -62,15 +62,21 @@ public partial class Db : IDb, IDisposable
 
 	public void SaveBookData(Book book)
 	{
-		var item = conn.Table<Book>().ToList().Exists(x => x.Id == book.Id);
-		if (item)
+		var item = conn.Table<Book>().ToList().Find(x => x.Title == book.Title);
+		if (item is not null)
 		{
-			conn.Update(book);
-			logger.Info("Updating book");
-			return;
+			throw new InvalidOperationException("Book already exists");
 		}
 		logger.Info("Inserting book");
 		conn.Insert(book);
+	}
+
+	public void UpdateBookMark(Book book)
+	{
+		var item = conn.Table<Book>().ToList().Find(x => x.Title == book.Title) ?? throw new InvalidOperationException("Book not found");
+		item.CurrentChapter = book.CurrentChapter;
+		conn.Update(item);
+		logger.Info("Updating book");
 	}
 
 	public void RemoveAllSettings()

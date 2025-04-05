@@ -114,7 +114,7 @@ public static partial class EbookService
 				list.Add(sharedFile);
 			}
 		});
-		List<EpubFonts> fonts = [];
+		List<EpubFonts> fonts = [];		
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
 			if (item.FilePath.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase))
@@ -138,9 +138,9 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 			Chapters = GetChapters([.. book.GetReadingOrder()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
 		};
-		return books;
+			return books;
 	}
 	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
 	{
@@ -259,7 +259,6 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
 		return htmlFile;
 	}
