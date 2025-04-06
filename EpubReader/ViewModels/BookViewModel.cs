@@ -36,11 +36,11 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
-			var currentChapter = book.CurrentChapter;
-			book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
-			Book = book;
-			Book.CurrentChapter = currentChapter;
-			streamExtensions.SetBook(book);
+			var temp = db.GetBook(book);
+			ArgumentNullException.ThrowIfNull(temp);
+			Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
+			Book.CurrentChapter = temp.CurrentChapter;
+			streamExtensions.SetBook(Book);
 			Source = new UrlWebViewSource
 			{
 				Url = url,
