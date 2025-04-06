@@ -5,7 +5,7 @@
 }
 
 :root {
---background-color: transparent; /* Default value */
+    --background-color: transparent; /* Default value */
 }
 
 body {

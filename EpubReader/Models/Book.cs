@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using Newtonsoft.Json;
+using SQLite;
 using SQLiteNetExtensions.Attributes;
 
 namespace EpubReader.Models;
@@ -6,12 +7,21 @@ namespace EpubReader.Models;
 [Table("Book")]
 public class Book
 {
-	[PrimaryKey, AutoIncrement, Column("Id")]
-	public int Id { get; set; }
+	[PrimaryKey, AutoIncrement]
+	[Column("Id")]
+	public Guid Id { get; set; }
+	[Column("Title")]
 	public string Title { get; set; } = string.Empty;
-    public string FilePath { get; set; } = string.Empty;
+	[Column("FilePath")]
+	public string FilePath { get; set; } = string.Empty;
+	[Column("CurrentChapter")]
 	public int CurrentChapter { get; set; } = 0;
-	public string WWWPath { get; set; } = string.Empty;
+	[Column("CoverImagePath")]
+	public string CoverImagePath { get; set; } = string.Empty;
+	[Ignore]
+	public List<SharedEpubFiles> Files { get; set; } = [];
+	[Ignore]
+	public List<EpubFonts> Fonts { get; set; } = [];
 
 	[Ignore]
 	public List<Chapter> Chapters { get; set; } = [];
@@ -28,8 +38,4 @@ public class Book
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
 
-	[Ignore]
-	public List<EpubFonts> Fonts { get; set; } = [];
-	[Ignore]
-	public List<SharedEpubFiles> Files { get; set; } = [];
 }

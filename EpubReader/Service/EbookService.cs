@@ -15,7 +15,6 @@ namespace EpubReader.Service;
 
 public static partial class EbookService
 {
-	static string wWWpath = string.Empty;
 	static readonly string fontPatch = "android-fonts-patch.css";
 
 	static readonly List<string> jsImports =
@@ -91,7 +90,7 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
-
+	
 	public static Book? OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
@@ -105,10 +104,8 @@ public static partial class EbookService
 			logger.Error($"Error opening ebook: {ex.Message}");
 			return null;
 		}
-		var file = FileService.ValidateAndFixFileName(Path.GetFileNameWithoutExtension(book.Title.Trim()));
-		wWWpath = FileService.ValidateAndFixDirectoryName(Path.Combine(FileService.WWWDirectory, file));
-		Directory.CreateDirectory(wWWpath);
-	    var list = new List<SharedEpubFiles>();
+
+		var list = new List<SharedEpubFiles>();
 		requiredFiles.ForEach(async file =>
 		{
 			var sharedFile = await GetSharedFiles(file);
@@ -117,7 +114,7 @@ public static partial class EbookService
 				list.Add(sharedFile);
 			}
 		});
-		List<EpubFonts> fonts = [];
+		List<EpubFonts> fonts = [];		
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
 			if (item.FilePath.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase))
@@ -139,12 +136,11 @@ public static partial class EbookService
 			Files = list,
 			Fonts = fonts,
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
-			WWWPath = wWWpath,
 			Chapters = GetChapters([.. book.GetReadingOrder()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
 		};
-		return books;
+			return books;
 	}
 	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
 	{
@@ -263,7 +259,6 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
 		return htmlFile;
 	}

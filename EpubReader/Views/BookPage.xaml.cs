@@ -141,10 +141,8 @@ public partial class BookPage : ContentPage, IDisposable
 		if(book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
-			db.SaveBookData(book);
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			db.UpdateBookMark(book);
+			await LoadPage();
 		}
 	}
 
@@ -153,14 +151,18 @@ public partial class BookPage : ContentPage, IDisposable
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
+			db.UpdateBookMark(book);
 			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
-			db.SaveBookData(book);
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			await LoadPage();
 		}
 	}
 	
+	async Task LoadPage()
+	{
+		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+	}
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
 		if (!loadIndex)
@@ -202,7 +204,6 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		ArgumentNullException.ThrowIfNull(db);
 		settings = db.GetSettings() ?? new();
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
@@ -219,14 +220,14 @@ public partial class BookPage : ContentPage, IDisposable
 	}
 	async void OnSettingsClicked()
 	{
-		settings = db.GetSettings() ?? throw new InvalidOperationException("Settings is null");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
-		await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
-		await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
-		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
+		settings = db.GetSettings() ?? new();
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
+			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
+			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -245,7 +246,7 @@ public partial class BookPage : ContentPage, IDisposable
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.SaveBookData(book);
+					db.UpdateBookMark(book);
 					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await EpubText.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");

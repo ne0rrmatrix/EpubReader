@@ -6,11 +6,17 @@ namespace EpubReader.Models;
 [Table("settings")]
 public class Settings
 {
-	[PrimaryKey, AutoIncrement, Column("Id")]
-	public int Id { get; set; }
-	public string FontFamily { get; set; } = "Times New Roman";
-	public int FontSize { get; set; } = 12;
-	public string BackgroundColor { get; set; } = "#FFFFFF";
-	public string TextColor { get; set; } = "#000000";
-	public string ColorScheme { get; set; } = "Light";
+	[PrimaryKey, AutoIncrement]
+	[Column("Id")]
+	public Guid Id { get; set; }
+	[Column("FontFamily")]
+	public string FontFamily { get; set; } = string.Empty;
+	[Column("FontSize")]
+	public int FontSize { get; set; } = 0;
+	[Column("BackgroundColor")]
+	public string BackgroundColor { get; set; } = string.Empty;
+	[Column("TextColor")]
+	public string TextColor { get; set; } = string.Empty;
+	[Column("ColorScheme")]
+	public string ColorScheme { get; set; } = string.Empty;
 }

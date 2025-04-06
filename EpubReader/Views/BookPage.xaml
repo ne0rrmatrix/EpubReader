@@ -24,7 +24,10 @@
             Order="Primary" />
     </ContentPage.ToolbarItems>
 
-    <shimmer:SfShimmer x:Name="Shimmer" AnimationDuration="3000">
+    <shimmer:SfShimmer
+        x:Name="Shimmer"
+        AnimationDuration="3000"
+        IsActive="{Binding IsActive}">
         <shimmer:SfShimmer.Content>
             <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
                 <Grid.GestureRecognizers>

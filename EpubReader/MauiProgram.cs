@@ -5,6 +5,7 @@ using EpubReader.Interfaces;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
+using FFImageLoading.Maui;
 using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
@@ -26,6 +27,7 @@ public static class MauiProgram
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 		})
+		.UseFFImageLoading()
 		.UseMauiCommunityToolkit(options =>
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);
@@ -72,7 +74,6 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 		builder.Services.AddHybridWebViewDeveloperTools();
 #endif
-		AppContext.SetSwitch("HybridWebView.InvokeJavaScriptThrowsExceptions", true);
 		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
