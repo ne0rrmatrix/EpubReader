@@ -40,6 +40,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			ArgumentNullException.ThrowIfNull(temp);
 			Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
 			Book.CurrentChapter = temp.CurrentChapter;
+			Book.Id = temp.Id;
 			streamExtensions.SetBook(Book);
 			Source = new UrlWebViewSource
 			{

@@ -55,7 +55,6 @@ class CustomWebViewClient : WebViewClient
 
 	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
-		System.Diagnostics.Debug.WriteLine("Function: ShouldOverrideUrlLoading has been called");
 		var path = request?.Url?.ToString() ?? string.Empty;
 		if (request is null || request.Url is null)
 		{

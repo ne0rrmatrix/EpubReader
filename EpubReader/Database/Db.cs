@@ -62,7 +62,7 @@ public partial class Db : IDb, IDisposable
 
 	public void SaveBookData(Book book)
 	{
-		var item = conn.Table<Book>().ToList().Find(x => x.Title == book.Title);
+		var item = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
 		if (item is not null)
 		{
 			throw new InvalidOperationException("Book already exists");
@@ -73,7 +73,13 @@ public partial class Db : IDb, IDisposable
 
 	public void UpdateBookMark(Book book)
 	{
-		var item = conn.Table<Book>().ToList().Find(x => x.Title == book.Title) ?? throw new InvalidOperationException("Book not found");
+		var item = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
+		if (item is null)
+		{
+			conn.Insert(book);
+			logger.Info("Inserting book");
+			return;
+		}
 		item.CurrentChapter = book.CurrentChapter;
 		conn.Update(item);
 		logger.Info("Updating book");
