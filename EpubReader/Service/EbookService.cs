@@ -154,12 +154,21 @@ public static partial class EbookService
 		var memoryStream = new MemoryStream();
 		await reader.BaseStream.CopyToAsync(memoryStream);
 		var bytes = memoryStream.ToArray();
-		var htmlFile = Encoding.UTF8.GetString(bytes);
-		return new SharedEpubFiles
+		var sharedFile = new SharedEpubFiles();
+		if (StreamExtensions.IsText(fileName))
 		{
-			FileName = Path.GetFileName(fileName),
-			HTMLContent = htmlFile,
-		};
+			sharedFile.HTMLContent = Encoding.UTF8.GetString(bytes);
+		}
+		else if (StreamExtensions.IsBinary(fileName))
+		{
+			sharedFile.Content = bytes;
+		}
+		else
+		{
+			return null;
+		}
+		sharedFile.FileName = fileName;
+		return sharedFile;
 	}
 
 	static string? GetTitle(EpubBookRef book, EpubLocalTextContentFileRef? item)
@@ -244,8 +253,6 @@ public static partial class EbookService
 
 	static string ProcessHtml(string htmlFile, HtmlDocument doc)
 	{
-		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
 		doc.LoadHtml(htmlFile);
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(doc);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
@@ -257,9 +264,12 @@ public static partial class EbookService
 		}
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-after.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
+		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
+		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
+		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
 		return htmlFile;
 	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)

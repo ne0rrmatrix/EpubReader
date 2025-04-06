@@ -49,10 +49,9 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
-
+		
 		// Create <link> tags for each CSS file
 		StringBuilder cssLinks = new();
-		
 		cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
 
 		// Insert the CSS links before the closing </head> tag
@@ -68,7 +67,7 @@ public static partial class HtmlAgilityPackExtensions
 		return cssContent;
 	}
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
-	{
+	{	
 		// Find the closing </head> tag
 		int headCloseTagIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
 
@@ -77,10 +76,14 @@ public static partial class HtmlAgilityPackExtensions
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
 
-		// Create <link> tags for each CSS file
-		StringBuilder cssLinks = new();
+			// Create <link> tags for each CSS file
+			StringBuilder cssLinks = new();
 		foreach (string cssFile in cssFiles)
 		{
+			if (cssFile.Contains("kobo") || cssFile.Contains("calibre"))
+			{
+				continue;
+			}
 			cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
 		}
 
@@ -98,9 +101,16 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
-
-		// Create <link> tags for each CSS file
-		StringBuilder jsLinks = new();
+		if(jsFiles.Contains("kobo"))
+		{
+			return htmlContent;
+		}
+		if (jsFiles.Contains("calibre"))
+		{
+			return htmlContent;
+		}
+			// Create <link> tags for each CSS file
+			StringBuilder jsLinks = new();
 		foreach (string jsFile in jsFiles)
 		{
 			jsLinks.Append($"<script src=\"{jsFile}\"></script>\n");
@@ -146,7 +156,9 @@ public static partial class HtmlAgilityPackExtensions
 	}
 	public static string RemoveKoboHacks(string html)
 	{
-		string pattern = @"<style[^>]*id=""kobostylehacks""[^>]*>.*?</style>";
+		string pattern = @"<style[^>]*id\s*=\s*[""']kobostylehacks[""'][^>]*>.*?</style>";
+		string pattern1 = @"<style[^>]*id=""kobostylehacks""[^>]*>.*?</style>";
+		html = Regex.Replace(html, pattern1, string.Empty, RegexOptions.Singleline, matchTimeout: TimeSpan.FromSeconds(10));
 		return Regex.Replace(html, pattern, string.Empty, RegexOptions.Singleline, matchTimeout: TimeSpan.FromSeconds(10));
 	}
 
