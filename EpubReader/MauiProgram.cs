@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Storage;
+using EpubReader.Controls;
 using EpubReader.Database;
 using EpubReader.Interfaces;
 using EpubReader.Util;
@@ -10,9 +11,17 @@ using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Platform;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
+
+
+#if IOS || MACCATALYST
+using Foundation;
+using WebKit;
+using CoreGraphics;
+#endif
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
@@ -39,12 +48,8 @@ public static class MauiProgram
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
+			handlers.AddHandler<Microsoft.Maui.Controls.WebView, CustomWebViewHandler>();
 		});
-#if ANDROID
-		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
-	  nameof(Android.Webkit.WebView.WebViewClient),
-	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
-#endif
 
 		var config = new LoggingConfiguration();
 #if RELEASE

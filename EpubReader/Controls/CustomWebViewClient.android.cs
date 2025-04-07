@@ -6,10 +6,7 @@ using EpubReader.Platforms.Android;
 using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
-namespace EpubReader;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
-
+namespace EpubReader.Controls;
 class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
@@ -39,6 +36,7 @@ class CustomWebViewClient : WebViewClient
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
 		var text = streamExtensions.Content(filename);
+		
 		if (text is not null && StreamExtensions.IsText(filename))
 		{
 			var stream = StreamExtensions.GetStream(text);
@@ -66,18 +64,7 @@ class CustomWebViewClient : WebViewClient
 			var urlParts = path.Split('.');
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-			}
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
 			return true;
 		}
 		return false;
