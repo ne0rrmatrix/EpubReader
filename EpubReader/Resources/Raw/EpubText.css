@@ -5,29 +5,39 @@
 }
 
 :root {
-    --background-color: transparent; /* Default value */
+    --background-color: transparent;
 }
 
 body {
     height: 100vh;
-    width: 100%;
+    width: calc(100% - 2em);
+    margin-left: 1em;
+    margin-right: 1em;
     text-align: center;
+}
+
+iframe p {
+    margin: 0;
+    widows: 1;
+    orphans: 1;
+    word-spacing: normal;
+    overflow-wrap: break-word;
+    letter-spacing: normal;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto; 
+    -ms-hyphens: auto;
 }
 
 iframe {
     border: 0;
-    width: 80vw;
-    height: 95vh;
+    width: 100%;
+    height: calc(100% - 2em);
     padding: 0 !important;
-    margin-left: 1em;
-    margin-right: 1em;
     columns: 1;
-    column-fill: balance;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    user-select: none;
-    /* May help later with Reading modes so that bg can be applied to whole page
-        You need to allowtransparency on the iframe though (and sanitize authors’ CSS) */
+    user-select: none; */
     background-color: transparent;
 }
