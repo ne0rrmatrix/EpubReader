@@ -1,11 +1,9 @@
-using EpubReader.Models;
-using EpubReader.Util;
-using System.Diagnostics;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
+using EpubReader.Models;
+using EpubReader.Util;
 using EpubReader.ViewModels;
-using Microsoft.Maui.Controls.Platform;
 
 #if WINDOWS
 using Microsoft.UI.Xaml.Controls;
@@ -53,7 +51,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 		{
-			OnSettingsClicked();
+			await OnSettingsClicked();
 		}
 	}
 #endif
@@ -73,11 +71,11 @@ public partial class BookPage : ContentPage, IDisposable
 		webView2.CoreWebView2.FrameNavigationCompleted += CoreWebView2_FrameNavigationCompleted;
 	}
 
-	void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+	async void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
 	{
 		if(args.IsSuccess && args.WebErrorStatus == 0)
 		{
-			OnSettingsClicked();
+			await OnSettingsClicked();
 		}
 	}
 
@@ -193,7 +191,7 @@ public partial class BookPage : ContentPage, IDisposable
 			}
 			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 			{
-				OnSettingsClicked();
+				await OnSettingsClicked();
 			}
 		}
 	}
@@ -206,7 +204,7 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		settings = db.GetSettings() ?? new();
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await OnSettingsClicked());
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 #if WINDOWS
 		var platformView = EpubText.Handler?.PlatformView;
@@ -218,7 +216,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 #endif
 	}
-	async void OnSettingsClicked()
+	async Task OnSettingsClicked()
 	{
 		settings = db.GetSettings() ?? new();
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
@@ -227,7 +225,8 @@ public partial class BookPage : ContentPage, IDisposable
 			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
 			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
+			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize*10}%')");
+		await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)

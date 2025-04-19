@@ -31,6 +31,26 @@ public static partial class HtmlAgilityPackExtensions
 		return cssFiles;
 	}
 
+	public static string EnsureDoctypeDeclaration(string html)
+	{
+		if (string.IsNullOrEmpty(html))
+		{
+			return "<!DOCTYPE html>\n<html><head><title>Initial Document</title></head><body></body></html>"; // Return a minimal valid HTML
+		}
+
+		// Use a regular expression to check for the DOCTYPE declaration (case-insensitive).
+		Regex doctypeRegex = DocType();
+
+		if (!doctypeRegex.IsMatch(html))
+		{
+			// If the DOCTYPE declaration is not found, add it to the beginning of the string.
+			//  It's crucial to add a newline after the doctype for better formatting and to avoid issues.
+			return "<!DOCTYPE html>\n" + html;
+		}
+
+		// If the DOCTYPE declaration is already present, return the original HTML string.
+		return html;
+	}
 	public static string RemoveCssLinks(string htmlContent)
 	{
 		// Regular expression to match <link> tags with rel="stylesheet"
@@ -194,4 +214,7 @@ public static partial class HtmlAgilityPackExtensions
 	private static partial Regex CssContentFilter();
 	[GeneratedRegex(@"(\r?\n){2,}", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
 	private static partial Regex CleanNewLines();
+
+	[GeneratedRegex(@"<!DOCTYPE\s+html\s*>", RegexOptions.IgnoreCase,matchTimeoutMilliseconds: 2000, "en-US")]
+	private static partial Regex DocType();
 }

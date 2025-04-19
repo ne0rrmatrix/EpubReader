@@ -72,14 +72,11 @@ public static class MauiProgram
             new MemoryTarget(2048));
 #if DEBUG
 		builder.Logging.AddDebug();
-		builder.Services.AddHybridWebViewDeveloperTools();
 #endif
 		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();
-		builder.Services.AddSingleton<IFolderPicker>(FolderPicker.Default);
-        builder.Services.AddSingleton<IFilePicker>(FilePicker.Default);
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 

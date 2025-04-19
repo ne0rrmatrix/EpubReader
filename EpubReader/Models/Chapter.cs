@@ -1,6 +1,4 @@
-﻿using SQLite;
-
-namespace EpubReader.Models;
+﻿namespace EpubReader.Models;
 public class Chapter
 {
 	public string Title { get; set; } = string.Empty;

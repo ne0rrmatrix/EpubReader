@@ -15,8 +15,6 @@ namespace EpubReader.Service;
 
 public static partial class EbookService
 {
-	static readonly string fontPatch = "android-fonts-patch.css";
-
 	static readonly List<string> jsImports =
 		[
 			"Container.js",
@@ -25,7 +23,6 @@ public static partial class EbookService
 	static readonly List<string> requiredFiles =
 		[
 			"Container.js",
-			"android-fonts-patch.css",
 			"ReadiumCSS-default.css",
 			"ReadiumCSS-before.css",
 			"ReadiumCSS-after.css",
@@ -34,14 +31,6 @@ public static partial class EbookService
 			"favicon.ico",
 			"EpubText.css",
 			"EpubText.js",
-			"NimbusRoman.woff",
-			"NimbusRoman-Italic.woff",
-			"NimbusRoman-Bold.woff",
-			"NimbusRoman-BoldItalic.woff",
-			"NimbusSans.woff",
-			"NimbusSans-Italic.woff",
-			"NimbusSans-Bold.woff",
-			"NimbusSans-BoldItalic.woff"
 		];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
@@ -263,13 +252,13 @@ public static partial class EbookService
 			htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-default.css");
 		}
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-after.css");
-		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
 		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
 		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.EnsureDoctypeDeclaration(htmlFile);
 		return htmlFile;
 	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
