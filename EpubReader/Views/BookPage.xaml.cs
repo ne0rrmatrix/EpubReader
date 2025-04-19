@@ -1,11 +1,9 @@
-using EpubReader.Models;
-using EpubReader.Util;
-using System.Diagnostics;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
+using EpubReader.Models;
+using EpubReader.Util;
 using EpubReader.ViewModels;
-using Microsoft.Maui.Controls.Platform;
 
 #if WINDOWS
 using Microsoft.UI.Xaml.Controls;

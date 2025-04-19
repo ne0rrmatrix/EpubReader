@@ -1,11 +1,5 @@
 ﻿using System.Text;
-using System.Text.RegularExpressions;
-using EpubReader.Interfaces;
 using EpubReader.Models;
-using EpubReader.Service;
-using Microsoft.Maui.Storage;
-using static System.Net.Mime.MediaTypeNames;
-using Application = Microsoft.Maui.Controls.Application;
 
 namespace EpubReader.Util;
 public class StreamExtensions

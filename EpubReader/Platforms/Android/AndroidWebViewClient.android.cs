@@ -29,7 +29,6 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.TextZoom = 100;
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
-		Android.Webkit.WebView.SetWebContentsDebuggingEnabled(true);
 	}
 
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)

@@ -1,5 +1,4 @@
-﻿using EpubReader.Service;
-using SQLite;
+﻿using SQLite;
 
 namespace EpubReader.Models;
 
