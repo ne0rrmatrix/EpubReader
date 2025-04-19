@@ -263,13 +263,14 @@ public static partial class EbookService
 			htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-default.css");
 		}
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-after.css");
-		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
+		//htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, fontPatch);
 		htmlFile = HtmlAgilityPackExtensions.AddJsLinks(htmlFile, jsImports);
 		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.EnsureDoctypeDeclaration(htmlFile);
 		return htmlFile;
 	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
