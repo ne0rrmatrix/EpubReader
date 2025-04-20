@@ -19,9 +19,9 @@ using LogLevel = MetroLog.LogLevel;
 namespace EpubReader;
 public static class MauiProgram
 {
-    public static MauiApp CreateMauiApp()
-    {
-        var builder = MauiApp.CreateBuilder();
+	public static MauiApp CreateMauiApp()
+	{
+		var builder = MauiApp.CreateBuilder();
 		builder.UseMauiApp<App>().ConfigureFonts(fonts =>
 		{
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -45,7 +45,11 @@ public static class MauiProgram
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
 #endif
-
+#if WINDOWS
+		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
+	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
+	  async (handler, view, args) =>{ WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+#endif
 		var config = new LoggingConfiguration();
 #if RELEASE
         config.AddTarget(
