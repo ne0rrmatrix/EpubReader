@@ -1,32 +1,22 @@
-using EpubReader.Models;
-using EpubReader.Util;
-using System.Diagnostics;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
+using EpubReader.Models;
+using EpubReader.Util;
 using EpubReader.ViewModels;
-using Microsoft.Maui.Controls.Platform;
+using Microsoft.Maui.Handlers;
 
-#if WINDOWS
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
-#endif
 
 namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
 	bool loadIndex = true;
-#if WINDOWS
-	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	WebView2? webView2;
-#endif
 #if ANDROID
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	readonly IDb db;
-	Book book = new();
-	Settings settings = new();
+	Book? book;
 	bool disposedValue;
 
 	public BookPage(BookViewModel viewModel, IDb db)
@@ -34,92 +24,8 @@ public partial class BookPage : ContentPage, IDisposable
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-#if ANDROID
-		EpubText.Behaviors.Add(touchbehavior);
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => OnJavaScriptMessageReceived(m));
-#endif
+		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 	}
-#if ANDROID
-	async void OnJavaScriptMessageReceived(JavaScriptMessage m)
-	{
-		if(m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Next();
-			return;
-		}
-		if (m.Value.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Prev();
-		}
-		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-		{
-			OnSettingsClicked();
-		}
-	}
-#endif
-
-#if WINDOWS
-	void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
-	{
-		ArgumentNullException.ThrowIfNull(webView2);
-		webView2.CoreWebView2.Settings.AreDevToolsEnabled = true;
-		webView2.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
-		webView2.CoreWebView2.Settings.IsReputationCheckingRequired = false;
-		webView2.CoreWebView2.Settings.AreHostObjectsAllowed = true;
-		webView2.CoreWebView2.Settings.IsWebMessageEnabled = true;
-		webView2.CoreWebView2.Settings.IsScriptEnabled = true;
-		webView2.CoreWebView2.AddWebResourceRequestedFilter("*", Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
-		webView2.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
-		webView2.CoreWebView2.FrameNavigationCompleted += CoreWebView2_FrameNavigationCompleted;
-	}
-
-	void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-	{
-		if(args.IsSuccess && args.WebErrorStatus == 0)
-		{
-			OnSettingsClicked();
-		}
-	}
-
-	void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
-	{
-		ArgumentNullException.ThrowIfNull(webView2);
-		var url = e.Request.Uri ?? string.Empty;
-		var filename = Path.GetFileName(url);
-
-		if (url.Contains("https://runcsharp"))
-		{
-			e.Response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-			return;
-		}
-		
-		var mimeType = StreamExtensions.GetMimeType(filename);
-		var text = streamExtensions.Content(filename);
-		if (text is not null)
-		{
-			var stream = StreamExtensions.GetStream(text);
-			var response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
-			e.Response = response;
-			return;
-		}
-		var binary = streamExtensions.ByteContent(filename);
-		if (binary is not null)
-		{
-			var stream = StreamExtensions.GetStream(binary);
-			var response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
-			e.Response = response;
-			return;
-		}
-		e.Response = webView2.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-	}
-	static string GenerateHeaders(string contentType)
-	{
-		const string baseHeaders = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
-		string contentTypeHeader = $"Content-Type: {contentType}";
-		string completeHeaders = $"{baseHeaders}\r\n{contentTypeHeader}";
-		return completeHeaders;
-	}
-#endif
 
 	protected override void OnDisappearing()
 	{
@@ -128,56 +34,27 @@ public partial class BookPage : ContentPage, IDisposable
 			viewModel.Dispose();
 		}
 #if WINDOWS
-		if (webView2 is not null)
-		{
-			webView2.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
-		}
+		WebViewExtensions.WebView2_Unloaded();
 #endif
 		base.OnDisappearing();
 	}
-	
-	async Task Next()
-	{
-		if(book.CurrentChapter < book.Chapters.Count - 1)
-		{
-			book.CurrentChapter++;
-			db.UpdateBookMark(book);
-			await LoadPage();
-		}
-	}
 
-	async Task Prev()
-	{
-		if (book.CurrentChapter > 0)
-		{
-			book.CurrentChapter--;
-			db.UpdateBookMark(book);
-			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
-			await LoadPage();
-		}
-	}
-	
-	async Task LoadPage()
-	{
-		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-	}
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
+		ArgumentNullException.ThrowIfNull(book);
 		if (!loadIndex)
 		{
 			return;
 		}
 		loadIndex = false;
-		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		await WebViewExtensions.LoadPage(PageLabel, EpubText, book);
 		Shimmer.IsActive = false;
 	}
 
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
 	{
 		var urlParts = e.Url.Split('.');
+		ArgumentNullException.ThrowIfNull(book);
 		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			e.Cancel = true;
@@ -185,53 +62,36 @@ public partial class BookPage : ContentPage, IDisposable
 			var methodName = funcToCall[0][..^1];
 			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
-				await Next();
+				await WebViewExtensions.Next(PageLabel, EpubText, book);
 			}
 			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 			{
-				await Prev();
+				await WebViewExtensions.Prev(PageLabel, book, EpubText);
 			}
 			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 			{
-				OnSettingsClicked();
+				var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
+				await WebViewExtensions.OnSettingsClicked(webViewHandler);
 			}
 		}
 	}
-#if WINDOWS
-	async void CurrentPage_Loaded(object sender, EventArgs e)
-#elif ANDROID || IOS || MACCATALYST
-		void CurrentPage_Loaded(object sender, EventArgs e)
-#endif
+	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		settings = db.GetSettings() ?? new();
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) => OnSettingsClicked());
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-#if WINDOWS
-		var platformView = EpubText.Handler?.PlatformView;
-		if (platformView is Microsoft.UI.Xaml.Controls.WebView2 webView3)
-		{
-			this.webView2 = webView3;
-			webView2.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
-			await webView2.EnsureCoreWebView2Async();
-		}
+		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
+#if ANDROID
+		EpubText.Behaviors.Add(touchbehavior);
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
 #endif
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
-	async void OnSettingsClicked()
-	{
-		settings = db.GetSettings() ?? new();
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
-			await EpubText.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
-			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__advancedSettings', 'readium-advanced-on')");
-			await EpubText.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
-			await EpubText.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
-	}
+	
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
+		ArgumentNullException.ThrowIfNull(book);
 		if (string.IsNullOrEmpty(chapter.Title))
 		{
 			return;

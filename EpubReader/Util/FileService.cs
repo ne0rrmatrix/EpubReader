@@ -1,5 +1,4 @@
 ﻿using MetroLog;
-using static SQLite.SQLite3;
 
 namespace EpubReader.Util;
 

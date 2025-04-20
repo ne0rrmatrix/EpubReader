@@ -1,5 +1,16 @@
 ﻿document.addEventListener("DOMContentLoaded", function () {
     const frame = document.getElementById("page");
+    const body = document.getElementById("body");
+    const root = document.documentElement;
+    const width = Math.floor(frame.contentWindow.innerWidth);
+    const height = Math.floor(frame.contentWindow.innerHeight);
+    frame.style.width = width + "px";
+    body.style.width = width + "px";
+    body.style.height = height + "px";
+    frame.style.height = height + "px";
+    root.style.setProperty('--root-width', width + "px");
+    root.style.setProperty('--root-height', height + "px");
+
     function isHorizontalScrollAtStart() {
         const frame = document.getElementById("page");
         if (!frame.contentWindow) {
@@ -28,6 +39,9 @@
 
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
+        console.log(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap);
+        console.log(frame.contentWindow.scrollX);
+        console.log(frame.contentWindow.innerWidth);
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
     };
 
@@ -55,7 +69,8 @@
 
 let isPreviousPage = false;
 let iframe = document.getElementById("page");
-iframe.onload = function () {
+
+function gotoEnd () {
     if (isPreviousPage) {
         scrollToHorizontalEnd();
         isPreviousPage = false;

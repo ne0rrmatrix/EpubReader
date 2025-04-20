@@ -23,11 +23,14 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
 		handler.PlatformView.Settings.AllowContentAccess = true;
 		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
-		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
+		handler.PlatformView.Settings.MixedContentMode = Android.Webkit.MixedContentHandling.AlwaysAllow;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
 		handler.PlatformView.Settings.UseWideViewPort = true;
 		handler.PlatformView.Settings.TextZoom = 100;
+		handler.PlatformView.VerticalScrollBarEnabled = false;
+		handler.PlatformView.HorizontalScrollBarEnabled = false;
 	}
+
 	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;

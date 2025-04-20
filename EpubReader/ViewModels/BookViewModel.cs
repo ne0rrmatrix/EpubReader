@@ -32,6 +32,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		IsNavMenuVisible = true;
 		Press();
 	}
+	
 	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
