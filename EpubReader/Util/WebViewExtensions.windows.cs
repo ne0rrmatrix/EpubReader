@@ -18,7 +18,6 @@ public static partial class WebViewExtensions
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		webViewHandler.PlatformView.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested -= CoreWebView2_WebResourceRequested;
-		webViewHandler.PlatformView.CoreWebView2.FrameNavigationCompleted -= CoreWebView2_FrameNavigationCompleted;
 		System.Diagnostics.Debug.WriteLine("WebView2 Unloaded");
 	}
 
@@ -33,16 +32,6 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2.Settings.IsScriptEnabled = true;
 		webViewHandler.PlatformView.CoreWebView2.AddWebResourceRequestedFilter("*", Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
-		webViewHandler.PlatformView.CoreWebView2.FrameNavigationCompleted += CoreWebView2_FrameNavigationCompleted;
-	}
-
-	static async void CoreWebView2_FrameNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-	{
-		ArgumentNullException.ThrowIfNull(webViewHandler);
-		if (args.IsSuccess && args.WebErrorStatus == 0)
-		{
-			await OnSettingsClicked(webViewHandler);
-		}
 	}
 
 	static void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)

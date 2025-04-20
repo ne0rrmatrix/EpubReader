@@ -16,14 +16,14 @@ public partial class LibraryViewModel : BaseViewModel
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
 	readonly FilePickerFileType customFileType = new(
-			   new Dictionary<DevicePlatform, IEnumerable<string>>
-			   {
-					{ DevicePlatform.iOS, epub },
-					{ DevicePlatform.Android, android_epub },
-					{ DevicePlatform.WinUI, epub },
-					{ DevicePlatform.Tizen, epub },
-					{ DevicePlatform.macOS, epub },
-			   });
+		  new Dictionary<DevicePlatform, IEnumerable<string>>
+		  {
+			 { DevicePlatform.iOS, new[] { "org.idpf.epub-container" } },
+			 { DevicePlatform.MacCatalyst, new[] { "org.idpf.epub-container" } },
+			 { DevicePlatform.Android, android_epub },
+			 { DevicePlatform.WinUI, epub },
+			 { DevicePlatform.Tizen, epub },
+		  });
 
 	[ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; }

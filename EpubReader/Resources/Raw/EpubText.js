@@ -39,9 +39,6 @@
 
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        console.log(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap);
-        console.log(frame.contentWindow.scrollX);
-        console.log(frame.contentWindow.innerWidth);
         frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
     };
 
@@ -70,6 +67,13 @@
 let isPreviousPage = false;
 let iframe = document.getElementById("page");
 
+function getPageCount() {
+    const frame = document.getElementById("page");
+    const width = Math.floor(frame.contentWindow.innerWidth);
+    const containerWidth = Math.abs(frame.contentWindow.document.documentElement.scrollWidth);
+    pages = Math.floor(containerWidth / width);
+    return pages;
+}
 function gotoEnd () {
     if (isPreviousPage) {
         scrollToHorizontalEnd();

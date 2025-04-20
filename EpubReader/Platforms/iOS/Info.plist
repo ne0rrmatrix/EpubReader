@@ -28,5 +28,39 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>org.idpf.epub-container</string>
+            <key>UTTypeDescription</key>
+            <string>EPUB Document</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+                <string>public.composite-content</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>epub</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/epub+zip</string>
+            </dict>
+        </dict>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+    </array>
+    <key>CFBundleIdentifier</key>
+    <string>com.companyname.epubreader</string>
 </dict>
 </plist>

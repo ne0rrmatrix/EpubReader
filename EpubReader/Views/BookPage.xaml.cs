@@ -12,7 +12,7 @@ namespace EpubReader.Views;
 public partial class BookPage : ContentPage, IDisposable
 {
 	bool loadIndex = true;
-#if ANDROID
+#if ANDROID || IOS || MACCATALYST
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	readonly IDb db;
@@ -25,6 +25,7 @@ public partial class BookPage : ContentPage, IDisposable
 		BindingContext = viewModel;
 		this.db = db;
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+		System.Diagnostics.Trace.WriteLine($"BookPage: {book.Title}");
 	}
 
 	protected override void OnDisappearing()
@@ -42,6 +43,7 @@ public partial class BookPage : ContentPage, IDisposable
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(book);
+		System.Diagnostics.Trace.WriteLine($"webView_Navigated: {e.Url}");
 		if (!loadIndex)
 		{
 			return;
@@ -54,6 +56,7 @@ public partial class BookPage : ContentPage, IDisposable
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
 	{
 		var urlParts = e.Url.Split('.');
+		System.Diagnostics.Trace.WriteLine($"webView_Navigating: {e.Url}");
 		ArgumentNullException.ThrowIfNull(book);
 		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
@@ -77,10 +80,11 @@ public partial class BookPage : ContentPage, IDisposable
 	}
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
+		System.Diagnostics.Trace.WriteLine($"CurrentPage_Loaded: {EpubText.Source}");
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-#if ANDROID
+#if ANDROID || IOS || MACCATALYST
 		EpubText.Behaviors.Add(touchbehavior);
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
 #endif
@@ -144,7 +148,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			if (disposing)
 			{
-#if ANDROID
+#if ANDROID || IOS || MACCATALYST
 				touchbehavior.Dispose();
 #endif
 			}

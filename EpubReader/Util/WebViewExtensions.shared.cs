@@ -21,6 +21,8 @@ public static partial class WebViewExtensions
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
+		var pages = await webView.EvaluateJavaScriptAsync("getPageCount()");
+		System.Diagnostics.Debug.WriteLine("pages: " + pages);
 	}
 
 	public static async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book, WebView webView)
