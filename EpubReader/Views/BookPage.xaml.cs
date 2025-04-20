@@ -6,10 +6,6 @@ using EpubReader.Util;
 using EpubReader.ViewModels;
 using Microsoft.Maui.Handlers;
 
-#if WINDOWS
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
-#endif
 
 namespace EpubReader.Views;
 
@@ -20,7 +16,7 @@ public partial class BookPage : ContentPage, IDisposable
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	readonly IDb db;
-	Book book = new();
+	Book? book;
 	bool disposedValue;
 
 	public BookPage(BookViewModel viewModel, IDb db)
@@ -28,30 +24,8 @@ public partial class BookPage : ContentPage, IDisposable
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-#if ANDROID
-		EpubText.Behaviors.Add(touchbehavior);
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => OnJavaScriptMessageReceived(m));
-#endif
+		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 	}
-#if ANDROID
-	async void OnJavaScriptMessageReceived(JavaScriptMessage m)
-	{
-		if(m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Next();
-			return;
-		}
-		if (m.Value.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Prev();
-		}
-		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-		{
-			var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-			await WebViewExtensions.OnSettingsClicked(webViewHandler);
-		}
-	}
-#endif
 
 	protected override void OnDisappearing()
 	{
@@ -64,48 +38,23 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 		base.OnDisappearing();
 	}
-	
-	async Task Next()
-	{
-		if(book.CurrentChapter < book.Chapters.Count - 1)
-		{
-			book.CurrentChapter++;
-			db.UpdateBookMark(book);
-			await LoadPage();
-		}
-	}
 
-	async Task Prev()
-	{
-		if (book.CurrentChapter > 0)
-		{
-			book.CurrentChapter--;
-			db.UpdateBookMark(book);
-			await EpubText.EvaluateJavaScriptAsync("setPreviousPage()");
-			await LoadPage();
-		}
-	}
-	
-	async Task LoadPage()
-	{
-		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-		await EpubText.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-	}
 	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
 	{
+		ArgumentNullException.ThrowIfNull(book);
 		if (!loadIndex)
 		{
 			return;
 		}
 		loadIndex = false;
-		await LoadPage();
+		await WebViewExtensions.LoadPage(PageLabel, EpubText, book);
 		Shimmer.IsActive = false;
 	}
 
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
 	{
 		var urlParts = e.Url.Split('.');
+		ArgumentNullException.ThrowIfNull(book);
 		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			e.Cancel = true;
@@ -113,11 +62,11 @@ public partial class BookPage : ContentPage, IDisposable
 			var methodName = funcToCall[0][..^1];
 			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 			{
-				await Next();
+				await WebViewExtensions.Next(PageLabel, EpubText, book);
 			}
 			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 			{
-				await Prev();
+				await WebViewExtensions.Prev(PageLabel, book, EpubText);
 			}
 			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 			{
@@ -131,6 +80,10 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
+#if ANDROID
+		EpubText.Behaviors.Add(touchbehavior);
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
+#endif
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
@@ -138,6 +91,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
+		ArgumentNullException.ThrowIfNull(book);
 		if (string.IsNullOrEmpty(chapter.Title))
 		{
 			return;

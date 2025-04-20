@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EpubReader.Interfaces;
+﻿using EpubReader.Interfaces;
+using EpubReader.Messages;
+using EpubReader.Models;
 using Microsoft.Maui.Handlers;
 
 namespace EpubReader.Util;
@@ -23,5 +20,49 @@ public static partial class WebViewExtensions
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
+		await webView.EvaluateJavaScriptAsync("gotoEnd();");
+	}
+
+	public static async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book, WebView webView)
+	{
+		if (m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
+		{
+			await Next(label, webView, book);
+			return;
+		}
+		if (m.Value.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+		{
+			await Prev(label, book, webView);
+		}
+		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
+		{
+			await OnSettingsClicked(webView.Handler as IWebViewHandler ?? throw new InvalidOperationException());
+		}
+	}
+	public static async Task LoadPage(Label label, WebView webView, Book book)
+	{
+		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		label.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+	}
+	public static async Task Next(Label label, WebView webView, Book book)
+	{
+		if (book.CurrentChapter < book.Chapters.Count - 1)
+		{
+			book.CurrentChapter++;
+			db.UpdateBookMark(book);
+			await LoadPage(label, webView, book);
+		}
+	}
+
+	public static async Task Prev(Label label, Book book, WebView webView)
+	{
+		if (book.CurrentChapter > 0)
+		{
+			book.CurrentChapter--;
+			db.UpdateBookMark(book);
+			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
+			await LoadPage(label, webView, book);
+		}
 	}
 }

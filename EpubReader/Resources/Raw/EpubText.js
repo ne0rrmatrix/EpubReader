@@ -69,7 +69,8 @@
 
 let isPreviousPage = false;
 let iframe = document.getElementById("page");
-iframe.onload = function () {
+
+function gotoEnd () {
     if (isPreviousPage) {
         scrollToHorizontalEnd();
         isPreviousPage = false;

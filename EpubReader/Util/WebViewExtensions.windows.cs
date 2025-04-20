@@ -1,8 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using FFImageLoading;
-using Microsoft.Maui.Handlers;
+﻿using Microsoft.Maui.Handlers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -45,7 +41,7 @@ public static partial class WebViewExtensions
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		if (args.IsSuccess && args.WebErrorStatus == 0)
 		{
-			await WebViewExtensions.OnSettingsClicked(webViewHandler);
+			await OnSettingsClicked(webViewHandler);
 		}
 	}
 
