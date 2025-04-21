@@ -1,7 +1,7 @@
 ﻿window.addEventListener("click", function (e) {
    
-    e.preventDefault();
-   
+    //e.preventDefault();
+    console.log("click event detected");
     if (e.clientX > (window.innerWidth / 2)) {
         console.log("clicking next sent to parent.");
         if(iOS())
@@ -18,7 +18,7 @@
         }
         window.parent.postMessage("prev", "https://demo");
     }
-});
+},true);
 
 window.addEventListener("keydown", function (e) {
     if (e.key === "ArrowRight") {
@@ -38,7 +38,7 @@ window.addEventListener("keydown", function (e) {
         }
         window.parent.postMessage("prev", "https://demo");
     }
-});
+}, true);
 
 function iOS() {
     return [
