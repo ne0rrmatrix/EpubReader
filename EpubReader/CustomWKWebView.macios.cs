@@ -29,7 +29,7 @@ public class CustomMauiWKWebView : MauiWKWebView
 		var url = request.Url.AbsoluteString;
 		System.Diagnostics.Debug.WriteLine($"LoadRequest {url}");
 		
-		var baseUrl = NSUrl.FromString("https://demo/");
+		var baseUrl = NSUrl.FromString("app://demo/");
 		var filename = Path.GetFileName(url) ?? throw new InvalidOperationException("url is null");
 		var mimeType = FileService.GetMimeType(filename);
 		var text = StreamExtensions.Instance?.Content(filename);

@@ -39,10 +39,17 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
+#if ANDROID || WINDOWS
 			Source = new UrlWebViewSource
 			{
 				Url = url,
 			};
+#elif IOS || MACCATALYST
+			Source = new UrlWebViewSource
+			{
+				Url = "app://demo/index.html",
+			};
+#endif
 		}
 	}
 

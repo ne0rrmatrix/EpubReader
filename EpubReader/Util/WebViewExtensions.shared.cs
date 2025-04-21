@@ -46,7 +46,11 @@ public static partial class WebViewExtensions
 	public static async Task LoadPage(Label label, WebView webView, Book book)
 	{
 		System.Diagnostics.Trace.WriteLine($"LoadPage: {book.Chapters[book.CurrentChapter]?.FileName}");
+#if ANDROID || WINDOWS
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+#elif IOS || MACCATALYST
+		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+#endif
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		label.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 	}

@@ -1,4 +1,6 @@
-﻿using EpubReader.Util;
+﻿using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Messages;
+using EpubReader.Util;
 using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
@@ -16,6 +18,7 @@ class CustomWebViewNavigationDelegate : WKNavigationDelegate
 	{
 		var url = webView.Url?.AbsoluteString;
 		System.Diagnostics.Debug.WriteLine($"DidFinishNavigation: {url}");
+		WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
 	}
 	public override void DidCommitNavigation(WKWebView webView, WKNavigation navigation)
 	{
@@ -28,9 +31,9 @@ class CustomWebViewNavigationDelegate : WKNavigationDelegate
 		{
 			System.Diagnostics.Trace.WriteLine("DecidePolicy Action: about:blank");
 			//decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
-			var book = StreamExtensions.Instance?.Book ?? throw new InvalidOperationException("Book is null");
-			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			System.Diagnostics.Trace.WriteLine($"DecidePolicy Action: {pageToLoad}");
+			//var book = StreamExtensions.Instance?.Book ?? throw new InvalidOperationException("Book is null");
+			//var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+			//System.Diagnostics.Trace.WriteLine($"DecidePolicy Action: {pageToLoad}");
 			//await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 			//return;
 		}
