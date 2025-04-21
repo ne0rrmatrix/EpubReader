@@ -16,9 +16,10 @@ class CustomWebViewNavigationDelegate : WKNavigationDelegate
 	}
 	public override void DidFinishNavigation(WKWebView webView, WKNavigation navigation)
 	{
-		var url = webView.Url?.AbsoluteString;
+		var url = webView.Url?.AbsoluteString ?? throw new InvalidOperationException("url is null");
 		System.Diagnostics.Debug.WriteLine($"DidFinishNavigation: {url}");
-		WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
+		
+		handler.VirtualView?.Navigated(WebNavigationEvent.NewPage, url, WebNavigationResult.Success);
 	}
 	public override void DidCommitNavigation(WKWebView webView, WKNavigation navigation)
 	{
