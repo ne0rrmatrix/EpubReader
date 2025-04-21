@@ -85,8 +85,8 @@ public partial class BookPage : ContentPage, IDisposable
 		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
 #if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
 #endif
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
