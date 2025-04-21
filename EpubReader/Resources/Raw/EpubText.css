@@ -24,6 +24,7 @@ body {
 }
 
 iframe {
+    -webkit-touch-callout: none;
     -webkit-text-size-adjust: none;
     text-size-adjust: none;
     border-width: 0 !important;

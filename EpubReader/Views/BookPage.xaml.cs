@@ -12,7 +12,7 @@ namespace EpubReader.Views;
 public partial class BookPage : ContentPage, IDisposable
 {
 	bool loadIndex = true;
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	readonly IDb db;
@@ -83,13 +83,12 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID
 		EpubText.Behaviors.Add(touchbehavior);
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
 #endif
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		Shimmer.IsActive = false;
 	}
 
 
@@ -148,7 +147,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			if (disposing)
 			{
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID
 				touchbehavior.Dispose();
 #endif
 			}

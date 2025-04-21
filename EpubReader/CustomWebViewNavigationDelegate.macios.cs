@@ -28,17 +28,30 @@ class CustomWebViewNavigationDelegate : WKNavigationDelegate
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
 	{
 		System.Diagnostics.Trace.WriteLine("DecidePolicy Action: " + navigationAction.Request.Url?.AbsoluteString);
-		if(navigationAction.Request.Url?.AbsoluteString?.Contains("about:blank") is true)
+		
+		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
+		if (path.Contains("https://runcsharp") is true)
 		{
-			System.Diagnostics.Trace.WriteLine("DecidePolicy Action: about:blank");
-			//decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
-			//var book = StreamExtensions.Instance?.Book ?? throw new InvalidOperationException("Book is null");
-			//var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-			//System.Diagnostics.Trace.WriteLine($"DecidePolicy Action: {pageToLoad}");
-			//await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-			//return;
+			var urlParts = path.Split('.');
+			var funcToCall = urlParts[1].Split("?");
+			var methodName = funcToCall[0][..^1];
+			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
+			}
+			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
+			}
+			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
+			}
+
+			decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
+				return;
 		}
-			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
+		decisionHandler(WKNavigationActionPolicy.Allow, preferences);
 	}
 	public override void DecidePolicy(WKWebView webView, WKNavigationResponse navigationResponse, Action<WKNavigationResponsePolicy> decisionHandler)
 	{

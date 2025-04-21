@@ -43,7 +43,10 @@
     };
 
     window.addEventListener("message", function (event) {
-        if (event.origin !== "https://demo") {
+        if (event.origin !== "https://demo" && !iOS()) {
+            return;
+        }
+        if(event.origin !== "app://demo" && iOS()) {
             return;
         }
         if (event.data === "next") {
@@ -133,3 +136,16 @@ function UnsetBackgroundColor() {
 document.getElementById("page").addEventListener("load", function () {
     window.location.href = 'https://runcsharp.pageLoad?true';
 });
+
+function iOS() {
+    return [
+            'iPad Simulator',
+            'iPhone Simulator',
+            'iPod Simulator',
+            'iPad',
+            'iPhone',
+            'iPod'
+        ].includes(navigator.platform)
+        // iPad on iOS 13 detection
+        || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+}
