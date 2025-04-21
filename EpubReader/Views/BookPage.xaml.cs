@@ -25,7 +25,6 @@ public partial class BookPage : ContentPage, IDisposable
 		BindingContext = viewModel;
 		this.db = db;
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		System.Diagnostics.Trace.WriteLine($"BookPage: {book.Title}");
 	}
 
 	protected override void OnDisappearing()
@@ -90,8 +89,9 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		Shimmer.IsActive = false;
 	}
-	
+
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{

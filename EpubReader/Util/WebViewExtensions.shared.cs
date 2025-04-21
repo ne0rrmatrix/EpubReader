@@ -9,6 +9,7 @@ public static partial class WebViewExtensions
 	static readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	public static async Task OnSettingsClicked(IWebViewHandler handler)
 	{
+		System.Diagnostics.Trace.WriteLine("OnSettingsClicked");
 		var settings = db.GetSettings() ?? new();
 		var webView = handler.VirtualView as WebView ?? throw new InvalidOperationException();
 
@@ -27,6 +28,7 @@ public static partial class WebViewExtensions
 
 	public static async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book, WebView webView)
 	{
+		System.Diagnostics.Trace.WriteLine($"OnJavaScriptMessageReceived: {m.Value}");
 		if (m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await Next(label, webView, book);
@@ -43,6 +45,7 @@ public static partial class WebViewExtensions
 	}
 	public static async Task LoadPage(Label label, WebView webView, Book book)
 	{
+		System.Diagnostics.Trace.WriteLine($"LoadPage: {book.Chapters[book.CurrentChapter]?.FileName}");
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		label.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";

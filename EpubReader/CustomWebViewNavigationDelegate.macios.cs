@@ -1,109 +1,66 @@
-﻿using System.Reflection.Metadata;
+﻿using EpubReader.Util;
+using Foundation;
 using Microsoft.Maui.Handlers;
-using Microsoft.Maui.Platform;
 using WebKit;
 
 namespace EpubReader;
-class CustomWebViewNavigationDelegate(IWebViewHandler handler) : MauiWebViewNavigationDelegate(handler)
+class CustomWebViewNavigationDelegate : WKNavigationDelegate
 {
-	readonly IWebViewHandler handler = handler;
-	/*
-	public new void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
+	readonly IWebViewHandler handler;
+	public CustomWebViewNavigationDelegate(IWebViewHandler handler)
 	{
-		var url = navigationAction.Request.Url?.AbsoluteString;
-		if (url is not null && url.Contains("https://demo", StringComparison.OrdinalIgnoreCase))
-		{
-			System.Diagnostics.Debug.WriteLine("CustomWebViewNavigationDelegate: " + url);
-			decisionHandler(WKNavigationActionPolicy.Allow);
-			return;
-		}
-		if (url is not null && url.Contains("runcsharp", StringComparison.OrdinalIgnoreCase))
-		{
-			System.Diagnostics.Debug.WriteLine("CustomWebViewNavigationDelegate: " + url);
-			decisionHandler(WKNavigationActionPolicy.Cancel);
-			return;
-		}
-		
-		System.Diagnostics.Debug.WriteLine("CustomWebViewNavigationDelegate: " + url);
-		base.DecidePolicy(webView, navigationAction, decisionHandler);
+		this.handler = handler ?? throw new ArgumentNullException(nameof(handler));
+		System.Diagnostics.Debug.WriteLine($"CustomWebViewNavigationDelegate {handler}");
 	}
-1	*/
-	// https://stackoverflow.com/questions/37509990/migrating-from-uiwebview-to-wkwebview
-	
-	public new void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
+	public override void DidFinishNavigation(WKWebView webView, WKNavigation navigation)
 	{
-		System.Diagnostics.Trace.WriteLine("CustomWebViewNavigationDelegate: " + navigationAction.Request.Url?.AbsoluteString);
-		if (handler is null || !handler.IsConnected())
+		var url = webView.Url?.AbsoluteString;
+		System.Diagnostics.Debug.WriteLine($"DidFinishNavigation: {url}");
+	}
+	public override void DidCommitNavigation(WKWebView webView, WKNavigation navigation)
+	{
+		System.Diagnostics.Trace.WriteLine("DidCommitNavigation: " + webView.Url?.AbsoluteString);
+	}
+	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
+	{
+		System.Diagnostics.Trace.WriteLine("DecidePolicy Action: " + navigationAction.Request.Url?.AbsoluteString);
+		if(navigationAction.Request.Url?.AbsoluteString?.Contains("about:blank") is true)
 		{
-			decisionHandler.Invoke(WKNavigationActionPolicy.Cancel);
-			return;
+			System.Diagnostics.Trace.WriteLine("DecidePolicy Action: about:blank");
+			//decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
+			var book = StreamExtensions.Instance?.Book ?? throw new InvalidOperationException("Book is null");
+			var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+			System.Diagnostics.Trace.WriteLine($"DecidePolicy Action: {pageToLoad}");
+			//await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+			//return;
 		}
-
-		var platformView = handler?.PlatformView;
-		var virtualView = handler?.VirtualView;
-
-		if (platformView is null || virtualView is null)
-		{
-			decisionHandler.Invoke(WKNavigationActionPolicy.Cancel);
-			return;
-		}
-
-		var url = navigationAction.Request.Url?.AbsoluteString;
-		if (url is not null && url.Contains("https://demo", StringComparison.OrdinalIgnoreCase))
-		{
-			System.Diagnostics.Trace.WriteLine("CustomWebViewNavigationDelegate: " + url);
-			decisionHandler.Invoke(WKNavigationActionPolicy.Allow);
-			return;
-		}
-		if (url is not null && url.Contains("runcsharp", StringComparison.OrdinalIgnoreCase))
-		{
-			System.Diagnostics.Trace.WriteLine("CustomWebViewNavigationDelegate: " + url);
-			decisionHandler.Invoke(WKNavigationActionPolicy.Cancel);
-			return;
-		}
-		System.Diagnostics.Trace.WriteLine("CustomWebViewNavigationDelegate: " + url);
-		var navEvent = WebNavigationEvent.NewPage;
-		var navigationType = navigationAction.NavigationType;
-
-		switch (navigationType)
-		{
-			case WKNavigationType.LinkActivated:
-				navEvent = WebNavigationEvent.NewPage;
-
-				if (navigationAction.TargetFrame == null)
-				{
-					webView?.LoadRequest(navigationAction.Request);
-				}
-
-				break;
-			case WKNavigationType.FormSubmitted:
-				navEvent = WebNavigationEvent.NewPage;
-				break;
-			case WKNavigationType.BackForward:
-				navEvent = CurrentNavigationEvent;
-				break;
-			case WKNavigationType.Reload:
-				navEvent = WebNavigationEvent.Refresh;
-				break;
-			case WKNavigationType.FormResubmitted:
-				navEvent = WebNavigationEvent.NewPage;
-				break;
-			case WKNavigationType.Other:
-				navEvent = WebNavigationEvent.NewPage;
-				break;
-		}
-
-		var request = navigationAction.Request;
-		var lastUrl = request.Url?.ToString() ?? throw new InvalidNavigationException("Url cannot be null.");
-
-		bool cancel = virtualView.Navigating(navEvent, lastUrl);
-		decisionHandler(cancel ? WKNavigationActionPolicy.Cancel : WKNavigationActionPolicy.Allow);
+			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
+	}
+	public override void DecidePolicy(WKWebView webView, WKNavigationResponse navigationResponse, Action<WKNavigationResponsePolicy> decisionHandler)
+	{
+		System.Diagnostics.Trace.WriteLine("DecidePolicy Response: " + navigationResponse.Response.Url?.AbsoluteString);
+		decisionHandler(WKNavigationResponsePolicy.Allow);
+	}
+	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
+	{
+		System.Diagnostics.Trace.WriteLine("DecidePolicyAction2: " + navigationAction.Request.Url?.AbsoluteString);
+		decisionHandler(WKNavigationActionPolicy.Allow);
 	}
 
-	internal WebNavigationEvent CurrentNavigationEvent
+	public override void DidStartProvisionalNavigation(WKWebView webView, WKNavigation navigation)
 	{
-		get;
-		set;
+		System.Diagnostics.Trace.WriteLine("DidStartProvisionalNavigation: " + webView.Url?.AbsoluteString);
 	}
-
+	public override void DidFailNavigation(WKWebView webView, WKNavigation navigation, NSError error)
+	{
+		System.Diagnostics.Trace.WriteLine("DidFailNavigation: " + webView.Url?.AbsoluteString);
+	}
+	public override void DidFailProvisionalNavigation(WKWebView webView, WKNavigation navigation, NSError error)
+	{
+		System.Diagnostics.Trace.WriteLine("DidFailProvisionalNavigation: " + webView.Url?.AbsoluteString);
+	}
+	public override void DidReceiveServerRedirectForProvisionalNavigation(WKWebView webView, WKNavigation navigation)
+	{
+		System.Diagnostics.Trace.WriteLine("DidReceiveServerRedirectForProvisionalNavigation: " + webView.Url?.AbsoluteString);
+	}
 }

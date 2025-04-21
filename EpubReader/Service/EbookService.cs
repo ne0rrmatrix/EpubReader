@@ -80,7 +80,7 @@ public static partial class EbookService
 		};
 	}
 	
-	public static Book? OpenEbook(string path)
+	public static async Task<Book?> OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
 		EpubBookRef book;
@@ -95,14 +95,16 @@ public static partial class EbookService
 		}
 
 		var list = new List<SharedEpubFiles>();
-		requiredFiles.ForEach(async file =>
+		foreach (var item in requiredFiles)
 		{
-			var sharedFile = await GetSharedFiles(file);
+			var sharedFile = await GetSharedFiles(item);
 			if (sharedFile is not null)
 			{
 				list.Add(sharedFile);
+				//System.Diagnostics.Trace.WriteLine($"Shared file: {sharedFile.FileName}");
 			}
-		});
+		}
+		
 		List<EpubFonts> fonts = [];		
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
@@ -110,7 +112,7 @@ public static partial class EbookService
 			{
 				EpubFonts Font = new()
 				{
-					Content = item.ReadContentAsBytes(),
+					Content = await item.ReadContentAsBytesAsync(),
 					FileName = Path.GetFileName(item.FilePath),
 					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
 				};
@@ -124,8 +126,8 @@ public static partial class EbookService
 			FilePath = path,
 			Files = list,
 			Fonts = fonts,
-			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
-			Chapters = GetChapters([.. book.GetReadingOrder()], book),
+			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
+			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
 			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
 		};

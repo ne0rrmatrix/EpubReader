@@ -32,16 +32,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		IsNavMenuVisible = true;
 		Press();
 	}
-	
+
 	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
 		{
-			var temp = db.GetBook(book);
-			ArgumentNullException.ThrowIfNull(temp);
-			Book = EbookService.OpenEbook(book.FilePath) ?? throw new InvalidOperationException("Error opening ebook");
-			Book.CurrentChapter = temp.CurrentChapter;
-			Book.Id = temp.Id;
+			Book = book;
 			streamExtensions.SetBook(Book);
 			Source = new UrlWebViewSource
 			{

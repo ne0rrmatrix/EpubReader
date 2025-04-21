@@ -24,6 +24,7 @@ using EpubReader.Messages;
 using CoreGraphics;
 using Foundation;
 using UIKit;
+using WebKit;
 #endif
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
@@ -63,18 +64,21 @@ public static class MauiProgram
 #elif IOS || MACCATALYST
 		Microsoft.Maui.Handlers.WebViewHandler.PlatformViewFactory = (handler) => 
 		{
-			WebKit.WKWebViewConfiguration config = MauiWKWebView.CreateConfiguration();
-			config.Preferences.JavaScriptEnabled = true;
-			config.Preferences.JavaScriptCanOpenWindowsAutomatically = true;
-			config.ApplicationNameForUserAgent = "EpubReader/1.0.0";
-			CustomWebViewNavigationDelegate navigationDelegate = new((WebViewHandler)handler);
-			
-			var webView = new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			WKWebpagePreferences WebPagePreferences = new()
 			{
-				NavigationDelegate = navigationDelegate
+				AllowsContentJavaScript = true,
 			};
-			System.Diagnostics.Trace.WriteLine($"WebViewHandler: {webView}");
-			return webView;
+			WebKit.WKWebViewConfiguration config = MauiWKWebView.CreateConfiguration();
+			config.Preferences.JavaScriptCanOpenWindowsAutomatically = true;
+			config.Preferences.JavaScriptEnabled = true;
+			config.ApplicationNameForUserAgent = "EpubReader/1.0.0";
+			config.WebsiteDataStore = WKWebsiteDataStore.DefaultDataStore;
+			config.DefaultWebpagePreferences = WebPagePreferences;
+			
+			return new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			{
+				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),
+			};
 		};
 #endif
 		var config = new LoggingConfiguration();
@@ -117,92 +121,3 @@ public static class MauiProgram
 		return builder.Build();
     }
 }
-#if IOS || MACCATALYST
-public class CustomMauiWKWebView : MauiWKWebView
-{
-	//readonly WeakReference<WebViewHandler> handler;
-	readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-
-	public CustomMauiWKWebView(CGRect frame, WebViewHandler handler, WebKit.WKWebViewConfiguration configuration) : base(frame, handler, configuration)
-	{
-		_ = handler ?? throw new ArgumentNullException(nameof(handler));
-		//this.handler = new WeakReference<WebViewHandler>(handler);
-		BackgroundColor = UIColor.Clear;
-		AutosizesSubviews = true;
-		System.Diagnostics.Trace.WriteLine($"CustomMauiWKWebView: {this}");
-	}
-
-	public new void LoadUrl(string? url)
-	{
-		if (string.IsNullOrEmpty(url))
-		{
-			return;
-		}
-		System.Diagnostics.Trace.WriteLine($"LoadUrl: {url}");
-		if (url.Contains("runcsharp"))
-		{
-			var urlParts = url.Split('.');
-			var funcToCall = urlParts[1].Split("?");
-			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-			}
-			return;
-		}
-		try
-		{
-			var filename = Path.GetFileName(url);
-			var mimeType = FileService.GetMimeType(filename);
-			var text = streamExtensions.Content(filename);
-			if (text is not null && StreamExtensions.IsText(filename))
-			{
-				System.Diagnostics.Trace.WriteLine($"LoadUrl: {url} - {filename}");
-				var stream = StreamExtensions.GetStream(text);
-				var nsData = NSData.FromStream(stream) ?? throw new InvalidOperationException("Stream cannot be null");
-				LoadData(nsData, mimeType, string.Empty, new NSUrl(url));
-				return;
-			}
-			var binary = streamExtensions.ByteContent(filename);
-			if (binary is not null && StreamExtensions.IsBinary(filename))
-			{
-				System.Diagnostics.Trace.WriteLine($"LoadUrl: {url} - {filename}");
-				var stream = StreamExtensions.GetStream(binary);
-				var nsData = NSData.FromStream(stream) ?? throw new InvalidOperationException("Stream cannot be null");
-				LoadData(nsData, mimeType, string.Empty, new NSUrl(url));
-				return;
-			}
-			/*
-			var file = Path.GetFileNameWithoutExtension(url);
-			var ext = Path.GetExtension(url);
-
-			var nsUrl = NSBundle.MainBundle.GetUrlForResource(file, ext);
-
-			if (nsUrl == null)
-			{
-				return;
-			}
-			var nsData = NSData.FromString(string.Empty, NSStringEncoding.UTF8);
-			//LoadFileUrl(nsUrl, nsUrl);
-			LoadData(nsData, "text/html", string.Empty, nsUrl);
-			return;
-			*/
-		}
-		catch (Exception ex)
-		{
-			System.Diagnostics.Debug.WriteLine(ex.StackTrace ?? ex.Message ?? ex.InnerException?.Message ?? ex.InnerException?.InnerException?.Message ?? ex.Message);
-		}
-		base.LoadUrl(url);
-	}
-
-	
-}
-#endif
