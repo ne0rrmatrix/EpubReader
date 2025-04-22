@@ -23,12 +23,11 @@ public partial class BookPage : ContentPage, IDisposable
 		HorizontalOptions = LayoutOptions.Center,
 	};
 	bool loadIndex = true;
-#if ANDROID || IOS || MACCATALYST
-
-	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
-#endif
 	readonly IDb db;
 	Book? book;
+#if ANDROID || IOS
+	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
+#endif
 #if IOS || MACCATALYST
 	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
 	{
@@ -51,18 +50,21 @@ public partial class BookPage : ContentPage, IDisposable
 		epubText.Navigating += webView_Navigating;
 		epubText.Scale = 1;
 		epubText.Source = viewModel.Source;
-		
+
 #if ANDROID || WINDOWS
 		epubText.Source = new UrlWebViewSource
 		{
 			Url = "https://demo/index.html",
 		};
 #endif
+#if IOS
+epubText.Behaviors.Add(touchbehavior);
+#endif
 #if ANDROID
 		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
 		epubText.GestureRecognizers.Add(swipeGestureRecognizer_up);
 		grid.SetRow(epubText, 0);
-		//epubText.Behaviors.Add(touchbehavior);
+		epubText.Behaviors.Add(touchbehavior);
 #elif IOS || MACCATALYST
 		epubText.Source = new UrlWebViewSource
         {
@@ -130,7 +132,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		loadIndex = false;
 		await WebViewExtensions.LoadPage(pageLabel, epubText, book);
-		//Shimmer.IsActive = false;
+		Shimmer.IsActive = false;
 	}
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)

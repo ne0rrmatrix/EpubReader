@@ -23,31 +23,37 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
+    <shimmer:SfShimmer
+        x:Name="Shimmer"
+        AnimationDuration="3000"
+        IsActive="{Binding IsActive}">
+        <shimmer:SfShimmer.Content>
+            <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
+                <Grid.GestureRecognizers>
+                    <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                        <On Platform="MacCatalyst">
+                            <TapGestureRecognizer
+                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                                Command="{Binding PressCommand}"
+                                NumberOfTapsRequired="2" />
+                        </On>
+                        <On Platform="WinUI">
+                            <TapGestureRecognizer
+                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                                Command="{Binding PressCommand}"
+                                NumberOfTapsRequired="2" />
+                        </On>
+                    </OnPlatform>
+                </Grid.GestureRecognizers>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-    <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
-        <Grid.GestureRecognizers>
-            <OnPlatform x:TypeArguments="TapGestureRecognizer">
-                <On Platform="MacCatalyst">
-                    <TapGestureRecognizer
-                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                        Command="{Binding PressCommand}"
-                        NumberOfTapsRequired="2" />
-                </On>
-                <On Platform="WinUI">
-                    <TapGestureRecognizer
-                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                        Command="{Binding PressCommand}"
-                        NumberOfTapsRequired="2" />
-                </On>
-            </OnPlatform>
-        </Grid.GestureRecognizers>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-    </Grid>
+            </Grid>
+        </shimmer:SfShimmer.Content>
+    </shimmer:SfShimmer>
 </ContentPage>

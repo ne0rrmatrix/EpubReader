@@ -33,12 +33,20 @@
 
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
+        if (navigator.appVersion.indexOf("Win") != -1) {
+            frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap,0);
+            return;
+        }
         frame.contentWindow.scrollTo({left:frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, top:0, behavior:"smooth"});
     };
 
 
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
+        if (navigator.appVersion.indexOf("Win") != -1) {
+            frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
+            return;
+        }
         frame.contentWindow.scrollTo({
             left:frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, top:0, behavior: "smooth"});
     };
