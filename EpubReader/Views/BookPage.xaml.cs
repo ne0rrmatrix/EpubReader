@@ -12,7 +12,7 @@ namespace EpubReader.Views;
 public partial class BookPage : ContentPage, IDisposable
 {
 	bool loadIndex = true;
-#if ANDROID
+#if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
 	readonly IDb db;
@@ -49,7 +49,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		loadIndex = false;
 		await WebViewExtensions.LoadPage(PageLabel, EpubText, book);
-		Shimmer.IsActive = false;
+		//Shimmer.IsActive = false;
 	}
 
 	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
@@ -83,7 +83,7 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-#if ANDROID
+#if ANDROID || IOS
 		EpubText.Behaviors.Add(touchbehavior);
 #endif
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
@@ -128,26 +128,23 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 	}
 
-	public void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
+	async void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
 	{
-		if (sender is null)
-		{
-			return;
-		}
-		if (e.Direction == SwipeDirection.Up)
-		{
-			var viewModel = (BookViewModel)BindingContext;
-			viewModel.Press();
-		}
+		System.Diagnostics.Trace.WriteLine("SwipeGesture Right");
+		await EpubText.EvaluateJavaScriptAsync(" window.parent.postMessage(\"next\", \"app://demo\");");
 	}
-
+	async void SwipeGestureRecognizer_OnSwiped(object? sender, SwipedEventArgs e)
+	{
+		System.Diagnostics.Trace.WriteLine("SwipeGesture Left");
+		await EpubText.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
+	}
 	protected virtual void Dispose(bool disposing)
 	{
 		if (!disposedValue)
 		{
 			if (disposing)
 			{
-#if ANDROID
+#if ANDROID  || IOS
 				touchbehavior.Dispose();
 #endif
 			}

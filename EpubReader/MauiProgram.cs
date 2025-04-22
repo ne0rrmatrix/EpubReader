@@ -1,7 +1,12 @@
-﻿using System.Reflection.Metadata;
+﻿using System.Buffers.Text;
+using System.Globalization;
+using System.Reflection.Metadata;
+using System.Runtime.Versioning;
 using CommunityToolkit.Maui;
+using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Database;
 using EpubReader.Interfaces;
+using EpubReader.Messages;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
@@ -10,19 +15,13 @@ using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Animations;
+using Microsoft.Maui.Controls;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using Syncfusion.Maui.Toolkit.Hosting;
-
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-using Microsoft.Maui.Controls;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using Microsoft.Maui.Animations;
-using System.Buffers.Text;
-using System.Runtime.Versioning;
-using System.Globalization;
 
 
 

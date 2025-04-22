@@ -12,10 +12,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[ObservableProperty]
 	public partial bool IsActive { get; set; } = true;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-#pragma warning disable S1075 // URIs should not be hardcoded
-	static readonly string url = "https://demo/index.html";
-#pragma warning restore S1075 // URIs should not be hardcoded
-
+	
 	[ObservableProperty]
 	public partial WebViewSource? Source { get; set; } = new UrlWebViewSource
 	{
@@ -42,7 +39,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 #if ANDROID || WINDOWS
 			Source = new UrlWebViewSource
 			{
-				Url = url,
+				Url = "https://demo/index.html",
 			};
 #elif IOS || MACCATALYST
 			Source = new UrlWebViewSource

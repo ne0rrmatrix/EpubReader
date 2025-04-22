@@ -23,12 +23,7 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-
-    <shimmer:SfShimmer
-        x:Name="Shimmer"
-        AnimationDuration="3000"
-        IsActive="{Binding IsActive}">
-        <shimmer:SfShimmer.Content>
+    
             <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
                 <Grid.GestureRecognizers>
                     <OnPlatform x:TypeArguments="TapGestureRecognizer">
@@ -61,14 +56,8 @@
                     Scale="1"
                     Source="{Binding Source}">
                     <WebView.GestureRecognizers>
-                        <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
-                            <On Platform="Android">
-                                <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                            <On Platform="IOS">
-                                <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                        </OnPlatform>
+                        <SwipeGestureRecognizer Direction="Left" Swiped="SwipeGestureRecognizer_Swiped" />
+                        <SwipeGestureRecognizer Direction="Right" Swiped="SwipeGestureRecognizer_OnSwiped"/>
                     </WebView.GestureRecognizers>
                 </WebView>
 
@@ -82,6 +71,4 @@
                                            iOS={Binding IsNavMenuVisible},
                                            Android={Binding IsNavMenuVisible}}" />
             </Grid>
-        </shimmer:SfShimmer.Content>
-    </shimmer:SfShimmer>
 </ContentPage>

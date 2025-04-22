@@ -1,8 +1,8 @@
-﻿using EpubReader.Util;
-using Microsoft.Maui.Handlers;
+﻿using System.Globalization;
 using System.Runtime.Versioning;
-using System.Globalization;
+using EpubReader.Util;
 using Foundation;
+using Microsoft.Maui.Handlers;
 using WebKit;
 
 namespace EpubReader;
