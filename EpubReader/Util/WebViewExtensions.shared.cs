@@ -63,7 +63,6 @@ public static partial class WebViewExtensions
 			await LoadPage(label, webView, book);
 		}
 	}
-
 	public static async Task Prev(Label label, Book book, WebView webView)
 	{
 		if (book.CurrentChapter > 0)

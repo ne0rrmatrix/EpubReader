@@ -23,52 +23,31 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-    
-            <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
-                <Grid.GestureRecognizers>
-                    <OnPlatform x:TypeArguments="TapGestureRecognizer">
-                        <On Platform="MacCatalyst">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                        <On Platform="WinUI">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                    </OnPlatform>
-                </Grid.GestureRecognizers>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <WebView
-                    x:Name="EpubText"
-                    Grid.Row="0"
-                    Navigated="webView_Navigated"
-                    Navigating="webView_Navigating"
-                    Scale="1"
-                    Source="{Binding Source}">
-                    <WebView.GestureRecognizers>
-                        <SwipeGestureRecognizer Direction="Left" Swiped="SwipeGestureRecognizer_Swiped" />
-                        <SwipeGestureRecognizer Direction="Right" Swiped="SwipeGestureRecognizer_OnSwiped"/>
-                    </WebView.GestureRecognizers>
-                </WebView>
 
-                <Label
-                    x:Name="PageLabel"
-                    Grid.Row="1"
-                    FontSize="20"
-                    HorizontalOptions="Center"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           iOS={Binding IsNavMenuVisible},
-                                           Android={Binding IsNavMenuVisible}}" />
-            </Grid>
+    <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
+        <Grid.GestureRecognizers>
+            <OnPlatform x:TypeArguments="TapGestureRecognizer">
+                <On Platform="MacCatalyst">
+                    <TapGestureRecognizer
+                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                        Command="{Binding PressCommand}"
+                        NumberOfTapsRequired="2" />
+                </On>
+                <On Platform="WinUI">
+                    <TapGestureRecognizer
+                        BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
+                        Command="{Binding PressCommand}"
+                        NumberOfTapsRequired="2" />
+                </On>
+            </OnPlatform>
+        </Grid.GestureRecognizers>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+    </Grid>
 </ContentPage>

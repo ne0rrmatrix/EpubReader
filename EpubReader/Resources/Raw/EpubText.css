@@ -29,5 +29,9 @@ iframe {
     border-width: 0 !important;
     width: 100vw;
     height: 100vh;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
     background-color: transparent;
 }
