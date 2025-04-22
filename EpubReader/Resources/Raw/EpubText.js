@@ -33,13 +33,14 @@
 
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
+        frame.contentWindow.scrollTo({left:frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, top:0, behavior:"smooth"});
     };
 
 
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
+        frame.contentWindow.scrollTo({
+            left:frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, top:0, behavior: "smooth"});
     };
 
     window.addEventListener("message", function (event) {
