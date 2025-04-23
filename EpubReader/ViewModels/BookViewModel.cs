@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
-using EpubReader.Service;
 using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
@@ -12,12 +11,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[ObservableProperty]
 	public partial bool IsActive { get; set; } = true;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	
-	[ObservableProperty]
-	public partial WebViewSource? Source { get; set; } = new UrlWebViewSource
-	{
-		Url = "about:blank",
-	};
 
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; }
@@ -36,17 +29,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
-#if ANDROID || WINDOWS
-			Source = new UrlWebViewSource
-			{
-				Url = "https://demo/index.html",
-			};
-#elif IOS || MACCATALYST
-			Source = new UrlWebViewSource
-			{
-				Url = "app://demo/index.html",
-			};
-#endif
+			StreamExtensions.Instance?.SetBook(book);
 		}
 	}
 
@@ -55,12 +38,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		popupService.ShowPopup<SettingsPageViewModel>();
 	}
-
+	
 	[RelayCommand]
 	public void Press()
 	{
 #if ANDROID
-		EpubReader.Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
+		Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
 		IsNavMenuVisible = !IsNavMenuVisible;
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);

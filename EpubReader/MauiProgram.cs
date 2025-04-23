@@ -1,12 +1,6 @@
-﻿using System.Buffers.Text;
-using System.Globalization;
-using System.Reflection.Metadata;
-using System.Runtime.Versioning;
-using CommunityToolkit.Maui;
-using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Maui;
 using EpubReader.Database;
 using EpubReader.Interfaces;
-using EpubReader.Messages;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
@@ -15,18 +9,10 @@ using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Animations;
-using Microsoft.Maui.Controls;
 using Microsoft.Maui.Handlers;
-using Microsoft.Maui.Platform;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-
-
-
-
-
 
 #if IOS || MACCATALYST
 using CoreGraphics;
@@ -81,11 +67,16 @@ public static class MauiProgram
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
 			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler((WebViewHandler)handler), "app");
-			return new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			
+			var webView = new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
 			{
-				Inspectable = true,
 				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),
 			};
+			if(OperatingSystem.IsIOSVersionAtLeast(17) || OperatingSystem.IsMacCatalystVersionAtLeast(17))
+			{
+				webView.Inspectable = true;
+			}
+			return webView;
 		};
 #endif
 		var config = new LoggingConfiguration();
@@ -122,6 +113,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 
+		builder.Services.AddSingleton<Util.WebViewHelper>();
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("//LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("//BookPage");

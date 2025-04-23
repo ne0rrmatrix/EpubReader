@@ -18,7 +18,6 @@ public class StreamExtensions
 	{
 		if (Instance is null || Book is null)
 		{
-			System.Diagnostics.Trace.WriteLine("StreamExtensions is null");
 			return null;
 		}
 		fileName = Path.GetFileName(fileName);
@@ -31,7 +30,6 @@ public class StreamExtensions
 	{
 		if (Instance is null || Book is null)
 		{
-			System.Diagnostics.Trace.WriteLine("StreamExtensions is null");
 			return null;
 		}
 		fileName = Path.GetFileName(fileName);

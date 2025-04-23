@@ -38,4 +38,6 @@ public class Book
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
 
+	public string Desription { get; set; } = string.Empty;
+
 }

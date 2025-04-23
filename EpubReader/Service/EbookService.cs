@@ -101,7 +101,6 @@ public static partial class EbookService
 			if (sharedFile is not null)
 			{
 				list.Add(sharedFile);
-				//System.Diagnostics.Trace.WriteLine($"Shared file: {sharedFile.FileName}");
 			}
 		}
 		
@@ -119,6 +118,7 @@ public static partial class EbookService
 				fonts.Add(Font);
 			}
 		}
+		var coverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
@@ -126,7 +126,8 @@ public static partial class EbookService
 			FilePath = path,
 			Files = list,
 			Fonts = fonts,
-			CoverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title),
+			Desription = book.Description ?? string.Empty,
+			CoverImage = coverImage,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
 			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],

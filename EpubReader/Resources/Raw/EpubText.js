@@ -73,6 +73,10 @@
             }
             scrollLeft();
         }
+        else if (event.data === "menu") {
+            console.log("received menu");
+            window.location.href = 'https://runcsharp.menu?true';
+        }
     });
 });
 
