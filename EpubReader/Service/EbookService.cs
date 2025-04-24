@@ -261,7 +261,6 @@ public static partial class EbookService
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.EnsureDoctypeDeclaration(htmlFile);
 		return htmlFile;
 	}
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)

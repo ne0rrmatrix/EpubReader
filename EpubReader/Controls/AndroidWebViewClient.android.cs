@@ -2,12 +2,11 @@
 using Android.Webkit;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
-using EpubReader.Platforms.Android;
 using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
-namespace EpubReader;
+namespace EpubReader.Controls;
 #pragma warning restore IDE0130 // Namespace does not match folder structure
 
 class CustomWebViewClient : WebViewClient
@@ -31,7 +30,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
 	}
 
-	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
+	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
 		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))

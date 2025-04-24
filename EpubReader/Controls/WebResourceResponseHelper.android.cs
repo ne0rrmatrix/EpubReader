@@ -1,7 +1,7 @@
 ﻿using Android.OS;
 using Android.Webkit;
 
-namespace EpubReader.Platforms.Android;
+namespace EpubReader.Controls;
 public static class WebResourceResponseHelper
 {
 	/// <summary>

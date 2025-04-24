@@ -5,7 +5,7 @@ using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 
-namespace EpubReader;
+namespace EpubReader.Controls;
 class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDelegate
 {
 	readonly IWebViewHandler handler = handler ?? throw new ArgumentNullException(nameof(handler));

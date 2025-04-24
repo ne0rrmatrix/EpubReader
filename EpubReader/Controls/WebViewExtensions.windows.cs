@@ -1,8 +1,9 @@
-﻿using Microsoft.Maui.Handlers;
+﻿using EpubReader.Util;
+using Microsoft.Maui.Handlers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
-namespace EpubReader.Util;
+namespace EpubReader.Controls;
 public static partial class WebViewExtensions
 {
 	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();

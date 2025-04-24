@@ -114,7 +114,7 @@ public partial class BookPage : ContentPage, IDisposable
 			viewModel.Dispose();
 		}
 #if WINDOWS
-		WebViewExtensions.WebView2_Unloaded();
+	//	WebViewExtensions.WebView2_Unloaded();
 #endif
 		base.OnDisappearing();
 	}

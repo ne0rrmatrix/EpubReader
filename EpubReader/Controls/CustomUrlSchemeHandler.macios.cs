@@ -5,7 +5,7 @@ using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 
-namespace EpubReader;
+namespace EpubReader.Controls;
 class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();

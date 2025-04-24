@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui;
+using EpubReader.Controls;
 using EpubReader.Database;
 using EpubReader.Interfaces;
 using EpubReader.Util;
@@ -54,7 +55,7 @@ public static class MauiProgram
 #elif WINDOWS
 		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
-	  async (handler, view, args) =>{ EpubReader.Util.WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+	  async (handler, view, args) =>{ Controls.WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
 #elif IOS || MACCATALYST
 		Microsoft.Maui.Handlers.WebViewHandler.PlatformViewFactory = (handler) => 
 		{
@@ -66,11 +67,11 @@ public static class MauiProgram
 				config.MediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypes.None;
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
-			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
+			config.SetUrlSchemeHandler(new Controls.CustomUrlSchemeHandler(), "app");
 			
-			var webView = new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			var webView = new Controls.CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
 			{
-				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),
+				NavigationDelegate = new Controls.CustomWebViewNavigationDelegate((WebViewHandler)handler),
 			};
 			if(OperatingSystem.IsIOSVersionAtLeast(17) || OperatingSystem.IsMacCatalystVersionAtLeast(17))
 			{
