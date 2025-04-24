@@ -16,13 +16,11 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 		var url = urlSchemeTask.Request.Url.AbsoluteString ?? "";
 		if(!url.StartsWith("app://demo/"))
 		{
-			System.Diagnostics.Debug.WriteLine($"url: {url} baseUrl: {urlSchemeTask.Request.Url.AbsoluteString}");
 			urlSchemeTask.DidFailWithError(new NSError(new NSString("com.apple.webkit.error"), 0, new NSDictionary<NSString, NSString>()));
 			return;
 		}
 		var path = url["app://demo/".Length..];
 		var filename = Path.GetFileName(path) ?? throw new InvalidOperationException("url is null");
-		System.Diagnostics.Debug.WriteLine($"fileName: {filename}");
 		var mimeType = FileService.GetMimeType(filename);
 		var stream = streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
 		var data = NSData.FromStream(stream) ?? throw new InvalidOperationException("data is null");
