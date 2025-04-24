@@ -86,7 +86,7 @@ public static partial class EbookService
 		EpubBookRef book;
 		try
 		{
-			book = VersOne.Epub.EpubReader.OpenBook(path, options);
+			book = await VersOne.Epub.EpubReader.OpenBookAsync(path, options);
 		}
 		catch (Exception ex)
 		{

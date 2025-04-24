@@ -14,7 +14,31 @@ public class StreamExtensions
 	{
 		this.Book = book;
 	}
-	public string? Content(string fileName)
+	public Stream GetStream(string url)
+	{
+		var filename = System.IO.Path.GetFileName(url);
+		var text = Content(filename);
+		if (text is not null && IsText(filename))
+		{
+			UTF8Encoding utfEncoding = new();
+			byte[] postData = utfEncoding.GetBytes(
+				text);
+			MemoryStream postDataStream = new(text.Length);
+			postDataStream.Write(postData, 0, postData.Length);
+			postDataStream.Seek(0, SeekOrigin.Begin);
+			return postDataStream;
+		}
+		var bytes = ByteContent(filename);
+		if (bytes is not null && IsBinary(filename))
+		{
+			MemoryStream postDataStream = new(bytes.Length);
+			postDataStream.Write(bytes, 0, bytes.Length);
+			postDataStream.Seek(0, SeekOrigin.Begin);
+			return postDataStream;
+		}
+		return Stream.Null;
+	}
+	string? Content(string fileName)
 	{
 		if (Instance is null || Book is null)
 		{
@@ -26,7 +50,7 @@ public class StreamExtensions
 			?? Book.Css.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 			?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.HTMLContent;
 	}
-	public byte[]? ByteContent(string fileName)
+	byte[]? ByteContent(string fileName)
 	{
 		if (Instance is null || Book is null)
 		{
@@ -36,26 +60,6 @@ public class StreamExtensions
 		return Book.Images.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 			?? Book.Fonts.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 		   ?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.Content;
-	}
-
-	public static Stream GetStream(string txt)
-	{
-		UTF8Encoding utfEncoding = new();
-		byte[] postData = utfEncoding.GetBytes(
-			txt);
-		MemoryStream postDataStream = new(txt.Length);
-		postDataStream.Write(postData, 0, postData.Length);
-		postDataStream.Seek(0, SeekOrigin.Begin);
-		return postDataStream;
-	}
-
-	public static Stream GetStream(byte[] bytes)
-	{
-
-		MemoryStream postDataStream = new(bytes.Length);
-		postDataStream.Write(bytes, 0, bytes.Length);
-		postDataStream.Seek(0, SeekOrigin.Begin);
-		return postDataStream;
 	}
 
 	public static string GetMimeType(string fileName)

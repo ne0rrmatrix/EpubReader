@@ -5,8 +5,8 @@ using Microsoft.Web.WebView2.Core;
 namespace EpubReader.Util;
 public static partial class WebViewExtensions
 {
-	static IWebViewHandler? webViewHandler;
 	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	static IWebViewHandler? webViewHandler;
 	public static void Initialize(IWebViewHandler handler)
 	{
 		webViewHandler = handler;
@@ -18,7 +18,6 @@ public static partial class WebViewExtensions
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		webViewHandler.PlatformView.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested -= CoreWebView2_WebResourceRequested;
-		System.Diagnostics.Debug.WriteLine("WebView2 Unloaded");
 	}
 
 	static void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
@@ -30,7 +29,7 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2.Settings.AreHostObjectsAllowed = true;
 		webViewHandler.PlatformView.CoreWebView2.Settings.IsWebMessageEnabled = true;
 		webViewHandler.PlatformView.CoreWebView2.Settings.IsScriptEnabled = true;
-		webViewHandler.PlatformView.CoreWebView2.AddWebResourceRequestedFilter("*", Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
+		webViewHandler.PlatformView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
 	}
 
@@ -47,23 +46,13 @@ public static partial class WebViewExtensions
 		}
 
 		var mimeType = StreamExtensions.GetMimeType(filename);
-		var text = streamExtensions.Content(filename);
-		if (text is not null)
+		var stream = streamExtensions.GetStream(url);
+		if (stream is null)
 		{
-			var stream = StreamExtensions.GetStream(text);
-			var response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
-			e.Response = response;
+			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
 			return;
 		}
-		var binary = streamExtensions.ByteContent(filename);
-		if (binary is not null)
-		{
-			var stream = StreamExtensions.GetStream(binary);
-			var response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
-			e.Response = response;
-			return;
-		}
-		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
+		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
 	}
 	static string GenerateHeaders(string contentType)
 	{

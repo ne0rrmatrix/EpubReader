@@ -14,7 +14,7 @@ class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
-	readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
 	{
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
@@ -41,21 +41,9 @@ class CustomWebViewClient : WebViewClient
 
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
-		var text = streamExtensions.Content(filename);
-		if (text is not null && StreamExtensions.IsText(filename))
-		{
-			var stream = StreamExtensions.GetStream(text);
-			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
-		}
-		var binary = streamExtensions.ByteContent(filename);
-		if (binary is not null && StreamExtensions.IsBinary(filename))
-		{
-			var stream = StreamExtensions.GetStream(binary);
-			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
-		}
-		return base.ShouldInterceptRequest(view, request);
+		var stream = streamExtensions.GetStream(url);
+		return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
 	}
-
 	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var path = request?.Url?.ToString() ?? string.Empty;
@@ -69,18 +57,7 @@ class CustomWebViewClient : WebViewClient
 			var urlParts = path.Split('.');
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-			}
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
 			return true;
 		}
 		return false;
