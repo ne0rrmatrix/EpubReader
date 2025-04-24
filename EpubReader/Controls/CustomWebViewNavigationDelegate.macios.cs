@@ -1,7 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
-using EpubReader.Util;
-using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 

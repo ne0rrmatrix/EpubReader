@@ -2,7 +2,6 @@
 using System.Runtime.Versioning;
 using EpubReader.Util;
 using Foundation;
-using Microsoft.Maui.Handlers;
 using WebKit;
 
 namespace EpubReader.Controls;
