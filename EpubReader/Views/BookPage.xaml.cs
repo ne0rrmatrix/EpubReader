@@ -135,30 +135,35 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		var urlParts = e.Url.Split('.');
 		ArgumentNullException.ThrowIfNull(book);
-		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
-			e.Cancel = true;
-			var funcToCall = urlParts[1].Split("?");
-			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				await webViewHelper.Next(pageLabel, book);
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				await webViewHelper.Prev(pageLabel, book);
-			}
-			if (methodName.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
-			{
-				GridArea_Tapped(this, EventArgs.Empty);
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				await webViewHelper.OnSettingsClicked();
-			}
+			return;	
+		}
+		e.Cancel = true;
+		var funcToCall = urlParts[1].Split("?");
+		var methodName = funcToCall[0][..^1];
+		
+		if (Contains("next",methodName))
+		{
+			await webViewHelper.Next(pageLabel, book);
+		}
+		if (Contains("prev", methodName))
+		{
+			await webViewHelper.Prev(pageLabel, book);
+		}
+		if (Contains("menu", methodName))
+		{
+			GridArea_Tapped(this, EventArgs.Empty);
+		}
+		if (Contains("pageLoad", methodName))
+		{
+			await webViewHelper.OnSettingsClicked();
 		}
 	}
-
+	static bool Contains(string value, string methodName)
+	{
+		return methodName.Contains(value, StringComparison.CurrentCultureIgnoreCase);
+	}
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
@@ -174,8 +179,6 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		var viewModel = (BookViewModel)BindingContext;
 		viewModel.Press();
-		//Open the menu and hide the main content
-		// Reveal our menu and move the main content out of the view
 		var width = this.Width * 0.4;
 		if(OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
 		{
@@ -190,7 +193,6 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		var viewModel = (BookViewModel)BindingContext;
 		viewModel.Press();
-		//Close the menu and bring back back the main content
 		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
 		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
