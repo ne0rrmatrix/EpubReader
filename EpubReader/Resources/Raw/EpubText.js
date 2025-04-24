@@ -1,4 +1,6 @@
-﻿document.addEventListener("DOMContentLoaded", function () {
+﻿let isPreviousPage = false;
+
+document.addEventListener("DOMContentLoaded", function () {
     const frame = document.getElementById("page");
     const body = document.getElementById("body");
     const root = document.documentElement;
@@ -13,7 +15,6 @@
     const platform = detectPlatform();
 
     function isHorizontalScrollAtStart() {
-        const frame = document.getElementById("page");
         if (!frame.contentWindow) {
             console.log("frame.contentWindow is null");
             return false;
@@ -22,7 +23,6 @@
     }
 
     function isHorizontallyScrolledToEnd() {
-        const frame = document.getElementById("page");
         if (!frame.contentWindow) {
             return false;
         }
@@ -43,7 +43,6 @@
 
 
     const scrollRight = () => {
-       
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
         if (platform.isWindows) {
             frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
@@ -81,9 +80,6 @@
         }
     });
 });
-
-let isPreviousPage = false;
-let iframe = document.getElementById("page");
 
 function getPageCount() {
     const frame = document.getElementById("page");
