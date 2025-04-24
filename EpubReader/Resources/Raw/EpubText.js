@@ -10,6 +10,7 @@
     frame.style.height = height + "px";
     root.style.setProperty('--root-width', width + "px");
     root.style.setProperty('--root-height', height + "px");
+    const platform = detectPlatform();
 
     function isHorizontalScrollAtStart() {
         const frame = document.getElementById("page");
@@ -33,7 +34,7 @@
 
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        if (navigator.appVersion.indexOf("Win") != -1) {
+        if (platform.isWindows) {
             frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap,0);
             return;
         }
@@ -42,8 +43,9 @@
 
 
     const scrollRight = () => {
+       
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        if (navigator.appVersion.indexOf("Win") != -1) {
+        if (platform.isWindows) {
             frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
             return;
         }
@@ -52,10 +54,10 @@
     };
 
     window.addEventListener("message", function (event) {
-        if (event.origin !== "https://demo" && !iOS()) {
+        if (event.origin !== "https://demo" && platform.isWindows) {
             return;
         }
-        if(event.origin !== "app://demo" && iOS()) {
+        if (event.origin !== "app://demo" && platform.isIOS) {
             return;
         }
         if (event.data === "next") {
@@ -150,15 +152,15 @@ document.getElementById("page").addEventListener("load", function () {
     window.location.href = 'https://runcsharp.pageLoad?true';
 });
 
-function iOS() {
-    return [
-            'iPad Simulator',
-            'iPhone Simulator',
-            'iPod Simulator',
-            'iPad',
-            'iPhone',
-            'iPod'
-        ].includes(navigator.platform)
-        // iPad on iOS 13 detection
-        || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+function detectPlatform() {
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    return {
+        isIOS: /iphone|ipad|ipod/.test(userAgent) ||
+            (/mac/.test(userAgent) && navigator.maxTouchPoints > 1),
+        isMac: /macintosh|mac os x/.test(userAgent) &&
+            !(/iphone|ipad|ipod/.test(userAgent)) &&
+            (navigator.maxTouchPoints < 1),
+        isWindows: /win32|win64|windows|wince/.test(userAgent)
+    };
 }
