@@ -66,7 +66,7 @@ public static class MauiProgram
 				config.MediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypes.None;
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
-			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler((WebViewHandler)handler), "app");
+			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
 			
 			var webView = new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
 			{

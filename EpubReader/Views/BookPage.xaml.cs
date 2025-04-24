@@ -170,7 +170,7 @@ public partial class BookPage : ContentPage, IDisposable
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
 	}
 
-	async void GridArea_Tapped(System.Object sender, System.EventArgs e)
+	async void GridArea_Tapped(object sender, EventArgs e)
 	{
 		var viewModel = (BookViewModel)BindingContext;
 		viewModel.Press();

@@ -6,13 +6,8 @@ using Microsoft.Maui.Handlers;
 using WebKit;
 
 namespace EpubReader;
-class CustomUrlSchemeHandler :NSObject, IWKUrlSchemeHandler
+class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
-	readonly WebViewHandler handler;
-	public CustomUrlSchemeHandler(WebViewHandler handler)
-	{
-		this.handler = handler ?? throw new ArgumentNullException(nameof(handler));
-	}
 	[Export("webView:startURLSchemeTask:")]
 	[SupportedOSPlatform("ios11.0")]
 	public void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
@@ -21,14 +16,13 @@ class CustomUrlSchemeHandler :NSObject, IWKUrlSchemeHandler
 		var baseUrl = NSUrl.FromString("app://demo/");
 		if (url.StartsWith("app://"))
 		{
-			var path = url.Substring("app://demo/".Length);
+			var path = url["app://demo/".Length..];
 			var filename = Path.GetFileName(path) ?? throw new InvalidOperationException("url is null");
 			System.Diagnostics.Debug.WriteLine($"fileName: {filename}");
 			var mimeType = FileService.GetMimeType(filename);
 			var text = StreamExtensions.Instance?.Content(filename);
 			if (text is not null && StreamExtensions.IsText(filename))
 			{
-				System.Diagnostics.Debug.WriteLine($"File: {filename} mimeType: {mimeType} url: {url} baseUrl: {baseUrl}");
 				var stream = StreamExtensions.GetStream(text) ?? throw new InvalidOperationException("stream is null");
 				var data = NSData.FromStream(stream) ?? throw new InvalidOperationException("data is null");
 				

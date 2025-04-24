@@ -87,7 +87,7 @@ function getPageCount() {
     const frame = document.getElementById("page");
     const width = Math.floor(frame.contentWindow.innerWidth);
     const containerWidth = Math.abs(frame.contentWindow.document.documentElement.scrollWidth);
-    pages = Math.floor(containerWidth / width);
+    const pages = Math.floor(containerWidth / width);
     return pages;
 }
 function gotoEnd () {
