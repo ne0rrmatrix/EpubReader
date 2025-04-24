@@ -21,19 +21,7 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 			var urlParts = path.Split('.');
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-			}
-
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
 			decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
 				return;
 		}

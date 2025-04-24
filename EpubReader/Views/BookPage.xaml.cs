@@ -171,8 +171,16 @@ public partial class BookPage : ContentPage, IDisposable
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 		var bytes = book.CoverImage;
 		image.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book));
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book); OnJavaScriptMessageReceived(m); });
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
+	}
+
+	void OnJavaScriptMessageReceived(JavaScriptMessage m)
+	{
+		if (Contains("menu", m.Value))
+		{
+			GridArea_Tapped(this, EventArgs.Empty);
+		}
 	}
 
 	async void GridArea_Tapped(object sender, EventArgs e)
