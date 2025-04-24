@@ -18,12 +18,6 @@ public partial class BookPage : ContentPage, IDisposable
 		FontSize = 20,
 		HorizontalOptions = LayoutOptions.Center,
 	};
-#if ANDROID || IOS || MACCATALYST
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
-	{
-		Direction = SwipeDirection.Up,
-	};
-#endif
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
@@ -35,6 +29,10 @@ public partial class BookPage : ContentPage, IDisposable
 	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
 	{
 		Direction = SwipeDirection.Right,
+	};
+	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
+	{
+		Direction = SwipeDirection.Up,
 	};
 #endif
 	const uint animationDuration = 200u;
@@ -65,19 +63,14 @@ public partial class BookPage : ContentPage, IDisposable
 		};
 		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
 		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
+		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
 		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
 		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
 		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
-#if IOS
+#if IOS || ANDROID
 		webView.Behaviors.Add(touchbehavior);
-#elif ANDROID
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
-		webView.Behaviors.Add(touchbehavior);
-#endif
-#if IOS || MACCATALYST || ANDROID
-		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
 #endif
 		grid.SetRow(pageLabel, 1);
 		grid.Children.Add(webView);
