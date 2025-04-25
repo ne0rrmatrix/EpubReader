@@ -37,6 +37,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			StreamExtensions.Instance?.SetBook(book);
 			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
+#pragma warning disable S1075 // URIs should not be hardcoded
 #if ANDROID || WINDOWS
 			Source = new UrlWebViewSource
 		{
@@ -49,6 +50,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 				Url = "app://demo/index.html",
 			};
 #endif
+#pragma warning restore S1075 // URIs should not be hardcoded
 		}
 	}
 
