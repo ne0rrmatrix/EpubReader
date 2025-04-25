@@ -130,7 +130,7 @@ public static partial class EbookService
 			CoverImage = coverImage,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
 		};
 			return books;
 	}
@@ -220,8 +220,6 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
 		return htmlFile;
 	}
 
