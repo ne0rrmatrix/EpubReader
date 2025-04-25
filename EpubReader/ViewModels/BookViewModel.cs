@@ -9,6 +9,11 @@ namespace EpubReader.ViewModels;
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 	[ObservableProperty]
+	public partial WebViewSource Source { get; set; } = string.Empty;
+
+	[ObservableProperty]
+	public partial ImageSource CoverImage { get; set; } = string.Empty;
+	[ObservableProperty]
 	public partial bool IsActive { get; set; } = true;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
@@ -30,6 +35,20 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			Book = book;
 			streamExtensions.SetBook(Book);
 			StreamExtensions.Instance?.SetBook(book);
+			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
+			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
+#if ANDROID || WINDOWS
+			Source = new UrlWebViewSource
+		{
+			Url = "https://demo/index.html",
+		};
+#endif
+#if IOS || MACCATALYST
+			Source = new UrlWebViewSource
+			{
+				Url = "app://demo/index.html",
+			};
+#endif
 		}
 	}
 

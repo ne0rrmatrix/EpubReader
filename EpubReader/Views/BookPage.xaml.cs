@@ -12,12 +12,7 @@ public partial class BookPage : ContentPage, IDisposable
 	Book? book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
-	readonly WebView webView = new();
-	readonly Label pageLabel = new()
-	{
-		FontSize = 20,
-		HorizontalOptions = LayoutOptions.Center,
-	};
+	
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
@@ -45,22 +40,8 @@ public partial class BookPage : ContentPage, IDisposable
 		this.db = db;
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		webViewHelper = new(webView);
-		webView.Navigated += webView_Navigated;
-		webView.Navigating += webView_Navigating;
-		webView.Scale = 1;
 
-#pragma warning disable S1075 // URIs should not be hardcoded
-#if ANDROID || WINDOWS
-		webView.Source = new UrlWebViewSource
-		{
-			Url = "https://demo/index.html",
-		};
-#endif
 #if IOS || MACCATALYST
-		webView.Source = new UrlWebViewSource
-		{
-			Url = "app://demo/index.html",
-		};
 		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
 		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
 		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
@@ -68,13 +49,9 @@ public partial class BookPage : ContentPage, IDisposable
 		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
 		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
 #endif
-#pragma warning restore S1075 // URIs should not be hardcoded
 #if IOS || ANDROID
 		webView.Behaviors.Add(touchbehavior);
 #endif
-		grid.SetRow(pageLabel, 1);
-		grid.Children.Add(webView);
-		grid.Children.Add(pageLabel);
 	}
 
 	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
@@ -162,8 +139,6 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		var bytes = book.CoverImage;
-		image.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book); OnJavaScriptMessageReceived(m); });
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
 	}
