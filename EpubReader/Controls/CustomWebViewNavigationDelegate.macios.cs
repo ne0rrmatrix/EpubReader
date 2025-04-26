@@ -18,6 +18,7 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
 		if (path.Contains("https://runcsharp"))
 		{
+			System.Diagnostics.Debug.WriteLine($"Intercepted csharp request");
 			var urlParts = path.Split('.');
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
