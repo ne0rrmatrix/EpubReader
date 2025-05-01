@@ -1,4 +1,6 @@
-﻿document.addEventListener("DOMContentLoaded", function () {
+﻿let isPreviousPage = false;
+
+document.addEventListener("DOMContentLoaded", function () {
     const frame = document.getElementById("page");
     const body = document.getElementById("body");
     const root = document.documentElement;
@@ -10,9 +12,9 @@
     frame.style.height = height + "px";
     root.style.setProperty('--root-width', width + "px");
     root.style.setProperty('--root-height', height + "px");
+    const platform = detectPlatform();
 
     function isHorizontalScrollAtStart() {
-        const frame = document.getElementById("page");
         if (!frame.contentWindow) {
             console.log("frame.contentWindow is null");
             return false;
@@ -21,7 +23,6 @@
     }
 
     function isHorizontallyScrolledToEnd() {
-        const frame = document.getElementById("page");
         if (!frame.contentWindow) {
             return false;
         }
@@ -33,20 +34,29 @@
 
     const scrollLeft = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, 0);
+        if (platform.isWindows) {
+            frame.contentWindow.scrollTo(frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap,0);
+            return;
+        }
+        frame.contentWindow.scrollTo({left:frame.contentWindow.scrollX - frame.contentWindow.innerWidth - gap, top:0, behavior:"smooth"});
     };
 
 
     const scrollRight = () => {
         const gap = parseInt(window.getComputedStyle(frame.contentWindow.document.documentElement).getPropertyValue("column-gap"));
-        console.log(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap);
-        console.log(frame.contentWindow.scrollX);
-        console.log(frame.contentWindow.innerWidth);
-        frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
+        if (platform.isWindows) {
+            frame.contentWindow.scrollTo(frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, 0);
+            return;
+        }
+        frame.contentWindow.scrollTo({
+            left:frame.contentWindow.scrollX + frame.contentWindow.innerWidth + gap, top:0, behavior: "smooth"});
     };
 
     window.addEventListener("message", function (event) {
-        if (event.origin !== "https://demo") {
+        if (event.origin !== "https://demo" && platform.isWindows) {
+            return;
+        }
+        if (event.origin !== "app://demo" && platform.isIOS) {
             return;
         }
         if (event.data === "next") {
@@ -64,12 +74,20 @@
             }
             scrollLeft();
         }
+        else if (event.data === "menu") {
+            console.log("received menu");
+            window.location.href = 'https://runcsharp.menu?true';
+        }
     });
 });
 
-let isPreviousPage = false;
-let iframe = document.getElementById("page");
-
+function getPageCount() {
+    const frame = document.getElementById("page");
+    const width = Math.floor(frame.contentWindow.innerWidth);
+    const containerWidth = Math.abs(frame.contentWindow.document.documentElement.scrollWidth);
+    const pages = Math.floor(containerWidth / width);
+    return pages;
+}
 function gotoEnd () {
     if (isPreviousPage) {
         scrollToHorizontalEnd();
@@ -129,3 +147,16 @@ function UnsetBackgroundColor() {
 document.getElementById("page").addEventListener("load", function () {
     window.location.href = 'https://runcsharp.pageLoad?true';
 });
+
+function detectPlatform() {
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    return {
+        isIOS: /iphone|ipad|ipod/.test(userAgent) ||
+            (/mac/.test(userAgent) && navigator.maxTouchPoints > 1),
+        isMac: /macintosh|mac os x/.test(userAgent) &&
+            !(/iphone|ipad|ipod/.test(userAgent)) &&
+            (navigator.maxTouchPoints < 1),
+        isWindows: /win32|win64|windows|wince/.test(userAgent)
+    };
+}

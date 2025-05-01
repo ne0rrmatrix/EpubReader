@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.Maui;
-using CommunityToolkit.Maui.Storage;
+using EpubReader.Controls;
 using EpubReader.Database;
 using EpubReader.Interfaces;
 using EpubReader.Util;
@@ -10,9 +10,17 @@ using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Handlers;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
+
+#if IOS || MACCATALYST
+using CoreGraphics;
+using Foundation;
+using UIKit;
+using WebKit;
+#endif
 
 [assembly: XamlCompilation(XamlCompilationOptions.Compile)]
 
@@ -44,11 +52,33 @@ public static class MauiProgram
 		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
-#endif
-#if WINDOWS
+#elif WINDOWS
 		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
-	  async (handler, view, args) =>{ WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+	  async (handler, view, args) =>{ Controls.WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+#elif IOS || MACCATALYST
+		Microsoft.Maui.Handlers.WebViewHandler.PlatformViewFactory = (handler) => 
+		{
+			var config = new WKWebViewConfiguration();
+			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))
+			{
+				config.AllowsPictureInPictureMediaPlayback = true;
+				config.AllowsInlineMediaPlayback = true;
+				config.MediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypes.None;
+			}
+			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
+			config.SetUrlSchemeHandler(new Controls.CustomUrlSchemeHandler(), "app");
+			
+			var webView = new Controls.CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			{
+				NavigationDelegate = new Controls.CustomWebViewNavigationDelegate((WebViewHandler)handler),
+			};
+			if(OperatingSystem.IsIOSVersionAtLeast(17) || OperatingSystem.IsMacCatalystVersionAtLeast(17))
+			{
+				webView.Inspectable = true;
+			}
+			return webView;
+		};
 #endif
 		var config = new LoggingConfiguration();
 #if RELEASE
@@ -84,6 +114,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 
+		builder.Services.AddSingleton<Util.WebViewHelper>();
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("//LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("//BookPage");

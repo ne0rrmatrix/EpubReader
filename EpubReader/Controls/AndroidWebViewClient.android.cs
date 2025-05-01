@@ -2,19 +2,18 @@
 using Android.Webkit;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
-using EpubReader.Platforms.Android;
 using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
-namespace EpubReader;
+namespace EpubReader.Controls;
 #pragma warning restore IDE0130 // Namespace does not match folder structure
 
 class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
-	readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	public CustomWebViewClient(IWebViewHandler handler)
 	{
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
@@ -31,7 +30,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
 	}
 
-	public override global::Android.Webkit.WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
+	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
 		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
@@ -41,21 +40,9 @@ class CustomWebViewClient : WebViewClient
 
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
-		var text = streamExtensions.Content(filename);
-		if (text is not null && StreamExtensions.IsText(filename))
-		{
-			var stream = StreamExtensions.GetStream(text);
-			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
-		}
-		var binary = streamExtensions.ByteContent(filename);
-		if (binary is not null && StreamExtensions.IsBinary(filename))
-		{
-			var stream = StreamExtensions.GetStream(binary);
-			return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK");
-		}
-		return base.ShouldInterceptRequest(view, request);
+		var stream = streamExtensions.GetStream(url);
+		return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
 	}
-
 	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var path = request?.Url?.ToString() ?? string.Empty;
@@ -69,18 +56,7 @@ class CustomWebViewClient : WebViewClient
 			var urlParts = path.Split('.');
 			var funcToCall = urlParts[1].Split("?");
 			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("next"));
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("prev"));
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage("pageLoad"));
-			}
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
 			return true;
 		}
 		return false;

@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
+using FFImageLoading;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
@@ -16,14 +17,14 @@ public partial class LibraryViewModel : BaseViewModel
     static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
 	readonly FilePickerFileType customFileType = new(
-			   new Dictionary<DevicePlatform, IEnumerable<string>>
-			   {
-					{ DevicePlatform.iOS, epub },
-					{ DevicePlatform.Android, android_epub },
-					{ DevicePlatform.WinUI, epub },
-					{ DevicePlatform.Tizen, epub },
-					{ DevicePlatform.macOS, epub },
-			   });
+		  new Dictionary<DevicePlatform, IEnumerable<string>>
+		  {
+			 { DevicePlatform.iOS, new[] { "org.idpf.epub-container" } },
+			 { DevicePlatform.MacCatalyst, new[] { "org.idpf.epub-container" } },
+			 { DevicePlatform.Android, android_epub },
+			 { DevicePlatform.WinUI, epub },
+			 { DevicePlatform.Tizen, epub },
+		  });
 
 	[ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; }
@@ -34,8 +35,14 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
     [RelayCommand]
-    public static async Task GotoBookPage(Book Book)
+    public async Task GotoBookPage(Book book)
     {
+		var temp = db.GetBook(book);
+		ArgumentNullException.ThrowIfNull(temp);
+		Book = await EbookService.OpenEbook(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
+		Book.CurrentChapter = temp.CurrentChapter;
+		Book.Id = temp.Id;
+		Util.StreamExtensions.Instance?.SetBook(Book);
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }

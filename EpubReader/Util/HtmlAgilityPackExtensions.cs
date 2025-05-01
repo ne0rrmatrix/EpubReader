@@ -31,26 +31,6 @@ public static partial class HtmlAgilityPackExtensions
 		return cssFiles;
 	}
 
-	public static string EnsureDoctypeDeclaration(string html)
-	{
-		if (string.IsNullOrEmpty(html))
-		{
-			return "<!DOCTYPE html>\n";
-		}
-
-		// Create a case-insensitive regex to match DOCTYPE declarations
-		// This handles variations in spacing, casing, and any content between DOCTYPE and the closing bracket
-		var doctypeRegex = DocType();
-
-		if (!doctypeRegex.IsMatch(html))
-		{
-			// If the DOCTYPE declaration is not found, add it to the beginning of the string.
-			// It's crucial to add a newline after the doctype for better formatting and to avoid issues.
-			return "<!DOCTYPE html>\n" + html;
-		}
-
-		return html;
-	}
 	public static string RemoveCssLinks(string htmlContent)
 	{
 		// Regular expression to match <link> tags with rel="stylesheet"
@@ -78,14 +58,7 @@ public static partial class HtmlAgilityPackExtensions
 		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, cssLinks.ToString());
 		return RemoveEmptyLines(updatedHtmlContent);
 	}
-	public static string CheckAndRemoveKoboAndCalibreCss(string cssContent)
-	{
-		if (cssContent.Contains(".kobo") || cssContent.Contains(".calibre"))
-		{
-			return string.Empty;
-		}
-		return cssContent;
-	}
+
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
 	{	
 		// Find the closing </head> tag
@@ -174,13 +147,6 @@ public static partial class HtmlAgilityPackExtensions
 		}
 		
 	}
-	public static string RemoveKoboHacks(string html)
-	{
-		string pattern = @"<style[^>]*id\s*=\s*[""']kobostylehacks[""'][^>]*>.*?</style>";
-		string pattern1 = @"<style[^>]*id=""kobostylehacks""[^>]*>.*?</style>";
-		html = Regex.Replace(html, pattern1, string.Empty, RegexOptions.Singleline, matchTimeout: TimeSpan.FromSeconds(10));
-		return Regex.Replace(html, pattern, string.Empty, RegexOptions.Singleline, matchTimeout: TimeSpan.FromSeconds(10));
-	}
 
 	public static string UpdateImagePathsForCSSFiles(string cssContent)
 	{
@@ -192,28 +158,7 @@ public static partial class HtmlAgilityPackExtensions
 		});
 	}
 
-	public static string RemoveCalibreAndKoboRules(string cssText)
-	{
-		// First remove all .calibre rules
-		string pattern1 = @"\.calibre\w*\s*{[^{}]*}";
-		string intermediate = Regex.Replace(cssText, pattern1, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
-
-		// Then remove all .kobo rules
-		string pattern2 = @"\.kobo\w*\s*{[^{}]*}";
-		string result = Regex.Replace(intermediate, pattern2, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
-
-		string pattern3 = @"\.calibre\d+\s*{[^{}]*}";
-		result = Regex.Replace(result, pattern3, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(10));
-
-		// Clean up any consecutive newlines
-		result = CleanNewLines().Replace(result, Environment.NewLine);
-		return result;
-	}
 
 	[GeneratedRegex(@"url\(['""]?(.*?)['""]?\)", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
 	private static partial Regex CssContentFilter();
-	[GeneratedRegex(@"(\r?\n){2,}", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
-	private static partial Regex CleanNewLines();
-	[GeneratedRegex(@"^\s*<!DOCTYPE\s+html\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline,matchTimeoutMilliseconds: 2000, "en-US")]
-	private static partial Regex DocType();
 }

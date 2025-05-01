@@ -80,13 +80,13 @@ public static partial class EbookService
 		};
 	}
 	
-	public static Book? OpenEbook(string path)
+	public static async Task<Book?> OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
 		EpubBookRef book;
 		try
 		{
-			book = VersOne.Epub.EpubReader.OpenBook(path, options);
+			book = await VersOne.Epub.EpubReader.OpenBookAsync(path, options);
 		}
 		catch (Exception ex)
 		{
@@ -95,14 +95,15 @@ public static partial class EbookService
 		}
 
 		var list = new List<SharedEpubFiles>();
-		requiredFiles.ForEach(async file =>
+		foreach (var item in requiredFiles)
 		{
-			var sharedFile = await GetSharedFiles(file);
+			var sharedFile = await GetSharedFiles(item);
 			if (sharedFile is not null)
 			{
 				list.Add(sharedFile);
 			}
-		});
+		}
+		
 		List<EpubFonts> fonts = [];		
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
@@ -110,13 +111,14 @@ public static partial class EbookService
 			{
 				EpubFonts Font = new()
 				{
-					Content = item.ReadContentAsBytes(),
+					Content = await item.ReadContentAsBytesAsync(),
 					FileName = Path.GetFileName(item.FilePath),
 					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
 				};
 				fonts.Add(Font);
 			}
 		}
+		var coverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
@@ -124,10 +126,11 @@ public static partial class EbookService
 			FilePath = path,
 			Files = list,
 			Fonts = fonts,
-			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
-			Chapters = GetChapters([.. book.GetReadingOrder()], book),
+			Desription = book.Description ?? string.Empty,
+			CoverImage = coverImage,
+			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content =  HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent()))) })],
+			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
 		};
 			return books;
 	}
@@ -184,51 +187,12 @@ public static partial class EbookService
 	{
 		var chapters = new List<Chapter>();
 		var doc = new HtmlDocument();
-		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
-		{
-			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
-			{
-				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
-				doc.LoadHtml(htmlFile);
-				htmlFile = ProcessHtml(htmlFile, doc);
-				var fileName =  Path.GetFileName(item.FilePath);
-				var title = GetTitle(book, item) ?? string.Empty;
-				
-				chapters.Add(new Chapter
-				{
-					HtmlFile = htmlFile ?? string.Empty,
-					FileName = fileName,
-					Title = title,
-				});
-			}
-			return chapters;
-		}
-		
-		if (chaptersRef.Where(item => !item.FilePath.Contains("_split_")).ToList().Count < 3)
-		{
-			foreach (var item in chaptersRef)
-			{
-				var htmlFile = item.ReadContent();
-				doc.LoadHtml(htmlFile);
-				htmlFile = ProcessHtml(htmlFile, doc);
-				var fileName = Path.GetFileName(item.FilePath);
-				var title = GetTitle(book, item) ?? string.Empty;
-				chapters.Add(new Chapter
-				{
-					HtmlFile = htmlFile ?? string.Empty,
-					FileName = fileName,
-					Title = title,
-				});
-			}
-			return chapters;
-		}
-		foreach (var item in chaptersRef.Where(item => !item.FilePath.Contains("_split_")))
+		foreach (var item in chaptersRef)
 		{
 			var htmlFile = item.ReadContent();
 			doc.LoadHtml(htmlFile);
 			htmlFile = ProcessHtml(htmlFile, doc);
 			var fileName = Path.GetFileName(item.FilePath);
-
 			var title = GetTitle(book, item) ?? string.Empty;
 			chapters.Add(new Chapter
 			{
@@ -256,16 +220,9 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveCalibreAndKoboRules(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.RemoveKoboHacks(htmlFile);
-		htmlFile = HtmlAgilityPackExtensions.EnsureDoctypeDeclaration(htmlFile);
 		return htmlFile;
 	}
-	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
-	{
-		var temp = item.FilePath.Replace("_split_000", "_split_001");
-		return chaptersRef.Find(x => x.FilePath == temp);
-	}
+
 	static byte[] GenerateCoverImage(string title)
 	{
 		SkiaBitmapExportContext bmp = new(200, 400, 1.0f);

@@ -4,27 +4,77 @@ using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Util;
 using EpubReader.ViewModels;
-using Microsoft.Maui.Handlers;
-
 
 namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
-	bool loadIndex = true;
-#if ANDROID
+	Book? book;
+	readonly IDb db;
+	readonly WebViewHelper webViewHelper;
+	
+#if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
-	readonly IDb db;
-	Book? book;
+#if IOS || MACCATALYST
+	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
+	{
+		Direction = SwipeDirection.Left,
+	};
+	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
+	{
+		Direction = SwipeDirection.Right,
+	};
+	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
+	{
+		Direction = SwipeDirection.Up,
+	};
+#endif
+	const uint animationDuration = 200u;
 	bool disposedValue;
-
+	bool loadIndex = true;
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+		webViewHelper = new(webView);
+
+#if IOS || MACCATALYST
+		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
+		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
+		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
+		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
+		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
+		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
+#endif
+#if IOS || ANDROID
+		webView.Behaviors.Add(touchbehavior);
+#endif
+	}
+
+	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
+	{
+		if (e.Direction == SwipeDirection.Left)
+		{
+			await webView.EvaluateJavaScriptAsync(" window.parent.postMessage(\"next\", \"app://demo\");");
+		}
+	}
+
+	void SwipeGestureRecognizer_up_Swiped(object? sender, SwipedEventArgs e)
+	{
+		if (e.Direction == SwipeDirection.Up)
+		{
+			GridArea_Tapped(this, EventArgs.Empty);
+		}
+	}
+	async void SwipeGestureRecognizer_right_Swiped(object? sender, SwipedEventArgs e)
+	{
+		if (e.Direction == SwipeDirection.Right)
+		{
+			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
+		}
 	}
 
 	protected override void OnDisappearing()
@@ -34,86 +84,96 @@ public partial class BookPage : ContentPage, IDisposable
 			viewModel.Dispose();
 		}
 #if WINDOWS
-		WebViewExtensions.WebView2_Unloaded();
+		Controls.WebViewExtensions.WebView2_Unloaded();
 #endif
 		base.OnDisappearing();
 	}
 
-	async void webView_Navigated(object sender, WebNavigatedEventArgs e)
+	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
+		System.Diagnostics.Debug.WriteLine($"Navigated event.");
 		ArgumentNullException.ThrowIfNull(book);
 		if (!loadIndex)
 		{
 			return;
 		}
 		loadIndex = false;
-		await WebViewExtensions.LoadPage(PageLabel, EpubText, book);
+		await webViewHelper.LoadPage(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
 
-	async void webView_Navigating(object sender, WebNavigatingEventArgs e)
+	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
+		System.Diagnostics.Debug.WriteLine($"Navigating event.");
 		var urlParts = e.Url.Split('.');
 		ArgumentNullException.ThrowIfNull(book);
-		if (urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
-			e.Cancel = true;
-			var funcToCall = urlParts[1].Split("?");
-			var methodName = funcToCall[0][..^1];
-			if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-			{
-				await WebViewExtensions.Next(PageLabel, EpubText, book);
-			}
-			if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-			{
-				await WebViewExtensions.Prev(PageLabel, book, EpubText);
-			}
-			if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-			{
-				var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-				await WebViewExtensions.OnSettingsClicked(webViewHandler);
-			}
+			return;	
 		}
+		e.Cancel = true;
+		var funcToCall = urlParts[1].Split("?");
+		var methodName = funcToCall[0][..^1];
+		
+		if (Contains("next",methodName))
+		{
+			await webViewHelper.Next(pageLabel, book);
+		}
+		if (Contains("prev", methodName))
+		{
+			await webViewHelper.Prev(pageLabel, book);
+		}
+		if (Contains("menu", methodName))
+		{
+			GridArea_Tapped(this, EventArgs.Empty);
+		}
+		if (Contains("pageLoad", methodName))
+		{
+			await webViewHelper.OnSettingsClicked();
+		}
+	}
+	static bool Contains(string value, string methodName)
+	{
+		return methodName.Contains(value, StringComparison.CurrentCultureIgnoreCase);
 	}
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		var webViewHandler = EpubText.Handler as IWebViewHandler ?? throw new InvalidOperationException("WebViewHandler is null");
-#if ANDROID
-		EpubText.Behaviors.Add(touchbehavior);
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => WebViewExtensions.OnJavaScriptMessageReceived(m, PageLabel, book, EpubText));
-#endif
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await WebViewExtensions.OnSettingsClicked(webViewHandler));
+		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book); OnJavaScriptMessageReceived(m); });
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
 	}
-	
 
-	void CreateToolBarItem(int index, Chapter chapter)
+	void OnJavaScriptMessageReceived(JavaScriptMessage m)
 	{
-		ArgumentNullException.ThrowIfNull(book);
-		if (string.IsNullOrEmpty(chapter.Title))
+		if (Contains("menu", m.Value))
 		{
-			return;
+			GridArea_Tapped(this, EventArgs.Empty);
 		}
-		var toolbarItem = new ToolbarItem
+	}
+
+	async void GridArea_Tapped(object sender, EventArgs e)
+	{
+		var viewModel = (BookViewModel)BindingContext;
+		viewModel.Press();
+		var width = this.Width * 0.4;
+		if(OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
 		{
-			Text = chapter.Title,
-			Order = ToolbarItemOrder.Secondary,
-			Priority = index,
-			Command = new Command(() =>
-			{
-				Dispatcher.Dispatch(async () =>
-				{
-					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
-					PageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-					await EpubText.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
-				});
-			})
-		};
-		Shell.Current.ToolbarItems.Add(toolbarItem);
+			width = this.Width * 0.8;
+		}
+		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
+		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
+	}
+
+	async void CloseMenu(object sender, EventArgs e)
+	{
+		var viewModel = (BookViewModel)BindingContext;
+		viewModel.Press();
+		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
+		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
+		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
 	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
@@ -125,26 +185,13 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 	}
 
-	public void SwipeGestureRecognizer_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (sender is null)
-		{
-			return;
-		}
-		if (e.Direction == SwipeDirection.Up)
-		{
-			var viewModel = (BookViewModel)BindingContext;
-			viewModel.Press();
-		}
-	}
-
 	protected virtual void Dispose(bool disposing)
 	{
 		if (!disposedValue)
 		{
 			if (disposing)
 			{
-#if ANDROID
+#if ANDROID || IOS
 				touchbehavior.Dispose();
 #endif
 			}
@@ -156,5 +203,65 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
+	}
+
+	void CreateToolBarItem(int index, Chapter chapter)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		if (string.IsNullOrEmpty(chapter.Title))
+		{
+			return;
+		}
+#if IOS || MACCATALYST
+		Label label = new()
+		{
+			Text = chapter.Title,
+			TextColor = Colors.White,
+			HorizontalOptions = LayoutOptions.End,
+			Margin = new Thickness(0, 0, 10, 0),
+		};
+		label.GestureRecognizers.Add(new TapGestureRecognizer
+		{
+			Command = new Command(() =>
+			{
+				Dispatcher.Dispatch(async () =>
+				{
+					book.CurrentChapter = index;
+					db.UpdateBookMark(book);
+					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
+					CloseMenu(this, EventArgs.Empty);
+				});
+			})
+		});
+
+		menu.Add(label);
+		menu.SetRow(label, index);
+		menu.RowDefinitions.Add(new RowDefinition
+		{
+			Height = new GridLength(1, GridUnitType.Auto)
+		});
+#else
+		var toolbarItem = new ToolbarItem
+		{
+			Text = chapter.Title,
+			Order = ToolbarItemOrder.Secondary,
+			Priority = index,
+			Command = new Command(() =>
+			{
+				Dispatcher.Dispatch(async () =>
+				{
+					book.CurrentChapter = index;
+					db.UpdateBookMark(book);
+					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
+					CloseMenu(this, EventArgs.Empty);
+				});
+			})
+		};
+		Shell.Current.ToolbarItems.Add(toolbarItem);
+#endif
 	}
 }

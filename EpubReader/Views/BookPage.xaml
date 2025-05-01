@@ -3,6 +3,8 @@
     x:Class="EpubReader.Views.BookPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
     xmlns:local="clr-namespace:EpubReader.Views"
     xmlns:shimmer="clr-namespace:Syncfusion.Maui.Toolkit.Shimmer;assembly=Syncfusion.Maui.Toolkit"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
@@ -13,7 +15,6 @@
     Loaded="CurrentPage_Loaded"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
-
     <ContentPage.ToolbarItems>
         <ToolbarItem
             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
@@ -23,64 +24,102 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-
     <shimmer:SfShimmer
         x:Name="Shimmer"
         AnimationDuration="3000"
         IsActive="{Binding IsActive}">
         <shimmer:SfShimmer.Content>
-            <Grid x:Name="Grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
-                <Grid.GestureRecognizers>
-                    <OnPlatform x:TypeArguments="TapGestureRecognizer">
-                        <On Platform="MacCatalyst">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                        <On Platform="WinUI">
-                            <TapGestureRecognizer
-                                BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-                                Command="{Binding PressCommand}"
-                                NumberOfTapsRequired="2" />
-                        </On>
-                    </OnPlatform>
-                </Grid.GestureRecognizers>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <WebView
-                    x:Name="EpubText"
-                    Grid.Row="0"
-                    Navigated="webView_Navigated"
-                    Navigating="webView_Navigating"
-                    Scale="1"
-                    Source="{Binding Source}">
-                    <WebView.GestureRecognizers>
-                        <OnPlatform x:TypeArguments="SwipeGestureRecognizer">
-                            <On Platform="Android">
-                                <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                            <On Platform="IOS">
-                                <SwipeGestureRecognizer Direction="Up" Swiped="SwipeGestureRecognizer_Swiped" />
-                            </On>
-                        </OnPlatform>
-                    </WebView.GestureRecognizers>
-                </WebView>
+            <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
+                <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
+                    <ScrollView.GestureRecognizers>
+                        <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenu" />
+                    </ScrollView.GestureRecognizers>
+                    <Grid x:Name="menu">
+                        <Grid.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0.0" Color="#666666" />
+                                <GradientStop Offset="1.0" Color="#000000" />
+                            </LinearGradientBrush>
+                        </Grid.Background>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ImageButton
+                            x:Name="BackButton"
+                            Grid.Row="0"
+                            Margin="0,10,10,0"
+                            Clicked="CloseMenu"
+                            HeightRequest="45"
+                            HorizontalOptions="{OnPlatform WinUI=End,
+                                                           Default=Start}"
+                            Source="close.png"
+                            WidthRequest="45" />
+                        <VerticalStackLayout
+                            Grid.Row="0"
+                            Grid.RowSpan="{Binding Book.Chapters.Count}"
+                            HorizontalOptions="{OnPlatform iOS=Center,
+                                                           MacCatalyst=Center,
+                                                           Default=End}">
+                            <Label
+                                x:Name="Title"
+                                Margin="0,0,10,0"
+                                FontAttributes="Bold"
+                                FontSize="Header"
+                                HorizontalOptions="Center"
+                                Text="{Binding Book.Title}"
+                                TextColor="White"
+                                VerticalOptions="Start" />
+                            <ffimage:CachedImage
+                                x:Name="image"
+                                Margin="0,10,10,0"
+                                Aspect="AspectFit"
+                                CacheDuration="1000000"
+                                HeightRequest="{StaticResource CardHeight}"
+                                HorizontalOptions="Center"
+                                Source="{Binding CoverImage}"
+                                VerticalOptions="End" />
 
-                <Label
-                    x:Name="PageLabel"
-                    Grid.Row="1"
-                    FontSize="20"
-                    HorizontalOptions="Center"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           MacCatalyst=true,
-                                           iOS={Binding IsNavMenuVisible},
-                                           Android={Binding IsNavMenuVisible}}" />
+                            <Label
+                                x:Name="description"
+                                Margin="0,10,10,0"
+                                HorizontalOptions="Center"
+                                Text="{Binding Book.Desription}"
+                                TextColor="White"
+                                TextType="Html"
+                                VerticalOptions="End"
+                                WidthRequest="280" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </ScrollView>
+                <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <WebView
+                        x:Name="webView"
+                        Grid.Row="0"
+                        Navigated="webView_Navigated"
+                        Navigating="webView_Navigating"
+                        Scale="1"
+                        Source="{Binding Source}" />
+
+                    <Label
+                        x:Name="pageLabel"
+                        Grid.Row="1"
+                        FontSize="20"
+                        HorizontalOptions="Center"
+                        IsVisible="{OnPlatform WinUI=true,
+                                               MacCatalyst=true,
+                                               iOS={Binding IsNavMenuVisible},
+                                               Android={Binding IsNavMenuVisible}}" />
+                </Grid>
             </Grid>
         </shimmer:SfShimmer.Content>
     </shimmer:SfShimmer>

@@ -1,16 +1,17 @@
 ﻿using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Models;
-using Microsoft.Maui.Handlers;
 
 namespace EpubReader.Util;
-public static partial class WebViewExtensions
+public partial class WebViewHelper(WebView handler)
 {
-	static readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
-	public static async Task OnSettingsClicked(IWebViewHandler handler)
+
+	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly WebView webView = handler;
+
+	public async Task OnSettingsClicked()
 	{
 		var settings = db.GetSettings() ?? new();
-		var webView = handler.VirtualView as WebView ?? throw new InvalidOperationException();
 
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
 		await webView.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
@@ -21,48 +22,52 @@ public static partial class WebViewExtensions
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
+		await webView.EvaluateJavaScriptAsync("getPageCount()");
 	}
 
-	public static async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book, WebView webView)
+	public async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book)
 	{
 		if (m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 		{
-			await Next(label, webView, book);
+			await Next(label, book);
 			return;
 		}
 		if (m.Value.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 		{
-			await Prev(label, book, webView);
+			await Prev(label, book);
 		}
 		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 		{
-			await OnSettingsClicked(webView.Handler as IWebViewHandler ?? throw new InvalidOperationException());
+			await OnSettingsClicked();
 		}
 	}
-	public static async Task LoadPage(Label label, WebView webView, Book book)
+	public async Task LoadPage(Label label, Book book)
 	{
+#if ANDROID || WINDOWS
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+#elif IOS || MACCATALYST
+		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+#endif
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		label.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 	}
-	public static async Task Next(Label label, WebView webView, Book book)
+	public async Task Next(Label label, Book book)
 	{
 		if (book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
 			db.UpdateBookMark(book);
-			await LoadPage(label, webView, book);
+			await LoadPage(label, book);
 		}
 	}
-
-	public static async Task Prev(Label label, Book book, WebView webView)
+	public async Task Prev(Label label, Book book)
 	{
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
 			db.UpdateBookMark(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
-			await LoadPage(label, webView, book);
+			await LoadPage(label, book);
 		}
 	}
 }
