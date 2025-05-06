@@ -91,7 +91,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
-		System.Diagnostics.Debug.WriteLine($"Navigated event.");
 		ArgumentNullException.ThrowIfNull(book);
 		if (!loadIndex)
 		{
@@ -104,7 +103,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
-		System.Diagnostics.Debug.WriteLine($"Navigating event.");
 		var urlParts = e.Url.Split('.');
 		ArgumentNullException.ThrowIfNull(book);
 		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))

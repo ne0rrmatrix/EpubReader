@@ -20,7 +20,14 @@ public partial class WebViewHelper(WebView handler)
 		await webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
-		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
+		if(settings.SupportMultipleColumns)
+		{
+			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','2')");
+		}
+		else
+		{
+			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','1')");
+		}
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
 		await webView.EvaluateJavaScriptAsync("getPageCount()");
 	}
