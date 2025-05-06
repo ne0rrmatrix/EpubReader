@@ -183,16 +183,55 @@ public static partial class EbookService
 		return result;
 	}
 
-	 static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
 		var doc = new HtmlDocument();
-		foreach (var item in chaptersRef)
+		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
+		{
+			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
+			{
+				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
+				doc.LoadHtml(htmlFile);
+				htmlFile = ProcessHtml(htmlFile, doc);
+				var fileName = Path.GetFileName(item.FilePath);
+				var title = GetTitle(book, item) ?? string.Empty;
+
+				chapters.Add(new Chapter
+				{
+					HtmlFile = htmlFile ?? string.Empty,
+					FileName = fileName,
+					Title = title,
+				});
+			}
+			return chapters;
+		}
+
+		if (chaptersRef.Where(item => !item.FilePath.Contains("_split_")).ToList().Count < 3)
+		{
+			foreach (var item in chaptersRef)
+			{
+				var htmlFile = item.ReadContent();
+				doc.LoadHtml(htmlFile);
+				htmlFile = ProcessHtml(htmlFile, doc);
+				var fileName = Path.GetFileName(item.FilePath);
+				var title = GetTitle(book, item) ?? string.Empty;
+				chapters.Add(new Chapter
+				{
+					HtmlFile = htmlFile ?? string.Empty,
+					FileName = fileName,
+					Title = title,
+				});
+			}
+			return chapters;
+		}
+		foreach (var item in chaptersRef.Where(item => !item.FilePath.Contains("_split_")))
 		{
 			var htmlFile = item.ReadContent();
 			doc.LoadHtml(htmlFile);
 			htmlFile = ProcessHtml(htmlFile, doc);
 			var fileName = Path.GetFileName(item.FilePath);
+
 			var title = GetTitle(book, item) ?? string.Empty;
 			chapters.Add(new Chapter
 			{
@@ -202,6 +241,12 @@ public static partial class EbookService
 			});
 		}
 		return chapters;
+	}
+
+	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
+	{
+		var temp = item.FilePath.Replace("_split_000", "_split_001");
+		return chaptersRef.Find(x => x.FilePath == temp);
 	}
 
 	static string ProcessHtml(string htmlFile, HtmlDocument doc)
