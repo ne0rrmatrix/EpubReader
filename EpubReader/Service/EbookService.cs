@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using CommunityToolkit.Mvvm.DependencyInjection;
 using EpubReader.Models;
 using EpubReader.Util;
 using HtmlAgilityPack;
@@ -19,7 +20,7 @@ public static partial class EbookService
 		[
 			"Container.js",
 		];
-	
+
 	static readonly List<string> requiredFiles =
 		[
 			"Container.js",
@@ -27,7 +28,7 @@ public static partial class EbookService
 			"ReadiumCSS-before.css",
 			"ReadiumCSS-after.css",
 			"ReadiumCSS-config.css",
-		    "index.html",
+			"index.html",
 			"favicon.ico",
 			"EpubText.css",
 			"EpubText.js",
@@ -79,7 +80,7 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
-	
+
 	public static async Task<Book?> OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
@@ -103,8 +104,8 @@ public static partial class EbookService
 				list.Add(sharedFile);
 			}
 		}
-		
-		List<EpubFonts> fonts = [];		
+
+		List<EpubFonts> fonts = [];
 		foreach (var item in book.Content.AllFiles.Local.ToList())
 		{
 			if (item.FilePath.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase))
@@ -132,12 +133,12 @@ public static partial class EbookService
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
 			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
 		};
-			return books;
+		return books;
 	}
 	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
 	{
 		var exists = await FileSystem.AppPackageFileExistsAsync(fileName);
-		if(!exists)
+		if (!exists)
 		{
 			return null;
 		}
@@ -183,25 +184,55 @@ public static partial class EbookService
 		return result;
 	}
 
-	 static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
 		var doc = new HtmlDocument();
-		foreach (var item in chaptersRef)
+		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
+		{
+			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
+			{
+				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
+				chapters.Add(GetChapter(book, doc, htmlFile, item));
+			}
+			return chapters;
+		}
+
+		if (chaptersRef.Where(item => !item.FilePath.Contains("_split_")).ToList().Count < 3)
+		{
+			foreach (var item in chaptersRef)
+			{
+				var htmlFile = item.ReadContent();
+				chapters.Add(GetChapter(book, doc, htmlFile, item));
+			}
+			return chapters;
+		}
+
+		foreach (var item in chaptersRef.Where(item => !item.FilePath.Contains("_split_")))
 		{
 			var htmlFile = item.ReadContent();
-			doc.LoadHtml(htmlFile);
-			htmlFile = ProcessHtml(htmlFile, doc);
-			var fileName = Path.GetFileName(item.FilePath);
-			var title = GetTitle(book, item) ?? string.Empty;
-			chapters.Add(new Chapter
-			{
-				HtmlFile = htmlFile ?? string.Empty,
-				FileName = fileName,
-				Title = title,
-			});
+			chapters.Add(GetChapter(book, doc, htmlFile, item));
 		}
 		return chapters;
+	}
+
+	static Chapter GetChapter(EpubBookRef book, HtmlDocument doc, string htmlFile, EpubLocalTextContentFileRef item)
+	{
+		doc.LoadHtml(htmlFile);
+		htmlFile = ProcessHtml(htmlFile, doc);
+		var fileName = Path.GetFileName(item.FilePath);
+		var title = GetTitle(book, item) ?? string.Empty;
+		return new Chapter
+		{
+			HtmlFile = htmlFile ?? string.Empty,
+			FileName = fileName,
+			Title = title,
+		};
+	}
+	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
+	{
+		var temp = item.FilePath.Replace("_split_000", "_split_001");
+		return chaptersRef.Find(x => x.FilePath == temp);
 	}
 
 	static string ProcessHtml(string htmlFile, HtmlDocument doc)
@@ -211,7 +242,7 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
-		if(cssFiles.Count == 0)
+		if (cssFiles.Count == 0)
 		{
 			htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-default.css");
 		}
