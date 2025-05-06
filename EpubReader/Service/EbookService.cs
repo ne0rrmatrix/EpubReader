@@ -171,9 +171,9 @@ public static partial class EbookService
 		var fileName = Path.GetFileName(item?.FilePath) ?? string.Empty;
 		var result = book.Schema.Package.EpubVersion switch
 		{
-			EpubVersion.EPUB_2 => epub2Nav?.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text ?? epub2Nav?.Find(x => Path.GetFileName(x.Content.Source?.Split('#')[0]) == fileName)?.NavigationLabels[0]?.Text,
-			EpubVersion.EPUB_3 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text ?? epub3Nav?.Find(x => Path.GetFileName(x.Anchor?.Href)?.Split('#')[0] == fileName)?.Anchor?.Text,
-			EpubVersion.EPUB_3_1 => epub3Nav?.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
+			EpubVersion.EPUB_2 => epub2Nav.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text ?? epub2Nav.Find(x => Path.GetFileName(x.Content.Source?.Split('#')[0]) == fileName)?.NavigationLabels[0]?.Text,
+			EpubVersion.EPUB_3 => epub3Nav.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text ?? epub3Nav.Find(x => Path.GetFileName(x.Anchor?.Href)?.Split('#')[0] == fileName)?.Anchor?.Text,
+			EpubVersion.EPUB_3_1 => epub3Nav.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text,
 			_ => book.GetNavigation()?.Find(x => x.Link?.ContentFilePath == item?.FilePath)?.Title,
 		};
 
