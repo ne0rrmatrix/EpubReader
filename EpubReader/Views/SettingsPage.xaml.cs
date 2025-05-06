@@ -20,6 +20,7 @@ public partial class SettingsPage : Popup
 		this.db = db;
 		settings = db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;
+		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 	}
@@ -75,5 +76,13 @@ public partial class SettingsPage : Popup
 		logger.Info($"Chaging Font to: {font.FontFamily}");
 		db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+	}
+
+	void ToggleMultipleColumns(object sender, EventArgs e)
+	{
+		settings.SupportMultipleColumns = !settings.SupportMultipleColumns;
+		db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 	}
 }

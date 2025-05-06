@@ -18,4 +18,6 @@ public class Settings
 	public string TextColor { get; set; } = string.Empty;
 	[Column("ColorScheme")]
 	public string ColorScheme { get; set; } = string.Empty;
+	[Column("SupportMultipleColumns")]
+	public bool SupportMultipleColumns { get; set; } = false;
 }

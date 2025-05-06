@@ -89,11 +89,18 @@
             SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
 
         <Button
-            Grid.Row="10"
+            Grid.Row="9"
             Clicked="RemoveAllSettings"
             HeightRequest="45"
             Text="Reset"
             WidthRequest="120" />
+        <Button
+            IsVisible="{OnPlatform WinUI=true, Default=false}"
+            x:Name="ButtonColumn"
+            Grid.Row="11"
+            Clicked="ToggleMultipleColumns"
+            HeightRequest="45"
+            WidthRequest="250"/>
     </Grid>
 
 </mct:Popup>
