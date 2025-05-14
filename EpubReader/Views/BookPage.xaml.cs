@@ -112,7 +112,7 @@ public partial class BookPage : ContentPage, IDisposable
 		e.Cancel = true;
 		var funcToCall = urlParts[1].Split("?");
 		var methodName = funcToCall[0][..^1];
-		string[] url = e.Url.Split("https://demo/") ?? [];
+		string[] url = e.Url.Split("https://demo/");
 		string fileName = string.Empty;
 		if (url.Length > 1)
 		{

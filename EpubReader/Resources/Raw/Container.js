@@ -7,6 +7,26 @@
         window.parent.postMessage("jump." + event.target.href, "https://demo");
         return;
     }
+    const imageDiv = event.target.closest('div.image');
+    if (imageDiv) {
+        const linkElement = imageDiv.querySelector('a');
+        if (linkElement) {
+            console.log("Clicked on an image link, allowing default action.");
+            console.log(linkElement.href);
+            window.parent.postMessage("jump." + linkElement.href, "https://demo");
+            return;
+        }
+    }
+    const paragraph = event.target.closest('p.image');
+    if (paragraph) {
+        const linkElement = paragraph.querySelector('a');
+        if (linkElement) {
+            console.log("Clicked on a paragraph link, allowing default action.");
+            console.log(linkElement.href);
+            window.parent.postMessage("jump." + linkElement.href, "https://demo");
+            return;
+        }
+    }
     event.preventDefault();
     // Get the x-coordinate of the click relative to the viewport
     const clickX = event.clientX;
