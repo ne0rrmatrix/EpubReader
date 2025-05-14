@@ -118,7 +118,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			fileName = url[1].Split('#')[0] ?? string.Empty;
 		}
-		if (methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && book.Chapters.FindIndex(chapter => chapter.FileName.Contains(fileName, StringComparison.CurrentCultureIgnoreCase)) is int index && index != -1)
+		if (!string.IsNullOrEmpty(fileName) && methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && book.Chapters.FindIndex(chapter => chapter.FileName.Contains(fileName, StringComparison.CurrentCultureIgnoreCase)) is int index && index != -1)
 		{
 			book.CurrentChapter = index;
 			db.UpdateBookMark(book);
