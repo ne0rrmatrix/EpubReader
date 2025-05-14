@@ -59,6 +59,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (event.origin !== "app://demo" && platform.isIOS) {
             return;
         }
+        if (event.data.startsWith("jump.")) {
+            const href = event.data.substring(5);
+            console.log("Jumping to:", href);
+            window.location.href = `https://runcsharp.jump?${href}`;
+        }
         if (event.data === "next") {
             if (isHorizontallyScrolledToEnd()) {
                 console.log("received scrollRight");

@@ -14,8 +14,6 @@ public static partial class StatusBarExtensions
 			if (hidden)
 			{
 				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
-				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
-				window.ClearFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
 				window.AddFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.Fullscreen, WindowManagerFlags.Fullscreen);
 				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
