@@ -104,7 +104,7 @@ public partial class BookPage : ContentPage, IDisposable
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
 		var urlParts = e.Url.Split('.');
-		ArgumentNullException.ThrowIfNull(book);
+		ArgumentNullException.ThrowIfNull(book);	
 		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			return;	
@@ -112,28 +112,36 @@ public partial class BookPage : ContentPage, IDisposable
 		e.Cancel = true;
 		var funcToCall = urlParts[1].Split("?");
 		var methodName = funcToCall[0][..^1];
-		
-		if (Contains("next",methodName))
+		string[] url = e.Url.Split("https://demo/") ?? [];
+		string fileName = string.Empty;
+		if (url.Length > 1)
+		{
+			fileName = url[1].Split('#')[0] ?? string.Empty;
+		}
+		if (methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && book.Chapters.FindIndex(chapter => chapter.FileName.Contains(fileName, StringComparison.CurrentCultureIgnoreCase)) is int index && index != -1)
+		{
+			book.CurrentChapter = index;
+			db.UpdateBookMark(book);
+			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		}
+		if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.Next(pageLabel, book);
 		}
-		if (Contains("prev", methodName))
+		if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.Prev(pageLabel, book);
 		}
-		if (Contains("menu", methodName))
+		if (methodName.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
 		{
 			GridArea_Tapped(this, EventArgs.Empty);
 		}
-		if (Contains("pageLoad", methodName))
+		if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.OnSettingsClicked();
 		}
 	}
-	static bool Contains(string value, string methodName)
-	{
-		return methodName.Contains(value, StringComparison.CurrentCultureIgnoreCase);
-	}
+
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
@@ -145,7 +153,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	void OnJavaScriptMessageReceived(JavaScriptMessage m)
 	{
-		if (Contains("menu", m.Value))
+		if (m.Value.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
 		{
 			GridArea_Tapped(this, EventArgs.Empty);
 		}

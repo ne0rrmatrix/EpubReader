@@ -1,5 +1,12 @@
 ﻿window.addEventListener('click', function (event) {
-
+	// Check if the clicked element is an anchor tag
+    if (event.target.tagName.toLowerCase() === 'a') {
+        // If it's a link, let the default action (navigation) happen
+        console.log("Clicked on a link, allowing default action.");
+        console.log(event.target.href);
+        window.parent.postMessage("jump." + event.target.href, "https://demo");
+        return;
+    }
     event.preventDefault();
     // Get the x-coordinate of the click relative to the viewport
     const clickX = event.clientX;
