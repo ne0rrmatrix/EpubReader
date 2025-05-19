@@ -1,32 +1,19 @@
 ﻿window.addEventListener('click', function (event) {
-	// Check if the clicked element is an anchor tag
-    if (event.target.tagName.toLowerCase() === 'a') {
-        // If it's a link, let the default action (navigation) happen
-        console.log("Clicked on a link, allowing default action.");
-        console.log(event.target.href);
-        window.parent.postMessage("jump." + event.target.href, "https://demo");
+    let target = event.target;
+
+    if (target.tagName === 'A') {
+        // Click was directly on a link
+        console.log('Clicked on link:', target.href);
+        window.parent.postMessage("jump." + target.href, "https://demo");
+        return;
+    } else if (target.closest('a')) {
+        // Click was on a child of a link
+        let link = target.closest('a');
+        window.parent.postMessage("jump." + link.href, "https://demo");
+        console.log('Clicked on link:', link.href);
         return;
     }
-    const imageDiv = event.target.closest('div.image');
-    if (imageDiv) {
-        const linkElement = imageDiv.querySelector('a');
-        if (linkElement) {
-            console.log("Clicked on an image link, allowing default action.");
-            console.log(linkElement.href);
-            window.parent.postMessage("jump." + linkElement.href, "https://demo");
-            return;
-        }
-    }
-    const paragraph = event.target.closest('p.image');
-    if (paragraph) {
-        const linkElement = paragraph.querySelector('a');
-        if (linkElement) {
-            console.log("Clicked on a paragraph link, allowing default action.");
-            console.log(linkElement.href);
-            window.parent.postMessage("jump." + linkElement.href, "https://demo");
-            return;
-        }
-    }
+
     event.preventDefault();
     // Get the x-coordinate of the click relative to the viewport
     const clickX = event.clientX;

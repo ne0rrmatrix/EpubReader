@@ -16,7 +16,7 @@
     <NuGetAuditMode>all</NuGetAuditMode>
 
     <!-- MAUI Specific -->
-    <MauiPackageVersion>9.0.60</MauiPackageVersion>
+    <MauiPackageVersion>9.0.70</MauiPackageVersion>
     <NextMauiPackageVersion>10.0.0</NextMauiPackageVersion>
     <MauiStrictXamlCompilation>true</MauiStrictXamlCompilation>
     <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
@@ -199,21 +199,6 @@
       IL3050,IL3051,IL3052,IL3053,IL3054,IL3055,IL3056,
       RS2007
     </WarningsAsErrors>
-  </PropertyGroup>
-
-  <!-- Required for NuGet Source Link -->
-  <PropertyGroup Condition="'$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">
-    <!--  Ensure deterministic build when using Azure Pipelines or GitHub Actions-->
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-
-    <!-- Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-
-    <!-- Embed source files that are not tracked by the source control manager in the PDB -->
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-
-    <!-- Embed symbols containing Source Link in the main file (exe/dll) -->
-    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
 </Project>

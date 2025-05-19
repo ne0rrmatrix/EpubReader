@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
+﻿using System.Reflection;
+using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
 using Microsoft.Maui.Handlers;
 using WebKit;
@@ -16,15 +17,13 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
 	{	
 		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
-		if (path.Contains("https://runcsharp"))
+		var url = path.Split('?');
+		
+		if (url.Length > 1 || path.Contains("https://runcsharp"))
 		{
-			System.Diagnostics.Debug.WriteLine($"Intercepted csharp request");
-			var urlParts = path.Split('.');
-			var funcToCall = urlParts[1].Split("?");
-			var methodName = funcToCall[0][..^1];
-			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
 			decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
-				return;
+			return;
 		}
 		decisionHandler(WKNavigationActionPolicy.Allow, preferences);
 	}

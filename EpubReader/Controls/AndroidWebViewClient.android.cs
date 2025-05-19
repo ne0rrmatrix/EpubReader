@@ -46,17 +46,14 @@ class CustomWebViewClient : WebViewClient
 	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var path = request?.Url?.ToString() ?? string.Empty;
+		var url = path.Split('?');
 		if (request is null || request.Url is null)
 		{
 			return true;
 		}
-
-		if (path.Contains(csharp))
+		if(url.Length > 1 || path.Contains(csharp))
 		{
-			var urlParts = path.Split('.');
-			var funcToCall = urlParts[1].Split("?");
-			var methodName = funcToCall[0][..^1];
-			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(methodName));
+			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
 			return true;
 		}
 		return false;
