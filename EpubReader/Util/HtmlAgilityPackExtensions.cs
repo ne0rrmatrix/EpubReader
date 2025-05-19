@@ -7,8 +7,10 @@ namespace EpubReader.Util;
 
 public static partial class HtmlAgilityPackExtensions
 {
-	public static List<string> GetCssFiles(this HtmlDocument doc)
+	public static List<string> GetCssFiles(string htmlFile)
 	{
+		var doc = new HtmlDocument();
+		doc.LoadHtml(htmlFile);
 		List<string> cssFiles = [];
 
 		// XPath to find all <link> tags with rel="stylesheet"
@@ -29,6 +31,39 @@ public static partial class HtmlAgilityPackExtensions
 		}
 
 		return cssFiles;
+	}
+
+	public static string EnsureXmlLang(string xhtml)
+	{
+		try
+		{
+			var doc = XDocument.Parse(xhtml, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
+
+			// Get the root element (usually <html>)
+			var root = doc.Root;
+			if (root is null)
+			{
+				return xhtml;
+			}
+
+			// Check for xml:lang attribute (must use the XML namespace)
+			XNamespace xmlNs = XNamespace.Xml;
+			var xmlLangAttr = root.Attribute(xmlNs + "lang");
+
+			if (xmlLangAttr is null)
+			{
+				root.SetAttributeValue(xmlNs + "lang", "en-US");
+				return doc.ToString(SaveOptions.DisableFormatting);
+			}
+
+			// Already set, return original
+			return xhtml;
+		}
+		catch
+		{
+			// If parsing fails, return original input
+			return xhtml;
+		}
 	}
 
 	public static string RemoveCssLinks(string htmlContent)

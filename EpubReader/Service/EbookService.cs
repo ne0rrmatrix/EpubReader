@@ -187,13 +187,19 @@ public static partial class EbookService
 	static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
-		var doc = new HtmlDocument();
+
 		if (chaptersRef.FindAll(x => x.FilePath.Contains("_split_001")).Count > 2)
 		{
 			foreach (var item in chaptersRef.Where(x => x is not null).Where(item => item.FilePath.Contains("_split_000")))
 			{
-				var htmlFile = ReplaceChapter(chaptersRef, item)?.ReadContent() ?? string.Empty;
-				chapters.Add(GetChapter(book, doc, htmlFile, item));
+				var temp = ReplaceChapter(chaptersRef, item);
+				var htmlFile = temp?.ReadContent() ?? string.Empty;
+				var chapter = GetChapter(book, htmlFile, item);
+				if (string.IsNullOrEmpty(chapter.Title))
+				{
+					chapter.Title = GetTitle(book, temp) ?? string.Empty;
+				}
+				chapters.Add(chapter);
 			}
 			return chapters;
 		}
@@ -203,7 +209,7 @@ public static partial class EbookService
 			foreach (var item in chaptersRef)
 			{
 				var htmlFile = item.ReadContent();
-				chapters.Add(GetChapter(book, doc, htmlFile, item));
+				chapters.Add(GetChapter(book, htmlFile, item));
 			}
 			return chapters;
 		}
@@ -211,15 +217,14 @@ public static partial class EbookService
 		foreach (var item in chaptersRef.Where(item => !item.FilePath.Contains("_split_")))
 		{
 			var htmlFile = item.ReadContent();
-			chapters.Add(GetChapter(book, doc, htmlFile, item));
+			chapters.Add(GetChapter(book, htmlFile, item));
 		}
 		return chapters;
 	}
 
-	static Chapter GetChapter(EpubBookRef book, HtmlDocument doc, string htmlFile, EpubLocalTextContentFileRef item)
+	static Chapter GetChapter(EpubBookRef book, string htmlFile, EpubLocalTextContentFileRef item)
 	{
-		doc.LoadHtml(htmlFile);
-		htmlFile = ProcessHtml(htmlFile, doc);
+		htmlFile = ProcessHtml(htmlFile);
 		var fileName = Path.GetFileName(item.FilePath);
 		var title = GetTitle(book, item) ?? string.Empty;
 		return new Chapter
@@ -229,16 +234,16 @@ public static partial class EbookService
 			Title = title,
 		};
 	}
+	
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
 	{
 		var temp = item.FilePath.Replace("_split_000", "_split_001");
 		return chaptersRef.Find(x => x.FilePath == temp);
 	}
-
-	static string ProcessHtml(string htmlFile, HtmlDocument doc)
+	
+	static string ProcessHtml(string htmlFile)
 	{
-		doc.LoadHtml(htmlFile);
-		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(doc);
+		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);

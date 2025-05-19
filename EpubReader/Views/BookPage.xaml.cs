@@ -69,6 +69,7 @@ public partial class BookPage : ContentPage, IDisposable
 			GridArea_Tapped(this, EventArgs.Empty);
 		}
 	}
+
 	async void SwipeGestureRecognizer_right_Swiped(object? sender, SwipedEventArgs e)
 	{
 		if (e.Direction == SwipeDirection.Right)
@@ -112,43 +113,60 @@ public partial class BookPage : ContentPage, IDisposable
 		e.Cancel = true;
 		var funcToCall = urlParts[1].Split("?");
 		var methodName = funcToCall[0][..^1];
+		var newUrl = e.Url.Split('?');
+		if (newUrl.Length > 1 && e.Url.Contains("https://runcsharp.jump/?") && !e.Url.Contains("https://demo"))
+		{
+			var queryString = newUrl[1];
+			queryString = queryString.Replace("http://", "https://");
+			if (string.IsNullOrEmpty(queryString) || !queryString.Contains("https://"))
+			{
+				return;
+			}
+			await Launcher.OpenAsync(queryString);
+			return;
+		}
+
+		string[] url = e.Url.Split("https://demo/");
 		
-		if (Contains("next",methodName))
+		if (url.Length > 1 && 
+			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && 
+			book.Chapters.FindIndex(chapter => chapter.FileName.Contains(url[1].Split('#')[0], StringComparison.CurrentCultureIgnoreCase)) 
+			is int index && 
+			index != -1)
+		{
+			book.CurrentChapter = index;
+			db.UpdateBookMark(book);
+			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		}
+		if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.Next(pageLabel, book);
 		}
-		if (Contains("prev", methodName))
+		if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.Prev(pageLabel, book);
 		}
-		if (Contains("menu", methodName))
+		if (methodName.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
 		{
 			GridArea_Tapped(this, EventArgs.Empty);
 		}
-		if (Contains("pageLoad", methodName))
+		if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.OnSettingsClicked();
 		}
 	}
-	static bool Contains(string value, string methodName)
-	{
-		return methodName.Contains(value, StringComparison.CurrentCultureIgnoreCase);
-	}
+
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book); OnJavaScriptMessageReceived(m); });
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
-	}
-
-	void OnJavaScriptMessageReceived(JavaScriptMessage m)
-	{
-		if (Contains("menu", m.Value))
+		if(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
 		{
-			GridArea_Tapped(this, EventArgs.Empty);
+			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
 		}
+		
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
 	}
 
 	async void GridArea_Tapped(object sender, EventArgs e)

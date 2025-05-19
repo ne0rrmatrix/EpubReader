@@ -19,6 +19,7 @@ public static partial class WebViewExtensions
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		webViewHandler.PlatformView.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested -= CoreWebView2_WebResourceRequested;
+		webViewHandler.PlatformView.CoreWebView2.DownloadStarting -= CoreWebView2_DownloadStarting;
 	}
 
 	static void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
@@ -30,8 +31,14 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2.Settings.AreHostObjectsAllowed = true;
 		webViewHandler.PlatformView.CoreWebView2.Settings.IsWebMessageEnabled = true;
 		webViewHandler.PlatformView.CoreWebView2.Settings.IsScriptEnabled = true;
+		webViewHandler.PlatformView.CoreWebView2.DownloadStarting += CoreWebView2_DownloadStarting;
 		webViewHandler.PlatformView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
+	}
+
+	static void CoreWebView2_DownloadStarting(CoreWebView2 sender, CoreWebView2DownloadStartingEventArgs args)
+	{
+		args.Handled = true;
 	}
 
 	static void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)

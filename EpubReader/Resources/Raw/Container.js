@@ -1,4 +1,18 @@
 ﻿window.addEventListener('click', function (event) {
+    let target = event.target;
+
+    if (target.tagName === 'A') {
+        // Click was directly on a link
+        console.log('Clicked on link:', target.href);
+        window.parent.postMessage("jump." + target.href, "https://demo");
+        return;
+    } else if (target.closest('a')) {
+        // Click was on a child of a link
+        let link = target.closest('a');
+        window.parent.postMessage("jump." + link.href, "https://demo");
+        console.log('Clicked on link:', link.href);
+        return;
+    }
 
     event.preventDefault();
     // Get the x-coordinate of the click relative to the viewport

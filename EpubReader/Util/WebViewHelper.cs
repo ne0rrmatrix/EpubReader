@@ -1,5 +1,4 @@
 ﻿using EpubReader.Interfaces;
-using EpubReader.Messages;
 using EpubReader.Models;
 
 namespace EpubReader.Util;
@@ -20,7 +19,7 @@ public partial class WebViewHelper(WebView handler)
 		await webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
-		if(settings.SupportMultipleColumns)
+		if (settings.SupportMultipleColumns)
 		{
 			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','2')");
 		}
@@ -31,23 +30,7 @@ public partial class WebViewHelper(WebView handler)
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
 		await webView.EvaluateJavaScriptAsync("getPageCount()");
 	}
-
-	public async void OnJavaScriptMessageReceived(JavaScriptMessage m,Label label, Book book)
-	{
-		if (m.Value.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Next(label, book);
-			return;
-		}
-		if (m.Value.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await Prev(label, book);
-		}
-		if (m.Value.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await OnSettingsClicked();
-		}
-	}
+	
 	public async Task LoadPage(Label label, Book book)
 	{
 #if ANDROID || WINDOWS
