@@ -57,12 +57,7 @@
                                                            Default=Start}"
                             Source="close.png"
                             WidthRequest="45" />
-                        <VerticalStackLayout
-                            Grid.Row="0"
-                            Grid.RowSpan="{Binding Book.Chapters.Count}"
-                            HorizontalOptions="{OnPlatform iOS=Center,
-                                                           MacCatalyst=Center,
-                                                           Default=End}">
+                        <VerticalStackLayout Grid.Row="0" HorizontalOptions="{OnPlatform iOS=Center, MacCatalyst=Center, Default=End}">
                             <Label
                                 x:Name="Title"
                                 Margin="0,0,10,0"

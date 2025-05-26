@@ -119,6 +119,12 @@ public static partial class EbookService
 				fonts.Add(Font);
 			}
 		}
+		var description = book.Description ?? string.Empty;
+		if (!description.Contains("<html>"))
+		{
+			description = description.Insert(0, "<html><body>");
+			description = description.Insert(description.Length, "</body></html>");
+		}
 		var coverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
 		Book books = new()
 		{
@@ -127,7 +133,7 @@ public static partial class EbookService
 			FilePath = path,
 			Files = list,
 			Fonts = fonts,
-			Desription = book.Description ?? string.Empty,
+			Desription = description,
 			CoverImage = coverImage,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
