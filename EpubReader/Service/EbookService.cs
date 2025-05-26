@@ -133,7 +133,7 @@ public static partial class EbookService
 			FilePath = path,
 			Files = list,
 			Fonts = fonts,
-			Desription = description,
+			Description = description,
 			CoverImage = coverImage,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],

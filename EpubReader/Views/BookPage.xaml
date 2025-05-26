@@ -81,7 +81,7 @@
                                 x:Name="description"
                                 Margin="0,10,10,0"
                                 HorizontalOptions="Center"
-                                Text="{Binding Book.Desription}"
+                                Text="{Binding Book.Description}"
                                 TextColor="White"
                                 TextType="Html"
                                 VerticalOptions="End"
