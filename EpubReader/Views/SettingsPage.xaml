@@ -95,7 +95,7 @@
             Text="Reset"
             WidthRequest="120" />
         <Button
-            IsVisible="{OnPlatform WinUI=true, Default=false}"
+            IsVisible="{OnPlatform WinUI=true, MacCatalyst=true, Default=false}"
             x:Name="ButtonColumn"
             Grid.Row="11"
             Clicked="ToggleMultipleColumns"

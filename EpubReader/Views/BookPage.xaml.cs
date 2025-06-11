@@ -129,11 +129,13 @@ public partial class BookPage : ContentPage, IDisposable
 		string[] url = e.Url.Split("https://demo/");
 		
 		if (url.Length > 1 && 
-			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && 
-			book.Chapters.FindIndex(chapter => chapter.FileName.Contains(url[1].Split('#')[0], StringComparison.CurrentCultureIgnoreCase)) 
-			is int index && 
-			index != -1)
+			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase))
 		{
+			var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(url[1].Split('#')[0], StringComparison.CurrentCultureIgnoreCase));
+			if (index < 0)
+			{
+				return;
+			}
 			book.CurrentChapter = index;
 			db.UpdateBookMark(book);
 			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";

@@ -14,6 +14,53 @@ document.addEventListener("DOMContentLoaded", function () {
     root.style.setProperty('--root-height', height + "px");
     const platform = detectPlatform();
 
+    frame.onload = function () {
+        try {
+            const frame = document.getElementById("page");
+
+            if (!frame) {
+                console.error("Iframe element not found");
+                return;
+            }
+
+            // Check if content is accessible
+            if (!frame?.contentWindow.document) {
+                console.error("Cannot access iframe content - likely CORS restriction");
+                return;
+            }
+            if (isAndroid || isIOS) {
+                console.log("Not setting extra page for single column");
+                return;
+            }
+            // Small delay to ensure content is fully ready
+            setTimeout(() => {
+                try {
+                    const width = Math.floor(frame.contentWindow.innerWidth);
+                    const height = Math.floor(frame.contentWindow.innerHeight);
+                    const pageCount = getPageCount();
+
+                    if (pageCount % 2 != 0) {
+                        const blankPage = frame.contentWindow.document.createElement("div");
+                        blankPage.style.width = width + "px";
+                        blankPage.style.height = height + "px";
+                        blankPage.style.display = "inline-block";
+                        blankPage.style.backgroundColor = "transparent";
+                        blankPage.style.overflow = "hidden";
+                        frame.contentWindow.document.body.appendChild(blankPage);
+                        console.log("Added blank page to make page count even:", pageCount + 1);
+                    }
+                    else {
+                        console.log("Page count is already even:", pageCount);
+                    }
+                } catch (innerError) {
+                    console.error("Error manipulating iframe content:", innerError);
+                }
+            }, 100);
+
+        } catch (error) {
+            console.error("Error accessing iframe:", error);
+        }
+    };
     function isHorizontalScrollAtStart() {
         if (!frame.contentWindow) {
             console.log("frame.contentWindow is null");
@@ -162,6 +209,7 @@ function detectPlatform() {
         isMac: /macintosh|mac os x/.test(userAgent) &&
             !(/iphone|ipad|ipod/.test(userAgent)) &&
             (navigator.maxTouchPoints < 1),
-        isWindows: /win32|win64|windows|wince/.test(userAgent)
+        isWindows: /win32|win64|windows|wince/.test(userAgent),
+        isAndroid: /android/.test(userAgent)
     };
 }
