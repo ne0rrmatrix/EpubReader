@@ -82,7 +82,7 @@ window.addEventListener('touchstart', function (event) {
         return handleLinkClick(parentLink.href);
     }
     // Handle navigation touch
-    handleNavigationClick(event);
+    handleTouchRegion(event);
 });
 // Keyboard navigation handler
 window.addEventListener("keydown", function (event) {
