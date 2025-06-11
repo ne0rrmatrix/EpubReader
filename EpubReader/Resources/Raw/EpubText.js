@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.error("Cannot access iframe content - likely CORS restriction");
                 return;
             }
-            if (isAndroid || isIOS) {
+            if (platform.isAndroid || platform.isIOS) {
                 console.log("Not setting extra page for single column");
                 return;
             }
