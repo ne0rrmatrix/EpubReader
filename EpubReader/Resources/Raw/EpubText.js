@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     frame.onload = function () {
         try {
-            const frame = document.getElementById("page");
 
             if (!frame) {
                 console.error("Iframe element not found");
@@ -32,30 +31,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.log("Not setting extra page for single column");
                 return;
             }
-            // Small delay to ensure content is fully ready
-            setTimeout(() => {
-                try {
-                    const width = Math.floor(frame.contentWindow.innerWidth);
-                    const height = Math.floor(frame.contentWindow.innerHeight);
-                    const pageCount = getPageCount();
 
-                    if (pageCount % 2 != 0) {
-                        const blankPage = frame.contentWindow.document.createElement("div");
-                        blankPage.style.width = width + "px";
-                        blankPage.style.height = height + "px";
-                        blankPage.style.display = "inline-block";
-                        blankPage.style.backgroundColor = "transparent";
-                        blankPage.style.overflow = "hidden";
-                        frame.contentWindow.document.body.appendChild(blankPage);
-                        console.log("Added blank page to make page count even:", pageCount + 1);
-                    }
-                    else {
-                        console.log("Page count is already even:", pageCount);
-                    }
-                } catch (innerError) {
-                    console.error("Error manipulating iframe content:", innerError);
-                }
-            }, 100);
+            if (getPageCount() % 2 != 0) {
+                const blankPage = frame.contentWindow.document.createElement("div");
+                blankPage.style.width = width + "px";
+                blankPage.style.height = height + "px";
+                blankPage.style.display = "inline-block";
+                blankPage.style.backgroundColor = "transparent";
+                blankPage.style.overflow = "hidden";
+                frame.contentWindow.document.body.appendChild(blankPage);
+                console.log("Added blank page to make page count even:", getPageCount() + 1);
+            }
+            else {
+                console.log("Page count is already even:", getPageCount());
+            }
 
         } catch (error) {
             console.error("Error accessing iframe:", error);
