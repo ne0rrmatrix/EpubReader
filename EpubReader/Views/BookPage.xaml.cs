@@ -16,20 +16,7 @@ public partial class BookPage : ContentPage, IDisposable
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
-#if IOS || MACCATALYST
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
-	{
-		Direction = SwipeDirection.Left,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
-	{
-		Direction = SwipeDirection.Right,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
-	{
-		Direction = SwipeDirection.Up,
-	};
-#endif
+
 	const uint animationDuration = 200u;
 	bool disposedValue;
 	bool loadIndex = true;
@@ -41,14 +28,6 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		webViewHelper = new(webView);
 
-#if IOS || MACCATALYST
-		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
-		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
-		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
-#endif
 #if IOS || ANDROID
 		webView.Behaviors.Add(touchbehavior);
 #endif
