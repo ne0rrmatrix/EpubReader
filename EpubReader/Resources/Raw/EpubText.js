@@ -297,7 +297,7 @@ function setReadiumProperty(property, value) {
  * Removes a CSS custom property from the iframe's document element.
  * @param {string} property - The name of the CSS custom property to remove.
  */
-function UnsetReadiumProperty(property) {
+function unsetReadiumProperty(property) {
     const frame = document.getElementById("page");
     const root = frame?.contentWindow?.document?.documentElement; // Safely access properties
     if (root) {
@@ -319,6 +319,6 @@ function setBackgroundColor(color) {
 /**
  * Removes the background color CSS custom property from the main document element.
  */
-function UnsetBackgroundColor() {
+function unsetBackgroundColor() {
     document.documentElement.style.removeProperty('--background-color');
 }
