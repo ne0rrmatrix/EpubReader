@@ -163,17 +163,24 @@ document.addEventListener("DOMContentLoaded", function () {
             frame.contentWindow.scrollTo({ left: frame.contentWindow.scrollX + scrollAmount, top: 0, behavior: "smooth" });
         }
     };
+    function validateOrigin(origin) {
+        const isAllowedOrigin =
+            ((platform.isAndroid || platform.isWindows) && origin === "https://demo") ||
+            ((platform.isIOS || platform.isMac) && origin === "app://demo");
+
+        if (!isAllowedOrigin) {
+            console.warn("Received message from unauthorized origin:", origin);
+        }
+
+        return isAllowedOrigin;
+    }
 
     // Listen for messages from the parent window
     window.addEventListener("message", function (event) {
         // Origin validation for security
-        if (platform.isWindows && event.origin !== "https://demo") {
+        if (!validateOrigin(event.origin)) {
             return;
         }
-        if (platform.isIOS && event.origin !== "app://demo") {
-            return;
-        }
-
         const { data } = event; // Destructure event.data for conciseness
 
         if (data.startsWith("jump.")) {
