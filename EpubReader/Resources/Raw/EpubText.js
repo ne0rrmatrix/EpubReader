@@ -1,4 +1,5 @@
 ﻿let isPreviousPage = false;
+let frame = null;
 
 /**
  * Detects the user's operating system platform.
@@ -16,7 +17,7 @@ function detectPlatform() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    const frame = document.getElementById("page");
+    frame = document.getElementById("page");
     const body = document.getElementById("body");
     const root = document.documentElement;
     const platform = detectPlatform();
@@ -205,7 +206,6 @@ document.addEventListener("DOMContentLoaded", function () {
  * @returns {number} The number of pages.
  */
 function getPageCount() {
-    const frame = document.getElementById("page");
     if (!frame?.contentWindow) {
         console.warn("Iframe contentWindow not available in getPageCount.");
         return 0; // Return 0 or handle error appropriately
@@ -240,7 +240,6 @@ function setPreviousPage() {
  * @returns {boolean} True if the frame was found and source set, false otherwise.
  */
 function loadPage(page) {
-    const frame = document.getElementById("page");
     if (!frame) {
         console.error("Frame not found for loadPage.");
         return false;
@@ -255,7 +254,6 @@ function loadPage(page) {
  * Handles cases where the iframe content might not be fully loaded yet by retrying on `onload`.
  */
 function scrollToHorizontalEnd() {
-    const frame = document.getElementById("page");
     if (!frame) {
         console.error("Iframe element not found for scrollToHorizontalEnd.");
         return;
@@ -283,7 +281,6 @@ function scrollToHorizontalEnd() {
  * @param {string} value - The value to set for the property.
  */
 function setReadiumProperty(property, value) {
-    const frame = document.getElementById("page");
     const root = frame?.contentWindow?.document?.documentElement; // Safely access properties
     if (root) {
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
@@ -298,7 +295,6 @@ function setReadiumProperty(property, value) {
  * @param {string} property - The name of the CSS custom property to remove.
  */
 function unsetReadiumProperty(property) {
-    const frame = document.getElementById("page");
     const root = frame?.contentWindow?.document?.documentElement; // Safely access properties
     if (root) {
         console.log(`Unsetting iframe CSS property: ${property}`);

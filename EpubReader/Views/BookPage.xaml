@@ -89,7 +89,7 @@
                         </VerticalStackLayout>
                     </Grid>
                 </ScrollView>
-                <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Light={StaticResource Blue200Accent}, Dark={StaticResource AppBackgroundDarkColor}}">
+                <Grid x:Name="grid">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="auto" />
@@ -108,12 +108,8 @@
                     <Label
                         x:Name="pageLabel"
                         Grid.Row="1"
-                        FontSize="20"
-                        HorizontalOptions="Center"
-                        IsVisible="{OnPlatform WinUI=true,
-                                               MacCatalyst=true,
-                                               iOS={Binding IsNavMenuVisible},
-                                               Android={Binding IsNavMenuVisible}}" />
+                        FontSize="{OnPlatform Android=16, iOS=16, WinUI=20, MacCatalyst=20}"
+                        HorizontalOptions="Center"/>
                 </Grid>
             </Grid>
         </shimmer:SfShimmer.Content>

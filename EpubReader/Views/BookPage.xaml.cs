@@ -104,6 +104,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
+		var setttings = db.GetSettings() ?? new();
 		var urlParts = e.Url.Split('.');
 		ArgumentNullException.ThrowIfNull(book);
 		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
@@ -127,11 +128,12 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 
 		string[] url = e.Url.Split("https://demo/");
-		
+
 		if (url.Length > 1 && 
 			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase))
 		{
-			var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(url[1].Split('#')[0], StringComparison.CurrentCultureIgnoreCase));
+			var key = url[1].Split('#')[0];
+			var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(key, StringComparison.CurrentCultureIgnoreCase));
 			if (index < 0)
 			{
 				return;
@@ -155,6 +157,31 @@ public partial class BookPage : ContentPage, IDisposable
 		if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
 		{
 			await webViewHelper.OnSettingsClicked();
+		}
+		if(pageLabel.Text.Length == 0)
+		{
+			pageLabel.IsVisible = false;
+			return;
+		}
+		else
+		{
+			pageLabel.IsVisible = true;
+		}
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+		{
+			grid.BackgroundColor = Color.FromArgb(setttings.BackgroundColor);
+		}
+		else
+		{
+			var currentTheme = Application.Current?.RequestedTheme;
+			if (currentTheme!.Value == AppTheme.Dark)
+			{
+				grid.BackgroundColor = Color.FromArgb("#121212");
+			}
+			else
+			{
+				grid.BackgroundColor = Color.FromArgb("#72ACF1");
+			}
 		}
 	}
 
