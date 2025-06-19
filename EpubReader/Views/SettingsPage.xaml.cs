@@ -41,6 +41,7 @@ public partial class SettingsPage : Popup
 		db.RemoveAllSettings();
 		settings = new Settings();
 		db.SaveSettings(settings);
+		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
