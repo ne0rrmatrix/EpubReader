@@ -8,14 +8,14 @@ using MetroLog;
 
 namespace EpubReader.Views;
 
-public partial class SettingsPage : Popup
+public partial class SettingsPage : ContentView
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db;
 	Settings settings;
 	public SettingsPage(SettingsPageViewModel viewModel, IDb db)
 	{
-        InitializeComponent();
+		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		settings = db.GetSettings() ?? new();
@@ -27,7 +27,7 @@ public partial class SettingsPage : Popup
 
 	void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
 	{
-		if((int)e.NewValue == 0)
+		if ((int)e.NewValue == 0)
 		{
 			return;
 		}
@@ -41,6 +41,7 @@ public partial class SettingsPage : Popup
 		db.RemoveAllSettings();
 		settings = new Settings();
 		db.SaveSettings(settings);
+		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
@@ -55,7 +56,7 @@ public partial class SettingsPage : Popup
 		{
 			return;
 		}
-		
+
 		settings.BackgroundColor = scheme.BackgroundColor;
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;

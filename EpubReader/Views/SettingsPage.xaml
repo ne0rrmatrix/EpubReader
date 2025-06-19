@@ -1,19 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<mct:Popup
+<ContentView
     x:Class="EpubReader.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:page="clr-namespace:EpubReader.Views"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    Size="400,600">
+    WidthRequest="400"
+    HeightRequest="600"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                            Light={StaticResource Blue200Accent}}"
+    x:DataType="viewModel:SettingsPageViewModel">
 
 
     <Grid
-        Padding="20"
         ColumnSpacing="10"
         RowSpacing="20">
 
@@ -68,8 +70,8 @@
             x:Name="FontPicker"
             Grid.Row="4"
             HeightRequest="40"
-            ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
-            ItemsSource="{Binding Fonts, x:DataType=viewModel:SettingsPageViewModel}"
+            ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts, Source={RelativeSource AncestorType={x:Type models:EpubFonts}}}"
+            ItemsSource="{Binding Fonts}"
             SelectedIndexChanged="FontPicker_SelectedIndexChanged" />
 
         <Label
@@ -84,8 +86,8 @@
             Title="Choose a theme"
             Grid.Row="8"
             HeightRequest="70"
-            ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
-            ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}"
+            ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme, Source={RelativeSource AncestorType={x:Type models:ColorScheme}}}"
+            ItemsSource="{Binding ColorSchemes}"
             SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
 
         <Button
@@ -95,7 +97,7 @@
             Text="Reset"
             WidthRequest="120" />
         <Button
-            IsVisible="{OnPlatform WinUI=true, Default=false}"
+            IsVisible="{OnPlatform WinUI=true, MacCatalyst=true, Default=false}"
             x:Name="ButtonColumn"
             Grid.Row="11"
             Clicked="ToggleMultipleColumns"
@@ -103,4 +105,4 @@
             WidthRequest="250"/>
     </Grid>
 
-</mct:Popup>
+</ContentView>
