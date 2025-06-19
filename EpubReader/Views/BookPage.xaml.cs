@@ -104,84 +104,132 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
-		var setttings = db.GetSettings() ?? new();
-		var urlParts = e.Url.Split('.');
-		ArgumentNullException.ThrowIfNull(book);
-		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		if (!e.Url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
-			return;	
-		}
-		e.Cancel = true;
-		var funcToCall = urlParts[1].Split("?");
-		var methodName = funcToCall[0][..^1];
-		var newUrl = e.Url.Split('?');
-		if (newUrl.Length > 1 && e.Url.Contains("https://runcsharp.jump/?") && !e.Url.Contains("https://demo"))
-		{
-			var queryString = newUrl[1];
-			queryString = queryString.Replace("http://", "https://");
-			if (string.IsNullOrEmpty(queryString) || !queryString.Contains("https://"))
-			{
-				return;
-			}
-			await Launcher.OpenAsync(queryString);
 			return;
 		}
 
-		string[] url = e.Url.Split("https://demo/");
+		e.Cancel = true;
+		ArgumentNullException.ThrowIfNull(book);
 
-		if (url.Length > 1 && 
-			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase))
+		if (await TryHandleExternalLinkAsync(e.Url))
 		{
-			var key = url[1].Split('#')[0];
-			var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(key, StringComparison.CurrentCultureIgnoreCase));
-			if (index < 0)
-			{
-				return;
-			}
+			return;
+		}
+
+		var methodName = GetMethodNameFromUrl(e.Url);
+		if (string.IsNullOrEmpty(methodName))
+		{
+			return;
+		}
+
+		await HandleWebViewActionAsync(methodName, e.Url);
+		UpdateUiAppearance();
+	}
+
+	static async Task<bool> TryHandleExternalLinkAsync(string url)
+	{
+		const string externalLinkPrefix = "https://runcsharp.jump/?";
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo"))
+		{
+			return false;
+		}
+
+		var urlParts = url.Split('?');
+		if (urlParts.Length <= 1)
+		{
+			return false;
+		}
+
+		var queryString = urlParts[1].Replace("http://", "https://");
+		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
+		{
+			await Launcher.OpenAsync(queryString);
+			return true;
+		}
+
+		return false;
+	}
+
+	static string GetMethodNameFromUrl(string url)
+	{
+		var urlParts = url.Split('.');
+		if (urlParts.Length < 2)
+		{
+			return string.Empty;
+		}
+
+		var funcToCall = urlParts[1].Split('?');
+		if (string.IsNullOrEmpty(funcToCall[0]) || funcToCall[0].Length <= 1)
+		{
+			return string.Empty;
+		}
+
+		return funcToCall[0][..^1]; // Assumes format like "method()"
+	}
+
+	async Task HandleWebViewActionAsync(string methodName, string url)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		switch (methodName.ToLowerInvariant())
+		{
+			case "jump":
+				HandleJumpAction(url);
+				break;
+			case "next":
+				await webViewHelper.Next(pageLabel, book);
+				break;
+			case "prev":
+				await webViewHelper.Prev(pageLabel, book);
+				break;
+			case "menu":
+				GridArea_Tapped(this, EventArgs.Empty);
+				break;
+			case "pageload":
+				await webViewHelper.OnSettingsClicked();
+				break;
+		}
+	}
+
+	void HandleJumpAction(string url)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		var urlParts = url.Split("https://demo/");
+		if (urlParts.Length <= 1)
+		{
+			return;
+		}
+
+		var key = urlParts[1].Split('#')[0];
+		var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(key, StringComparison.CurrentCultureIgnoreCase));
+
+		if (index >= 0)
+		{
 			book.CurrentChapter = index;
 			db.UpdateBookMark(book);
 			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		}
-		if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
+	}
+
+	void UpdateUiAppearance()
+	{
+		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
+		if (!pageLabel.IsVisible)
 		{
-			await webViewHelper.Next(pageLabel, book);
-		}
-		if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await webViewHelper.Prev(pageLabel, book);
-		}
-		if (methodName.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-		if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await webViewHelper.OnSettingsClicked();
-		}
-		if(pageLabel.Text.Length == 0)
-		{
-			pageLabel.IsVisible = false;
 			return;
 		}
-		else
-		{
-			pageLabel.IsVisible = true;
-		}
+
+		var settings = db.GetSettings() ?? new();
 		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
 		{
-			grid.BackgroundColor = Color.FromArgb(setttings.BackgroundColor);
+			grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
 		}
 		else
 		{
 			var currentTheme = Application.Current?.RequestedTheme;
-			if (currentTheme!.Value == AppTheme.Dark)
-			{
-				grid.BackgroundColor = Color.FromArgb("#121212");
-			}
-			else
-			{
-				grid.BackgroundColor = Color.FromArgb("#72ACF1");
-			}
+			grid.BackgroundColor = currentTheme == AppTheme.Dark
+				? Color.FromArgb("#121212")
+				: Color.FromArgb("#72ACF1");
 		}
 	}
 
