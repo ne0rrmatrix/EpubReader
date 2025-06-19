@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-using SQLite;
-using SQLiteNetExtensions.Attributes;
+﻿using SQLite;
 
 namespace EpubReader.Models;
 

@@ -20,7 +20,6 @@
     </ContentPage.ToolbarItems>
 
     <CollectionView
-        x:Name="collectionView"
         Grid.Row="1"
         Margin="{StaticResource CollectionMargin}"
         HorizontalScrollBarVisibility="Never"

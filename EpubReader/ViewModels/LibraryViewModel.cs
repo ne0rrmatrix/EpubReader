@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
-using FFImageLoading;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 

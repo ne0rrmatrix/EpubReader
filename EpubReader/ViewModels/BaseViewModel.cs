@@ -1,8 +1,11 @@
-﻿using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Maui.Core.Platform;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using EpubReader.Interfaces;
 using EpubReader.Models;
+
+#if ANDROID
+using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Core.Platform;
+#endif
 
 namespace EpubReader.ViewModels;
 
