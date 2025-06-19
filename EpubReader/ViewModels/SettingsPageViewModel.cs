@@ -1,4 +1,5 @@
-﻿using EpubReader.Models;
+﻿using CommunityToolkit.Maui;
+using EpubReader.Models;
 
 namespace EpubReader.ViewModels;
 

@@ -8,7 +8,7 @@ using MetroLog;
 
 namespace EpubReader.Views;
 
-public partial class SettingsPage : Popup
+public partial class SettingsPage : ContentView
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db;
