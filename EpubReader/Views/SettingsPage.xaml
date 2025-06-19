@@ -81,9 +81,8 @@
 
         <Picker
             x:Name="ThemePicker"
-            Title="Choose a theme"
             Grid.Row="8"
-            HeightRequest="70"
+            HeightRequest="40"
             ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
             ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}"
             SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
@@ -95,12 +94,14 @@
             Text="Reset"
             WidthRequest="120" />
         <Button
-            IsVisible="{OnPlatform WinUI=true, MacCatalyst=true, Default=false}"
             x:Name="ButtonColumn"
             Grid.Row="11"
             Clicked="ToggleMultipleColumns"
             HeightRequest="45"
-            WidthRequest="250"/>
+            IsVisible="{OnPlatform WinUI=true,
+                                   MacCatalyst=true,
+                                   Default=false}"
+            WidthRequest="250" />
     </Grid>
 
 </mct:Popup>

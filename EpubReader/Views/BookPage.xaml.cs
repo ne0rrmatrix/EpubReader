@@ -187,6 +187,7 @@ public partial class BookPage : ContentPage, IDisposable
 				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClicked();
+				UpdateUiAppearance();
 				break;
 		}
 	}
@@ -214,36 +215,29 @@ public partial class BookPage : ContentPage, IDisposable
 	void UpdateUiAppearance()
 	{
 		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
-		if (!pageLabel.IsVisible)
-		{
-			return;
-		}
-
 		var settings = db.GetSettings() ?? new();
+		if(string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			settings.BackgroundColor = "#FFFFFF"; // Default background color
+			settings.TextColor = "#000000"; // Default text color
+		}
 		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
 		{
 			grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-		}
-		else
-		{
-			var currentTheme = Application.Current?.RequestedTheme;
-			grid.BackgroundColor = currentTheme == AppTheme.Dark
-				? Color.FromArgb("#121212")
-				: Color.FromArgb("#72ACF1");
+			pageLabel.TextColor = Color.FromArgb(settings.TextColor);
 		}
 	}
-
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		if(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
 		{
 			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
 		}
-		
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
+
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 	}
 
 	async void GridArea_Tapped(object sender, EventArgs e)

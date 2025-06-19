@@ -24,15 +24,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 #if ANDROID
 		ArgumentNullException.ThrowIfNull(Application.Current);
 		StatusBar.SetStyle(StatusBarStyle.LightContent);
-		if (Application.Current.RequestedTheme == AppTheme.Dark)
-		{
-			StatusBar.SetColor(Color.FromArgb("#121212"));
-		}
-		else
-		{
-			StatusBar.SetColor(Color.FromArgb("#3E8EED"));
-
-		}
+		Current_RequestedThemeChanged(Application.Current, new AppThemeChangedEventArgs(Application.Current.RequestedTheme));
 		Application.Current.RequestedThemeChanged += Current_RequestedThemeChanged;
 #endif
 	}
@@ -40,7 +32,6 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 #if ANDROID
 	static void Current_RequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
 	{
-		StatusBar.SetStyle(StatusBarStyle.LightContent);
 		if (e.RequestedTheme == AppTheme.Dark)
 		{
 			StatusBar.SetColor(Color.FromArgb("#121212"));
@@ -51,6 +42,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 		}
 	}
 #endif
+
 	protected virtual void Dispose(bool disposing)
 	{
 		if (!disposedValue)

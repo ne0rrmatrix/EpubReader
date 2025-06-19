@@ -1,5 +1,6 @@
 ﻿let isPreviousPage = false;
 let frame = null;
+let colCount = 1;
 
 /**
  * Detects the user's operating system platform.
@@ -88,8 +89,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     background-color: transparent;
                     overflow: hidden;
                 `;
-                frame.contentWindow.document.body.appendChild(blankPage);
-                console.log(`Added blank page to make page count even: ${pageCount + 1}`);
+                if (colCount > 1) {
+                    frame.contentWindow.document.body.appendChild(blankPage);
+                    console.log(`Added blank page to make page count even: ${pageCount + 1}`);
+                }
             } else {
                 console.log(`Page count is already even: ${pageCount}`);
             }
@@ -285,6 +288,9 @@ function setReadiumProperty(property, value) {
     if (root) {
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
+        if (property === '--USER__colCount') {
+            colCount = parseInt(value);
+        }
     } else {
         console.warn(`Could not set property '${property}'. Iframe content not accessible or not loaded.`);
     }
