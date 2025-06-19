@@ -49,15 +49,15 @@ public static class MauiProgram
 #endif
 		});
 #if ANDROID
-		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
+		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
 #elif WINDOWS
-		Microsoft.Maui.Handlers.WebViewHandler.Mapper.ModifyMapping(
+		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
-	  async (handler, view, args) =>{ Controls.WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+	  async (handler, view, args) =>{ WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
 #elif IOS || MACCATALYST
-		Microsoft.Maui.Handlers.WebViewHandler.PlatformViewFactory = (handler) => 
+		WebViewHandler.PlatformViewFactory = (handler) => 
 		{
 			var config = new WKWebViewConfiguration();
 			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))
@@ -67,11 +67,11 @@ public static class MauiProgram
 				config.MediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypes.None;
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
-			config.SetUrlSchemeHandler(new Controls.CustomUrlSchemeHandler(), "app");
+			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
 			
-			var webView = new Controls.CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
+			var webView = new CustomMauiWKWebView(CGRect.Empty,(WebViewHandler)handler, config)
 			{
-				NavigationDelegate = new Controls.CustomWebViewNavigationDelegate((WebViewHandler)handler),
+				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),
 			};
 			if(OperatingSystem.IsIOSVersionAtLeast(17) || OperatingSystem.IsMacCatalystVersionAtLeast(17))
 			{
