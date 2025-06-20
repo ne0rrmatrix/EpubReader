@@ -9,9 +9,6 @@ public class MainActivity : MauiAppCompatActivity
 {
 	protected override void OnCreate(Bundle? savedInstanceState)
 	{
-		// Must apply the style before the DecorView setup
-		Theme?.ApplyStyle(Resource.Style.OptOutEdgeToEdgeEnforcement, force: false);
-
 		base.OnCreate(savedInstanceState);
 	}
 }
