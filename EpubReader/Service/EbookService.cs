@@ -262,6 +262,8 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.UpdateImageUrl(htmlFile);
 		htmlFile = FilePathExtensions.UpdateImagePathsToFilenames(htmlFile);
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.EnsureXmlLang(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.EnsureXhtml1TransitionalDoctype(htmlFile);
 		return htmlFile;
 	}
 

@@ -37,6 +37,10 @@ public static partial class HtmlAgilityPackExtensions
 	{
 		try
 		{
+			if (IsHtmlPage(xhtml))
+			{
+				return xhtml;
+			}
 			var doc = XDocument.Parse(xhtml, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
 
 			// Get the root element (usually <html>)
@@ -106,6 +110,7 @@ public static partial class HtmlAgilityPackExtensions
 
 			// Create <link> tags for each CSS file
 			StringBuilder cssLinks = new();
+		
 		foreach (string cssFile in cssFiles)
 		{
 			if (cssFile.Contains("kobo") || cssFile.Contains("calibre"))
@@ -137,8 +142,8 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			return htmlContent;
 		}
-			// Create <link> tags for each CSS file
-			StringBuilder jsLinks = new();
+		// Create <link> tags for each CSS file
+		StringBuilder jsLinks = new();
 		foreach (string jsFile in jsFiles)
 		{
 			jsLinks.Append($"<script src=\"{jsFile}\"></script>\n");
@@ -147,6 +152,37 @@ public static partial class HtmlAgilityPackExtensions
 		// Insert the CSS links before the closing </head> tag
 		string updatedHtmlContent = htmlContent.Insert(headCloseTagIndex, jsLinks.ToString());
 		return RemoveEmptyLines(updatedHtmlContent);
+	}
+
+	public static string EnsureXhtml1TransitionalDoctype(string htmlContent)
+	{
+		const string xhtmlDoctype = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">";
+		const string doctypeKeyword = "<!DOCTYPE"; // The keyword to check for any doctype
+
+		if (string.IsNullOrEmpty(htmlContent) || htmlContent.Contains(doctypeKeyword, StringComparison.OrdinalIgnoreCase))
+		{
+			return htmlContent; // If content is empty, just return it
+		}
+
+		// If no <!DOCTYPE was found, then proceed to add the XHTML 1.0 Transitional doctype
+		return xhtmlDoctype + Environment.NewLine + htmlContent;
+	}
+	static bool IsHtmlPage(string htmlContent)
+	{
+		try
+		{
+			HtmlDocument doc = new();
+			doc.LoadHtml(htmlContent);
+
+			// If there are parsing errors, it might not be well-formed HTML,
+			// but Html Agility Pack is very forgiving.
+			// A better check is to see if the root HTML element exists.
+			return doc.DocumentNode.Descendants("html").Any();
+		}
+		catch
+		{
+			return false; // Not valid HTML according to the parser
+		}
 	}
 
 	static string RemoveEmptyLines(string input)

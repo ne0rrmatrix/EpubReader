@@ -11,7 +11,7 @@ public class Settings
 	[Column("FontFamily")]
 	public string FontFamily { get; set; } = string.Empty;
 	[Column("FontSize")]
-	public int FontSize { get; set; } = 10;
+	public int FontSize { get; set; } = 0;
 	[Column("BackgroundColor")]
 	public string BackgroundColor { get; set; } = string.Empty;
 	[Column("TextColor")]

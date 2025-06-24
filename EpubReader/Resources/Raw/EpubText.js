@@ -208,6 +208,19 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+
+/**
+ * Retrieves the width of the content in the iframe.
+ * @returns {number} The width of the content.
+ */
+function getWidth() {
+    if (!frame?.contentWindow) {
+        console.warn("Iframe contentWindow not available in getWidth.");
+        return 0; // Return 0 or handle error appropriately
+    }
+    return Math.floor(frame.contentWindow.innerWidth);
+}
+
 /**
  * Retrieves the calculated page count within the iframe.
  * NOTE: This function re-queries the DOM for the iframe and its contentWindow,

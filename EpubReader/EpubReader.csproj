@@ -72,25 +72,25 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</TargetPlatformMinVersion>
 	</PropertyGroup>
 
-	<ItemGroup>
+  <ItemGroup>
     <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
-   <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
     <PackageReference Include="VersOne.Epub" Version="3.3.3" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="*" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.6" />
-		<PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />
-		<PackageReference Include="CommunityToolkit.Maui.Core" Version="11.2.0" />
-		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-		<PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-		<PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.5" />
-		<PackageReference Include="System.ServiceModel.Syndication" Version="9.0.6" />
-		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
-		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.6" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="11.2.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
+    <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.5" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="9.0.6" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
-	</ItemGroup>
+  </ItemGroup>
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.1" />
