@@ -95,8 +95,8 @@
                     <WebView
                         x:Name="webView"
                         Grid.Row="0"
-                        Margin="{OnPlatform Android=10,
-                                            iOS=10}"
+                        Margin="{OnIdiom Tablet=10,
+                                         Phone=5}"
                         Navigated="webView_Navigated"
                         Navigating="webView_Navigating"
                         Scale="1"

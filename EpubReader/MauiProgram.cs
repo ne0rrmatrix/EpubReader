@@ -114,10 +114,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 
-		builder.Services.AddSingleton<Util.WebViewHelper>();
+		builder.Services.AddSingleton<WebViewHelper>();
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
-		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("//LibraryPage");
-		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("//BookPage");
+		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
+		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
 		return builder.Build();
     }
 }

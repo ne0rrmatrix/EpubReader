@@ -46,7 +46,7 @@ public partial class LibraryViewModel : BaseViewModel
         {
             { "Book", Book }
         };
-        await Shell.Current.GoToAsync($"//BookPage", navigationParams);
+        await Shell.Current.GoToAsync($"BookPage", navigationParams);
     }
 
     [RelayCommand]

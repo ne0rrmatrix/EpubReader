@@ -1,8 +1,6 @@
 ﻿using System.Text;
-using CommunityToolkit.Mvvm.DependencyInjection;
 using EpubReader.Models;
 using EpubReader.Util;
-using HtmlAgilityPack;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
@@ -106,19 +104,22 @@ public static partial class EbookService
 		}
 
 		List<EpubFonts> fonts = [];
-		foreach (var item in book.Content.AllFiles.Local.ToList())
-		{
-			if (item.FilePath.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase))
+		foreach (var item in book.Content.AllFiles.Local
+			.Where(item => item.FilePath
+			.Contains(".ttf", StringComparison.InvariantCultureIgnoreCase) || 
+				item.FilePath.Contains(".otf", StringComparison.InvariantCultureIgnoreCase) || 
+				item.FilePath.Contains(".woff", StringComparison.InvariantCultureIgnoreCase) || 
+				item.FilePath.Contains(".woff2", StringComparison.InvariantCultureIgnoreCase)))
 			{
-				EpubFonts Font = new()
-				{
-					Content = await item.ReadContentAsBytesAsync(),
-					FileName = Path.GetFileName(item.FilePath),
-					FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
-				};
-				fonts.Add(Font);
-			}
+			EpubFonts Font = new()
+			{
+				Content = await item.ReadContentAsBytesAsync(),
+				FileName = Path.GetFileName(item.FilePath),
+				FontFamily = Path.GetFileNameWithoutExtension(item.FilePath)
+			};
+			fonts.Add(Font);
 		}
+
 		var description = book.Description ?? string.Empty;
 		if (!description.Contains("<html>"))
 		{

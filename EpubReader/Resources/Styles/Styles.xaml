@@ -21,7 +21,7 @@
     <Style ApplyToDerivedTypes="true" TargetType="toolkit:Popup">
         <Setter Property="VerticalOptions" Value="Center" />
         <Setter Property="HorizontalOptions" Value="Center" />
-        <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}" />
     </Style>
 
     <Style TargetType="NavigationPage">

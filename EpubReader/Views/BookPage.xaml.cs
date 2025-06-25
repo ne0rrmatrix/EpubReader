@@ -12,9 +12,12 @@ public partial class BookPage : ContentPage, IDisposable
 	Book? book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
-	
+
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
+#endif
+#if WINDOWS
+	bool loadIndex = true;
 #endif
 #if IOS || MACCATALYST
 	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
@@ -32,7 +35,7 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	const uint animationDuration = 200u;
 	bool disposedValue;
-	bool loadIndex = true;
+	
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -77,27 +80,23 @@ public partial class BookPage : ContentPage, IDisposable
 			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
 		}
 	}
-
+#if WINDOWS
 	protected override void OnDisappearing()
 	{
-		if (BindingContext is BookViewModel viewModel)
-		{
-			viewModel.Dispose();
-		}
-#if WINDOWS
-		Controls.WebViewExtensions.WebView2_Unloaded();
-#endif
+		loadIndex = false;
 		base.OnDisappearing();
 	}
-
+#endif
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(book);
-		if (!loadIndex)
+#if WINDOWS
+		if (!loadIndex && !e.Url.Contains("https://demo/index.html"))
 		{
 			return;
 		}
 		loadIndex = false;
+#endif
 		await webViewHelper.LoadPage(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
@@ -263,13 +262,12 @@ public partial class BookPage : ContentPage, IDisposable
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
-	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+	protected override bool OnBackButtonPressed()
 	{
-		base.OnNavigatedFrom(args);
-
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 		Shell.Current.ToolbarItems.Clear();
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+		return base.OnBackButtonPressed();
 	}
 
 	protected virtual void Dispose(bool disposing)

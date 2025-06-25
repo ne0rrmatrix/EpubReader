@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<mct:Popup
+<toolkit:Popup
     x:Class="EpubReader.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:page="clr-namespace:EpubReader.Views"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    Size="400,600">
+    x:DataType="viewModel:SettingsPageViewModel"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                      Light={StaticResource Blue200Accent}}"
+    HeightRequest="600"
+    WidthRequest="400">
 
     <Grid
         Padding="20"
@@ -103,4 +106,4 @@
             WidthRequest="250" />
     </Grid>
 
-</mct:Popup>
+</toolkit:Popup>
