@@ -9,6 +9,10 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
+	const uint animationDuration = 200u;
+	bool loadIndex = true;
+	bool disposedValue;
+
 	Book? book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
@@ -16,9 +20,7 @@ public partial class BookPage : ContentPage, IDisposable
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
-#if WINDOWS
-	bool loadIndex = true;
-#endif
+
 #if IOS || MACCATALYST
 	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
 	{
@@ -33,8 +35,6 @@ public partial class BookPage : ContentPage, IDisposable
 		Direction = SwipeDirection.Up,
 	};
 #endif
-	const uint animationDuration = 200u;
-	bool disposedValue;
 	
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
@@ -89,17 +89,27 @@ public partial class BookPage : ContentPage, IDisposable
 
 	protected override void OnDisappearing()
 	{
-#if WINDOWS
 		loadIndex = false;
-#endif
 #if ANDROID
-		System.Diagnostics.Debug.WriteLine("OnDisappearing called");
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 		Shell.Current.ToolbarItems.Clear();
 		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 #endif
 		base.OnDisappearing();
 	}
+#if ANDROID
+	protected override void OnAppearing()
+	{
+		if (!loadIndex)
+	   {
+			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
+			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
+
+	   }
+	  
+		base.OnAppearing();
+	}
+#endif
 
 	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
 	{

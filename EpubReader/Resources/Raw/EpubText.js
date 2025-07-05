@@ -335,6 +335,13 @@ function unsetReadiumProperty(property) {
  * @param {string} color - The color value to set (e.g., "red", "#HEX", "rgb(R,G,B)").
  */
 function setBackgroundColor(color) {
+    if (color == null || color === '') {
+        console.log("No color provided, unsetting background color.");
+        document.documentElement.style.removeProperty('--background-color');
+        return;
+
+    }
+    console.log(`Setting background color to: ${color}`);
     document.documentElement.style.setProperty('--background-color', color);
 }
 
