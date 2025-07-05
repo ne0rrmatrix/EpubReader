@@ -25,15 +25,17 @@ public static partial class WebViewExtensions
 	static void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
 	{
 		ArgumentNullException.ThrowIfNull(webViewHandler);
-		webViewHandler.PlatformView.CoreWebView2.Settings.AreDevToolsEnabled = true;
-		webViewHandler.PlatformView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
-		webViewHandler.PlatformView.CoreWebView2.Settings.IsReputationCheckingRequired = false;
-		webViewHandler.PlatformView.CoreWebView2.Settings.AreHostObjectsAllowed = true;
-		webViewHandler.PlatformView.CoreWebView2.Settings.IsWebMessageEnabled = true;
-		webViewHandler.PlatformView.CoreWebView2.Settings.IsScriptEnabled = true;
-		webViewHandler.PlatformView.CoreWebView2.DownloadStarting += CoreWebView2_DownloadStarting;
-		webViewHandler.PlatformView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
+		var settings = webViewHandler.PlatformView.CoreWebView2.Settings;
+		var coreWebView = webViewHandler.PlatformView.CoreWebView2;
+		settings.AreDevToolsEnabled = true;
+		settings.AreBrowserAcceleratorKeysEnabled = true;
+		settings.IsReputationCheckingRequired = false;
+		settings.AreHostObjectsAllowed = true;
+		settings.IsWebMessageEnabled = true;
+		settings.IsScriptEnabled = true;
+		coreWebView.DownloadStarting += CoreWebView2_DownloadStarting;
+		coreWebView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+		coreWebView.WebResourceRequested += CoreWebView2_WebResourceRequested;
 	}
 
 	static void CoreWebView2_DownloadStarting(CoreWebView2 sender, CoreWebView2DownloadStartingEventArgs args)

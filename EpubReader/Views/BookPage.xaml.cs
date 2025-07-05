@@ -57,6 +57,50 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 	}
 
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!disposedValue)
+		{
+			if (disposing)
+			{
+#if ANDROID || IOS
+				touchbehavior.Dispose();
+#endif
+			}
+			disposedValue = true;
+		}
+	}
+
+	public void Dispose()
+	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
+
+#if WINDOWS
+	protected override bool OnBackButtonPressed()
+	{
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+		return base.OnBackButtonPressed();
+	}
+#endif
+
+	protected override void OnDisappearing()
+	{
+#if WINDOWS
+		loadIndex = false;
+#endif
+#if ANDROID
+		System.Diagnostics.Debug.WriteLine("OnDisappearing called");
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+#endif
+		base.OnDisappearing();
+	}
+
 	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
 	{
 		if (e.Direction == SwipeDirection.Left)
@@ -80,13 +124,21 @@ public partial class BookPage : ContentPage, IDisposable
 			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
 		}
 	}
-#if WINDOWS
-	protected override void OnDisappearing()
+
+	async void GridArea_Tapped(object sender, EventArgs e)
 	{
-		loadIndex = false;
-		base.OnDisappearing();
+		var viewModel = (BookViewModel)BindingContext;
+		viewModel.Press();
+		var width = this.Width * 0.4;
+		if (OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
+		{
+			width = this.Width * 0.8;
+		}
+		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
+		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
 	}
-#endif
+
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(book);
@@ -99,6 +151,19 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 		await webViewHelper.LoadPage(pageLabel, book);
 		Shimmer.IsActive = false;
+	}
+
+	void CurrentPage_Loaded(object sender, EventArgs e)
+	{
+		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
+		{
+			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
+		}
+
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 	}
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
@@ -226,33 +291,8 @@ public partial class BookPage : ContentPage, IDisposable
 			pageLabel.TextColor = Color.FromArgb(settings.TextColor);
 		}
 	}
-	void CurrentPage_Loaded(object sender, EventArgs e)
-	{
-		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
-		{
-			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
-		}
 
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
-	}
-
-	async void GridArea_Tapped(object sender, EventArgs e)
-	{
-		var viewModel = (BookViewModel)BindingContext;
-		viewModel.Press();
-		var width = this.Width * 0.4;
-		if(OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
-		{
-			width = this.Width * 0.8;
-		}
-		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
-		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
-		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
-	}
-
+	
 	async void CloseMenu(object sender, EventArgs e)
 	{
 		var viewModel = (BookViewModel)BindingContext;
@@ -262,33 +302,6 @@ public partial class BookPage : ContentPage, IDisposable
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
-	protected override bool OnBackButtonPressed()
-	{
-		WeakReferenceMessenger.Default.UnregisterAll(this);
-		Shell.Current.ToolbarItems.Clear();
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-		return base.OnBackButtonPressed();
-	}
-
-	protected virtual void Dispose(bool disposing)
-	{
-		if (!disposedValue)
-		{
-			if (disposing)
-			{
-#if ANDROID || IOS
-				touchbehavior.Dispose();
-#endif
-			}
-			disposedValue = true;
-		}
-	}
-
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
-	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{
