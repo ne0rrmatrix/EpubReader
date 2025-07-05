@@ -1,10 +1,24 @@
-﻿let isPreviousPage = false;
+﻿/**
+ * Flag indicating if the previous page navigation occurred.
+ * @type {boolean}
+ */
+let isPreviousPage = false;
+
+/**
+ * Reference to the iframe element that contains the EPUB content.
+ * @type {HTMLIFrameElement|null}
+ */
 let frame = null;
+
+/**
+ * Number of columns to display in the EPUB layout.
+ * @type {number}
+ */
 let colCount = 1;
 
 /**
- * Detects the user's operating system platform.
- * @returns {object} An object indicating the detected platform.
+ * Detects the user's operating system platform based on the navigator user agent.
+ * @returns {Object} An object with boolean flags for different platforms (isIOS, isMac, isWindows, isAndroid).
  */
 function detectPlatform() {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -17,6 +31,10 @@ function detectPlatform() {
     };
 }
 
+/**
+ * Main initialization function that runs when the DOM is fully loaded.
+ * Sets up event listeners and initializes the EPUB reader interface.
+ */
 document.addEventListener("DOMContentLoaded", function () {
     frame = document.getElementById("page");
     const body = document.getElementById("body");
@@ -29,7 +47,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     /**
-     * Sets the dimensions of the iframe and body, and updates CSS custom properties.
+     * Sets the dimensions of the iframe and body elements, and updates CSS custom properties.
+     * Called on initial load and on resize events.
      */
     const setDimensions = () => {
         if (!frame.contentWindow) {
@@ -52,6 +71,10 @@ document.addEventListener("DOMContentLoaded", function () {
     setDimensions();
     frame.contentWindow?.addEventListener('resize', setDimensions);
 
+    /**
+     * Handles iframe load events. Ensures proper page layout, particularly for two-column mode
+     * by adding a blank page if necessary to make page count even.
+     */
     frame.onload = function () {
         try {
             if (!frame.contentWindow?.document) {
@@ -66,8 +89,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             /**
-             * Calculates the number of pages within the iframe's content based on scroll width and inner width.
-             * @returns {number} The calculated page count.
+             * Calculates the number of pages within the iframe's content.
+             * @returns {number} The calculated page count based on content width.
              */
             const getPageCount = () => {
                 const innerWidth = frame.contentWindow?.innerWidth ?? 0;
@@ -106,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     /**
-     * Checks if the horizontal scroll position within the iframe is at the start.
+     * Checks if the horizontal scroll position within the iframe is at the start (leftmost position).
      * @returns {boolean} True if at the start, false otherwise.
      */
     const isHorizontalScrollAtStart = () => {
@@ -118,8 +141,7 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     /**
-     * Checks if the horizontal scroll position within the iframe is at the end.
-     * Allows for a small tolerance.
+     * Checks if the horizontal scroll position within the iframe is at the end (rightmost position).
      * @returns {boolean} True if at the end, false otherwise.
      */
     const isHorizontallyScrolledToEnd = () => {
@@ -128,12 +150,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         const contentDoc = frame.contentWindow.document.documentElement;
         const maxScrollLeft = contentDoc.scrollWidth - contentDoc.clientWidth;
-        // Allow a small tolerance for floating point inaccuracies
+        // Allow a small tolerance (30px) for floating point inaccuracies
         return Math.abs(frame.contentWindow.scrollX - maxScrollLeft) <= 30;
     };
 
     /**
-     * Scrolls the iframe content to the left by one page.
+     * Scrolls the iframe content to the left by one page width.
+     * Accounts for column gap in the calculation.
      */
     const scrollLeft = () => {
         if (!frame.contentWindow) return;
@@ -149,7 +172,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     /**
-     * Scrolls the iframe content to the right by one page.
+     * Scrolls the iframe content to the right by one page width.
+     * Accounts for column gap in the calculation.
      */
     const scrollRight = () => {
         if (!frame.contentWindow) return;
@@ -163,6 +187,12 @@ document.addEventListener("DOMContentLoaded", function () {
             frame.contentWindow.scrollTo({ left: frame.contentWindow.scrollX + scrollAmount, top: 0, behavior: "smooth" });
         }
     };
+
+    /**
+     * Validates the origin of incoming messages for security purposes.
+     * @param {string} origin - The origin of the incoming message.
+     * @returns {boolean} True if the origin is allowed, false otherwise.
+     */
     function validateOrigin(origin) {
         const isAllowedOrigin =
             ((platform.isAndroid || platform.isWindows) && origin === "https://demo") ||
@@ -211,7 +241,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 /**
  * Retrieves the width of the content in the iframe.
- * @returns {number} The width of the content.
+ * @returns {number} The inner width of the iframe content window, or 0 if unavailable.
  */
 function getWidth() {
     if (!frame?.contentWindow) {
@@ -222,11 +252,8 @@ function getWidth() {
 }
 
 /**
- * Retrieves the calculated page count within the iframe.
- * NOTE: This function re-queries the DOM for the iframe and its contentWindow,
- * which might be less efficient if called frequently outside the `DOMContentLoaded` scope.
- * Consider passing `frame` as an argument if frequent external calls are expected.
- * @returns {number} The number of pages.
+ * Calculates the number of pages within the iframe based on content width.
+ * @returns {number} The calculated number of pages, or 0 if the iframe is not available.
  */
 function getPageCount() {
     if (!frame?.contentWindow) {
@@ -240,8 +267,8 @@ function getPageCount() {
 }
 
 /**
- * Scrolls the iframe content to its horizontal end if 'isPreviousPage' flag is true, then resets the flag.
- * This function depends on `scrollToHorizontalEnd`.
+ * Navigates to the end of the iframe content if the previous page flag is set.
+ * Used when navigating backwards through pages to position at the end of the previous page.
  */
 function gotoEnd() {
     if (isPreviousPage) {
@@ -251,7 +278,8 @@ function gotoEnd() {
 }
 
 /**
- * Sets a flag indicating that the previous page was navigated to.
+ * Sets a flag indicating that navigation to the previous page has occurred.
+ * This flag is used by gotoEnd() to determine if scrolling to the end is needed.
  */
 function setPreviousPage() {
     isPreviousPage = true;
@@ -259,7 +287,7 @@ function setPreviousPage() {
 
 /**
  * Loads a specified URL into the iframe.
- * @param {string} page - The URL to load.
+ * @param {string} page - The URL to load in the iframe.
  * @returns {boolean} True if the frame was found and source set, false otherwise.
  */
 function loadPage(page) {
@@ -273,8 +301,8 @@ function loadPage(page) {
 }
 
 /**
- * Scrolls the iframe content to its horizontal end.
- * Handles cases where the iframe content might not be fully loaded yet by retrying on `onload`.
+ * Scrolls the iframe content to its horizontal end (rightmost position).
+ * Handles cases where the iframe content might not be fully loaded yet by using the onload event.
  */
 function scrollToHorizontalEnd() {
     if (!frame) {
@@ -339,7 +367,6 @@ function setBackgroundColor(color) {
         console.log("No color provided, unsetting background color.");
         document.documentElement.style.removeProperty('--background-color');
         return;
-
     }
     console.log(`Setting background color to: ${color}`);
     document.documentElement.style.setProperty('--background-color', color);

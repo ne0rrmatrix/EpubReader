@@ -104,7 +104,9 @@ public partial class BookPage : ContentPage, IDisposable
 	   {
 			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
 			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
-
+			book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+			book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	   }
 	  
 		base.OnAppearing();
