@@ -88,12 +88,10 @@ public partial class BookPage : ContentPage, IDisposable
 		return base.OnBackButtonPressed();
 	}
 #endif
-
+#if WINDOWS || ANDROID
 	protected override void OnDisappearing()
 	{
-#if WINDOWS || ANDROID
 		loadIndex = false;
-#endif
 #if ANDROID
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 		Shell.Current.ToolbarItems.Clear();
@@ -101,6 +99,8 @@ public partial class BookPage : ContentPage, IDisposable
 #endif
 		base.OnDisappearing();
 	}
+#endif
+
 #if ANDROID
 	protected override void OnAppearing()
 	{
