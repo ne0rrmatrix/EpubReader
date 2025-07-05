@@ -159,8 +159,8 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			return;
 		}
-		loadIndex = false;
 #endif
+		loadIndex = false;
 		await webViewHelper.LoadPage(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
