@@ -40,12 +40,9 @@ public partial class FolderPicker : IFolderPicker
 		try
 		{
 			var files = await pickedFolder.GetFilesAsync();
-			foreach (var file in files)
+			foreach (var file in files.Where(x => x.FileType.Equals(".epub", StringComparison.OrdinalIgnoreCase)))
 			{
-				if (file.FileType.Equals(".epub", StringComparison.OrdinalIgnoreCase))
-				{
-					epubFiles.Add(file.Path);
-				}
+				epubFiles.Add(file.Path);
 			}
 		}
 		catch (Exception ex)

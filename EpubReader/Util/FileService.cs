@@ -46,10 +46,6 @@ public static partial class FileService
 		{
 			if (Directory.Exists(directoryName))
 			{
-				// Ensure GC runs to close any lingering file handles
-				GC.Collect();
-				GC.WaitForPendingFinalizers();
-				
 				Directory.Delete(directoryName, true);
 				logger.Info($"Deleted directory {directoryName}");
 			}
@@ -65,10 +61,6 @@ public static partial class FileService
 		{
 			if (File.Exists(fileName))
 			{
-				// Ensure GC runs to close any lingering file handles
-				GC.Collect();
-				GC.WaitForPendingFinalizers();
-				
 				File.Delete(fileName);
 				logger.Info($"Deleted file {fileName}");
 			}

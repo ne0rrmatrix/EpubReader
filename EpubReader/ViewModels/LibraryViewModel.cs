@@ -84,25 +84,6 @@ public partial class LibraryViewModel : BaseViewModel
 			Book? ebook = null;
 			ebook = EbookService.GetListing(stream, file);
 			stream.Seek(0, SeekOrigin.Begin); // Reset stream position for reading
-			if (ebook is not null)
-			{
-				ebook.FilePath = await FileService.SaveFile(stream, file);
-				ebook.CoverImagePath = await FileService.SaveImage(file, ebook.CoverImage);
-				if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
-				{
-					logger.Info($"Book {ebook.Title} saved successfully.");
-				}
-				else
-				{
-					logger.Error($"Failed to save book {ebook.Title} or its cover image.");
-					message = $"Failed to save book {ebook.Title} or its cover image.";
-					await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-					continue;
-				}
-				
-				db.SaveBookData(ebook);
-				Books.Add(ebook);
-			}
 			if (ebook is null)
 			{
 				message = $"Error opening Book: {file}";
@@ -110,7 +91,30 @@ public partial class LibraryViewModel : BaseViewModel
 				logger.Info(message);
 				continue;
 			}
+			if (Books.Any(x => x.Title == ebook.Title))
+			{
+				message = $"Book already exists in library: {ebook.Title}";
+				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+				logger.Info(message);
+				continue;
+			}
 			
+			ebook.FilePath = await FileService.SaveFile(stream, file);
+			ebook.CoverImagePath = await FileService.SaveImage(file, ebook.CoverImage);
+			if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
+			{
+				logger.Info($"Book {ebook.Title} saved successfully.");
+			}
+			else
+			{
+				logger.Error($"Failed to save book {ebook.Title} or its cover image.");
+				message = $"Failed to save book {ebook.Title} or its cover image.";
+				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+				continue;
+			}
+
+			db.SaveBookData(ebook);
+			Books.Add(ebook);
 		}
 	}
 

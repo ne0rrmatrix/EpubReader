@@ -13,10 +13,12 @@ public partial class FolderPicker : IFolderPicker
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
 	public const int PickFolderRequestCode = 1001;
 	TaskCompletionSource<string>? folderPickedTcs;
-	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUriString)
+
+	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
 	{
 		List<string> epubFiles = [];
-		if (string.IsNullOrEmpty(folderUriString))
+		
+		if (string.IsNullOrEmpty(folderUri))
 		{
 			logger.Info("No folder URI provided.");
 			return Task.FromResult(epubFiles);
@@ -24,74 +26,140 @@ public partial class FolderPicker : IFolderPicker
 
 		try
 		{
-			Uri folderUri = Uri.Parse(folderUriString) ?? throw new InvalidOperationException("Invalid folder URI");
-			ArgumentNullException.ThrowIfNull(Platform.CurrentActivity);
-			var documentFile = DocumentFile.FromTreeUri(Platform.CurrentActivity.ApplicationContext, folderUri);
+			var documentFile = GetDocumentFileFromUri(folderUri);
 			if (documentFile is null)
 			{
-				logger.Info("DocumentFile is null. Check if the URI is valid and permissions are granted.");
 				return Task.FromResult(epubFiles);
 			}
-			if (documentFile is not null && documentFile.Exists() && documentFile.IsDirectory)
-			{
-				var listFiles = documentFile.ListFiles();
-				if (listFiles is null)
-				{
-					logger.Info("No files found in the folder.");
-					return Task.FromResult(epubFiles);
-				}
-				foreach (var file in listFiles)
-				{
-					if (file.IsFile && file.Name is not null && file.Name.EndsWith(".epub", StringComparison.OrdinalIgnoreCase))
-					{
-						var tempUri = file.Uri?.ToString();
-						if (tempUri is null)
-						{
-							logger.Info("File URI is null.");
-							continue;
-						}
-						epubFiles.Add(tempUri);
-					}
-				}
-			}
+
+			epubFiles = GetEpubFilesFromDirectory(documentFile);
 		}
 		catch (Exception ex)
 		{
 			logger.Info($"Error enumerating files: {ex.Message}");
 		}
+		
 		return Task.FromResult(epubFiles);
+	}
+
+	static DocumentFile? GetDocumentFileFromUri(string folderUri)
+	{
+		try
+		{
+			Uri uri = Uri.Parse(folderUri) ?? throw new InvalidOperationException("Invalid folder URI");
+			ArgumentNullException.ThrowIfNull(Platform.CurrentActivity);
+			
+			var documentFile = DocumentFile.FromTreeUri(Platform.CurrentActivity.ApplicationContext, uri);
+			if (documentFile is null)
+			{
+				logger.Info("DocumentFile is null. Check if the URI is valid and permissions are granted.");
+			}
+			
+			return documentFile;
+		}
+		catch (Exception ex)
+		{
+			logger.Info($"Error creating DocumentFile: {ex.Message}");
+			return null;
+		}
+	}
+
+	static List<string> GetEpubFilesFromDirectory(DocumentFile documentFile)
+	{
+		List<string> epubFiles = [];
+		
+		if (!documentFile.IsDirectory)
+		{
+			return epubFiles;
+		}
+		
+		var listFiles = documentFile.ListFiles();
+		if (listFiles is null)
+		{
+			logger.Info("No files found in the folder.");
+			return epubFiles;
+		}
+		
+		foreach (var file in listFiles)
+		{
+			if (IsEpubFile(file))
+			{
+				var tempUri = file.Uri?.ToString();
+				if (tempUri is null)
+				{
+					logger.Info("File URI is null.");
+					continue;
+				}
+				epubFiles.Add(tempUri);
+			}
+		}
+		
+		return epubFiles;
+	}
+
+	static bool IsEpubFile(DocumentFile file)
+	{
+		return file.IsFile && 
+			   file.Name is not null && 
+			   file.Name.EndsWith(".epub", StringComparison.OrdinalIgnoreCase);
 	}
 
 	public async Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath)
 	{
+		if (string.IsNullOrEmpty(epubFilePath))
+		{
+			logger.Info("Empty EPUB file path provided.");
+			return Stream.Null;
+		}
+
 		try
 		{
-			Uri? epubUri = Uri.Parse(epubFilePath);
-			ArgumentNullException.ThrowIfNull(Platform.CurrentActivity?.ApplicationContext);
-			var contentResolver = Platform.CurrentActivity.ApplicationContext.ContentResolver;
-			ArgumentNullException.ThrowIfNull(contentResolver);
-
-			if (epubUri is null)
-			{
-				logger.Info("Invalid EPUB file path.");
-				return Stream.Null;
-			}
-
-			using var inputStream = contentResolver.OpenInputStream(epubUri);
-			if (inputStream is not null)
-			{
-				var reader = new StreamReader(inputStream);
-				var stream = new MemoryStream();
-				await inputStream.CopyToAsync(stream);
-				stream.Position = 0; // Reset position to the beginning of the stream
-				return stream;
-			}
+			return await OpenEpubStreamAsync(epubFilePath);
 		}
 		catch (Exception ex)
 		{
 			logger.Info($"Error performing operation on {epubFilePath}: {ex.Message}");
+			return Stream.Null;
 		}
-		return Stream.Null;
+	}
+
+	static async Task<Stream> OpenEpubStreamAsync(string epubFilePath)
+	{
+		Uri? epubUri = Uri.Parse(epubFilePath);
+		if (epubUri is null)
+		{
+			logger.Info("Invalid EPUB file path.");
+			return Stream.Null;
+		}
+
+		var contentResolver = GetContentResolver();
+		if (contentResolver is null)
+		{
+			return Stream.Null;
+		}
+
+		using var inputStream = contentResolver.OpenInputStream(epubUri);
+		if (inputStream is null)
+		{
+			logger.Info("Could not open input stream for EPUB file.");
+			return Stream.Null;
+		}
+
+		var stream = new MemoryStream();
+		await inputStream.CopyToAsync(stream);
+		stream.Position = 0; // Reset position to the beginning of the stream
+		return stream;
+	}
+
+	static ContentResolver? GetContentResolver()
+	{
+		if (Platform.CurrentActivity?.ApplicationContext is null)
+		{
+			logger.Info("Current activity or application context is null.");
+			return null;
+		}
+		
+		return Platform.CurrentActivity.ApplicationContext.ContentResolver;
 	}
 
 	public async Task<string> PickFolder()

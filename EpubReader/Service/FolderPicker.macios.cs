@@ -49,9 +49,9 @@ public partial class FolderPicker : IFolderPicker
 		{
 			PickHandler = urls => GetFileResults(urls, tcs)
 		};
-
-		picker.PresentationController?.Delegate =
-				new UIPresentationControllerDelegate(() => GetFileResults(null!, tcs));
+		var dismissHandler = new Action(() => GetFileResults(null!, tcs));
+		var delegateController = new UIPresentationControllerDelegate(dismissHandler);
+		picker.PresentationController?.Delegate = delegateController;
 
 		var parentController = Platform.GetCurrentUIViewController();
 
@@ -60,11 +60,11 @@ public partial class FolderPicker : IFolderPicker
 		return await tcs.Task;
 	}
 
-    public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUriString)
+    public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
     {
         List<string> epubFiles = [];
 
-        if (string.IsNullOrEmpty(folderUriString))
+        if (string.IsNullOrEmpty(folderUri))
         {
 			logger.Info("No folder URI provided.");
 			return Task.FromResult(epubFiles);
@@ -73,7 +73,7 @@ public partial class FolderPicker : IFolderPicker
         try
         {
             // Convert the string URL to NSUrl
-            NSUrl folderUrl = new(folderUriString);
+            NSUrl folderUrl = new(folderUri);
             if (!folderUrl.IsFileUrl)
             {
                 return Task.FromResult(epubFiles);
@@ -104,14 +104,12 @@ public partial class FolderPicker : IFolderPicker
                     logger.Info("File URL is null.");
                     continue;
                 }
-                if (fileManager.FileExists(fileUrl.Path, ref isDirectory) && !isDirectory)
-                {
-                    // Check if the file has an .epub extension
-                    if (fileUrl.LastPathComponent?.EndsWith(".epub", StringComparison.OrdinalIgnoreCase) == true)
-                    {
+                if (fileManager.FileExists(fileUrl.Path, ref isDirectory) && 
+					!isDirectory && 
+					fileUrl.LastPathComponent?.EndsWith(".epub", StringComparison.OrdinalIgnoreCase) == true)
+					{
 						epubFiles.Add(fileUrl.Path);
-                    }
-                }
+					}
             }
         }
         catch (Exception ex)
