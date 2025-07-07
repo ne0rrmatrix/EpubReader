@@ -13,19 +13,20 @@ public static partial class FileService
 		foreach (char invalidChar in invalidChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
-			directoryName = directoryName.Replace("\\", "");
-			directoryName = directoryName.Replace("/", "");
-			directoryName = directoryName.Replace(":", "");
-			directoryName = directoryName.Replace("*", "");
-			directoryName = directoryName.Replace("?", "");
-			directoryName = directoryName.Replace("\"", "");
-			directoryName = directoryName.Replace("<", "");
-			directoryName = directoryName.Replace(">", "");
-			directoryName = directoryName.Replace("|", "");
-			directoryName = directoryName.Replace("$", "");
-			directoryName = directoryName.Replace("%", "");
 		}
-		directoryName = directoryName.Replace(" ", "").Trim();
+
+        directoryName = directoryName.Replace("\\", "");
+        directoryName = directoryName.Replace("/", "");
+        directoryName = directoryName.Replace(":", "");
+        directoryName = directoryName.Replace("*", "");
+        directoryName = directoryName.Replace("?", "");
+        directoryName = directoryName.Replace("\"", "");
+        directoryName = directoryName.Replace("<", "");
+        directoryName = directoryName.Replace(">", "");
+        directoryName = directoryName.Replace("|", "");
+        directoryName = directoryName.Replace("$", "");
+        directoryName = directoryName.Replace("%", "");
+        directoryName = directoryName.Replace(" ", "").Trim();
 		directoryName = Path.GetFileNameWithoutExtension(directoryName);
 		return directoryName;
 	}

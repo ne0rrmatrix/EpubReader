@@ -178,7 +178,7 @@ public partial class FolderPicker : IFolderPicker
 	{
 		if (requestCode == PickFolderRequestCode)
 		{
-			if (resultCode == Result.Ok && data != null && data.Data != null)
+			if (resultCode == Result.Ok && data is not null && data.Data is not null)
 			{
 				Uri treeUri = data.Data;
 				// Persist the URI access permissions

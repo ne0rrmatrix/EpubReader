@@ -557,6 +557,9 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Error during iframe onload:", error);
         } finally {
             // Notify via URL change after processing
+            if (platform.isIOS || platform.isMac) {
+                frame.contentWindow?.focus();
+            }
             window.location.href = 'https://runcsharp.pageLoad?true';
         }
     };
@@ -625,6 +628,9 @@ function loadPage(page) {
     }
     console.log("Frame found. Loading page:", page);
     frame.setAttribute('src', page);
+    if (platform.isIOS || platform.isMac) {
+        frame.contentWindow?.focus();
+    }
     return true;
 }
 

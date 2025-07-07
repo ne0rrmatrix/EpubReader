@@ -37,7 +37,7 @@ public partial class BookPage : ContentPage, IDisposable
 		Direction = SwipeDirection.Up,
 	};
 #endif
-	
+
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -311,7 +311,6 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 	}
 
-	
 	async void CloseMenu(object sender, EventArgs e)
 	{
 		var viewModel = (BookViewModel)BindingContext;
@@ -320,7 +319,6 @@ public partial class BookPage : ContentPage, IDisposable
 		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
-
 
 	void CreateToolBarItem(int index, Chapter chapter)
 	{

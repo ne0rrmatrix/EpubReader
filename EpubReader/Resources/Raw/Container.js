@@ -3,9 +3,9 @@ const TARGET_ORIGIN = "https://demo";
 
 // Helper function to send messages to parent
 function sendMessageToParent(message) {
-    window.parent.postMessage(message, TARGET_ORIGIN);
-    console.log(`Sent message: ${message}`);
-}
+        window.parent.postMessage(message, TARGET_ORIGIN);
+        console.log(`Sent message: ${message}`);
+    }
 
 // Handle link navigation
 function handleLinkClick(href) {
