@@ -1,6 +1,7 @@
 ﻿using EpubReader.Interfaces;
 using Foundation;
 using UIKit;
+using UniformTypeIdentifiers;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
@@ -37,30 +38,33 @@ public partial class FolderPicker : IFolderPicker
 
 	public async Task<string> PickFolder()
 	{
-		var allowedTypes = new string[]
+		var allowedTypes = new UTType[]
 		{
-			  "public.folder"
+		UTTypes.Folder
 		};
 
-		var picker = new UIDocumentPickerViewController(allowedTypes, UIDocumentPickerMode.Open);
-		var tcs = new TaskCompletionSource<string>();
+		var picker = new UIDocumentPickerViewController(allowedTypes, false)
+		{
+			AllowsMultipleSelection = false
+		};
 
+		var tcs = new TaskCompletionSource<string>();
 		picker.Delegate = new PickerDelegate
 		{
 			PickHandler = urls => GetFileResults(urls, tcs)
 		};
+
 		var dismissHandler = new Action(() => GetFileResults(null!, tcs));
 		var delegateController = new UIPresentationControllerDelegate(dismissHandler);
 		picker.PresentationController?.Delegate = delegateController;
 
 		var parentController = Platform.GetCurrentUIViewController();
-
 		parentController?.PresentViewController(picker, true, null);
 
 		return await tcs.Task;
 	}
 
-    public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
+	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
     {
         List<string> epubFiles = [];
 

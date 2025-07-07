@@ -80,18 +80,15 @@ public partial class FolderPicker : IFolderPicker
 			return epubFiles;
 		}
 		
-		foreach (var file in listFiles)
+		foreach (var file in listFiles.Where(x => IsEpubFile(x)))
 		{
-			if (IsEpubFile(file))
+			var tempUri = file.Uri?.ToString();
+			if (tempUri is null)
 			{
-				var tempUri = file.Uri?.ToString();
-				if (tempUri is null)
-				{
-					logger.Info("File URI is null.");
-					continue;
-				}
-				epubFiles.Add(tempUri);
+				logger.Info("File URI is null.");
+				continue;
 			}
+			epubFiles.Add(tempUri);
 		}
 		
 		return epubFiles;

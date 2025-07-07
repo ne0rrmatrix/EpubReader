@@ -74,7 +74,6 @@ public partial class LibraryViewModel : BaseViewModel
 		
 		foreach (var file in epubFiles)
 		{
-			var bookData = db.GetAllBooks() ?? [];
 			var stream = await folderPicker.PerformFileOperationOnEpubAsync(file);
 			if (stream is null)
 			{
