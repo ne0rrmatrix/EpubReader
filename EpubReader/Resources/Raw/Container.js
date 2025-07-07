@@ -106,7 +106,6 @@ window.addEventListener('click', function (event) {
         console.log('iframe window event listener clicked');
         return;
     }
-    console.log('click', event.touches.length);
     const target = event.target;
 
     // Handle direct link click
