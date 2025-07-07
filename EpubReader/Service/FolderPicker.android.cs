@@ -193,14 +193,14 @@ public partial class FolderPicker : IFolderPicker
 				if (string.IsNullOrEmpty(treeTempUri))
 				{
 					logger.Info("Picked folder URI is empty.");
-					folderPickedTcs?.SetResult("null");
+					folderPickedTcs?.SetResult(string.Empty);
 					return;
 				}
 				folderPickedTcs?.SetResult(treeTempUri);
 			}
 			else
 			{
-				folderPickedTcs?.SetResult("null");
+				folderPickedTcs?.SetResult(string.Empty);
 				logger.Info("Folder picking was cancelled or failed.");
 			}
 		}
