@@ -10,7 +10,7 @@ namespace EpubReader.Views;
 public partial class BookPage : ContentPage, IDisposable
 {
 	const uint animationDuration = 200u;
-#if ANDROID || WINDOWS || IOS || MACCATALYST
+#if ANDROID || WINDOWS
 	bool loadIndex = true;
 #endif
 	bool disposedValue;
@@ -71,7 +71,7 @@ public partial class BookPage : ContentPage, IDisposable
 		return base.OnBackButtonPressed();
 	}
 #endif
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
 	protected override void OnDisappearing()
 	{
 		loadIndex = false;
@@ -123,7 +123,7 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 #endif
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
 		loadIndex = false;
 #endif
 		await webViewHelper.LoadPage(pageLabel, book);
