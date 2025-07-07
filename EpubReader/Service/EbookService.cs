@@ -78,7 +78,27 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
+	public static Book? GetListing(Stream stream, string path)
+	{
+		EpubBookRef book;
+		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
+		try
+		{
+			book = VersOne.Epub.EpubReader.OpenBook(stream, options);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Get Listing Error: {ex.Message}");
+			return null;
+		}
 
+		return new Book
+		{
+			Title = book.Title,
+			FilePath = path,
+			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
+		};
+	}
 	public static async Task<Book?> OpenEbook(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
@@ -127,6 +147,13 @@ public static partial class EbookService
 			description = description.Insert(description.Length, "</body></html>");
 		}
 		var coverImage = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
+		var cssFiles = book.Content.AllFiles.Local
+			.Where(item => item.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase))
+			.Select(item => new Css
+			{
+				FileName = Path.GetFileName(item.FilePath),
+				Content = ProcessCssFiles(item.ReadContentAsText()),
+			}).ToList();
 		Book books = new()
 		{
 			Title = book.Title.Trim(),
@@ -138,9 +165,21 @@ public static partial class EbookService
 			CoverImage = coverImage,
 			Chapters = GetChapters([.. await book.GetReadingOrderAsync()], book),
 			Images = [.. book.Content.Images.Local.Select(image => GetImage(image.ReadContentAsBytes(), Path.GetFileName(image.FilePath)))],
-			Css = [.. book.Content.Css.Local.Select(style => new Css { FileName = Path.GetFileName(style.FilePath), Content = FilePathExtensions.SetFontFilenames(HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(style.ReadContent())) })],
+			Css = cssFiles,
 		};
 		return books;
+	}
+
+	static string ProcessCssFiles(string cssFile)
+	{
+		if (string.IsNullOrEmpty(cssFile))
+		{
+			return string.Empty;
+		}
+		cssFile = HtmlAgilityPackExtensions.RemoveCalibreReferences(cssFile);
+		cssFile =FilePathExtensions.SetFontFilenames(cssFile);
+		cssFile = HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(cssFile);
+		return cssFile;
 	}
 	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
 	{
@@ -201,6 +240,10 @@ public static partial class EbookService
 			{
 				var temp = ReplaceChapter(chaptersRef, item);
 				var htmlFile = temp?.ReadContent() ?? string.Empty;
+				if(string.IsNullOrEmpty(htmlFile))
+				{
+					continue;
+				}
 				var chapter = GetChapter(book, htmlFile, item);
 				if (string.IsNullOrEmpty(chapter.Title))
 				{
@@ -241,13 +284,13 @@ public static partial class EbookService
 			Title = title,
 		};
 	}
-	
+
 	static EpubLocalTextContentFileRef? ReplaceChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
 	{
 		var temp = item.FilePath.Replace("_split_000", "_split_001");
 		return chaptersRef.Find(x => x.FilePath == temp);
 	}
-	
+
 	static string ProcessHtml(string htmlFile)
 	{
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);

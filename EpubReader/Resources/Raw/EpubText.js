@@ -32,6 +32,113 @@ function detectPlatform() {
 }
 
 /**
+ * Prevents images from moving down when font size changes
+ * This function stabilizes image positioning while preserving multicolumn layout
+ */
+function fixImagePositioning() {
+    if (!frame?.contentWindow?.document) return;
+
+    const doc = frame.contentWindow.document;
+    const images = doc.querySelectorAll('img, svg');
+
+    // Add a style element with our image fixes if it doesn't exist
+    if (!doc.getElementById('image-position-fixes')) {
+        const styleEl = doc.createElement('style');
+        styleEl.id = 'image-position-fixes';
+        styleEl.textContent = `
+            img, svg {
+                max-width: 100%;
+                height: auto !important;
+                width: auto !important;
+                max-height: 95vh;
+                object-fit: contain;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            /* For multicolumn layouts, ensure images respect column boundaries */
+            body[style*="column-count"] img,
+            body[style*="column-width"] img,
+            html[style*="column-count"] img,
+            html[style*="column-width"] img {
+                max-width: 100%; 
+                display: inline-block;
+                vertical-align: top;
+                margin: 0.5em 0;
+            }
+            
+            /* Handle images in paragraphs and divs */
+            p img, div img {
+                vertical-align: top;
+                margin: 0.2em 0;
+            }
+            
+            /* Figure handling */
+            figure {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                margin: 0.5em 0;
+                max-width: 100%;
+            }
+            
+            figcaption {
+                font-size: 0.9em;
+                margin-top: 0.3em;
+            }
+        `;
+        doc.head.appendChild(styleEl);
+    }
+
+    // Process each image
+    images.forEach(img => {
+        // Skip images that have already been processed
+        if (img.hasAttribute('data-positioned')) return;
+
+        // Set fixed dimensions if we can determine them
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
+
+        // If image has em/rem based dimensions, convert to fixed size
+        if ((img.style.width && (img.style.width.includes('em') || img.style.width.includes('rem'))) ||
+            (img.style.height && (img.style.height.includes('em') || img.style.height.includes('rem')))) {
+            // Get computed dimensions
+            const computedStyle = window.getComputedStyle(img);
+            const computedWidth = parseInt(computedStyle.width);
+            const computedHeight = parseInt(computedStyle.height);
+
+            if (!isNaN(computedWidth)) img.width = computedWidth;
+            if (!isNaN(computedHeight)) img.height = computedHeight;
+
+            // Clear relative units
+            if (img.style.width && (img.style.width.includes('em') || img.style.width.includes('rem')))
+                img.style.width = 'auto';
+            if (img.style.height && (img.style.height.includes('em') || img.style.height.includes('rem')))
+                img.style.height = 'auto';
+        }
+
+        // Mark as processed
+        img.setAttribute('data-positioned', 'true');
+
+        // Add special handling for inline images
+        const parent = img.parentElement;
+        if (parent && (parent.tagName === 'P' || parent.tagName === 'DIV') &&
+            !parent.classList.contains('image-container') &&
+            !img.closest('figure')) {
+
+            // Don't disrupt natural flow in multicolumn layout
+            if (colCount > 1) {
+                // For multicolumn, just ensure the image stays in place
+                img.style.display = 'inline-block';
+                img.style.verticalAlign = 'top';
+
+                // Add a specific class to help with styling
+                img.classList.add('multicolumn-image');
+            }
+        }
+    });
+}
+
+/**
  * Main initialization function that runs when the DOM is fully loaded.
  * Sets up event listeners and initializes the EPUB reader interface.
  */
@@ -44,6 +151,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!frame || !body) {
         console.error("Required DOM elements (iframe with id 'page' or body with id 'body') not found.");
         return; // Exit if essential elements are missing
+    }
+
+    // Add platform-specific class to body
+    if (platform.isWindows) {
+        body.classList.add('windows-platform');
+        frame.classList.add('windows-platform');
     }
 
     /**
@@ -75,12 +188,16 @@ document.addEventListener("DOMContentLoaded", function () {
      * Handles iframe load events. Ensures proper page layout, particularly for two-column mode
      * by adding a blank page if necessary to make page count even.
      */
+    const originalOnload = frame.onload;
     frame.onload = function () {
         try {
             if (!frame.contentWindow?.document) {
                 console.error("Cannot access iframe content - likely CORS restriction or iframe not fully loaded.");
                 return;
             }
+
+            // Fix image positioning when page loads
+            setTimeout(fixImagePositioning, 100);
 
             // Early exit for mobile platforms as per original logic
             if (platform.isAndroid || platform.isIOS) {
@@ -338,6 +455,13 @@ function setReadiumProperty(property, value) {
         root.style.setProperty(property, value);
         if (property === '--USER__colCount') {
             colCount = parseInt(value);
+            // Fix image positioning after column count changes
+            setTimeout(fixImagePositioning, 100);
+        }
+
+        // Fix image positioning after font size changes
+        if (property.includes('fontSize') || property.includes('font-size')) {
+            setTimeout(fixImagePositioning, 100);
         }
     } else {
         console.warn(`Could not set property '${property}'. Iframe content not accessible or not loaded.`);

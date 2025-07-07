@@ -9,8 +9,7 @@
     xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
     x:DataType="viewModel:SettingsPageViewModel"
-    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
-                                      Light={StaticResource Blue200Accent}}"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}"
     HeightRequest="600"
     WidthRequest="400">
 

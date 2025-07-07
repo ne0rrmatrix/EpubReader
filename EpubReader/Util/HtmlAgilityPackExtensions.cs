@@ -229,6 +229,24 @@ public static partial class HtmlAgilityPackExtensions
 		});
 	}
 
+	/// <summary>
+	/// Removes all CSS rules that contain "calibre" from the input CSS string.
+	/// This includes class selectors like .calibre, .calibre1, etc.,
+	/// and pseudo-class selectors like .pcalibre:link.
+	/// </summary>
+	/// <param name="cssString">The input CSS string.</param>
+	/// <returns>The CSS string with calibre references removed.</returns>
+	public static string RemoveCalibreReferences(string cssString)
+	{
+		// This regex looks for CSS rules starting with ".calibre" (and any digits after it)
+		// or ".pcalibre" (and any digits after it) followed by any pseudo-class,
+		// and captures the entire rule block, including the curly braces and their content.
+		// It's designed to be non-greedy (.*?) to match only up to the next closing brace.
+		string pattern = @"\.(p?calibre\d*)\s*\{[^}]*\}";
+
+		// Use Regex.Replace to remove all matches of the pattern.
+		return Regex.Replace(cssString, pattern, "", RegexOptions.Singleline, TimeSpan.FromSeconds(10));
+	}
 
 	[GeneratedRegex(@"url\(['""]?(.*?)['""]?\)", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
 	private static partial Regex CssContentFilter();

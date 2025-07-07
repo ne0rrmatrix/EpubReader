@@ -14,6 +14,7 @@ using Microsoft.Maui.Handlers;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
+using EpubReader.Service;
 
 #if IOS || MACCATALYST
 using CoreGraphics;
@@ -111,7 +112,8 @@ public static class MauiProgram
 		LoggerFactory.Initialize(config);
         builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();
-        builder.Services.AddSingleton<AppShell>();
+		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
+		builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 
 		builder.Services.AddSingleton<WebViewHelper>();

@@ -3,6 +3,7 @@ using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using EpubReader.Interfaces;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
@@ -13,7 +14,8 @@ namespace EpubReader.ViewModels;
 public partial class LibraryViewModel : BaseViewModel
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
-    static readonly string[] epub = [".epub", ".epub"];
+	readonly IFolderPicker folderPicker = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>() ?? throw new InvalidOperationException();
+	static readonly string[] epub = [".epub", ".epub"];
     static readonly string[] android_epub = ["application/epub+zip", ".epub"];
 	readonly FilePickerFileType customFileType = new(
 		  new Dictionary<DevicePlatform, IEnumerable<string>>
@@ -49,7 +51,70 @@ public partial class LibraryViewModel : BaseViewModel
         await Shell.Current.GoToAsync($"BookPage", navigationParams);
     }
 
-    [RelayCommand]
+	[RelayCommand]
+	async Task AddFolder(CancellationToken cancellationToken = default)
+	{
+		var folderUri = await folderPicker.PickFolder();
+		if (string.IsNullOrEmpty(folderUri))
+		{
+			logger.Info("No folder selected");
+			return;
+		}
+		logger.Info($"Selected folder: {folderUri}");
+		var epubFiles = await folderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
+		if (epubFiles.Count == 0)
+		{
+			logger.Info("No epub files found in the selected folder");
+			await Dispatcher.DispatchAsync(async () => await Toast.Make("No epub files found in the selected folder", ToastDuration.Short, 12).Show(cancellationToken));
+			return;
+		}
+		logger.Info($"Found {epubFiles.Count} epub files in the selected folder");
+		string message = string.Empty;
+
+		
+		foreach (var file in epubFiles)
+		{
+			var bookData = db.GetAllBooks() ?? [];
+			var stream = await folderPicker.PerformFileOperationOnEpubAsync(file);
+			if (stream is null)
+			{
+				logger.Info($"Failed to open stream for file: {file}");
+				continue;
+			}
+			Book? ebook = null;
+			ebook = EbookService.GetListing(stream, file);
+			stream.Seek(0, SeekOrigin.Begin); // Reset stream position for reading
+			if (ebook is not null)
+			{
+				ebook.FilePath = await FileService.SaveFile(stream, file);
+				ebook.CoverImagePath = await FileService.SaveImage(file, ebook.CoverImage);
+				if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
+				{
+					logger.Info($"Book {ebook.Title} saved successfully.");
+				}
+				else
+				{
+					logger.Error($"Failed to save book {ebook.Title} or its cover image.");
+					message = $"Failed to save book {ebook.Title} or its cover image.";
+					await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+					continue;
+				}
+				
+				db.SaveBookData(ebook);
+				Books.Add(ebook);
+			}
+			if (ebook is null)
+			{
+				message = $"Error opening Book: {file}";
+				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+				logger.Info(message);
+				continue;
+			}
+			
+		}
+	}
+
+	[RelayCommand]
     async Task Add(CancellationToken cancellationToken = default)
     {
 		string message = string.Empty;
@@ -63,7 +128,7 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info("No file selected");
 			return;
 		}
-		var bookData = db.GetAllBooks() ?? [];
+
 		var ebook = EbookService.GetListing(result.FullPath);
 		if (ebook is null)
 		{
@@ -72,17 +137,16 @@ public partial class LibraryViewModel : BaseViewModel
 			logger.Info(message);
 			return;
 		}
-
-		if (bookData.Any(x => x.Title == ebook.Title))
+		if (Books.Any(x => x.Title == ebook.Title))
 		{
-			message = "Book already exists in library";
+			message = $"Book already exists in library: {ebook.Title}";
 			await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
 			logger.Info(message);
 			return;
 		}
 		
-		ebook.FilePath =  await FileService.SaveFile(result, ebook.Title).ConfigureAwait(false);
-		ebook.CoverImagePath = await FileService.SaveImage(ebook.Title, ebook.CoverImage).ConfigureAwait(false);
+		ebook.FilePath =  await FileService.SaveFile(result, ebook.FilePath).ConfigureAwait(false);
+		ebook.CoverImagePath = await FileService.SaveImage(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
 		db.SaveBookData(ebook);
 		Books.Add(ebook);
 

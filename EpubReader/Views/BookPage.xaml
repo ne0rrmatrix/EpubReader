@@ -87,7 +87,7 @@
                 <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="auto" />
+                        <RowDefinition Height="40" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -95,8 +95,6 @@
                     <WebView
                         x:Name="webView"
                         Grid.Row="0"
-                        Margin="{OnIdiom Tablet=10,
-                                         Phone=5}"
                         Navigated="webView_Navigated"
                         Navigating="webView_Navigating"
                         Scale="1"
@@ -105,6 +103,7 @@
                     <Label
                         x:Name="pageLabel"
                         Grid.Row="1"
+                        HeightRequest="30"
                         FontSize="{OnPlatform Android=16,
                                               iOS=16,
                                               WinUI=20,
