@@ -24,10 +24,7 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 		var stream = streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
 		var data = NSData.FromStream(stream) ?? throw new InvalidOperationException("data is null");
 		using var dic = new NSMutableDictionary<NSString, NSString>();
-		if (mimeType is not null)
-		{
-			dic[(NSString)"Content-Type"] = (NSString)mimeType;
-		}
+		dic[(NSString)"Content-Type"] = (NSString)mimeType;
 		// Disable local caching which would otherwise prevent user scripts from executing correctly.
 		dic[(NSString)"Cache-Control"] = (NSString)"no-cache, max-age=0, must-revalidate, no-store";
 		dic[(NSString)"Content-Length"] = (NSString)data.Length.ToString(CultureInfo.InvariantCulture);

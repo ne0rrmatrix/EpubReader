@@ -10,7 +10,7 @@ namespace EpubReader.Views;
 public partial class BookPage : ContentPage, IDisposable
 {
 	const uint animationDuration = 200u;
-#if ANDROID || WINDOWS
+#if ANDROID || WINDOWS || IOS || MACCATALYST
 	bool loadIndex = true;
 #endif
 	bool disposedValue;
@@ -22,22 +22,6 @@ public partial class BookPage : ContentPage, IDisposable
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
-
-#if IOS || MACCATALYST
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
-	{
-		Direction = SwipeDirection.Left,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
-	{
-		Direction = SwipeDirection.Right,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
-	{
-		Direction = SwipeDirection.Up,
-	};
-#endif
-
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -53,14 +37,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 
-#if IOS || MACCATALYST
-		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
-		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
-		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
-#endif
 #if IOS || ANDROID
 		webView.Behaviors.Add(touchbehavior);
 #endif
@@ -95,7 +71,7 @@ public partial class BookPage : ContentPage, IDisposable
 		return base.OnBackButtonPressed();
 	}
 #endif
-#if WINDOWS || ANDROID
+#if WINDOWS || ANDROID || IOS || MACCATALYST
 	protected override void OnDisappearing()
 	{
 		loadIndex = false;
@@ -124,30 +100,6 @@ public partial class BookPage : ContentPage, IDisposable
 	}
 #endif
 
-	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Left)
-		{
-			await webView.EvaluateJavaScriptAsync(" window.parent.postMessage(\"next\", \"app://demo\");");
-		}
-	}
-
-	void SwipeGestureRecognizer_up_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Up)
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-	}
-
-	async void SwipeGestureRecognizer_right_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Right)
-		{
-			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
-		}
-	}
-
 	async void GridArea_Tapped(object sender, EventArgs e)
 	{
 		var viewModel = (BookViewModel)BindingContext;
@@ -171,7 +123,7 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 #endif
-#if WINDOWS || ANDROID
+#if WINDOWS || ANDROID || IOS || MACCATALYST
 		loadIndex = false;
 #endif
 		await webViewHelper.LoadPage(pageLabel, book);

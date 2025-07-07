@@ -514,6 +514,7 @@ function fixImagePositioning() {
  * Initialize the reader when the DOM is fully loaded
  */
 document.addEventListener("DOMContentLoaded", function () {
+    console.log('Document ready');
     frame = document.getElementById("page");
     const body = document.getElementById("body");
     const root = document.documentElement;
@@ -529,7 +530,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body.classList.add('windows-platform');
         frame.classList.add('windows-platform');
     }
-
+    
     // Set initial dimensions and add resize listener
     layoutUtils.setDimensions(body, root);
     frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
@@ -557,15 +558,15 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Error during iframe onload:", error);
         } finally {
             // Notify via URL change after processing
-            if (platform.isIOS || platform.isMac) {
-                frame.contentWindow?.focus();
-            }
             window.location.href = 'https://runcsharp.pageLoad?true';
         }
     };
 
     // Listen for messages from the parent window
     window.addEventListener("message", event => handleMessage(event, platform));
+    if (platform.isIOS) {
+        window.addEventListener('touchstart', {});
+    }
 });
 
 // Public API functions
@@ -628,9 +629,6 @@ function loadPage(page) {
     }
     console.log("Frame found. Loading page:", page);
     frame.setAttribute('src', page);
-    if (platform.isIOS || platform.isMac) {
-        frame.contentWindow?.focus();
-    }
     return true;
 }
 
