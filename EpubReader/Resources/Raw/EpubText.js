@@ -274,7 +274,7 @@ const navigationUtils = {
             const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
             console.log("Scrolling to end of container.");
             frame.contentWindow.scrollTo(maxScrollLeft, 0);
-            currentPage = getPageCount(frame.contentWindow);
+            currentPage = getPageCount();
             window.location.href = 'https://runcsharp.updatepageinfo?true';
         } else {
             // If iframe not ready, set onload to call this function again

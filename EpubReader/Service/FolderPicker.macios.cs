@@ -49,10 +49,11 @@ public partial class FolderPicker : IFolderPicker
 		};
 
 		var tcs = new TaskCompletionSource<string>();
-		picker.Delegate = new PickerDelegate
+		var pickerDelegate = new PickerDelegate
 		{
 			PickHandler = urls => GetFileResults(urls, tcs)
 		};
+		picker.Delegate = pickerDelegate;
 
 		var dismissHandler = new Action(() => GetFileResults(null!, tcs));
 		var delegateController = new UIPresentationControllerDelegate(dismissHandler);
