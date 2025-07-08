@@ -5,6 +5,7 @@
 
 // Global state
 let isPreviousPage = false;
+let currentPage = 1;
 let frame = null;
 let colCount = 1;
 
@@ -213,6 +214,12 @@ const navigationUtils = {
                 behavior: "smooth"
             });
         }
+        if (currentPage > 1) {
+            currentPage--;
+        } else {
+            console.warn("Already at the first page, cannot scroll left.");
+        }
+        window.location.href = 'https://runcsharp.updatepageinfo?true';
     },
 
     /**
@@ -234,6 +241,8 @@ const navigationUtils = {
                 behavior: "smooth"
             });
         }
+        currentPage++;
+        window.location.href = 'https://runcsharp.updatepageinfo?true';
     },
 
     /**
@@ -265,6 +274,8 @@ const navigationUtils = {
             const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
             console.log("Scrolling to end of container.");
             frame.contentWindow.scrollTo(maxScrollLeft, 0);
+            currentPage = getPageCount(frame.contentWindow);
+            window.location.href = 'https://runcsharp.updatepageinfo?true';
         } else {
             // If iframe not ready, set onload to call this function again
             frame.onload = function () {
@@ -325,44 +336,6 @@ const layoutUtils = {
         root.style.setProperty('--root-width', `${width}px`);
         root.style.setProperty('--root-height', `${height}px`);
     },
-
-    /**
-     * Adds a blank page if needed for even page count
-     * @param {Window} contentWindow - The iframe content window
-     */
-    addBlankPageIfNeeded(contentWindow) {
-        const pageCount = this.getPageCount(contentWindow);
-
-        // Add a blank page if the page count is odd
-        if (pageCount % 2 !== 0 && colCount > 1) {
-            const blankPage = contentWindow.document.createElement("div");
-            const { width, height } = frame.style;
-
-            blankPage.style.cssText = `
-                width: ${width};
-                height: ${height};
-                display: inline-block;
-                background-color: transparent;
-                overflow: hidden;
-            `;
-
-            contentWindow.document.body.appendChild(blankPage);
-            console.log(`Added blank page to make page count even: ${pageCount + 1}`);
-        } else {
-            console.log(`Page count is already even: ${pageCount}`);
-        }
-    },
-
-    /**
-     * Calculates the number of pages
-     * @param {Window} contentWindow - The iframe content window
-     * @returns {number} The page count
-     */
-    getPageCount(contentWindow) {
-        const innerWidth = contentWindow?.innerWidth ?? 0;
-        const scrollWidth = contentWindow?.document.documentElement.scrollWidth ?? 0;
-        return Math.floor(scrollWidth / innerWidth);
-    }
 };
 
 /**
@@ -546,14 +519,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // Fix image positioning when page loads
             setTimeout(fixImagePositioning, 100);
-
-            // Early exit for mobile platforms
-            if (platform.isAndroid || platform.isIOS) {
-                console.log("Not setting extra page for single column on mobile.");
-                return;
-            }
-
-            layoutUtils.addBlankPageIfNeeded(contentWindow);
         } catch (error) {
             console.error("Error during iframe onload:", error);
         } finally {
@@ -595,9 +560,17 @@ function getPageCount() {
         return 0;
     }
 
-    const width = Math.floor(contentWindow.innerWidth);
-    const containerWidth = Math.abs(contentWindow.document.documentElement.scrollWidth);
-    return Math.floor(containerWidth / width);
+    const width = Math.ceil(contentWindow.innerWidth);
+    const containerWidth = Math.ceil(contentWindow.document.documentElement.scrollWidth);
+    return Math.ceil(Math.max(1, containerWidth / width));
+}
+
+/**
+ * Retrieves the current page number
+ * @returns {number} The current page number
+ */
+function getCurrentPage() {
+    return currentPage;
 }
 
 /**
@@ -615,6 +588,7 @@ function gotoEnd() {
  */
 function setPreviousPage() {
     isPreviousPage = true;
+    currentPage = 1; // Reset current page on previous navigation
 }
 
 /**
@@ -629,6 +603,7 @@ function loadPage(page) {
     }
     console.log("Frame found. Loading page:", page);
     frame.setAttribute('src', page);
+    currentPage = 1; // Reset current page on new load
     return true;
 }
 

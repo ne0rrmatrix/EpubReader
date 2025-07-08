@@ -9,6 +9,7 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
+	const string externalLinkPrefix = "https://runcsharp.jump/?";
 	const uint animationDuration = 200u;
 #if ANDROID || WINDOWS
 	bool loadIndex = true;
@@ -92,10 +93,8 @@ public partial class BookPage : ContentPage, IDisposable
 			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
 			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 			book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 			book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-	   }
-	  
+		}
 		base.OnAppearing();
 	}
 #endif
@@ -133,12 +132,23 @@ public partial class BookPage : ContentPage, IDisposable
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
 
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
+		ArgumentNullException.ThrowIfNull(book);
+		var url = e.Url;
+		if (url.Contains(externalLinkPrefix))
+		{
+			var link = url.Replace(externalLinkPrefix, string.Empty);
+			var temp = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(link), StringComparison.OrdinalIgnoreCase));
+			if (temp is not null)
+			{
+				book.CurrentChapter = book.Chapters.IndexOf(temp);
+				db.UpdateBookMark(book);
+			}
+		}
 		if (!e.Url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			return;
@@ -147,7 +157,7 @@ public partial class BookPage : ContentPage, IDisposable
 		e.Cancel = true;
 		ArgumentNullException.ThrowIfNull(book);
 
-		if (await TryHandleExternalLinkAsync(e.Url))
+		if (await BookPage.TryHandleExternalLinkAsync(e.Url))
 		{
 			return;
 		}
@@ -158,13 +168,12 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 
-		await HandleWebViewActionAsync(methodName, e.Url);
+		await HandleWebViewActionAsync(methodName);
 		UpdateUiAppearance();
 	}
 
 	static async Task<bool> TryHandleExternalLinkAsync(string url)
 	{
-		const string externalLinkPrefix = "https://runcsharp.jump/?";
 		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo"))
 		{
 			return false;
@@ -203,14 +212,11 @@ public partial class BookPage : ContentPage, IDisposable
 		return funcToCall[0][..^1]; // Assumes format like "method()"
 	}
 
-	async Task HandleWebViewActionAsync(string methodName, string url)
+	async Task HandleWebViewActionAsync(string methodName)
 	{
 		ArgumentNullException.ThrowIfNull(book);
 		switch (methodName.ToLowerInvariant())
 		{
-			case "jump":
-				HandleJumpAction(url);
-				break;
 			case "next":
 				await webViewHelper.Next(pageLabel, book);
 				break;
@@ -223,29 +229,30 @@ public partial class BookPage : ContentPage, IDisposable
 			case "pageload":
 				await webViewHelper.OnSettingsClicked();
 				UpdateUiAppearance();
+				pageLabel.Text = await GetCurrentPageInfo();
+				break;
+			case "updatepageinfo":
+				pageLabel.Text = await GetCurrentPageInfo();
 				break;
 		}
 	}
 
-	void HandleJumpAction(string url)
+	async Task<string> GetCurrentPageInfo()
 	{
 		ArgumentNullException.ThrowIfNull(book);
-		var urlParts = url.Split("https://demo/");
-		if (urlParts.Length <= 1)
+		var tempPageResult = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
+		var tempPageCount = await webView.EvaluateJavaScriptAsync("getPageCount()");
+		var pageCount = tempPageCount?.ToString();
+		var result = Int32.TryParse(pageCount, out var pageCountValue) ? pageCountValue : 0;
+		pageCount = pageCountValue > 0 ? result.ToString() : string.Empty;
+		var currentPage = tempPageResult?.ToString();
+		if (!string.IsNullOrEmpty(pageCount) || !string.IsNullOrEmpty(currentPage))
 		{
-			return;
+			return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty} (Page {currentPage} of {pageCount})";		
 		}
-
-		var key = urlParts[1].Split('#')[0];
-		var index = book.Chapters.FindIndex(chapter => chapter.FileName.Contains(key, StringComparison.CurrentCultureIgnoreCase));
-
-		if (index >= 0)
-		{
-			book.CurrentChapter = index;
-			db.UpdateBookMark(book);
-			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		}
+		return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 	}
+
 
 	void UpdateUiAppearance()
 	{
@@ -295,7 +302,7 @@ public partial class BookPage : ContentPage, IDisposable
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					pageLabel.Text = await GetCurrentPageInfo();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenu(this, EventArgs.Empty);
@@ -321,7 +328,7 @@ public partial class BookPage : ContentPage, IDisposable
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					pageLabel.Text = await GetCurrentPageInfo();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenu(this, EventArgs.Empty);

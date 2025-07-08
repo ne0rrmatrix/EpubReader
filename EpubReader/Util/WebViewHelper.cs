@@ -81,7 +81,6 @@ public partial class WebViewHelper(WebView handler)
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-		label.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 	}
 	public async Task Next(Label label, Book book)
 	{
