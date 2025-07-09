@@ -4,11 +4,14 @@ namespace EpubReader;
 
 public partial class App : Application
 {
-    readonly AppShell appShell;
+	readonly AppShell appShell;
+
 	public App(AppShell appShell)
-    {
-        InitializeComponent();
+	{
+		InitializeComponent();
+
 		this.appShell = appShell;
 	}
+
 	protected override Window CreateWindow(IActivationState? activationState) => new(appShell);
 }

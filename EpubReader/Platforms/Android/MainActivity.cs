@@ -1,6 +1,9 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using EpubReader.Interfaces;
+using EpubReader.Service;
 
 namespace EpubReader;
 
@@ -9,9 +12,15 @@ public class MainActivity : MauiAppCompatActivity
 {
 	protected override void OnCreate(Bundle? savedInstanceState)
 	{
-		// Must apply the style before the DecorView setup
-		Theme?.ApplyStyle(Resource.Style.OptOutEdgeToEdgeEnforcement, force: false);
-
 		base.OnCreate(savedInstanceState);
+	}
+
+	protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+	{
+		base.OnActivityResult(requestCode, resultCode, data);
+
+		var serviceProvider = IPlatformApplication.Current?.Services ?? throw new InvalidOperationException("Unable to retrieve service provider");
+		var folderPickerService = serviceProvider.GetService<IFolderPicker>() as FolderPicker;
+		folderPickerService?.OnActivityResult(requestCode, resultCode, data);
 	}
 }

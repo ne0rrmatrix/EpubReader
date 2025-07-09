@@ -13,18 +13,20 @@ public static partial class FileService
 		foreach (char invalidChar in invalidChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
-			directoryName = directoryName.Replace("\\", "");
-			directoryName = directoryName.Replace("/", "");
-			directoryName = directoryName.Replace(":", "");
-			directoryName = directoryName.Replace("*", "");
-			directoryName = directoryName.Replace("?", "");
-			directoryName = directoryName.Replace("\"", "");
-			directoryName = directoryName.Replace("<", "");
-			directoryName = directoryName.Replace(">", "");
-			directoryName = directoryName.Replace("|", "");
-			directoryName = directoryName.Replace("$", "");
 		}
-		directoryName = directoryName.Replace(" ", "").Trim();
+
+        directoryName = directoryName.Replace("\\", "");
+        directoryName = directoryName.Replace("/", "");
+        directoryName = directoryName.Replace(":", "");
+        directoryName = directoryName.Replace("*", "");
+        directoryName = directoryName.Replace("?", "");
+        directoryName = directoryName.Replace("\"", "");
+        directoryName = directoryName.Replace("<", "");
+        directoryName = directoryName.Replace(">", "");
+        directoryName = directoryName.Replace("|", "");
+        directoryName = directoryName.Replace("$", "");
+        directoryName = directoryName.Replace("%", "");
+        directoryName = directoryName.Replace(" ", "").Trim();
 		directoryName = Path.GetFileNameWithoutExtension(directoryName);
 		return directoryName;
 	}
@@ -77,14 +79,63 @@ public static partial class FileService
 		if (!Directory.Exists(fullPath))
 		{
 			Directory.CreateDirectory(fullPath);
+			logger.Info($"Created directory: {fullPath}");
 		}
-		using var memoryStream = new MemoryStream(imageBytes);
-		var type =ImageExtensions.GetFileExtension(memoryStream);
-		var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
-		var fileName = Path.Combine(fullPath, ValidateAndFixFileName(newfileName));
-		await File.WriteAllBytesAsync(fileName, imageBytes);
-		logger.Info($"Image saved: {bookName}");
+		
+		string fileName;
+		
+		try
+		{
+			using var memoryStream = new MemoryStream(imageBytes);
+			var type = ImageExtensions.GetFileExtension(memoryStream);
+			var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
+			fileName = Path.Combine(fullPath, ValidateAndFixFileName(newfileName));
+			
+			memoryStream.Seek(0, SeekOrigin.Begin);
+			
+			// Simplified file writing with less chances of handle leaks
+			await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
+			logger.Info($"Image saved: {bookName}");
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error saving image: {bookName}, Message: {ex.Message}");
+			return string.Empty;
+		}
+		
 		return fileName;
+	}
+	
+	public static async Task<string> SaveFile(Stream stream, string bookName)
+	{
+		try
+		{
+			var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName)));
+			if (!Directory.Exists(fullPath))
+			{
+				Directory.CreateDirectory(fullPath);
+				logger.Info($"Created directory: {fullPath}");
+			}
+			
+			var fileName = Path.Combine(fullPath, ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName)));
+			fileName = Path.ChangeExtension(fileName, ".epub");
+			
+			// Create a memory buffer to ensure we're not locking the original stream
+			using var memoryStream = new MemoryStream();
+			await stream.CopyToAsync(memoryStream);
+			memoryStream.Position = 0;
+			
+			// Write to file in one operation
+			await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
+			
+			logger.Info($"File saved: {fileName}");
+			return fileName;
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error saving file: {ex.Message}");
+			return string.Empty;
+		}
 	}
 	
 	public static async Task<string> SaveFile(FileResult result, string bookName)
@@ -96,15 +147,22 @@ public static partial class FileService
 			if (!Directory.Exists(fullPath))
 			{
 				Directory.CreateDirectory(fullPath);
+				logger.Info($"Created directory: {fullPath}");
 			}
 
-			using Stream fileStream = await result.OpenReadAsync();
-			using StreamReader reader = new(fileStream);
 			var fileName = Path.Combine(fullPath, ValidateAndFixFileName(result.FileName));
-			using FileStream output = File.Create(fileName);
-			await fileStream.CopyToAsync(output);
-			fileStream.Seek(0, SeekOrigin.Begin);
-			Stream.Synchronized(output);
+			
+			// Use a memory buffer to avoid file handle issues
+			using (Stream fileStream = await result.OpenReadAsync())
+			{
+				using var memoryStream = new MemoryStream();
+				await fileStream.CopyToAsync(memoryStream);
+				memoryStream.Position = 0;
+				
+				// Write the bytes in one operation
+				await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
+			}
+			
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}

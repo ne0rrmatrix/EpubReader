@@ -9,30 +9,20 @@ namespace EpubReader.Views;
 
 public partial class BookPage : ContentPage, IDisposable
 {
+	const string externalLinkPrefix = "https://runcsharp.jump/?";
+	const uint animationDuration = 200u;
+#if ANDROID || WINDOWS
+	bool loadIndex = true;
+#endif
+	bool disposedValue;
+
 	Book? book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
-	
+
 #if ANDROID || IOS
 	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
 #endif
-#if IOS || MACCATALYST
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
-	{
-		Direction = SwipeDirection.Left,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
-	{
-		Direction = SwipeDirection.Right,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
-	{
-		Direction = SwipeDirection.Up,
-	};
-#endif
-	const uint animationDuration = 200u;
-	bool disposedValue;
-	bool loadIndex = true;
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -41,164 +31,16 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		webViewHelper = new(webView);
 
-#if IOS || MACCATALYST
-		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
-		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
-		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
-#endif
-#if IOS || ANDROID
-		webView.Behaviors.Add(touchbehavior);
-#endif
-	}
-
-	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Left)
-		{
-			await webView.EvaluateJavaScriptAsync(" window.parent.postMessage(\"next\", \"app://demo\");");
-		}
-	}
-
-	void SwipeGestureRecognizer_up_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Up)
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-	}
-
-	async void SwipeGestureRecognizer_right_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Right)
-		{
-			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
-		}
-	}
-
-	protected override void OnDisappearing()
-	{
-		if (BindingContext is BookViewModel viewModel)
-		{
-			viewModel.Dispose();
-		}
-#if WINDOWS
-		Controls.WebViewExtensions.WebView2_Unloaded();
-#endif
-		base.OnDisappearing();
-	}
-
-	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
-	{
-		ArgumentNullException.ThrowIfNull(book);
-		if (!loadIndex)
-		{
-			return;
-		}
-		loadIndex = false;
-		await webViewHelper.LoadPage(pageLabel, book);
-		Shimmer.IsActive = false;
-	}
-
-	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
-	{
-		var urlParts = e.Url.Split('.');
-		ArgumentNullException.ThrowIfNull(book);
-		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
-		{
-			return;	
-		}
-		e.Cancel = true;
-		var funcToCall = urlParts[1].Split("?");
-		var methodName = funcToCall[0][..^1];
-		var newUrl = e.Url.Split('?');
-		if (newUrl.Length > 1 && e.Url.Contains("https://runcsharp.jump/?") && !e.Url.Contains("https://demo"))
-		{
-			var queryString = newUrl[1];
-			queryString = queryString.Replace("http://", "https://");
-			if (string.IsNullOrEmpty(queryString) || !queryString.Contains("https://"))
-			{
-				return;
-			}
-			await Launcher.OpenAsync(queryString);
-			return;
-		}
-
-		string[] url = e.Url.Split("https://demo/");
-		
-		if (url.Length > 1 && 
-			methodName.Contains("jump", StringComparison.CurrentCultureIgnoreCase) && 
-			book.Chapters.FindIndex(chapter => chapter.FileName.Contains(url[1].Split('#')[0], StringComparison.CurrentCultureIgnoreCase)) 
-			is int index && 
-			index != -1)
-		{
-			book.CurrentChapter = index;
-			db.UpdateBookMark(book);
-			pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		}
-		if (methodName.Contains("next", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await webViewHelper.Next(pageLabel, book);
-		}
-		if (methodName.Contains("prev", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await webViewHelper.Prev(pageLabel, book);
-		}
-		if (methodName.Contains("menu", StringComparison.CurrentCultureIgnoreCase))
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-		if (methodName.Contains("pageLoad", StringComparison.CurrentCultureIgnoreCase))
-		{
-			await webViewHelper.OnSettingsClicked();
-		}
-	}
-
-	void CurrentPage_Loaded(object sender, EventArgs e)
-	{
-		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		if(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
 		{
 			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
 		}
-		
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
-	}
 
-	async void GridArea_Tapped(object sender, EventArgs e)
-	{
-		var viewModel = (BookViewModel)BindingContext;
-		viewModel.Press();
-		var width = this.Width * 0.4;
-		if(OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
-		{
-			width = this.Width * 0.8;
-		}
-		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
-		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
-		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
-	}
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 
-	async void CloseMenu(object sender, EventArgs e)
-	{
-		var viewModel = (BookViewModel)BindingContext;
-		viewModel.Press();
-		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
-		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
-		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
-	}
-
-	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
-	{
-		base.OnNavigatedFrom(args);
-
-		WeakReferenceMessenger.Default.UnregisterAll(this);
-		Shell.Current.ToolbarItems.Clear();
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+#if IOS || ANDROID
+		webView.Behaviors.Add(touchbehavior);
+#endif
 	}
 
 	protected virtual void Dispose(bool disposing)
@@ -219,6 +61,222 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
+	}
+
+#if WINDOWS
+	protected override bool OnBackButtonPressed()
+	{
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+		return base.OnBackButtonPressed();
+	}
+#endif
+#if WINDOWS || ANDROID
+	protected override void OnDisappearing()
+	{
+		loadIndex = false;
+#if ANDROID
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		Shell.Current.ToolbarItems.Clear();
+		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+#endif
+		base.OnDisappearing();
+	}
+#endif
+
+#if ANDROID
+	protected override void OnAppearing()
+	{
+		if (!loadIndex)
+	   {
+			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
+			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
+			book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+			book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		}
+		base.OnAppearing();
+	}
+#endif
+
+	async void GridArea_Tapped(object sender, EventArgs e)
+	{
+		var viewModel = (BookViewModel)BindingContext;
+		viewModel.Press();
+		var width = this.Width * 0.4;
+		if (OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
+		{
+			width = this.Width * 0.8;
+		}
+		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
+		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
+	}
+
+	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+#if WINDOWS
+		if (!loadIndex && !e.Url.Contains("https://demo/index.html"))
+		{
+			return;
+		}
+#endif
+#if WINDOWS || ANDROID
+		loadIndex = false;
+#endif
+		await webViewHelper.LoadPage(pageLabel, book);
+		Shimmer.IsActive = false;
+	}
+
+	void CurrentPage_Loaded(object sender, EventArgs e)
+	{
+		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+	}
+
+	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		var url = e.Url;
+		if (url.Contains(externalLinkPrefix))
+		{
+			var link = url.Replace(externalLinkPrefix, string.Empty);
+			var temp = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(link), StringComparison.OrdinalIgnoreCase));
+			if (temp is not null)
+			{
+				book.CurrentChapter = book.Chapters.IndexOf(temp);
+				db.UpdateBookMark(book);
+			}
+		}
+		if (!e.Url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		{
+			return;
+		}
+
+		e.Cancel = true;
+		ArgumentNullException.ThrowIfNull(book);
+
+		if (await BookPage.TryHandleExternalLinkAsync(e.Url))
+		{
+			return;
+		}
+
+		var methodName = GetMethodNameFromUrl(e.Url);
+		if (string.IsNullOrEmpty(methodName))
+		{
+			return;
+		}
+
+		await HandleWebViewActionAsync(methodName);
+		UpdateUiAppearance();
+	}
+
+	static async Task<bool> TryHandleExternalLinkAsync(string url)
+	{
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo"))
+		{
+			return false;
+		}
+
+		var urlParts = url.Split('?');
+		if (urlParts.Length <= 1)
+		{
+			return false;
+		}
+
+		var queryString = urlParts[1].Replace("http://", "https://");
+		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
+		{
+			await Launcher.OpenAsync(queryString);
+			return true;
+		}
+
+		return false;
+	}
+
+	static string GetMethodNameFromUrl(string url)
+	{
+		var urlParts = url.Split('.');
+		if (urlParts.Length < 2)
+		{
+			return string.Empty;
+		}
+
+		var funcToCall = urlParts[1].Split('?');
+		if (string.IsNullOrEmpty(funcToCall[0]) || funcToCall[0].Length <= 1)
+		{
+			return string.Empty;
+		}
+
+		return funcToCall[0][..^1]; // Assumes format like "method()"
+	}
+
+	async Task HandleWebViewActionAsync(string methodName)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		switch (methodName.ToLowerInvariant())
+		{
+			case "next":
+				await webViewHelper.Next(pageLabel, book);
+				break;
+			case "prev":
+				await webViewHelper.Prev(pageLabel, book);
+				break;
+			case "menu":
+				GridArea_Tapped(this, EventArgs.Empty);
+				break;
+			case "pageload":
+				await webViewHelper.OnSettingsClicked();
+				UpdateUiAppearance();
+				pageLabel.Text = await GetCurrentPageInfo();
+				break;
+			case "updatepageinfo":
+				pageLabel.Text = await GetCurrentPageInfo();
+				break;
+		}
+	}
+
+	async Task<string> GetCurrentPageInfo()
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		var tempPageResult = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
+		var tempPageCount = await webView.EvaluateJavaScriptAsync("getPageCount()");
+		var pageCount = tempPageCount?.ToString();
+		var result = Int32.TryParse(pageCount, out var pageCountValue) ? pageCountValue : 0;
+		pageCount = pageCountValue > 0 ? result.ToString() : string.Empty;
+		var currentPage = tempPageResult?.ToString();
+		if (!string.IsNullOrEmpty(pageCount) || !string.IsNullOrEmpty(currentPage))
+		{
+			return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty} (Page {currentPage} of {pageCount})";		
+		}
+		return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+	}
+
+
+	void UpdateUiAppearance()
+	{
+		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
+		var settings = db.GetSettings() ?? new();
+		if(string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			settings.BackgroundColor = "#FFFFFF"; // Default background color
+			settings.TextColor = "#000000"; // Default text color
+		}
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+		{
+			grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+			pageLabel.TextColor = Color.FromArgb(settings.TextColor);
+		}
+	}
+
+	async void CloseMenu(object sender, EventArgs e)
+	{
+		var viewModel = (BookViewModel)BindingContext;
+		viewModel.Press();
+		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
+		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
+		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -244,7 +302,7 @@ public partial class BookPage : ContentPage, IDisposable
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					pageLabel.Text = await GetCurrentPageInfo();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenu(this, EventArgs.Empty);
@@ -270,7 +328,7 @@ public partial class BookPage : ContentPage, IDisposable
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					pageLabel.Text = await GetCurrentPageInfo();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenu(this, EventArgs.Empty);

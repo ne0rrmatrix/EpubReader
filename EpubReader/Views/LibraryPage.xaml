@@ -17,10 +17,13 @@
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add.png"
             Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddFolderCommand}"
+            IconImageSource="folder_24dp.png"
+            Order="Primary" />
     </ContentPage.ToolbarItems>
 
     <CollectionView
-        x:Name="collectionView"
         Grid.Row="1"
         Margin="{StaticResource CollectionMargin}"
         HorizontalScrollBarVisibility="Never"

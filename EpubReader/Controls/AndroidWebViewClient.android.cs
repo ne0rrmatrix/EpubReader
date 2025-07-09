@@ -5,9 +5,7 @@ using EpubReader.Messages;
 using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace EpubReader.Controls;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 class CustomWebViewClient : WebViewClient
 {
@@ -22,7 +20,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
 		handler.PlatformView.Settings.AllowContentAccess = true;
 		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
-		handler.PlatformView.Settings.MixedContentMode = Android.Webkit.MixedContentHandling.AlwaysAllow;
+		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
 		handler.PlatformView.Settings.LoadWithOverviewMode = true;
 		handler.PlatformView.Settings.UseWideViewPort = true;
 		handler.PlatformView.Settings.TextZoom = 100;
@@ -30,7 +28,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
 	}
 
-	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, global::Android.Webkit.IWebResourceRequest? request)
+	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
 		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))

@@ -1,6 +1,9 @@
-﻿html, body {
+﻿html {
     margin: 0;
     padding: 0;
+}
+
+html, body {
     background-color: var(--background-color);
     width: var(--root-width);
     height: var(--root-height);
@@ -10,13 +13,12 @@
     --background-color: transparent;
     --root-width: 100%;
     --root-height: 100%;
+    --side-margin: 5vw;
 }
 
 body {
     border: 0;
     padding: 0;
-    margin-left: 0;
-    margin-right: 0;
     margin-top: 0;
     margin-bottom: 0;
     overflow: hidden;
@@ -27,11 +29,32 @@ iframe {
     -webkit-text-size-adjust: none;
     text-size-adjust: none;
     border-width: 0 !important;
-    width: 100vw;
     height: 100vh;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
     background-color: transparent;
+}
+
+/* Apply margins only on non-Windows platforms */
+@supports selector(:root) {
+    /* This is just to ensure the rule is applied in modern browsers */
+    body:not(.windows-platform) {
+        margin-left: var(--side-margin);
+        margin-right: var(--side-margin);
+    }
+    
+    iframe:not(.windows-platform) {
+        width: calc(100% - (2 * var(--side-margin)));
+    }
+    
+    body.windows-platform {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    iframe.windows-platform {
+        width: 100%;
+    }
 }

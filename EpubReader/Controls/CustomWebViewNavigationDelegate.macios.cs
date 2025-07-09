@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
 using Microsoft.Maui.Handlers;
 using WebKit;

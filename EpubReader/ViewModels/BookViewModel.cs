@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Core;
+﻿using CommunityToolkit.Maui;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
@@ -55,9 +55,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	}
 
 	[RelayCommand]
-	void ShowPopup()
+	async Task ShowPopup()
 	{
-		popupService.ShowPopup<SettingsPageViewModel>();
+		await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current, options: new PopupOptions
+		{
+			CanBeDismissedByTappingOutsideOfPopup = true,
+		});
 	}
 	
 	[RelayCommand]
