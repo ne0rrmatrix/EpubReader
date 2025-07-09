@@ -4,7 +4,7 @@
    A file allowing implementers to customize flags for reading modes,
    user settings, etc.
 
-   Repo: https://github.com/readium/readium-css */
+   Repo: https://github.com/readium/css */
 
 /* Custom selectors
    Syntax: @custom-selector :--variable selector
@@ -15,11 +15,11 @@
 @custom-selector :--paged-view [style*="readium-paged-on"];
 @custom-selector :--scroll-view [style*="readium-scroll-on"];
 
-/* Font-family override */
-@custom-selector :--font-override [style*="readium-font-on"];
+/* Disabling the new implementation for font-size */
+@custom-selector :--deprecated-font-size [style*="readium-deprecatedFontSize-on"];
 
-/* Advanced settings */
-@custom-selector :--advanced-settings [style*="readium-advanced-on"];
+/* Font-size normalization for engines that don’t support zoom */
+@custom-selector :--fs-normalize [style*="readium-normalize-on"];
 
 /* Reading Modes */
 @custom-selector :--sepia-mode [style*="readium-sepia-on"];
@@ -34,6 +34,9 @@
 /* Disabling pagination for vertical writing */
 @custom-selector :--no-vertical-pagination [style*="readium-noVerticalPagination-on"];
 
+/* Disabling overflow */
+@custom-selector :--no-overflow [style*="readium-noOverflow-on"];
+
 /* Hiding ruby */
 @custom-selector :--no-ruby [style*="readium-noRuby-on"];
 
@@ -46,3 +49,6 @@
 /* Direction i.e. ltr and rtl */
 @custom-selector :--ltr [dir="ltr"];
 @custom-selector :--rtl [dir="rtl"];
+
+/* Patch for iPadOS */
+@custom-selector :--ipadOS-patch [style*="readium-iPadOSPatch-on"];
