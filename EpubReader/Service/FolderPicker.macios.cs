@@ -57,7 +57,11 @@ public partial class FolderPicker : IFolderPicker
 
 		var dismissHandler = new Action(() => GetFileResults(null!, tcs));
 		var delegateController = new UIPresentationControllerDelegate(dismissHandler);
-		picker.PresentationController?.Delegate = delegateController;
+		if(picker.PresentationController is null)
+		{
+			throw new InvalidOperationException("Picker's PresentationController is null. Ensure the picker is presented from a valid UIViewController.");
+		}
+		picker.PresentationController.Delegate = delegateController;
 
 		var parentController = Platform.GetCurrentUIViewController();
 		parentController?.PresentViewController(picker, true, null);
