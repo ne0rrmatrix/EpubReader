@@ -33,7 +33,7 @@
             <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
                 <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
                     <ScrollView.GestureRecognizers>
-                        <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenu" />
+                        <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenuAsync" />
                     </ScrollView.GestureRecognizers>
                     <Grid x:Name="menu" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}">
 
@@ -47,7 +47,7 @@
                             x:Name="BackButton"
                             Grid.Row="0"
                             Margin="0,10,10,0"
-                            Clicked="CloseMenu"
+                            Clicked="CloseMenuAsync"
                             HeightRequest="45"
                             HorizontalOptions="{OnPlatform WinUI=End,
                                                            Default=Start}"

@@ -8,7 +8,7 @@ public partial class WebViewHelper(WebView handler)
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	readonly WebView webView = handler;
 
-	public async Task OnSettingsClicked()
+	public async Task OnSettingsClickedAsync()
 	{
 		var settings = db.GetSettings() ?? new();
 		await SetColorScheme(settings);
