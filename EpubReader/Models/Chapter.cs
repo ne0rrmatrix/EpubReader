@@ -8,7 +8,7 @@ public class Chapter
 
 	/// <summary>
 	/// Gets or sets the title of the item.
-	/// </summary>`
+	/// </summary>
 	public string Title { get; set; } = string.Empty;
 
 	/// <summary>
