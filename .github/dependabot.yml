@@ -1,5 +1,7 @@
 version: 2
 updates:
+- name: Install required .NET workloads
+  run: dotnet workload install maui-tizen wasm-tools-net9
   - package-ecosystem: nuget
     directory: /EpubReader
     schedule:
