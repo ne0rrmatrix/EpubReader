@@ -1,14 +1,43 @@
 version: 2
+registries:
+  custom-nuget:
+    type: nuget-feed
+    url: https://api.nuget.org/v3/index.json
 updates:
 - package-ecosystem: nuget
   directory: "/"
+  registries:
+    - custom-nuget
   schedule:
     interval: daily
+  open-pull-requests-limit: 25
+  groups:
+    SkiaSharp:
+      patterns:
+        - "SkiaSharp.*"
+        - "Svg.*"
+        - "ShimSkiaSharp"
+        - "Fizzler"
+    MicrosoftExtensions:
+      patterns:
+        - "Microsoft.Extensions.*"
+    WindowsAppSDK:
+      patterns:
+        - "Microsoft.Graphics.Win2D"
+        - "Microsoft.Windows.SDK.BuildTools"
+        - "Microsoft.WindowsAppSDK"
+        - "Microsoft.Web.WebView2"
+    SyncfusionToolkit:
+      patterns:
+        - "Syncfusion.Maui.Toolkit"
   ignore:
-        - dependency-name: "Microsoft.Maui.Controls"
-        - dependency-name: "Microsoft.Maui.Core"
-        - dependency-name: "Microsoft.Maui.Essentials"
-- package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-    interval: "weekly"
+    - dependency-name: "MicrosoftMauiGraphicsVersion"         # maestro
+    - dependency-name: "Microsoft.Maui.Graphics*"             # maestro
+    - dependency-name: "SkiaSharp*"                           # needs to be done manually with maui graphics
+    - dependency-name: "HarfBuzzSharp*"                       # needs to be done manually with maui graphics
+    - dependency-name: "Newtonsoft.Json"                      # needs to be done manually to match VS
+
+  labels:
+      - "nuget"
+      - "dependencies"
+      - "area-infrastructure"
