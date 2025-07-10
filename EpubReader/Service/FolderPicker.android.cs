@@ -159,7 +159,7 @@ public partial class FolderPicker : IFolderPicker
 		return Platform.CurrentActivity.ApplicationContext.ContentResolver;
 	}
 
-	public async Task<string> PickFolder()
+	public async Task<string> PickFolderAsync()
 	{
 		folderPickedTcs = new TaskCompletionSource<string>();
 
@@ -182,9 +182,7 @@ public partial class FolderPicker : IFolderPicker
 			{
 				Uri treeUri = data.Data;
 				// Persist the URI access permissions
-				ArgumentNullException.ThrowIfNull(Platform.CurrentActivity?.ApplicationContext);
-				var contentResolver = Platform.CurrentActivity.ApplicationContext.ContentResolver;
-				ArgumentNullException.ThrowIfNull(contentResolver);
+				var contentResolver = GetContentResolver() ?? throw new InvalidOperationException("ContentResolver is null.");
 				contentResolver.TakePersistableUriPermission(treeUri, ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
 				var treeTempUri = treeUri.ToString();
 				if (string.IsNullOrEmpty(treeTempUri))

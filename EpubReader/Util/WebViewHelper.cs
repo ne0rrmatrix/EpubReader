@@ -4,28 +4,27 @@ using EpubReader.Models;
 namespace EpubReader.Util;
 public partial class WebViewHelper(WebView handler)
 {
-
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	readonly WebView webView = handler;
 
 	public async Task OnSettingsClickedAsync()
 	{
 		var settings = db.GetSettings() ?? new();
-		await SetColorScheme(settings);
-		await SetFontData(settings);
+		await SetColorSchemeAsync(settings);
+		await SetFontDataAsync(settings);
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
 
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')");
 		if(OperatingSystem.IsWindows())
 		{
-			var width = await GetWidth(settings);
+			var width = await GetWidthAsync(settings);
 			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');");
 		}
 		
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
 		await webView.EvaluateJavaScriptAsync("getPageCount()");
 	}
-	async Task SetColorScheme(Settings settings)
+	async Task SetColorSchemeAsync(Settings settings)
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor))
 		{
@@ -41,7 +40,7 @@ public partial class WebViewHelper(WebView handler)
 		}
 	}
 
-	async Task SetFontData(Settings settings)
+	async Task SetFontDataAsync(Settings settings)
 	{
 		if (!string.IsNullOrEmpty(settings.FontFamily))
 		{
@@ -62,7 +61,7 @@ public partial class WebViewHelper(WebView handler)
 			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontSize')");
 		}
 	}
-	async Task<int> GetWidth(Settings settings)
+	async Task<int> GetWidthAsync(Settings settings)
 	{
 		var result = await webView.EvaluateJavaScriptAsync("getWidth()");
 		var fontSize = settings.FontSize > 0 ? settings.FontSize * 10 : 30;
@@ -73,7 +72,7 @@ public partial class WebViewHelper(WebView handler)
 		}
 		return (Convert.ToInt32(result) - fontSize);
 	}
-	public async Task LoadPage(Label label, Book book)
+	public async Task LoadPageAsync(Label label, Book book)
 	{
 #if ANDROID || WINDOWS
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
@@ -88,7 +87,7 @@ public partial class WebViewHelper(WebView handler)
 		{
 			book.CurrentChapter++;
 			db.UpdateBookMark(book);
-			await LoadPage(label, book);
+			await LoadPageAsync(label, book);
 		}
 	}
 	public async Task Prev(Label label, Book book)
@@ -98,7 +97,7 @@ public partial class WebViewHelper(WebView handler)
 			book.CurrentChapter--;
 			db.UpdateBookMark(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
-			await LoadPage(label, book);
+			await LoadPageAsync(label, book);
 		}
 	}
 }

@@ -99,7 +99,7 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
-	public static async Task<Book?> OpenEbook(string path)
+	public static async Task<Book?> OpenEbookAsync(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
 		EpubBookRef book;
@@ -116,7 +116,7 @@ public static partial class EbookService
 		var list = new List<SharedEpubFiles>();
 		foreach (var item in requiredFiles)
 		{
-			var sharedFile = await GetSharedFiles(item);
+			var sharedFile = await GetSharedFilesAsync(item);
 			if (sharedFile is not null)
 			{
 				list.Add(sharedFile);
@@ -181,7 +181,7 @@ public static partial class EbookService
 		cssFile = HtmlAgilityPackExtensions.UpdateImagePathsForCSSFiles(cssFile);
 		return cssFile;
 	}
-	static async Task<SharedEpubFiles?> GetSharedFiles(string fileName)
+	static async Task<SharedEpubFiles?> GetSharedFilesAsync(string fileName)
 	{
 		var exists = await FileSystem.AppPackageFileExistsAsync(fileName);
 		if (!exists)

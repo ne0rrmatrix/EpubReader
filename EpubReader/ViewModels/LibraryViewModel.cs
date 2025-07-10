@@ -36,11 +36,11 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
     [RelayCommand]
-    public async Task GotoBookPage(Book book)
+    public async Task GotoBookPageAsync(Book book)
     {
 		var temp = db.GetBook(book);
 		ArgumentNullException.ThrowIfNull(temp);
-		Book = await EbookService.OpenEbook(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
+		Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
 		Book.CurrentChapter = temp.CurrentChapter;
 		Book.Id = temp.Id;
 		Util.StreamExtensions.Instance?.SetBook(Book);
@@ -52,9 +52,9 @@ public partial class LibraryViewModel : BaseViewModel
     }
 
 	[RelayCommand]
-	async Task AddFolder(CancellationToken cancellationToken = default)
+	async Task AddFolderAsync(CancellationToken cancellationToken = default)
 	{
-		var folderUri = await folderPicker.PickFolder();
+		var folderUri = await folderPicker.PickFolderAsync();
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			logger.Info("No folder selected");
@@ -98,8 +98,8 @@ public partial class LibraryViewModel : BaseViewModel
 				continue;
 			}
 			
-			ebook.FilePath = await FileService.SaveFile(stream, file);
-			ebook.CoverImagePath = await FileService.SaveImage(file, ebook.CoverImage);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, file);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(file, ebook.CoverImage);
 			if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
 			{
 				logger.Info($"Book {ebook.Title} saved successfully.");
@@ -118,10 +118,10 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 	[RelayCommand]
-    async Task Add(CancellationToken cancellationToken = default)
+    async Task AddAsync(CancellationToken cancellationToken = default)
     {
 		string message = string.Empty;
-        var result = await PickAndShow(new PickOptions
+        var result = await PickAndShowAsync(new PickOptions
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
@@ -148,8 +148,8 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 		
-		ebook.FilePath =  await FileService.SaveFile(result, ebook.FilePath).ConfigureAwait(false);
-		ebook.CoverImagePath = await FileService.SaveImage(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
+		ebook.FilePath =  await FileService.SaveFileAsync(result, ebook.FilePath).ConfigureAwait(false);
+		ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
 		db.SaveBookData(ebook);
 		Books.Add(ebook);
 
@@ -174,7 +174,7 @@ public partial class LibraryViewModel : BaseViewModel
 		OnPropertyChanged(nameof(Books));
 	}
 
-	public static async Task<FileResult?> PickAndShow(PickOptions options)
+	public static async Task<FileResult?> PickAndShowAsync(PickOptions options)
     {
         try
         {

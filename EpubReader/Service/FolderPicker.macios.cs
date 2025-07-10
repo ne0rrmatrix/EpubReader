@@ -36,7 +36,7 @@ public partial class FolderPicker : IFolderPicker
 		}
 	}
 
-	public async Task<string> PickFolder()
+	public async Task<string> PickFolderAsync()
 	{
 		var allowedTypes = new UTType[]
 		{

@@ -1,15 +1,16 @@
 ﻿using EpubReader.Interfaces;
+using Windows.Storage;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
-using Windows.Storage;
 using WindowsFolderPicker = Windows.Storage.Pickers.FolderPicker;
 
 namespace EpubReader.Service;
 public partial class FolderPicker : IFolderPicker
 {
 	StorageFolder? pickedFolder;
+	static Window window => App.Current?.Windows[0] ?? throw new InvalidOperationException("Current window is null");
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
-	public async Task<string> PickFolder()
+	public async Task<string> PickFolderAsync()
 	{
 		var folderPicker = new WindowsFolderPicker();
 
@@ -54,7 +55,6 @@ public partial class FolderPicker : IFolderPicker
 
 	static IntPtr GetWindowsHandle()
 	{
-		var window = App.Current!.Windows[0];
 		if (window.Handler?.PlatformView is Microsoft.UI.Xaml.Window mauiWinUIWindow)
 		{
 			// On Windows, the PlatformView of a MAUI Window's handler is a Microsoft.UI.Xaml.Window

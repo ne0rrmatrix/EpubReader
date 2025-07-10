@@ -25,7 +25,6 @@ public partial class BookPage : ContentPage
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); UpdateUiAppearance(); });
-
 	}
 
 	protected override void OnDisappearing()
@@ -54,7 +53,7 @@ public partial class BookPage : ContentPage
 
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
-		await webViewHelper.LoadPage(pageLabel, book);
+		await webViewHelper.LoadPageAsync(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
 
@@ -66,7 +65,7 @@ public partial class BookPage : ContentPage
 	async Task HandleJavascriptAsync(string url)
 	{
 		await TryHandleInternalLinkAsync(url);
-		await TryHandleExternalLinkAsync(url);
+		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
 		await HandleWebViewActionAsync(methodName);
 		UpdateUiAppearance();
@@ -85,8 +84,11 @@ public partial class BookPage : ContentPage
 	}
 	async Task TryHandleInternalLinkAsync(string url)
 	{
-		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		var tempUrl = url.Split('?');
+		
+		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
+			System.Diagnostics.Trace.WriteLine($"Not a valid internal link. : {url}");
 			return;
 		}
 		
@@ -103,9 +105,9 @@ public partial class BookPage : ContentPage
 			db.UpdateBookMark(book);
 		}
 	}
-	async Task TryHandleExternalLinkAsync(string url)
+	static async Task TryHandleExternalLinkAsync(string url)
 	{
-		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo"))
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
 		{
 			return;
 		}
@@ -120,15 +122,6 @@ public partial class BookPage : ContentPage
 		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
 		{
 			await Launcher.OpenAsync(queryString);
-
-			var link = url.Replace(externalLinkPrefix, string.Empty);
-			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(link), StringComparison.OrdinalIgnoreCase));
-			if (chapter is null)
-			{
-				return;
-			}
-			book.CurrentChapter = book.Chapters.IndexOf(chapter);
-			db.UpdateBookMark(book);
 		}
 	}
 

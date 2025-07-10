@@ -72,7 +72,7 @@ public static partial class FileService
 		}
 	}
 
-	public static async Task<string> SaveImage(string bookName, byte[] imageBytes)
+	public static async Task<string> SaveImageAsync(string bookName, byte[] imageBytes)
 	{
 		var partialPath = Path.GetFileNameWithoutExtension(bookName);
 		var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(partialPath));
@@ -106,7 +106,7 @@ public static partial class FileService
 		return fileName;
 	}
 	
-	public static async Task<string> SaveFile(Stream stream, string bookName)
+	public static async Task<string> SaveFileAsync(Stream stream, string bookName)
 	{
 		try
 		{
@@ -138,7 +138,7 @@ public static partial class FileService
 		}
 	}
 	
-	public static async Task<string> SaveFile(FileResult result, string bookName)
+	public static async Task<string> SaveFileAsync(FileResult result, string bookName)
 	{
 		try
 		{

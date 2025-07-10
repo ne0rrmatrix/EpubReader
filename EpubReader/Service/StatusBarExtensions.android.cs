@@ -4,11 +4,11 @@ using AndroidX.Core.View;
 namespace EpubReader.Service;
 public static partial class StatusBarExtensions
 {
+	static Android.Views.Window window => Platform.CurrentActivity?.Window ?? throw new InvalidOperationException("Current activity is null");
+	static Android.Views.View decorView => window.DecorView ?? throw new InvalidOperationException("DecorView is null");
+	static AndroidX.Core.View.WindowInsetsControllerCompat insetsController => WindowCompat.GetInsetsController(window, decorView) ?? throw new InvalidOperationException("InsetsController is null");
 	public static void SetStatusBarsHidden(bool hidden)
 	{
-		var window = Platform.CurrentActivity?.Window ?? throw new InvalidOperationException();
-		var decorView = window.DecorView ?? throw new InvalidOperationException();
-		var insets = WindowCompat.GetInsetsController(window, decorView) ?? throw new InvalidOperationException();
 		if (OperatingSystem.IsAndroidVersionAtLeast(26))
 		{
 			if (hidden)
@@ -16,20 +16,20 @@ public static partial class StatusBarExtensions
 				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
 				window.AddFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.Fullscreen, WindowManagerFlags.Fullscreen);
-				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
+				insetsController.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Hide(WindowInsets.Type.SystemBars());
+					insetsController.Hide(WindowInsets.Type.SystemBars());
 				}
 			}
 			else
 			{
 				window.ClearFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
-				insets.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
+				insetsController.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorDefault;
 				if (OperatingSystem.IsAndroidVersionAtLeast(34))
 				{
-					insets.Show(WindowInsets.Type.SystemBars());
+					insetsController.Show(WindowInsets.Type.SystemBars());
 				}
 			}
 		}
