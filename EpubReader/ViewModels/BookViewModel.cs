@@ -6,6 +6,12 @@ using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 
+/// <summary>
+/// Represents a view model for a book, providing properties and methods to manage book-related data and interactions.
+/// </summary>
+/// <remarks>The <see cref="BookViewModel"/> class is responsible for handling the presentation logic related to a
+/// book, including managing the web view content source, cover image, and UI state such as navigation menu visibility.
+/// It also supports applying query attributes to update its state based on external input.</remarks>
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
 #pragma warning disable S1075 // URIs should not be hardcoded
@@ -19,30 +25,60 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	readonly IPopupService popupService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
+	/// <summary>
+	/// Gets or sets the source of the web view content.
+	/// </summary>
 	[ObservableProperty]
 	public partial WebViewSource Source { get; set; } = new UrlWebViewSource
 	{
 		Url = url,
 	};
 	
+	/// <summary>
+	/// Gets or sets the cover image for the item.
+	/// </summary>
 	[ObservableProperty]
 	public partial ImageSource CoverImage { get; set; } = string.Empty;
-	
+
+	/// <summary>
+	/// Gets or sets a value indicating whether the view model is currently active.
+	/// </summary>
 	[ObservableProperty]
 	public partial bool IsActive { get; set; } = true;
-	
+
+	/// <summary>
+	/// Gets or sets a value indicating whether the popup is currently active.
+	/// </summary>
 	[ObservableProperty]
 	public partial bool isPopupActive { get; set; } = false;
 
+	/// <summary>
+	/// Gets or sets a value indicating whether the navigation menu is visible.
+	/// </summary>
 	[ObservableProperty]
 	public partial bool IsNavMenuVisible { get; set; } = true;
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
+	/// </summary>
+	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with the specified <paramref
+	/// name="popupService"/>. It also triggers an initial call to the <c>Press</c> method upon instantiation.</remarks>
+	/// <param name="popupService">The service used to display pop-up messages or dialogs.</param>
 	public BookViewModel(IPopupService popupService)
 	{
 		this.popupService = popupService;
 		Press();
 	}
 
+	/// <summary>
+	/// Applies query attributes to the current instance, extracting and setting the book details.
+	/// </summary>
+	/// <remarks>This method updates the current instance with the book details provided in the query. It sets the
+	/// <see cref="Book"/> property and initializes the <see cref="CoverImage"/> from the book's cover image
+	/// data.</remarks>
+	/// <param name="query">A dictionary containing query parameters, where the key "Book" should map to a <see cref="Book"/> object.</param>
+	/// <exception cref="InvalidOperationException">Thrown if the "Book" entry in the query does not contain a valid <see cref="Book"/> object or if the book's cover
+	/// image is null.</exception>
 	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
 		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
@@ -54,6 +90,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		}
 	}
 
+	/// <summary>
+	/// Displays a popup using the specified view model.
+	/// </summary>
+	/// <remarks>This method activates a popup and awaits its completion. If the popup is dismissed by tapping
+	/// outside of it, the popup is deactivated.</remarks>
+	/// <returns></returns>
 	[RelayCommand]
 	async Task ShowPopup()
 	{
@@ -65,6 +107,11 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		}
 	}
 	
+	/// <summary>
+	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
+	/// </summary>
+	/// <remarks>On Android, this method also adjusts the status bar visibility to match the navigation menu's
+	/// visibility.</remarks>
 	[RelayCommand]
 	public void Press()
 	{

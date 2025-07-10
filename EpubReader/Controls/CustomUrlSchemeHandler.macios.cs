@@ -5,9 +5,26 @@ using Foundation;
 using WebKit;
 
 namespace EpubReader.Controls;
+
+/// <summary>
+/// Provides a custom URL scheme handler for processing requests in a <see cref="WKWebView"/>.
+/// </summary>
+/// <remarks>This handler is designed to manage URL requests that begin with the "app://demo/" scheme. It
+/// retrieves the requested resource, determines its MIME type, and sends the appropriate response back to the web view.
+/// The handler also ensures that local caching is disabled to allow user scripts to execute correctly.</remarks>
 class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	
+	/// <summary>
+	/// Handles the start of a custom URL scheme task in a <see cref="WKWebView"/>.
+	/// </summary>
+	/// <remarks>This method processes requests with URLs starting with "app://demo/". If the URL does not match
+	/// this pattern, the task fails with an error. The method retrieves the requested resource, determines its MIME type,
+	/// and sends the appropriate response back to the web view, including headers to disable local caching.</remarks>
+	/// <param name="webView">The <see cref="WKWebView"/> that initiated the URL scheme task.</param>
+	/// <param name="urlSchemeTask">The URL scheme task to be processed.</param>
+	/// <exception cref="InvalidOperationException">Thrown if the URL or the data stream is null, indicating an invalid request or resource.</exception>
 	[Export("webView:startURLSchemeTask:")]
 	[SupportedOSPlatform("ios11.0")]
 	public void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)

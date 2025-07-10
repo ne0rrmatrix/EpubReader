@@ -2,6 +2,12 @@
 
 namespace EpubReader.ViewModels;
 
+/// <summary>
+/// Represents the view model for the settings page, providing access to available fonts and color schemes.
+/// </summary>
+/// <remarks>This class is responsible for managing the collections of fonts and color schemes that can be used in
+/// an EPUB document. It provides properties to access these collections, which are initialized with a predefined set of
+/// options.</remarks>
 public partial class SettingsPageViewModel : BaseViewModel
 {
 	readonly List<EpubFonts> fonts = [
@@ -25,8 +31,20 @@ public partial class SettingsPageViewModel : BaseViewModel
 			new ColorScheme() { Name = "Charcoal", BackgroundColor = "#36454f", TextColor = "#dcdcdc" },
 			new ColorScheme() { Name = "Vintage", BackgroundColor = "#f5f5dc", TextColor = "#000000" }
 		];
+
+	/// <summary>
+	/// Gets the collection of available color schemes.
+	/// </summary>
 	public List<ColorScheme> ColorSchemes => colorSchemes;
+
+	/// <summary>
+	/// Gets the collection of fonts used in the EPUB document.
+	/// </summary>
 	public List<EpubFonts> Fonts => fonts;
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="SettingsPageViewModel"/> class.
+	/// </summary>
 	public SettingsPageViewModel()
 	{
 	}

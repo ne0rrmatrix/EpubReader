@@ -6,36 +6,27 @@ using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.Service;
+
+/// <summary>
+/// Provides functionality to select a folder and perform operations on EPUB files within the selected folder.
+/// </summary>
+/// <remarks>The <see cref="FolderPicker"/> class allows users to pick a folder using a document picker interface
+/// and perform operations such as enumerating EPUB files within the selected folder. It is designed to work with
+/// iOS-specific APIs and requires a valid UIViewController to present the picker.</remarks>
 public partial class FolderPicker : IFolderPicker
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
-	class PickerDelegate : UIDocumentPickerDelegate
-	{
-		
-		public Action<NSUrl[]>? PickHandler { get; set; }
-
-		public override void WasCancelled(UIDocumentPickerViewController controller)
-			=> PickHandler?.Invoke(null!);
-
-		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl[] urls)
-			=> PickHandler?.Invoke(urls);
-
-		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl url)
-			=> PickHandler?.Invoke([url]);
-	}
-
-	static void GetFileResults(NSUrl[] urls, TaskCompletionSource<string> tcs)
-	{
-		try
-		{
-			tcs.TrySetResult(urls?[0]?.ToString() ?? "");
-		}
-		catch (Exception ex)
-		{
-			tcs.TrySetException(ex);
-		}
-	}
-
+	
+	/// <summary>
+	/// Asynchronously presents a folder picker dialog to the user and returns the path of the selected folder.
+	/// </summary>
+	/// <remarks>This method displays a folder picker using a <see cref="UIDocumentPickerViewController"/>
+	/// configured to allow selection of a single folder. The method completes when the user selects a folder or dismisses
+	/// the picker.</remarks>
+	/// <returns>A task that represents the asynchronous operation. The task result contains the path of the selected folder as a
+	/// string. If the picker is dismissed without selecting a folder, the result is <see langword="null"/>.</returns>
+	/// <exception cref="InvalidOperationException">Thrown if the picker's PresentationController is <see langword="null"/>. Ensure the picker is presented from a
+	/// valid UIViewController.</exception>
 	public async Task<string> PickFolderAsync()
 	{
 		var allowedTypes = new UTType[]
@@ -69,6 +60,15 @@ public partial class FolderPicker : IFolderPicker
 		return await tcs.Task;
 	}
 
+	/// <summary>
+	/// Asynchronously enumerates all EPUB files in the specified folder.
+	/// </summary>
+	/// <remarks>This method logs information about any errors encountered during the enumeration process, such as
+	/// invalid folder URIs or inaccessible folder contents.</remarks>
+	/// <param name="folderUri">The URI of the folder to search for EPUB files. This must be a valid file URI. If null or empty, an empty list is
+	/// returned.</param>
+	/// <returns>A task representing the asynchronous operation. The task result contains a list of file paths to EPUB files found
+	/// in the specified folder. The list will be empty if no EPUB files are found or if the folder cannot be accessed.</returns>
 	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
     {
         List<string> epubFiles = [];
@@ -129,9 +129,28 @@ public partial class FolderPicker : IFolderPicker
         return Task.FromResult(epubFiles);
     }
 
+	/// <summary>
+	/// Asynchronously performs a file operation on the specified EPUB file.
+	/// </summary>
+	/// <param name="epubFilePath">The path to the EPUB file on which the operation will be performed. Cannot be null or empty.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Stream"/> of the EPUB
+	/// file.</returns>
+	/// <exception cref="NotImplementedException">Thrown if the method is not implemented for the current platform.</exception>
 	public Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath)
 	{
 		throw new NotImplementedException("PerformFileOperationOnEpubAsync is not implemented for iOS.");
+	}
+
+	static void GetFileResults(NSUrl[] urls, TaskCompletionSource<string> tcs)
+	{
+		try
+		{
+			tcs.TrySetResult(urls?[0]?.ToString() ?? "");
+		}
+		catch (Exception ex)
+		{
+			tcs.TrySetException(ex);
+		}
 	}
 
 	internal class UIPresentationControllerDelegate : UIAdaptivePresentationControllerDelegate
@@ -152,5 +171,20 @@ public partial class FolderPicker : IFolderPicker
 			dismissHandler?.Invoke();
 			base.Dispose(disposing);
 		}
+	}
+
+	class PickerDelegate : UIDocumentPickerDelegate
+	{
+
+		public Action<NSUrl[]>? PickHandler { get; set; }
+
+		public override void WasCancelled(UIDocumentPickerViewController controller)
+			=> PickHandler?.Invoke(null!);
+
+		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl[] urls)
+			=> PickHandler?.Invoke(urls);
+
+		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl url)
+			=> PickHandler?.Invoke([url]);
 	}
 }

@@ -1,4 +1,10 @@
-﻿// Constants
+﻿/// <summary>
+/// Container.js
+/// This script handles navigation and interaction within an iframe for an ePub reader.
+/// It detects the user's platform, manages link clicks, and handles navigation regions.
+/// </summary>
+
+// Constants
 const TARGET_ORIGIN = "https://demo";
 const TARGET_ORIGIN_MACIOS = "app://demo";
 

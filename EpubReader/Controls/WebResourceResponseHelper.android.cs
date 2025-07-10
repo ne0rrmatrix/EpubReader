@@ -2,6 +2,13 @@
 using Android.Webkit;
 
 namespace EpubReader.Controls;
+
+/// <summary>
+/// Provides helper methods for creating <see cref="WebResourceResponse"/> objects from HTML content.
+/// </summary>
+/// <remarks>This class is designed to facilitate the creation of <see cref="WebResourceResponse"/> instances with
+/// specified MIME types, status codes, and additional headers. It supports different API levels, ensuring compatibility
+/// with older and newer Android versions.</remarks>
 public static class WebResourceResponseHelper
 {
 	/// <summary>

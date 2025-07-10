@@ -7,6 +7,13 @@ using EpubReader.ViewModels;
 
 namespace EpubReader.Views;
 
+/// <summary>
+/// Represents a page in a book application, providing functionality for displaying and interacting with book content.
+/// </summary>
+/// <remarks>The <see cref="BookPage"/> class is responsible for managing the user interface and interactions for
+/// a single page of a book. It handles navigation, animations, and JavaScript interactions within a web view. The page
+/// is initialized with a view model and a database interface, which are used for data binding and data operations,
+/// respectively.</remarks>
 public partial class BookPage : ContentPage
 {
 	const string externalLinkPrefix = "https://runcsharp.jump/?";
@@ -16,6 +23,13 @@ public partial class BookPage : ContentPage
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
+	/// </summary>
+	/// <remarks>This constructor sets up the page's data binding context and initializes necessary components. It
+	/// also registers message handlers for JavaScript and settings messages using a weak reference messenger.</remarks>
+	/// <param name="viewModel">The view model that provides data binding for the page.</param>
+	/// <param name="db">The database interface used for data operations within the page.</param>
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -27,6 +41,12 @@ public partial class BookPage : ContentPage
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); UpdateUiAppearance(); });
 	}
 
+	/// <summary>
+	/// Handles the actions to be performed when the page is disappearing.
+	/// </summary>
+	/// <remarks>This method unregisters all messages for the current instance and clears the toolbar items if the
+	/// popup is not active. It also ensures the navigation bar is visible. Overrides the base <see cref="OnDisappearing"/>
+	/// method.</remarks>
 	protected override void OnDisappearing()
 	{
 		if (!ViewModel.isPopupActive)
@@ -38,6 +58,14 @@ public partial class BookPage : ContentPage
 		base.OnDisappearing();
 	}
 
+	/// <summary>
+	/// Handles the tap event on the grid area, triggering animations for translation, scaling, and fading.
+	/// </summary>
+	/// <remarks>This method initiates a sequence of animations on the grid area when it is tapped. The animations
+	/// include translating the grid, scaling it down, and fading it. The translation distance varies depending on the
+	/// operating system, with a larger translation on iOS and Android platforms.</remarks>
+	/// <param name="sender">The source of the event, typically the grid area that was tapped.</param>
+	/// <param name="e">The event data associated with the tap event.</param>
 	async void GridArea_Tapped(object sender, EventArgs e)
 	{
 		ViewModel.Press();
@@ -51,17 +79,37 @@ public partial class BookPage : ContentPage
 		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
 	}
 
+	/// <summary>
+	/// Handles the navigation event for the web view.
+	/// </summary>
+	/// <remarks>This method is triggered after the web view has completed navigation to a new page. It updates the
+	/// UI to reflect the navigation state.</remarks>
+	/// <param name="sender">The source of the event, typically the web view control.</param>
+	/// <param name="e">The event data containing information about the navigation event.</param>
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		await webViewHelper.LoadPageAsync(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
 
+	/// <summary>
+	/// Handles the Loaded event for the current page, initializing toolbar items for each chapter in the book.
+	/// </summary>
+	/// <param name="sender">The source of the event.</param>
+	/// <param name="e">The event data.</param>
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
 
+	/// <summary>
+	/// Asynchronously handles a JavaScript action based on the provided URL.
+	/// </summary>
+	/// <remarks>This method processes the URL to determine the appropriate JavaScript action and updates the UI
+	/// accordingly. It attempts to handle both internal and external links before executing a specific web view
+	/// action.</remarks>
+	/// <param name="url">The URL that determines the JavaScript action to be handled. Cannot be null or empty.</param>
+	/// <returns></returns>
 	async Task HandleJavascriptAsync(string url)
 	{
 		await TryHandleInternalLinkAsync(url);
@@ -70,6 +118,14 @@ public partial class BookPage : ContentPage
 		await HandleWebViewActionAsync(methodName);
 		UpdateUiAppearance();
 	}
+
+	/// <summary>
+	/// Handles the navigation event for the web view, intercepting specific URLs for custom processing.
+	/// </summary>
+	/// <remarks>This method cancels navigation if the URL contains the substring "runcsharp", ignoring case, and
+	/// processes the URL asynchronously.</remarks>
+	/// <param name="sender">The source of the event, typically the web view control.</param>
+	/// <param name="e">The <see cref="WebNavigatingEventArgs"/> containing event data, including the URL being navigated to.</param>
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
 		var url = e.Url;
@@ -179,7 +235,6 @@ public partial class BookPage : ContentPage
 		return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
 	}
 
-
 	void UpdateUiAppearance()
 	{
 		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
@@ -196,6 +251,14 @@ public partial class BookPage : ContentPage
 		}
 	}
 
+	/// <summary>
+	/// Asynchronously closes the menu by performing a series of animations.
+	/// </summary>
+	/// <remarks>This method triggers the ViewModel's press action and performs fade, scale, and translation
+	/// animations on the grid element to close the menu. The animations are executed sequentially with a specified
+	/// duration.</remarks>
+	/// <param name="sender">The source of the event that triggered the method.</param>
+	/// <param name="e">The event data associated with the event.</param>
 	async void CloseMenuAsync(object sender, EventArgs e)
 	{
 		ViewModel.Press();

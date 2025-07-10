@@ -12,6 +12,14 @@ using SizeF = Microsoft.Maui.Graphics.SizeF;
 
 namespace EpubReader.Service;
 
+/// <summary>
+/// Provides services for handling eBook files, specifically EPUB format, including retrieving book listings and opening
+/// eBooks.
+/// </summary>
+/// <remarks>The <see cref="EbookService"/> class offers static methods to interact with EPUB files, allowing
+/// users to extract metadata and content. It supports operations such as retrieving book listings from file paths or
+/// streams and opening eBooks asynchronously. The service handles missing content files gracefully by suppressing
+/// related exceptions and logs errors encountered during operations.</remarks>
 public static partial class EbookService
 {
 	static readonly List<string> jsImports =
@@ -57,6 +65,15 @@ public static partial class EbookService
 			SkipXmlHeaders = true
 		},
 	};
+
+	/// <summary>
+	/// Retrieves a book listing from the specified file path.
+	/// </summary>
+	/// <remarks>This method attempts to open an ePub book from the given path and extract its title and cover
+	/// image. If the cover image is missing, a default image is generated based on the book's title.</remarks>
+	/// <param name="path">The file path to the ePub book. Must be a valid path to an ePub file.</param>
+	/// <returns>A <see cref="Book"/> object containing the title, file path, and cover image of the book. Returns <see
+	/// langword="null"/> if the book cannot be opened or an error occurs.</returns>
 	public static Book? GetListing(string path)
 	{
 		EpubBookRef book;
@@ -78,6 +95,16 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
+
+	/// <summary>
+	/// Retrieves a <see cref="Book"/> object from the specified EPUB file stream.
+	/// </summary>
+	/// <remarks>This method attempts to read an EPUB book from the provided stream. If the EPUB file is missing any
+	/// content files, the method suppresses exceptions related to those missing files.</remarks>
+	/// <param name="stream">The input stream containing the EPUB file data. Must not be null.</param>
+	/// <param name="path">The file path associated with the EPUB file, used for setting the <see cref="Book.FilePath"/> property.</param>
+	/// <returns>A <see cref="Book"/> object containing the title, file path, and cover image of the EPUB book. Returns <see
+	/// langword="null"/> if the EPUB file cannot be opened or processed.</returns>
 	public static Book? GetListing(Stream stream, string path)
 	{
 		EpubBookRef book;
@@ -99,6 +126,17 @@ public static partial class EbookService
 			CoverImage = book.ReadCover() ?? GenerateCoverImage(book.Title),
 		};
 	}
+
+	/// <summary>
+	/// Asynchronously opens an eBook from the specified file path and returns a <see cref="Book"/> object representing the
+	/// eBook's content.
+	/// </summary>
+	/// <remarks>This method handles missing content files by suppressing exceptions related to them. It logs any
+	/// errors encountered during the opening process. The returned <see cref="Book"/> object includes the eBook's title,
+	/// authors, description, cover image, chapters, images, fonts, and CSS files.</remarks>
+	/// <param name="path">The file path to the eBook to be opened. Must be a valid path to an ePub file.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Book"/> object with the
+	/// eBook's metadata, content, and resources. Returns <see langword="null"/> if the eBook cannot be opened.</returns>
 	public static async Task<Book?> OpenEbookAsync(string path)
 	{
 		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
