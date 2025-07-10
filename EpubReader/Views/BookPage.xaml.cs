@@ -101,9 +101,7 @@ public partial class BookPage : ContentPage
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
 			db.UpdateBookMark(book);
-			return;
 		}
-		return;
 	}
 	async Task TryHandleExternalLinkAsync(string url)
 	{
@@ -131,10 +129,7 @@ public partial class BookPage : ContentPage
 			}
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 			db.UpdateBookMark(book);
-			return;
 		}
-
-		return;
 	}
 
 	static string GetMethodNameFromUrl(string url)

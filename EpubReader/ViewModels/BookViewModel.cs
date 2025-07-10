@@ -8,11 +8,13 @@ namespace EpubReader.ViewModels;
 
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
+#pragma warning disable S1075 // URIs should not be hardcoded
 #if ANDROID || WINDOWS
 	const string url = "https://demo/index.html";
 #elif IOS || MACCATALYST
 	const string url = "app://demo/index.html";
 #endif
+#pragma warning restore S1075 // URIs should not be hardcoded
 
 	readonly IPopupService popupService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
