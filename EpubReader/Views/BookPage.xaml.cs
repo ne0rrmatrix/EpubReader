@@ -83,12 +83,10 @@ public partial class BookPage : ContentPage
 		await HandleJavascriptAsync(e.Url);
 	}
 	async Task TryHandleInternalLinkAsync(string url)
-	{
-		var tempUrl = url.Split('?');
-		
+	{	
 		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
-			System.Diagnostics.Trace.WriteLine($"Not a valid internal link. : {url}");
+			System.Diagnostics.Trace.TraceInformation($"Not a valid internal link. : {url}");
 			return;
 		}
 		
