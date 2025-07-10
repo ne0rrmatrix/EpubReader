@@ -9,12 +9,30 @@ using CommunityToolkit.Maui.Core.Platform;
 
 namespace EpubReader.ViewModels;
 
+/// <summary>
+/// Serves as a base class for view models, providing common functionality such as access to the application's
+/// dispatcher and database service, as well as handling theme changes on Android.
+/// </summary>
+/// <remarks>This class implements <see cref="IDisposable"/> to manage resources, particularly for handling theme
+/// change events on Android. It provides properties for accessing the application's dispatcher and database service,
+/// and includes a property for managing the current book instance.</remarks>
 public partial class BaseViewModel : ObservableObject, IDisposable
 {
+
+	/// <summary>
+	/// Gets the dispatcher associated with the current application.
+	/// </summary>
 	public readonly IDispatcher Dispatcher = Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	bool disposedValue;
 
+	/// <summary>
+	/// Gets or sets the database service used by the application.
+	/// </summary>
 	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+
+	/// <summary>
+	/// Gets or sets the current book instance.
+	/// </summary>
 	[ObservableProperty]
 	public partial Book Book { get; set; }
 

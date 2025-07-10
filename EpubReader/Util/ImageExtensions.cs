@@ -1,4 +1,8 @@
 ﻿namespace EpubReader.Util;
+
+/// <summary>
+/// A utility class that provides methods for detecting image file types based on their content.
+/// </summary>
 public static class ImageExtensions
 {
 	static readonly List<string> jpgSignature = ["FF", "D8"];

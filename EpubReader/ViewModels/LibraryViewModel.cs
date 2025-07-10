@@ -11,6 +11,15 @@ using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
+
+/// <summary>
+/// Represents the view model for managing a library of books, providing functionality to add, remove, and navigate
+/// books.
+/// </summary>
+/// <remarks>The <see cref="LibraryViewModel"/> class is responsible for handling operations related to a
+/// collection of books, including adding books from files, removing books, and navigating to a book's page. It
+/// interacts with services for file picking, database operations, and ebook processing. This class is designed to be
+/// used in a UI context where users can manage their book library.</remarks>
 public partial class LibraryViewModel : BaseViewModel
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
@@ -27,23 +36,37 @@ public partial class LibraryViewModel : BaseViewModel
 			 { DevicePlatform.Tizen, epub },
 		  });
 
+	/// <summary>
+	/// Gets or sets the collection of books.
+	/// </summary>
 	[ObservableProperty]
     public partial ObservableCollection<Book> Books { get; set; }
    
+	/// <summary>
+	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
+	/// </summary>
+	/// <remarks>This constructor initializes the <see cref="Books"/> collection with all available books retrieved
+	/// from the database. If no books are found, the collection is initialized as empty.</remarks>
 	public LibraryViewModel()
     {
 		Books = [.. db.GetAllBooks() ?? []];
 	}
 
+	/// <summary>
+	/// Navigates to the book page asynchronously, opening the specified book and setting its current state.
+	/// </summary>
+	/// <param name="book">The book to open and navigate to. Must not be <see langword="null"/>.</param>
+	/// <returns>A task that represents the asynchronous operation.</returns>
+	/// <exception cref="InvalidOperationException">Thrown if there is an error opening the ebook.</exception>
     [RelayCommand]
-    public async Task GotoBookPage(Book book)
+    public async Task GotoBookPageAsync(Book book)
     {
 		var temp = db.GetBook(book);
 		ArgumentNullException.ThrowIfNull(temp);
-		Book = await EbookService.OpenEbook(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
+		Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
 		Book.CurrentChapter = temp.CurrentChapter;
 		Book.Id = temp.Id;
-		Util.StreamExtensions.Instance?.SetBook(Book);
+		StreamExtensions.Instance?.SetBook(Book);
 		var navigationParams = new Dictionary<string, object>
         {
             { "Book", Book }
@@ -51,10 +74,18 @@ public partial class LibraryViewModel : BaseViewModel
         await Shell.Current.GoToAsync($"BookPage", navigationParams);
     }
 
+	/// <summary>
+	/// Asynchronously adds EPUB files from a selected folder to the library.
+	/// </summary>
+	/// <remarks>This method allows the user to select a folder and processes all EPUB files within it. If no folder
+	/// is selected or no EPUB files are found, appropriate messages are logged and displayed. Each EPUB file is processed
+	/// to extract book information, which is then saved to the library if it does not already exist.</remarks>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+	/// <returns></returns>
 	[RelayCommand]
-	async Task AddFolder(CancellationToken cancellationToken = default)
+	async Task AddFolderAsync(CancellationToken cancellationToken = default)
 	{
-		var folderUri = await folderPicker.PickFolder();
+		var folderUri = await folderPicker.PickFolderAsync();
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			logger.Info("No folder selected");
@@ -98,8 +129,8 @@ public partial class LibraryViewModel : BaseViewModel
 				continue;
 			}
 			
-			ebook.FilePath = await FileService.SaveFile(stream, file);
-			ebook.CoverImagePath = await FileService.SaveImage(file, ebook.CoverImage);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, file);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(file, ebook.CoverImage);
 			if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
 			{
 				logger.Info($"Book {ebook.Title} saved successfully.");
@@ -117,11 +148,18 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 
+	/// <summary>
+	/// Asynchronously adds a selected ePub book to the library.
+	/// </summary>
+	/// <remarks>This method prompts the user to select an ePub file, verifies its uniqueness in the library, and
+	/// saves it to the database. If the book already exists, a notification is shown.</remarks>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+	/// <returns></returns>
 	[RelayCommand]
-    async Task Add(CancellationToken cancellationToken = default)
+    async Task AddAsync(CancellationToken cancellationToken = default)
     {
 		string message = string.Empty;
-        var result = await PickAndShow(new PickOptions
+        var result = await PickAndShowAsync(new PickOptions
         {
             FileTypes = customFileType,
             PickerTitle = "Please select a epub book"
@@ -148,8 +186,8 @@ public partial class LibraryViewModel : BaseViewModel
 			return;
 		}
 		
-		ebook.FilePath =  await FileService.SaveFile(result, ebook.FilePath).ConfigureAwait(false);
-		ebook.CoverImagePath = await FileService.SaveImage(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
+		ebook.FilePath =  await FileService.SaveFileAsync(result, ebook.FilePath).ConfigureAwait(false);
+		ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
 		db.SaveBookData(ebook);
 		Books.Add(ebook);
 
@@ -158,6 +196,12 @@ public partial class LibraryViewModel : BaseViewModel
 		logger.Info(message);
 	}
 
+	/// <summary>
+	/// Removes the specified book from the library.
+	/// </summary>
+	/// <remarks>This method deletes the directory containing the book's file and removes the book from the database
+	/// and the in-memory collection.</remarks>
+	/// <param name="book">The book to be removed. The book's file path must not be null.</param>
     [RelayCommand]
     void RemoveBook(Book book)
     {
@@ -174,7 +218,13 @@ public partial class LibraryViewModel : BaseViewModel
 		OnPropertyChanged(nameof(Books));
 	}
 
-	public static async Task<FileResult?> PickAndShow(PickOptions options)
+	/// <summary>
+	/// Asynchronously presents a file picker dialog to the user and returns the selected file.
+	/// </summary>
+	/// <param name="options">The options for picking files.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains the selected file, or null if no file was selected.</returns>
+	/// <exception cref="Exception">Thrown if an error occurs while picking the file.</exception>
+	public static async Task<FileResult?> PickAndShowAsync(PickOptions options)
     {
         try
         {

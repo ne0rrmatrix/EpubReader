@@ -4,16 +4,37 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
 namespace EpubReader.Controls;
+
+/// <summary>
+/// Provides extension methods for handling WebView2 controls within a .NET MAUI application.
+/// </summary>
+/// <remarks>This static class includes methods to initialize and manage the lifecycle of WebView2 controls,
+/// including event subscription and unsubscription to ensure proper resource management. It is designed to be used in
+/// conjunction with the <see cref="IWebViewHandler"/> interface.</remarks>
 public static partial class WebViewExtensions
 {
 	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	static IWebViewHandler? webViewHandler;
+
+	/// <summary>
+	/// Initializes the WebView handler and sets up the CoreWebView2 initialization event.
+	/// </summary>
+	/// <remarks>This method assigns the provided handler to the internal web view handler and subscribes to the
+	/// CoreWebView2 initialization event. Ensure that the handler is properly configured before calling this
+	/// method.</remarks>
+	/// <param name="handler">The <see cref="IWebViewHandler"/> instance to be initialized. Cannot be null.</param>
 	public static void Initialize(IWebViewHandler handler)
 	{
 		webViewHandler = handler;
 		webViewHandler.PlatformView.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
 	}
 
+	/// <summary>
+	/// Unsubscribes from events related to the WebView2 control when it is unloaded.
+	/// </summary>
+	/// <remarks>This method detaches event handlers from the WebView2 control to prevent memory leaks and ensure
+	/// proper cleanup when the control is no longer in use. It is important to call this method during the unloading
+	/// process of the WebView2 control.</remarks>
 	public static void WebView2_Unloaded()
 	{
 		ArgumentNullException.ThrowIfNull(webViewHandler);
