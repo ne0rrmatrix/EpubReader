@@ -7,22 +7,15 @@ using EpubReader.ViewModels;
 
 namespace EpubReader.Views;
 
-public partial class BookPage : ContentPage, IDisposable
+public partial class BookPage : ContentPage
 {
 	const string externalLinkPrefix = "https://runcsharp.jump/?";
 	const uint animationDuration = 200u;
-#if ANDROID || WINDOWS
-	bool loadIndex = true;
-#endif
-	bool disposedValue;
 
 	Book? book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
 
-#if ANDROID || IOS
-	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
-#endif
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
@@ -31,73 +24,22 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		webViewHelper = new(webView);
 
-		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
-		{
-			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
-		}
-
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascript(m.Value));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
 
-#if IOS || ANDROID
-		webView.Behaviors.Add(touchbehavior);
-#endif
 	}
 
-	protected virtual void Dispose(bool disposing)
-	{
-		if (!disposedValue)
-		{
-			if (disposing)
-			{
-#if ANDROID || IOS
-				touchbehavior.Dispose();
-#endif
-			}
-			disposedValue = true;
-		}
-	}
-
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
-	}
-
-#if WINDOWS
-	protected override bool OnBackButtonPressed()
-	{
-		WeakReferenceMessenger.Default.UnregisterAll(this);
-		Shell.Current.ToolbarItems.Clear();
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-		return base.OnBackButtonPressed();
-	}
-#endif
-#if WINDOWS || ANDROID
 	protected override void OnDisappearing()
 	{
-		loadIndex = false;
-#if ANDROID
-		WeakReferenceMessenger.Default.UnregisterAll(this);
-		Shell.Current.ToolbarItems.Clear();
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
-#endif
+		var viewModel = (BookViewModel)BindingContext;
+		if (!viewModel.isPopupActive)
+		{
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+			Shell.Current.ToolbarItems.Clear();
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+		}
 		base.OnDisappearing();
 	}
-#endif
-
-#if ANDROID
-	protected override void OnAppearing()
-	{
-		if (!loadIndex)
-	   {
-			WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webView_Navigating(this, new WebNavigatingEventArgs(WebNavigationEvent.NewPage, null, m.Value)); });
-			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClicked(); UpdateUiAppearance(); });
-			book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-			book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		}
-		base.OnAppearing();
-	}
-#endif
 
 	async void GridArea_Tapped(object sender, EventArgs e)
 	{
@@ -116,15 +58,6 @@ public partial class BookPage : ContentPage, IDisposable
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(book);
-#if WINDOWS
-		if (!loadIndex && !e.Url.Contains("https://demo/index.html"))
-		{
-			return;
-		}
-#endif
-#if WINDOWS || ANDROID
-		loadIndex = false;
-#endif
 		await webViewHelper.LoadPage(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
@@ -134,12 +67,10 @@ public partial class BookPage : ContentPage, IDisposable
 		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
-
-	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
+	async Task HandleJavascript(string url)
 	{
 		ArgumentNullException.ThrowIfNull(book);
-		var url = e.Url;
-		if (url.Contains(externalLinkPrefix))
+		if (await TryHandleExternalLinkAsync(url))
 		{
 			var link = url.Replace(externalLinkPrefix, string.Empty);
 			var temp = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(link), StringComparison.OrdinalIgnoreCase));
@@ -148,21 +79,10 @@ public partial class BookPage : ContentPage, IDisposable
 				book.CurrentChapter = book.Chapters.IndexOf(temp);
 				db.UpdateBookMark(book);
 			}
-		}
-		if (!e.Url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
-		{
 			return;
 		}
 
-		e.Cancel = true;
-		ArgumentNullException.ThrowIfNull(book);
-
-		if (await BookPage.TryHandleExternalLinkAsync(e.Url))
-		{
-			return;
-		}
-
-		var methodName = GetMethodNameFromUrl(e.Url);
+		var methodName = GetMethodNameFromUrl(url);
 		if (string.IsNullOrEmpty(methodName))
 		{
 			return;
@@ -170,6 +90,20 @@ public partial class BookPage : ContentPage, IDisposable
 
 		await HandleWebViewActionAsync(methodName);
 		UpdateUiAppearance();
+	}
+	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
+	{
+		var url = e.Url;
+		ArgumentNullException.ThrowIfNull(book);
+		
+		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
+		{
+			return;
+		}
+		
+		
+		e.Cancel = true;
+		await HandleJavascript(e.Url);
 	}
 
 	static async Task<bool> TryHandleExternalLinkAsync(string url)

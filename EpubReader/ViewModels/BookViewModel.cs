@@ -8,23 +8,36 @@ namespace EpubReader.ViewModels;
 
 public partial class BookViewModel : BaseViewModel, IQueryAttributable
 {
-	[ObservableProperty]
-	public partial WebViewSource Source { get; set; } = string.Empty;
+#if ANDROID || WINDOWS
+	const string url = "https://demo/index.html";
+#elif IOS || MACCATALYST
+	const string url = "app://demo/index.html";
+#endif
 
-	[ObservableProperty]
-	public partial ImageSource CoverImage { get; set; } = string.Empty;
-	[ObservableProperty]
-	public partial bool IsActive { get; set; } = true;
+	readonly IPopupService popupService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	[ObservableProperty]
-	public partial bool IsNavMenuVisible { get; set; }
+	public partial WebViewSource Source { get; set; } = new UrlWebViewSource
+	{
+		Url = url,
+	};
+	
+	[ObservableProperty]
+	public partial ImageSource CoverImage { get; set; } = string.Empty;
+	
+	[ObservableProperty]
+	public partial bool IsActive { get; set; } = true;
+	
+	[ObservableProperty]
+	public partial bool isPopupActive { get; set; } = false;
 
-	readonly IPopupService popupService;
+	[ObservableProperty]
+	public partial bool IsNavMenuVisible { get; set; } = true;
+
 	public BookViewModel(IPopupService popupService)
 	{
 		this.popupService = popupService;
-		IsNavMenuVisible = true;
 		Press();
 	}
 
@@ -34,33 +47,20 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
-			StreamExtensions.Instance?.SetBook(book);
 			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
-#pragma warning disable S1075 // URIs should not be hardcoded
-#if ANDROID || WINDOWS
-			Source = new UrlWebViewSource
-		{
-			Url = "https://demo/index.html",
-		};
-#endif
-#if IOS || MACCATALYST
-			Source = new UrlWebViewSource
-			{
-				Url = "app://demo/index.html",
-			};
-#endif
-#pragma warning restore S1075 // URIs should not be hardcoded
 		}
 	}
 
 	[RelayCommand]
 	async Task ShowPopup()
 	{
-		await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current, options: new PopupOptions
+		isPopupActive = true;
+		var result = await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current);
+		if (result.WasDismissedByTappingOutsideOfPopup)
 		{
-			CanBeDismissedByTappingOutsideOfPopup = true,
-		});
+			isPopupActive = false;
+		}
 	}
 	
 	[RelayCommand]
