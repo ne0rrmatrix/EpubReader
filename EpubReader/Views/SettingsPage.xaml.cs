@@ -64,8 +64,8 @@ public partial class SettingsPage : Popup
 	/// <remarks>This method clears all existing settings from the database and initializes new default settings. It
 	/// updates the UI components to reflect the default settings and sends a notification indicating that the settings
 	/// have been reset.</remarks>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	/// <param name="sender">The source of the event that triggered the method.</param>
+	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
 	void RemoveAllSettings(object sender, EventArgs e)
 	{
 		db.RemoveAllSettings();
