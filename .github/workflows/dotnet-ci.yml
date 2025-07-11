@@ -1,0 +1,72 @@
+name: .NET CI Build
+
+on:
+  push:
+    branches:
+      - main
+      - develop # Add any other branches you want to trigger on push
+
+  pull_request:
+    branches:
+      - main
+      - develop # Add any other branches you want to trigger on pull request
+
+  # This section is crucial for Dependabot to trigger the workflow and test its PRs
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main # Match the branch Dependabot targets for updates
+    if: github.actor == 'dependabot[bot]' # Ensure this only runs for Dependabot PRs for security
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Or windows-latest, macos-latest if your project requires it
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # For Dependabot PRs, we need to checkout the head of the PR branch
+        # This is important as Dependabot's PRs might involve changes that
+        # require specific tools or SDKs not present in the merge base.
+        ref: ${{ github.event.pull_request.head.ref }}
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        fetch-depth: 0 # Fetch all history for some .NET tools if needed
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        # Make sure this matches the target framework of your project (net9.0-ios implies .NET 9)
+        dotnet-version: '9.0.x' 
+        # Optionally, you can also include workload manifests if you know them.
+        # This can sometimes speed up 'dotnet workload restore'
+        # include-workload-packs: maui-tizen wasm-tools-net9
+
+    - name: Install Required .NET Workloads
+      run: |
+        echo "Attempting to restore .NET workloads..."
+        # The 'dotnet workload restore' command reads your project file(s)
+        # and installs any missing workloads required by the project.
+        # This is the primary solution for the NETSDK1147 error.
+        dotnet workload restore
+
+        # Optional: If 'dotnet workload restore' somehow doesn't catch them,
+        # or if you want to be explicitly sure, you can install them individually.
+        # This is usually not necessary if 'dotnet workload restore' works correctly.
+        # dotnet workload install maui-tizen
+        # dotnet workload install wasm-tools-net9
+        echo "Workload restoration complete."
+
+    - name: Restore NuGet packages
+      run: dotnet restore ./EpubReader/EpubReader.csproj # IMPORTANT: Adjust this path to your .csproj or .sln file!
+
+    - name: Build project
+      run: dotnet build ./EpubReader/EpubReader.csproj --configuration Release --no-restore # IMPORTANT: Adjust this path!
+
+    # Optional: Add a test step if you have unit tests
+    # - name: Run tests
+    #   run: dotnet test ./EpubReader/EpubReader.csproj --no-build # IMPORTANT: Adjust this path!
+
+    # Optional: If you plan to publish the app (e.g., for a release)
+    # - name: Publish application
+    #   run: dotnet publish ./EpubReader/EpubReader.csproj --configuration Release -o ./publish # IMPORTANT: Adjust this path!
