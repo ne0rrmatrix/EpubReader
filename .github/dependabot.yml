@@ -1,14 +1,20 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
+registries:
+  custom-nuget:
+    type: nuget-feed
+    url: https://api.nuget.org/v3/index.json
 updates:
-  - package-ecosystem: nuget
-    directory: /EpubReader
-    schedule:
-      interval: daily
+- package-ecosystem: nuget
+  directory: "/"
+  registries:
+    - custom-nuget
+  schedule:
+    interval: daily
     ignore:
         - dependency-name: "Microsoft.Maui.Controls"
         - dependency-name: "Microsoft.Maui.Core"
+        - dependency-name: "MicrosoftMauiGraphicsVersion"         # maestro
+        - dependency-name: "Microsoft.Maui.Graphics*"             # maestro
+        - dependency-name: "SkiaSharp*"                           # needs to be done manually with maui graphics
+        - dependency-name: "HarfBuzzSharp*"                       # needs to be done manually with maui graphics
+        - dependency-name: "Newtonsoft.Json"                      # needs to be done manually to match VS
