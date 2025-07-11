@@ -142,7 +142,6 @@ public partial class BookPage : ContentPage
 	{	
 		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
-			System.Diagnostics.Trace.TraceInformation($"Not a valid internal link. : {url}");
 			return;
 		}
 		

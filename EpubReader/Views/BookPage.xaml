@@ -27,6 +27,8 @@
     </ContentPage.ToolbarItems>
     <shimmer:SfShimmer
         x:Name="Shimmer"
+        RepeatCount="3"
+        Type="Feed"
         AnimationDuration="3000"
         IsActive="{Binding IsActive}">
         <shimmer:SfShimmer.Content>
