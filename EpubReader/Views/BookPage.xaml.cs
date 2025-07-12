@@ -115,7 +115,8 @@ public partial class BookPage : ContentPage
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
-		var data = url.Split('?').Length > 1 ? url.Split('?')[1] : string.Empty;
+		var parts = url.Split('?');
+		var data = parts.Length > 1 ? parts[1] : string.Empty;
 		await HandleWebViewActionAsync(methodName, data);
 		UpdateUiAppearance();
 	}
