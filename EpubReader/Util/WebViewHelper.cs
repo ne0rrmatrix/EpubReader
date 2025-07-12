@@ -51,7 +51,7 @@ public partial class WebViewHelper(WebView handler)
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-		UpdatePageLabel(label, book);
+		WebViewHelper.UpdatePageLabel(label, book);
 	}
 
 	/// <summary>
@@ -94,7 +94,7 @@ public partial class WebViewHelper(WebView handler)
 	/// </summary>
 	/// <param name="label">The label to update.</param>
 	/// <param name="book">The book to get page information for.</param>
-	public void UpdatePageLabel(Label label, Book book)
+	public static void UpdatePageLabel(Label label, Book book)
 	{
 		try
 		{
@@ -118,7 +118,7 @@ public partial class WebViewHelper(WebView handler)
 	/// <param name="book">The book to get page information for.</param>
 	/// <param name="characterPosition">Optional character position within the current chapter.</param>
 	/// <returns>A formatted string with synthetic page information.</returns>
-	public string GetSyntheticPageInfo(Book book, int characterPosition = 0)
+	public static string GetSyntheticPageInfo(Book book, int characterPosition = 0)
 	{
 		try
 		{

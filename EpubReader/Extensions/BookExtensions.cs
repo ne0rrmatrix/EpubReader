@@ -8,8 +8,6 @@ namespace EpubReader.Extensions;
 /// </summary>
 public static class BookExtensions
 {
-    static readonly SyntheticPageNumberService pageService = new();
-
     /// <summary>
     /// Generates synthetic page information for the book.
     /// </summary>

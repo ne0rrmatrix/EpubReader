@@ -10,14 +10,20 @@ namespace EpubReader.Service;
 public partial class SyntheticPageNumberService
 {
     const int bytesPerPage = 1024;
-    //const int ivSizeOverhead = 16; // Common IV size for AES encryption
 
-    /// <summary>
-    /// Generates synthetic page information for all resources in a book.
-    /// </summary>
-    /// <param name="book">The book containing resources to process.</param>
-    /// <returns>A list of synthetic page information for each resource.</returns>
-    public static List<SyntheticPageInfo> GenerateSyntheticPages(Book book)
+	/// <summary>
+	/// Initializes a new instance of the <see cref="SyntheticPageNumberService"/> class.
+	/// </summary>
+	/// <remarks>This constructor is protected, indicating that the <see cref="SyntheticPageNumberService"/> class
+	/// is intended to be used as a base class. It cannot be instantiated directly.</remarks>
+	protected SyntheticPageNumberService() { }
+
+	/// <summary>
+	/// Generates synthetic page information for all resources in a book.
+	/// </summary>
+	/// <param name="book">The book containing resources to process.</param>
+	/// <returns>A list of synthetic page information for each resource.</returns>
+	public static List<SyntheticPageInfo> GenerateSyntheticPages(Book book)
     {
         var syntheticPages = new List<SyntheticPageInfo>();
 

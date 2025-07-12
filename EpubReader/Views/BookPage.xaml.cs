@@ -4,9 +4,6 @@ using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Util;
 using EpubReader.ViewModels;
-using EpubReader.Extensions;
-using MetroLog;
-using System.Threading.Tasks;
 
 namespace EpubReader.Views;
 
@@ -24,7 +21,6 @@ public partial class BookPage : ContentPage
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
 	readonly IDb db;
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	readonly WebViewHelper webViewHelper;
 
 	/// <summary>
@@ -231,11 +227,11 @@ public partial class BookPage : ContentPage
 				
 				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
 				{
-					pageLabel.Text = webViewHelper.GetSyntheticPageInfo(book, characterPosition);
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
 				}
 				else
 				{
-					pageLabel.Text = webViewHelper.GetSyntheticPageInfo(book);
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
 				}
 				break;
 		}
@@ -250,9 +246,9 @@ public partial class BookPage : ContentPage
 		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
 		if(int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
 		{
-			return webViewHelper.GetSyntheticPageInfo(book, characterPosition);
+			return WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
 		}
-		return webViewHelper.GetSyntheticPageInfo(book);
+		return WebViewHelper.GetSyntheticPageInfo(book);
 	}
 
 	void UpdateUiAppearance()

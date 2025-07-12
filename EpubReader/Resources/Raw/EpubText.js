@@ -468,7 +468,7 @@ function handleMessage(event, platform) {
  * Handles the "next" command
  */
 function handleNextCommand() {
-    var platform = domUtils.detectPlatform();
+    let platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
         window.location.href = 'https://runcsharp.next?true';
@@ -481,7 +481,7 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
-    var platform = domUtils.detectPlatform();
+    let platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
         window.location.href = 'https://runcsharp.prev?true';
@@ -553,7 +553,7 @@ function getCharacterPositionFromScroll() {
  * @returns {string} The extracted text content
  */
 function extractTextFromDocument(doc) {
-    if (!doc || !doc.body) {
+    if (!doc?.body) {
         return "";
     }
     
