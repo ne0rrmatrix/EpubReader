@@ -219,6 +219,7 @@ const navigationUtils = {
         } else {
             console.warn("Already at the first page, cannot scroll left.");
         }
+        console.log("Scrolled left to page:", currentPage);
         window.location.href = 'https://runcsharp.updatepageinfo?true';
     },
 
@@ -242,6 +243,7 @@ const navigationUtils = {
             });
         }
         currentPage++;
+        console.log("Scrolled right to page:", currentPage);
         window.location.href = 'https://runcsharp.updatepageinfo?true';
     },
 
@@ -450,7 +452,7 @@ function handleNextCommand() {
         console.log("Reached end of current content, requesting next page.");
         window.location.href = 'https://runcsharp.next?true';
     } else {
-        navigationUtils.scrollRight(domUtils.detectPlatform());
+        scrollRightWithPosition(domUtils.detectPlatform());
     }
 }
 
@@ -462,7 +464,7 @@ function handlePrevCommand() {
         console.log("Reached start of current content, requesting previous page.");
         window.location.href = 'https://runcsharp.prev?true';
     } else {
-        navigationUtils.scrollLeft(domUtils.detectPlatform());
+        scrollLeftWithPosition(domUtils.detectPlatform());
     }
 }
 
@@ -481,6 +483,107 @@ function fixImagePositioning() {
 
     // Process each image
     images.forEach(img => imageUtils.processImage(img));
+}
+
+/**
+ * Calculates the approximate character position based on current scroll position
+ * This is used to determine which synthetic page is currently being displayed
+ * @returns {number} The estimated character position in the current document
+ */
+function getCharacterPositionFromScroll() {
+    const contentWindow = domUtils.getContentWindow();
+    const doc = domUtils.getIframeDocument();
+    
+    if (!contentWindow || !doc) {
+        console.warn("Cannot calculate character position - iframe content not accessible");
+        return 0;
+    }
+
+    try {
+        // Get the current scroll position and total scrollable width
+        const currentScrollX = contentWindow.scrollX;
+        const totalScrollWidth = doc.documentElement.scrollWidth;
+        const viewportWidth = contentWindow.innerWidth;
+        
+        // Calculate the scroll progress as a percentage (0-1)
+        const maxScrollX = Math.max(0, totalScrollWidth - viewportWidth);
+        const scrollProgress = maxScrollX > 0 ? Math.min(1, currentScrollX / maxScrollX) : 0;
+        
+        // Get the total text content from the document
+        const textContent = extractTextFromDocument(doc);
+        const totalCharacters = textContent.length;
+        
+        // Calculate character position based on scroll progress
+        const characterPosition = Math.floor(scrollProgress * totalCharacters);
+        
+        console.log(`Character position calculated: ${characterPosition} (scroll: ${scrollProgress.toFixed(3)}, total chars: ${totalCharacters})`);
+        
+        return Math.max(0, characterPosition);
+    } catch (error) {
+        console.error("Error calculating character position:", error);
+        return 0;
+    }
+}
+
+/**
+ * Extracts text content from the document, similar to the C# ExtractTextFromHtml method
+ * @param {Document} doc - The document to extract text from
+ * @returns {string} The extracted text content
+ */
+function extractTextFromDocument(doc) {
+    if (!doc || !doc.body) {
+        return "";
+    }
+    
+    try {
+        // Get the text content from the body, which automatically excludes HTML tags
+        let textContent = doc.body.textContent || doc.body.innerText || "";
+        
+        // Normalize whitespace while preserving paragraph breaks
+        textContent = textContent.replace(/\s+/g, " ").trim();
+        
+        return textContent;
+    } catch (error) {
+        console.error("Error extracting text from document:", error);
+        return "";
+    }
+}
+
+/**
+ * Gets the character position for the current page and notifies the C# code
+ * This is called when pages change to update synthetic page information
+ */
+function updateCharacterPosition() {
+    const characterPosition = getCharacterPositionFromScroll();
+    
+    // Notify C# code about the character position change
+    window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
+}
+
+/**
+ * Enhanced scroll left function that also updates character position
+ * @param {Object} platform - Platform flags
+ */
+function scrollLeftWithPosition(platform) {
+    navigationUtils.scrollLeft(platform);
+    
+    // Update character position after scroll
+    setTimeout(() => {
+        updateCharacterPosition();
+    }, 100);
+}
+
+/**
+ * Enhanced scroll right function that also updates character position
+ * @param {Object} platform - Platform flags
+ */
+function scrollRightWithPosition(platform) {
+    navigationUtils.scrollRight(platform);
+    
+    // Update character position after scroll
+    setTimeout(() => {
+        updateCharacterPosition();
+    }, 100);
 }
 
 /**
@@ -503,7 +606,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body.classList.add('windows-platform');
         frame.classList.add('windows-platform');
     }
-    
+
     // Set initial dimensions and add resize listener
     layoutUtils.setDimensions(body, root);
     frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));

@@ -4,6 +4,9 @@ using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Util;
 using EpubReader.ViewModels;
+using EpubReader.Extensions;
+using MetroLog;
+using System.Threading.Tasks;
 
 namespace EpubReader.Views;
 
@@ -21,6 +24,7 @@ public partial class BookPage : ContentPage
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
 	readonly IDb db;
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookPage));
 	readonly WebViewHelper webViewHelper;
 
 	/// <summary>
@@ -129,25 +133,24 @@ public partial class BookPage : ContentPage
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
 		var url = e.Url;
-		
+
 		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			return;
 		}
-		
+
 		e.Cancel = true;
 		await HandleJavascriptAsync(e.Url);
 	}
 	async Task TryHandleInternalLinkAsync(string url)
-	{	
+	{
 		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
-			System.Diagnostics.Trace.TraceInformation($"Not a valid internal link. : {url}");
 			return;
 		}
-		
+
 		var urlParts = url.Split('?')[1].Split('#')[0];
-		if(!string.IsNullOrEmpty(urlParts))
+		if (!string.IsNullOrEmpty(urlParts))
 		{
 			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 			if (chapter is null)
@@ -220,26 +223,25 @@ public partial class BookPage : ContentPage
 		}
 	}
 
+	/// <summary>
+	/// Gets the current page information using synthetic page numbers.
+	/// </summary>
+	/// <returns>A formatted string with synthetic page information.</returns>
 	async Task<string> GetCurrentPageInfoAsync()
 	{
-		var tempPageResult = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
-		var tempPageCount = await webView.EvaluateJavaScriptAsync("getPageCount()");
-		var pageCount = tempPageCount?.ToString();
-		var result = Int32.TryParse(pageCount, out var pageCountValue) ? pageCountValue : 0;
-		pageCount = pageCountValue > 0 ? result.ToString() : string.Empty;
-		var currentPage = tempPageResult?.ToString();
-		if (!string.IsNullOrEmpty(pageCount) || !string.IsNullOrEmpty(currentPage))
+		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
+		if(int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
 		{
-			return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty} (Page {currentPage} of {pageCount})";		
+			return webViewHelper.GetSyntheticPageInfo(book, characterPosition);
 		}
-		return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		return webViewHelper.GetSyntheticPageInfo(book);
 	}
 
 	void UpdateUiAppearance()
 	{
 		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
 		var settings = db.GetSettings() ?? new();
-		if(string.IsNullOrEmpty(settings.BackgroundColor))
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
 			settings.BackgroundColor = "#FFFFFF"; // Default background color
 			settings.TextColor = "#000000"; // Default text color
@@ -290,7 +292,6 @@ public partial class BookPage : ContentPage
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = await GetCurrentPageInfoAsync();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);
@@ -316,7 +317,6 @@ public partial class BookPage : ContentPage
 				{
 					book.CurrentChapter = index;
 					db.UpdateBookMark(book);
-					pageLabel.Text = await GetCurrentPageInfoAsync();
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);

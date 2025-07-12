@@ -1,5 +1,7 @@
-﻿using EpubReader.Interfaces;
+﻿using EpubReader.Extensions;
+using EpubReader.Interfaces;
 using EpubReader.Models;
+using MetroLog;
 
 namespace EpubReader.Util;
 
@@ -11,6 +13,7 @@ public partial class WebViewHelper(WebView handler)
 {
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	readonly WebView webView = handler;
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(WebViewHelper));
 
 	/// <summary>
 	/// Asynchronously sets the color scheme and font data for the web view based on user settings.
@@ -24,16 +27,16 @@ public partial class WebViewHelper(WebView handler)
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
 
 		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')");
-		if(OperatingSystem.IsWindows())
+		if (OperatingSystem.IsWindows())
 		{
 			var width = await GetWidthAsync(settings);
 			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');");
 		}
-		
+
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
 		await webView.EvaluateJavaScriptAsync("getPageCount()");
 	}
-	
+
 	/// <summary>
 	/// Asynchronously loads a specific page of the book into the web view.
 	/// </summary>
@@ -48,6 +51,7 @@ public partial class WebViewHelper(WebView handler)
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
+		UpdatePageLabel(label, book);
 	}
 
 	/// <summary>
@@ -80,6 +84,53 @@ public partial class WebViewHelper(WebView handler)
 			db.UpdateBookMark(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPageAsync(label, book);
+		}
+	}
+
+	/// <summary>
+	/// Updates the page label with synthetic page numbers.
+	/// </summary>
+	/// <param name="label">The label to update.</param>
+	/// <param name="book">The book to get page information for.</param>
+	public void UpdatePageLabel(Label label, Book book)
+	{
+		try
+		{
+			var currentPage = book.GetCurrentPageNumber();
+			var totalPages = book.GetTotalPageCount();
+			var chapterTitle = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+
+			label.Text = $"{chapterTitle} (Page {currentPage} of {totalPages})";
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error updating page label: {ex.Message}");
+			// Fallback to chapter title only if synthetic page calculation fails
+			label.Text = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+		}
+	}
+
+	/// <summary>
+	/// Gets synthetic page information for the current book state.
+	/// </summary>
+	/// <param name="book">The book to get page information for.</param>
+	/// <param name="characterPosition">Optional character position within the current chapter.</param>
+	/// <returns>A formatted string with synthetic page information.</returns>
+	public string GetSyntheticPageInfo(Book book, int characterPosition = 0)
+	{
+		try
+		{
+			var currentPage = book.GetCurrentPageNumber(characterPosition);
+			var totalPages = book.GetTotalPageCount();
+			var chapterTitle = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+
+			return $"{chapterTitle} (Page {currentPage} of {totalPages})";
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error getting synthetic page info: {ex.Message}");
+			// Fallback to chapter title only if synthetic page calculation fails
+			return book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
 		}
 	}
 
