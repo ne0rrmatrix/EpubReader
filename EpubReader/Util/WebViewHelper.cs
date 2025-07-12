@@ -65,6 +65,7 @@ public partial class WebViewHelper(WebView handler)
 		if (book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
+			book.CurrentPage = 0;
 			db.UpdateBookMark(book);
 			await LoadPageAsync(label, book);
 		}
@@ -81,6 +82,7 @@ public partial class WebViewHelper(WebView handler)
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
+			book.CurrentPage = 0;
 			db.UpdateBookMark(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPageAsync(label, book);

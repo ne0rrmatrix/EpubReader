@@ -65,6 +65,7 @@ public partial class LibraryViewModel : BaseViewModel
 		ArgumentNullException.ThrowIfNull(temp);
 		Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
 		Book.CurrentChapter = temp.CurrentChapter;
+		Book.CurrentPage = temp.CurrentPage;
 		Book.Id = temp.Id;
 		StreamExtensions.Instance?.SetBook(Book);
 		var navigationParams = new Dictionary<string, object>

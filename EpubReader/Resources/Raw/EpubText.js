@@ -5,7 +5,7 @@
 
 // Global state
 let isPreviousPage = false;
-let currentPage = 1;
+let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
@@ -214,13 +214,13 @@ const navigationUtils = {
                 behavior: "smooth"
             });
         }
-        if (currentPage > 1) {
+        if (currentPage > 0) {
             currentPage--;
         } else {
             console.warn("Already at the first page, cannot scroll left.");
         }
         console.log("Scrolled left to page:", currentPage);
-        window.location.href = 'https://runcsharp.updatepageinfo?true';
+        updateCharacterPosition();
     },
 
     /**
@@ -244,7 +244,26 @@ const navigationUtils = {
         }
         currentPage++;
         console.log("Scrolled right to page:", currentPage);
-        window.location.href = 'https://runcsharp.updatepageinfo?true';
+        updateCharacterPosition();
+    },
+
+    /**
+     * Scrolls to a specific page in the iframe content
+     * @param {number} page - The page number to scroll to (0-based index)
+     * @returns {void}
+     */
+    scrollToPage(page) {
+        const contentWindow = domUtils.getContentWindow();
+        if (!contentWindow) return;
+        for (let i = 0; i < page; i++) {
+            if (this.isHorizontallyScrolledToEnd()) {
+                console.warn("Already at the last page, cannot scroll further.");
+                return;
+            }
+            const scrollAmount = this.calculateScrollAmount(contentWindow);
+            contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
+        }
+        updateCharacterPosition();
     },
 
     /**
@@ -277,6 +296,7 @@ const navigationUtils = {
             console.log("Scrolling to end of container.");
             frame.contentWindow.scrollTo(maxScrollLeft, 0);
             currentPage = getPageCount();
+            updateCharacterPosition();
             window.location.href = 'https://runcsharp.updatepageinfo?true';
         } else {
             // If iframe not ready, set onload to call this function again
@@ -448,11 +468,12 @@ function handleMessage(event, platform) {
  * Handles the "next" command
  */
 function handleNextCommand() {
+    var platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
         window.location.href = 'https://runcsharp.next?true';
     } else {
-        scrollRightWithPosition(domUtils.detectPlatform());
+        navigationUtils.scrollRight(platform);
     }
 }
 
@@ -460,11 +481,12 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
+    var platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
         window.location.href = 'https://runcsharp.prev?true';
     } else {
-        scrollLeftWithPosition(domUtils.detectPlatform());
+        navigationUtils.scrollLeft(platform);
     }
 }
 
@@ -555,36 +577,11 @@ function extractTextFromDocument(doc) {
  */
 function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
-    
+    console.log(`Updating character position: ${characterPosition}`);
     // Notify C# code about the character position change
     window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
 }
 
-/**
- * Enhanced scroll left function that also updates character position
- * @param {Object} platform - Platform flags
- */
-function scrollLeftWithPosition(platform) {
-    navigationUtils.scrollLeft(platform);
-    
-    // Update character position after scroll
-    setTimeout(() => {
-        updateCharacterPosition();
-    }, 100);
-}
-
-/**
- * Enhanced scroll right function that also updates character position
- * @param {Object} platform - Platform flags
- */
-function scrollRightWithPosition(platform) {
-    navigationUtils.scrollRight(platform);
-    
-    // Update character position after scroll
-    setTimeout(() => {
-        updateCharacterPosition();
-    }, 100);
-}
 
 /**
  * Initialize the reader when the DOM is fully loaded
@@ -691,7 +688,7 @@ function gotoEnd() {
  */
 function setPreviousPage() {
     isPreviousPage = true;
-    currentPage = 1; // Reset current page on previous navigation
+    currentPage = 0; // Reset current page on previous navigation
 }
 
 /**
@@ -706,8 +703,22 @@ function loadPage(page) {
     }
     console.log("Frame found. Loading page:", page);
     frame.setAttribute('src', page);
-    currentPage = 1; // Reset current page on new load
+    currentPage = 0; // Reset current page on new load
     return true;
+}
+
+/**
+ * Goes to a specific page in the iframe content
+ * @param {number} page property - The page number to navigate to
+ * @returns {void}
+ */
+function gotoPage(page) {
+    console.log("Jumping to page:", page);
+    if (page < 1) {
+        console.warn("Page number must be 1 or greater. Current page:", page);
+        return;
+    }
+    navigationUtils.scrollToPage(page);
 }
 
 /**

@@ -126,6 +126,7 @@ public partial class Db : IDb, IDisposable
 			return;
 		}
 		item.CurrentChapter = book.CurrentChapter;
+		item.CurrentPage = book.CurrentPage;
 		conn.Update(item);
 		logger.Info("Updating book");
 	}

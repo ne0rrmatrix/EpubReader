@@ -37,6 +37,12 @@ public class Book
 	public int CurrentChapter { get; set; } = 0;
 
 	/// <summary>
+	/// Gets or sets the current page number in a paginated list.
+	/// </summary>
+	[Column("CurrentPage")]
+	public int CurrentPage { get; set; } = 0;
+
+	/// <summary>
 	/// Gets or sets the file path to the cover image.
 	/// </summary>
 	[Column("CoverImagePath")]

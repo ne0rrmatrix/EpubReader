@@ -119,7 +119,8 @@ public partial class BookPage : ContentPage
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
-		await HandleWebViewActionAsync(methodName);
+		var data = url.Split('?').Length > 1 ? url.Split('?')[1] : string.Empty;
+		await HandleWebViewActionAsync(methodName, data);
 		UpdateUiAppearance();
 	}
 
@@ -199,8 +200,11 @@ public partial class BookPage : ContentPage
 		return funcToCall[0][..^1]; // Assumes format like "method()"
 	}
 
-	async Task HandleWebViewActionAsync(string methodName)
+	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
+		var tempCurrentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
+		var currentPage = int.TryParse(tempCurrentPage, out int parsedPage) ? parsedPage : 0;
+		
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
@@ -215,10 +219,24 @@ public partial class BookPage : ContentPage
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
 				UpdateUiAppearance();
+				if (currentPage == 0 && book.CurrentPage > 0)
+				{
+					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
 				break;
-			case "updatepageinfo":
-				pageLabel.Text = await GetCurrentPageInfoAsync();
+			case "characterposition":
+				book.CurrentPage = currentPage;
+				db.UpdateBookMark(book);
+				
+				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
+				{
+					pageLabel.Text = webViewHelper.GetSyntheticPageInfo(book, characterPosition);
+				}
+				else
+				{
+					pageLabel.Text = webViewHelper.GetSyntheticPageInfo(book);
+				}
 				break;
 		}
 	}
