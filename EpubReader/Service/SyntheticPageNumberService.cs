@@ -2,7 +2,7 @@ using EpubReader.Models;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace EpubReader.Services;
+namespace EpubReader.Service;
 
 /// <summary>
 /// Service for generating synthetic page numbers based on Adobe Digital Editions specification.

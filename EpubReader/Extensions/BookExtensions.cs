@@ -1,5 +1,5 @@
 using EpubReader.Models;
-using EpubReader.Services;
+using EpubReader.Service;
 
 namespace EpubReader.Extensions;
 
