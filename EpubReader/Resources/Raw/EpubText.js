@@ -297,7 +297,6 @@ const navigationUtils = {
             frame.contentWindow.scrollTo(maxScrollLeft, 0);
             currentPage = getPageCount();
             updateCharacterPosition();
-            window.location.href = 'https://runcsharp.updatepageinfo?true';
         } else {
             // If iframe not ready, set onload to call this function again
             frame.onload = function () {
