@@ -115,8 +115,7 @@ public partial class BookPage : ContentPage
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
-		var parts = url.Split('?');
-		var data = parts.Length > 1 ? parts[1] : string.Empty;
+		var data = BookPage.GetDataFromUrl(url);
 		await HandleWebViewActionAsync(methodName, data);
 		UpdateUiAppearance();
 	}
@@ -140,6 +139,18 @@ public partial class BookPage : ContentPage
 		e.Cancel = true;
 		await HandleJavascriptAsync(e.Url);
 	}
+
+	static string GetDataFromUrl(string url)
+	{
+		var parts = url.Split('?');
+		if (parts.Length > 1)
+		{
+			var data = parts[1].Split('#')[0];
+			return data;
+		}
+		return string.Empty;
+	}
+
 	async Task TryHandleInternalLinkAsync(string url)
 	{
 		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))

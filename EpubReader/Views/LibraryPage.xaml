@@ -61,11 +61,10 @@
                                 <RowDefinition Height="{StaticResource CardHeight}" />
                             </Grid.RowDefinitions>
 
-                            <ffimage:CachedImage
+                            <Image
                                 Grid.Row="0"
                                 Margin="8,4,8,8"
                                 Aspect="AspectFit"
-                                CacheDuration="1000000"
                                 HeightRequest="{StaticResource CardHeight}"
                                 HorizontalOptions="Center"
                                 Source="{Binding CoverImagePath}">
@@ -80,10 +79,10 @@
                                     </MenuFlyout>
                                 </FlyoutBase.ContextFlyout>
 
-                                <ffimage:CachedImage.GestureRecognizers>
+                                <Image.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
-                                </ffimage:CachedImage.GestureRecognizers>
-                            </ffimage:CachedImage>
+                                </Image.GestureRecognizers>
+                            </Image>
 
                         </Grid>
                     </Border>
