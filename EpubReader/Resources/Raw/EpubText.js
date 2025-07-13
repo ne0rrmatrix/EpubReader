@@ -46,125 +46,6 @@ const domUtils = {
 };
 
 /**
- * Image handling utilities
- */
-const imageUtils = {
-    /**
-     * Creates and injects CSS styles for images
-     * @param {Document} doc - The document to inject styles into
-     */
-    injectImageStyles(doc) {
-        if (doc.getElementById('image-position-fixes')) return;
-
-        const styleEl = doc.createElement('style');
-        styleEl.id = 'image-position-fixes';
-        styleEl.textContent = `
-            img, svg {
-                max-width: 100%;
-                height: auto !important;
-                width: auto !important;
-                max-height: 95vh;
-                object-fit: contain;
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-            
-            /* For multicolumn layouts, ensure images respect column boundaries */
-            body[style*="column-count"] img,
-            body[style*="column-width"] img,
-            html[style*="column-count"] img,
-            html[style*="column-width"] img {
-                max-width: 100%; 
-                display: inline-block;
-                vertical-align: top;
-                margin: 0.5em 0;
-            }
-            
-            /* Handle images in paragraphs and divs */
-            p img, div img {
-                vertical-align: top;
-                margin: 0.2em 0;
-            }
-            
-            /* Figure handling */
-            figure {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                margin: 0.5em 0;
-                max-width: 100%;
-            }
-            
-            figcaption {
-                font-size: 0.9em;
-                margin-top: 0.3em;
-            }
-        `;
-        doc.head.appendChild(styleEl);
-    },
-
-    /**
-     * Processes a single image for proper layout
-     * @param {HTMLImageElement} img - The image to process
-     */
-    processImage(img) {
-        // Skip images that have already been processed
-        if (img.hasAttribute('data-positioned')) return;
-
-        this.convertRelativeDimensions(img);
-        this.markAsProcessed(img);
-        this.handleInlineImage(img);
-    },
-
-    /**
-     * Converts em/rem dimensions to fixed pixel values
-     * @param {HTMLImageElement} img - The image to process
-     */
-    convertRelativeDimensions(img) {
-        const hasRelativeWidth = img.style.width && (img.style.width.includes('em') || img.style.width.includes('rem'));
-        const hasRelativeHeight = img.style.height && (img.style.height.includes('em') || img.style.height.includes('rem'));
-
-        if (!hasRelativeWidth && !hasRelativeHeight) return;
-
-        // Get computed dimensions
-        const computedStyle = window.getComputedStyle(img);
-        const computedWidth = parseInt(computedStyle.width);
-        const computedHeight = parseInt(computedStyle.height);
-
-        if (!isNaN(computedWidth)) img.width = computedWidth;
-        if (!isNaN(computedHeight)) img.height = computedHeight;
-
-        // Clear relative units
-        if (hasRelativeWidth) img.style.width = 'auto';
-        if (hasRelativeHeight) img.style.height = 'auto';
-    },
-
-    /**
-     * Marks an image as processed
-     * @param {HTMLImageElement} img - The image to mark
-     */
-    markAsProcessed(img) {
-        img.setAttribute('data-positioned', 'true');
-    },
-
-    /**
-     * Applies special handling for inline images
-     * @param {HTMLImageElement} img - The image to process
-     */
-    handleInlineImage(img) {
-        const parent = img.parentElement;
-        const isInParagraphOrDiv = parent && (parent.tagName === 'P' || parent.tagName === 'DIV');
-        const isNotInContainer = !parent.classList.contains('image-container');
-        const isNotInFigure = !img.closest('figure');
-
-        if (isInParagraphOrDiv && isNotInContainer && isNotInFigure && colCount > 1) {
-            img.style.display = 'inline-block';
-            img.style.verticalAlign = 'top';
-            img.classList.add('multicolumn-image');
-        }
-    }
-};
-
-/**
  * Scrolling and navigation utilities
  */
 const navigationUtils = {
@@ -377,26 +258,8 @@ const styleUtils = {
 
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
-
-        // Handle special properties
-        this.handleSpecialProperties(property, value);
     },
 
-    /**
-     * Handles special property changes
-     * @param {string} property - The CSS property name
-     * @param {string} value - The CSS property value
-     */
-    handleSpecialProperties(property, value) {
-        if (property === '--USER__colCount') {
-            colCount = parseInt(value);
-            setTimeout(fixImagePositioning, 100);
-        }
-
-        if (property.includes('fontSize') || property.includes('font-size')) {
-            setTimeout(fixImagePositioning, 100);
-        }
-    },
 
     /**
      * Removes a CSS custom property from the iframe document
@@ -489,22 +352,6 @@ function handlePrevCommand() {
     }
 }
 
-/**
- * Prevents images from moving down when font size changes
- * This function stabilizes image positioning while preserving multicolumn layout
- */
-function fixImagePositioning() {
-    const doc = domUtils.getIframeDocument();
-    if (!doc) return;
-
-    const images = doc.querySelectorAll('img, svg');
-
-    // Add style element with image fixes
-    imageUtils.injectImageStyles(doc);
-
-    // Process each image
-    images.forEach(img => imageUtils.processImage(img));
-}
 
 /**
  * Calculates the approximate character position based on current scroll position
@@ -616,13 +463,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            // Fix image positioning when page loads
-            setTimeout(fixImagePositioning, 100);
+            window.location.href = 'https://runcsharp.pageLoad?true';
         } catch (error) {
             console.error("Error during iframe onload:", error);
-        } finally {
-            // Notify via URL change after processing
-            window.location.href = 'https://runcsharp.pageLoad?true';
         }
     };
 
