@@ -4,7 +4,6 @@ using EpubReader.Util;
 using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
@@ -96,9 +95,7 @@ public static partial class EbookService
 
 	static async Task<Book> CreateBookListingAsync(EpubBookRef book, string path)
 	{
-		var coverBytes = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
-		var coverImage = ResizeImageForCollectionView(coverBytes);
-
+		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		return new Book
 		{
 			Title = book.Title,
@@ -109,13 +106,13 @@ public static partial class EbookService
 
 	static async Task<Book> CreateFullBookAsync(EpubBookRef book, string path)
 	{
-		var sharedFiles = await GetSharedFilesAsync();
-		var fonts = await ExtractFontsAsync(book);
+		var sharedFiles = await GetSharedFilesAsync().ConfigureAwait(false);
+		var fonts = await ExtractFontsAsync(book).ConfigureAwait(false);
 		var description = ProcessDescription(book.Description);
 		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
-		var cssFiles = ExtractCssFiles(book);
-		var chapters = await GetChaptersAsync(book);
-		var images = ExtractImages(book);
+		var cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
+		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
+		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
 
 		return new Book
@@ -142,7 +139,7 @@ public static partial class EbookService
 		try
 		{
 			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(path, options);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(path, options).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -156,7 +153,7 @@ public static partial class EbookService
 		try
 		{
 			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, options);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, options).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -193,7 +190,7 @@ public static partial class EbookService
 
 		foreach (var fileName in requiredFiles)
 		{
-			var sharedFile = await GetSharedFileAsync(fileName);
+			var sharedFile = await GetSharedFileAsync(fileName).ConfigureAwait(false);
 			if (sharedFile is not null)
 			{
 				sharedFiles.Add(sharedFile);
@@ -205,16 +202,16 @@ public static partial class EbookService
 
 	static async Task<SharedEpubFiles?> GetSharedFileAsync(string fileName, CancellationToken cancellation = default)
 	{
-		var exists = await FileSystem.AppPackageFileExistsAsync(fileName);
+		var exists = await FileSystem.AppPackageFileExistsAsync(fileName).ConfigureAwait(false);
 		if (!exists)
 		{
 			return null;
 		}
 
-		await using var stream = await FileSystem.OpenAppPackageFileAsync(fileName);
+		await using var stream = await FileSystem.OpenAppPackageFileAsync(fileName).ConfigureAwait(false);
 		using var reader = new StreamReader(stream);
 		using var memoryStream = new MemoryStream();
-		await reader.BaseStream.CopyToAsync(memoryStream, cancellation);
+		await reader.BaseStream.CopyToAsync(memoryStream, cancellation).ConfigureAwait(false);
 		var bytes = memoryStream.ToArray();
 
 		var sharedFile = new SharedEpubFiles { FileName = fileName };
@@ -244,7 +241,7 @@ public static partial class EbookService
 		{
 			var font = new EpubFonts
 			{
-				Content = await fontFile.ReadContentAsBytesAsync(),
+				Content = await fontFile.ReadContentAsBytesAsync().ConfigureAwait(false),
 				FileName = Path.GetFileName(fontFile.FilePath),
 				FontFamily = Path.GetFileNameWithoutExtension(fontFile.FilePath)
 			};
@@ -272,26 +269,38 @@ public static partial class EbookService
 			: $"<html><body>{description}</body></html>";
 	}
 
-	static List<Css> ExtractCssFiles(EpubBookRef book)
+	static async Task<List<Css>> ExtractCssFiles(EpubBookRef book)
 	{
-		return [.. book.Content.AllFiles.Local
-			.Where(file => file.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase))
-			.Select(file => new Css
+		var result = new List<Css>();
+		foreach (var file in book.Content.AllFiles.Local.Where(file => file.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase)))
+		{
+			var css = new Css
 			{
 				FileName = Path.GetFileName(file.FilePath),
-				Content = ProcessCssFiles(file.ReadContentAsText()),
-			})];
+				Content = ProcessCssFiles(await file.ReadContentAsTextAsync().ConfigureAwait(false)),
+			};
+			result.Add(css);
+		}
+
+		return result;
 	}
 
-	static List<Models.Image> ExtractImages(EpubBookRef book)
-	{
-		return [.. book.Content.Images.Local
-			.Select(image => new Models.Image
-			{
-				FileName = Path.GetFileName(image.FilePath),
-				Content = image.ReadContentAsBytes(),
-			})];
-	}
+	static async Task<List<Models.Image>> ExtractImages(EpubBookRef book)
+    {
+        var images = new List<Models.Image>();
+
+        foreach (var image in book.Content.Images.Local)
+        {
+            var img = new Models.Image
+            {
+                FileName = Path.GetFileName(image.FilePath),
+                Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
+            };
+            images.Add(img);
+        }
+
+        return images;
+    }
 
 	static List<Author> ExtractAuthors(EpubBookRef book)
 	{
@@ -306,32 +315,32 @@ public static partial class EbookService
 
 	static async Task<List<Chapter>> GetChaptersAsync(EpubBookRef book)
 	{
-		var readingOrder = await book.GetReadingOrderAsync();
+		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
 		var chaptersRef = readingOrder.ToList();
 
-		return GetChapters(chaptersRef, book);
+		return await GetChapters(chaptersRef, book);
 	}
 
-	static List<Chapter> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	static async  Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
 
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
-			ProcessSplitChapters(chaptersRef, book, chapters);
+			await ProcessSplitChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
 
 		// Handle books with few non-split chapters
 		if (HasFewNonSplitChapters(chaptersRef))
 		{
-			ProcessAllChapters(chaptersRef, book, chapters);
+			await ProcessAllChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
 
 		// Handle standard books with multiple non-split chapters
-		ProcessNonSplitChapters(chaptersRef, book, chapters);
+		await ProcessNonSplitChapters(chaptersRef, book, chapters);
 		return chapters;
 	}
 
@@ -345,46 +354,47 @@ public static partial class EbookService
 		return chaptersRef.Count(item => !item.FilePath.Contains("_split_")) < 3;
 	}
 
-	static void ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
-	{
-		var split000Chapters = chaptersRef
-			.Where(x => x is not null && x.FilePath.Contains("_split_000"));
+    static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
+    {
+        var split000Chapters = chaptersRef
+            .Where(x => x is not null && x.FilePath.Contains("_split_000"));
 
-		foreach (var item in split000Chapters)
-		{
-			var replacementChapter = FindReplacementChapter(chaptersRef, item);
-			var htmlContent = replacementChapter?.ReadContent() ?? string.Empty;
+        foreach (var item in split000Chapters)
+        {
+            var replacementChapter = FindReplacementChapter(chaptersRef, item);
+            var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
 
-			if (string.IsNullOrEmpty(htmlContent))
-			{
-				continue;
-			}
+            if (string.IsNullOrEmpty(htmlContent))
+            {
+                continue;
+            }
 
-			var chapter = CreateChapter(book, htmlContent, item);
-			if (string.IsNullOrEmpty(chapter.Title))
-			{
-				chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
-			}
-			chapters.Add(chapter);
-		}
-	}
+            var chapter = CreateChapter(book, htmlContent, item);
+            if (string.IsNullOrEmpty(chapter.Title))
+            {
+                chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
+            }
+            chapters.Add(chapter);
+        }
+    }
 
-	static void ProcessAllChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
+ 
+	static async Task ProcessAllChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		foreach (var item in chaptersRef)
 		{
-			var htmlContent = item.ReadContent();
+			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
 			chapters.Add(CreateChapter(book, htmlContent, item));
 		}
 	}
 
-	static void ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
+	static async Task ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
 
 		foreach (var item in nonSplitChapters)
 		{
-			var htmlContent = item.ReadContent();
+			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
 			chapters.Add(CreateChapter(book, htmlContent, item));
 		}
 	}
@@ -559,63 +569,5 @@ public static partial class EbookService
 		canvas.DrawString(title, textRectangle,
 			HorizontalAlignment.Center, VerticalAlignment.Center, TextFlow.ClipBounds);
 	}
-
-	static byte[] ResizeImageForCollectionView(byte[] imageBytes)
-	{
-		try
-		{
-			using var inputStream = new MemoryStream(imageBytes);
-			using var image = SixLabors.ImageSharp.Image.Load(inputStream);
-
-			var scale = CalculateImageScale(image.Width, image.Height);
-			var newWidth = (int)(image.Width * scale);
-			var newHeight = (int)(image.Height * scale);
-
-			using var resizedImage = CreateResizedImage(image, newWidth, newHeight);
-			return SaveImageAsPng(resizedImage);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error resizing image for collection view: {ex.Message}");
-			return imageBytes;
-		}
-	}
-
-	static float CalculateImageScale(int originalWidth, int originalHeight)
-	{
-		bool needsUpscaling = originalWidth < coverImageWidth || originalHeight < coverImageHeight;
-		var scaleX = (float)coverImageWidth / originalWidth;
-		var scaleY = (float)coverImageHeight / originalHeight;
-
-		return needsUpscaling ? Math.Max(scaleX, scaleY) : Math.Min(scaleX, scaleY);
-	}
-
-	static Image<SixLabors.ImageSharp.PixelFormats.Rgba32> CreateResizedImage(
-		SixLabors.ImageSharp.Image originalImage, int newWidth, int newHeight)
-	{
-		var resizedImage = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(
-			coverImageWidth, coverImageHeight);
-
-		resizedImage.Mutate(ctx => ctx.BackgroundColor(SixLabors.ImageSharp.Color.Transparent));
-		originalImage.Mutate(ctx => ctx.Resize(newWidth, newHeight));
-
-		var x = (coverImageWidth - newWidth) / 2;
-		var y = (coverImageHeight - newHeight) / 2;
-
-		resizedImage.Mutate(ctx => ctx.DrawImage(originalImage, new SixLabors.ImageSharp.Point(x, y), 1f));
-
-		return resizedImage;
-	}
-
-	static byte[] SaveImageAsPng(SixLabors.ImageSharp.Image image)
-	{
-		using var outputStream = new MemoryStream();
-		image.SaveAsPng(outputStream, new SixLabors.ImageSharp.Formats.Png.PngEncoder
-		{
-			CompressionLevel = SixLabors.ImageSharp.Formats.Png.PngCompressionLevel.DefaultCompression
-		});
-		return outputStream.ToArray();
-	}
-
 	#endregion
 }

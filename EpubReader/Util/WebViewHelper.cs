@@ -136,6 +136,15 @@ public partial class WebViewHelper(WebView handler)
 		}
 	}
 
+	/// <summary>
+	/// Asynchronously sets the color scheme for the web view based on the specified settings.
+	/// </summary>
+	/// <remarks>This method updates the web view's color scheme by applying the specified background and text
+	/// colors. If both colors in the <paramref name="settings"/> are null or empty, the method resets the color scheme to
+	/// its default state.</remarks>
+	/// <param name="settings">The settings containing the background and text colors to apply. If both colors are null or empty, the color scheme
+	/// will be reset to default.</param>
+	/// <returns>A task that represents the asynchronous operation.</returns>
 	async Task SetColorSchemeAsync(Settings settings)
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor))
@@ -152,6 +161,16 @@ public partial class WebViewHelper(WebView handler)
 		}
 	}
 
+	/// <summary>
+	/// Asynchronously sets the font properties for the web view based on the specified settings.
+	/// </summary>
+	/// <remarks>This method updates the font settings in the web view by executing JavaScript commands. If the font
+	/// family is specified, it enables the font override and sets the font family. If the font size is greater than zero,
+	/// it sets the font size as a percentage. Otherwise, it unsets the respective properties.</remarks>
+	/// <param name="settings">The settings containing font properties such as font family and font size. The <see cref="Settings.FontFamily"/>
+	/// property cannot be null or empty to apply a font family, and <see cref="Settings.FontSize"/> must be greater than
+	/// zero to apply a font size.</param>
+	/// <returns>A task that represents the asynchronous operation.</returns>
 	async Task SetFontDataAsync(Settings settings)
 	{
 		if (!string.IsNullOrEmpty(settings.FontFamily))
@@ -174,6 +193,14 @@ public partial class WebViewHelper(WebView handler)
 		}
 	}
 
+	/// <summary>
+	/// Asynchronously retrieves the width of the content and adjusts it based on the specified settings.
+	/// </summary>
+	/// <remarks>The method evaluates a JavaScript function to obtain the initial width and then adjusts it based on
+	/// the font size and whether multiple columns are supported. If multiple columns are supported, the width is divided
+	/// by three before adjusting for font size.</remarks>
+	/// <param name="settings">The settings used to determine the font size and column support for the width calculation. Must not be null.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains the calculated width as an integer.</returns>
 	async Task<int> GetWidthAsync(Settings settings)
 	{
 		var result = await webView.EvaluateJavaScriptAsync("getWidth()");

@@ -156,6 +156,14 @@ public class StreamExtensions
 		};
 	}
 
+	/// <summary>
+	/// Retrieves the HTML content associated with the specified file name.
+	/// </summary>
+	/// <remarks>The method searches for the file name within the book's chapters, files, and CSS. If a match is
+	/// found, it returns the corresponding HTML content. If no match is found or if the instance or book is not
+	/// initialized, the method returns <see langword="null"/>.</remarks>
+	/// <param name="fileName">The name of the file to search for within the book's chapters, files, and CSS.</param>
+	/// <returns>A string containing the HTML content of the file if found; otherwise, <see langword="null"/>.</returns>
 	string? Content(string fileName)
 	{
 		if (Instance is null || Book is null)
@@ -168,6 +176,16 @@ public class StreamExtensions
 			?? Book.Css.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 			?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.HTMLContent;
 	}
+
+	/// <summary>
+	/// Retrieves the byte content of a file specified by its name from the book's images, fonts, or files.
+	/// </summary>
+	/// <remarks>The method searches for the file in the book's images, fonts, and files collections in that order.
+	/// If the <c>Instance</c> or <c>Book</c> is <see langword="null"/>, the method returns <see
+	/// langword="null"/>.</remarks>
+	/// <param name="fileName">The name of the file to search for within the book's resources. The search is case-sensitive and matches any part
+	/// of the file name.</param>
+	/// <returns>A byte array containing the content of the file if found; otherwise, <see langword="null"/>.</returns>
 	byte[]? ByteContent(string fileName)
 	{
 		if (Instance is null || Book is null)

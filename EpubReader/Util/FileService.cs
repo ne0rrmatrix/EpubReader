@@ -123,7 +123,7 @@ public static partial class FileService
 				return string.Empty;
 			}
 
-			await File.WriteAllBytesAsync(fileName, imageBytes, cancellation);
+			await File.WriteAllBytesAsync(fileName, imageBytes, cancellation).ConfigureAwait(false);
 			logger.Info($"Image saved: {bookName}");
 			return fileName;
 		}
@@ -167,9 +167,9 @@ public static partial class FileService
 			}
 
 			var fileName = GenerateEpubFileName(bookName, directoryPath);
-			var fileBytes = await ReadStreamToBytesAsync(stream, cancellation);
+			var fileBytes = await ReadStreamToBytesAsync(stream, cancellation).ConfigureAwait(false);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes, cancellation);
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellation).ConfigureAwait(false);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -214,10 +214,10 @@ public static partial class FileService
 
 			var fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
 
-			using var fileStream = await result.OpenReadAsync();
-			var fileBytes = await ReadStreamToBytesAsync(fileStream, cancellationToken);
+			using var fileStream = await result.OpenReadAsync().ConfigureAwait(false);
+			var fileBytes = await ReadStreamToBytesAsync(fileStream, cancellationToken).ConfigureAwait(false);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes, cancellationToken);
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellationToken).ConfigureAwait(false);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -358,7 +358,7 @@ public static partial class FileService
 		}
 
 		using var memoryStream = new MemoryStream();
-		await stream.CopyToAsync(memoryStream, cancellation);
+		await stream.CopyToAsync(memoryStream, cancellation).ConfigureAwait(false);
 		return memoryStream.ToArray();
 	}
 

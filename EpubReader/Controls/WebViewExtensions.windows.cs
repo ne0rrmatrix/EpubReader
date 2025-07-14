@@ -43,6 +43,13 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2.DownloadStarting -= CoreWebView2_DownloadStarting;
 	}
 
+	/// <summary>
+	/// Initializes the settings and event handlers for a WebView2 instance when the CoreWebView2 is initialized.
+	/// </summary>
+	/// <remarks>This method configures various settings for the WebView2, such as enabling developer tools and
+	/// script execution. It also sets up event handlers for download starting and web resource requests.</remarks>
+	/// <param name="sender">The WebView2 instance that triggered the initialization event.</param>
+	/// <param name="args">The event data associated with the CoreWebView2 initialization.</param>
 	static void WebView2_CoreWebView2Initialized(WebView2 sender, CoreWebView2InitializedEventArgs args)
 	{
 		ArgumentNullException.ThrowIfNull(webViewHandler);
@@ -59,11 +66,27 @@ public static partial class WebViewExtensions
 		coreWebView.WebResourceRequested += CoreWebView2_WebResourceRequested;
 	}
 
+	/// <summary>
+	/// Handles the event that occurs when a download is starting in the WebView2 control.
+	/// </summary>
+	/// <remarks>This method sets the <see cref="CoreWebView2DownloadStartingEventArgs.Handled"/> property to <see
+	/// langword="true"/>, indicating that the download event has been handled.</remarks>
+	/// <param name="sender">The <see cref="CoreWebView2"/> instance that triggered the event.</param>
+	/// <param name="args">The <see cref="CoreWebView2DownloadStartingEventArgs"/> containing event data, including the download operation
+	/// details.</param>
 	static void CoreWebView2_DownloadStarting(CoreWebView2 sender, CoreWebView2DownloadStartingEventArgs args)
 	{
 		args.Handled = true;
 	}
 
+	/// <summary>
+	/// Handles the WebResourceRequested event for a CoreWebView2 instance.
+	/// </summary>
+	/// <remarks>This method processes web resource requests by checking the request URI and responding accordingly.
+	/// If the URI contains "https://runcsharp", a 404 response is returned. Otherwise, it attempts to retrieve the
+	/// requested resource and respond with the appropriate data and MIME type.</remarks>
+	/// <param name="sender">The CoreWebView2 instance that raised the event.</param>
+	/// <param name="e">The event arguments containing details about the web resource request.</param>
 	static async void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(webViewHandler);
@@ -87,6 +110,12 @@ public static partial class WebViewExtensions
         e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
 		cancellationTokenSource.Dispose();
 	}
+
+	/// <summary>
+	/// Generates HTTP headers for CORS and content type.
+	/// </summary>
+	/// <param name="contentType">The MIME type to be set in the Content-Type header.</param>
+	/// <returns>A string containing the complete set of HTTP headers, including CORS and the specified Content-Type.</returns>
 	static string GenerateHeaders(string contentType)
 	{
 		const string baseHeaders = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
