@@ -95,7 +95,7 @@ public static partial class FileService
 	/// <param name="imageBytes">The byte array representing the image to be saved.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved image file,
 	/// or an empty string if the operation fails.</returns>
-	public static async Task<string> SaveImageAsync(string bookName, byte[] imageBytes)
+	public static async Task<string> SaveImageAsync(string bookName, byte[] imageBytes, CancellationToken cancellation = default)
 	{
 		if (string.IsNullOrWhiteSpace(bookName))
 		{
@@ -123,7 +123,7 @@ public static partial class FileService
 				return string.Empty;
 			}
 
-			await File.WriteAllBytesAsync(fileName, imageBytes);
+			await File.WriteAllBytesAsync(fileName, imageBytes, cancellation);
 			logger.Info($"Image saved: {bookName}");
 			return fileName;
 		}
@@ -144,7 +144,7 @@ public static partial class FileService
 	/// <param name="bookName">The name of the book, used to determine the file name and directory. The name should not include an extension.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved file if
 	/// successful; otherwise, an empty string.</returns>
-	public static async Task<string> SaveFileAsync(Stream stream, string bookName)
+	public static async Task<string> SaveFileAsync(Stream stream, string bookName, CancellationToken cancellation = default)
 	{
 		if (stream == null)
 		{
@@ -167,9 +167,9 @@ public static partial class FileService
 			}
 
 			var fileName = GenerateEpubFileName(bookName, directoryPath);
-			var fileBytes = await ReadStreamToBytesAsync(stream);
+			var fileBytes = await ReadStreamToBytesAsync(stream, cancellation);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes);
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellation);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -190,7 +190,7 @@ public static partial class FileService
 	/// <param name="bookName">The name of the book used to determine the directory path. The directory will be created if it does not exist.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved file, or an
 	/// empty string if an error occurs.</returns>
-	public static async Task<string> SaveFileAsync(FileResult result, string bookName)
+	public static async Task<string> SaveFileAsync(FileResult result, string bookName, CancellationToken cancellationToken = default)
 	{
 		if (result == null)
 		{
@@ -215,9 +215,9 @@ public static partial class FileService
 			var fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
 
 			using var fileStream = await result.OpenReadAsync();
-			var fileBytes = await ReadStreamToBytesAsync(fileStream);
+			var fileBytes = await ReadStreamToBytesAsync(fileStream, cancellationToken);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes);
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellationToken);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -350,7 +350,7 @@ public static partial class FileService
 	/// </summary>
 	/// <param name="stream">The stream to read from.</param>
 	/// <returns>A byte array containing the stream content.</returns>
-	static async Task<byte[]> ReadStreamToBytesAsync(Stream stream)
+	static async Task<byte[]> ReadStreamToBytesAsync(Stream stream, CancellationToken cancellation = default)
 	{
 		if (stream.CanSeek)
 		{
@@ -358,7 +358,7 @@ public static partial class FileService
 		}
 
 		using var memoryStream = new MemoryStream();
-		await stream.CopyToAsync(memoryStream);
+		await stream.CopyToAsync(memoryStream, cancellation);
 		return memoryStream.ToArray();
 	}
 

@@ -21,7 +21,7 @@ public partial class WebViewHelper(WebView handler)
 	/// <returns></returns>
 	public async Task OnSettingsClickedAsync()
 	{
-		var settings = db.GetSettings() ?? new();
+		var settings = await db.GetSettings() ?? new();
 		await SetColorSchemeAsync(settings);
 		await SetFontDataAsync(settings);
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
@@ -66,7 +66,7 @@ public partial class WebViewHelper(WebView handler)
 		{
 			book.CurrentChapter++;
 			book.CurrentPage = 0;
-			db.UpdateBookMark(book);
+			await db.UpdateBookMark(book);
 			await LoadPageAsync(label, book);
 		}
 	}
@@ -83,7 +83,7 @@ public partial class WebViewHelper(WebView handler)
 		{
 			book.CurrentChapter--;
 			book.CurrentPage = 0;
-			db.UpdateBookMark(book);
+			await db.UpdateBookMark(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPageAsync(label, book);
 		}

@@ -58,10 +58,10 @@ public static partial class EbookService
 	/// <param name="path">The file path to the ePub book. Must be a valid path to an ePub file.</param>
 	/// <returns>A <see cref="Book"/> object containing the title, file path, and cover image of the book. Returns <see
 	/// langword="null"/> if the book cannot be opened or an error occurs.</returns>
-	public static Book? GetListing(string path)
+	public static async Task<Book?> GetListingAsync(string path)
 	{
-		var book = OpenEpubBook(path);
-		return book is null ? null : CreateBookListing(book, path);
+		var book = await OpenEpubBookAsync(path);
+		return book is null ? null : await CreateBookListingAsync(book, path);
 	}
 
 	/// <summary>
@@ -71,10 +71,10 @@ public static partial class EbookService
 	/// <param name="path">The file path associated with the EPUB file, used for setting the <see cref="Book.FilePath"/> property.</param>
 	/// <returns>A <see cref="Book"/> object containing the title, file path, and cover image of the EPUB book. Returns <see
 	/// langword="null"/> if the EPUB file cannot be opened or processed.</returns>
-	public static Book? GetListing(Stream stream, string path)
+	public static async Task<Book?> GetListingAsync(Stream stream, string path)
 	{
-		var book = OpenEpubBook(stream);
-		return book is null ? null : CreateBookListing(book, path);
+		var book = await OpenEpubBook(stream);
+		return book is null ? null : await CreateBookListingAsync(book, path);
 	}
 
 	/// <summary>
@@ -94,9 +94,9 @@ public static partial class EbookService
 
 	#region Private Helper Methods - Book Creation
 
-	static Book CreateBookListing(EpubBookRef book, string path)
+	static async Task<Book> CreateBookListingAsync(EpubBookRef book, string path)
 	{
-		var coverBytes = book.ReadCover() ?? GenerateCoverImage(book.Title);
+		var coverBytes = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
 		var coverImage = ResizeImageForCollectionView(coverBytes);
 
 		return new Book
@@ -112,8 +112,7 @@ public static partial class EbookService
 		var sharedFiles = await GetSharedFilesAsync();
 		var fonts = await ExtractFontsAsync(book);
 		var description = ProcessDescription(book.Description);
-		var coverBytes = await book.ReadCoverAsync() ?? GenerateCoverImage(book.Title);
-		var coverImage = ResizeImageForCollectionView(coverBytes);
+		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		var cssFiles = ExtractCssFiles(book);
 		var chapters = await GetChaptersAsync(book);
 		var images = ExtractImages(book);
@@ -138,34 +137,6 @@ public static partial class EbookService
 
 	#region Private Helper Methods - EPUB Operations
 
-	static EpubBookRef? OpenEpubBook(string path)
-	{
-		try
-		{
-			ConfigureContentFileMissingHandler();
-			return VersOne.Epub.EpubReader.OpenBook(path, options);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Get Listing Error: {ex.Message}");
-			return null;
-		}
-	}
-
-	static EpubBookRef? OpenEpubBook(Stream stream)
-	{
-		try
-		{
-			ConfigureContentFileMissingHandler();
-			return VersOne.Epub.EpubReader.OpenBook(stream, options);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Get Listing Error: {ex.Message}");
-			return null;
-		}
-	}
-
 	static async Task<EpubBookRef?> OpenEpubBookAsync(string path)
 	{
 		try
@@ -175,10 +146,25 @@ public static partial class EbookService
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error opening ebook: {ex.Message}");
+			logger.Error($"Get Listing Error: {ex.Message}");
 			return null;
 		}
 	}
+
+	static async Task<EpubBookRef?> OpenEpubBook(Stream stream)
+	{
+		try
+		{
+			ConfigureContentFileMissingHandler();
+			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, options);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Get Listing Error: {ex.Message}");
+			return null;
+		}
+	}
+
 
 	static void ConfigureContentFileMissingHandler()
 	{
@@ -217,7 +203,7 @@ public static partial class EbookService
 		return sharedFiles;
 	}
 
-	static async Task<SharedEpubFiles?> GetSharedFileAsync(string fileName)
+	static async Task<SharedEpubFiles?> GetSharedFileAsync(string fileName, CancellationToken cancellation = default)
 	{
 		var exists = await FileSystem.AppPackageFileExistsAsync(fileName);
 		if (!exists)
@@ -228,7 +214,7 @@ public static partial class EbookService
 		await using var stream = await FileSystem.OpenAppPackageFileAsync(fileName);
 		using var reader = new StreamReader(stream);
 		using var memoryStream = new MemoryStream();
-		await reader.BaseStream.CopyToAsync(memoryStream);
+		await reader.BaseStream.CopyToAsync(memoryStream, cancellation);
 		var bytes = memoryStream.ToArray();
 
 		var sharedFile = new SharedEpubFiles { FileName = fileName };

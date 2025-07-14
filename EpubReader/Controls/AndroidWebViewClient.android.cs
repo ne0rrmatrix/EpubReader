@@ -18,7 +18,9 @@ class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
-	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	
+	readonly CancellationTokenSource cancellationTokenSource = new();
+	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CustomWebViewClient"/> class with the specified web view handler.
@@ -65,8 +67,27 @@ class CustomWebViewClient : WebViewClient
 
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
-		var stream = streamExtensions.GetStream(url);
-		return WebResourceResponseHelper.CreateFromHtmlString(stream, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
+		
+		var getData = StreamAsync(url, cancellationTokenSource.Token);
+		
+		if (getData.IsFaulted || getData.IsCanceled)
+		{
+			return base.ShouldInterceptRequest(view, request);
+		}
+		return WebResourceResponseHelper.CreateFromHtmlString(getData.Result, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
+	}
+
+	/// <summary>
+	/// Asynchronously retrieves a stream from the specified URL.
+	/// </summary>
+	/// <param name="url">The URL from which to retrieve the stream. Must be a valid, accessible URL.</param>
+	/// <param name="cancellation">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains the stream retrieved from the specified
+	/// URL.</returns>
+	static async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
+	{
+		var result = await streamExtensions.GetStream(url, cancellation);
+		return result;
 	}
 
 	/// <summary>

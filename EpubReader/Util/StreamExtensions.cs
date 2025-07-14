@@ -41,7 +41,7 @@ public class StreamExtensions
 	/// <returns>A <see cref="Stream"/> containing the content of the file specified by the URL.  If the file is a text file, the
 	/// stream contains UTF-8 encoded text.  If the file is a binary file, the stream contains the raw binary data. 
 	/// Returns <see cref="Stream.Null"/> if the content cannot be retrieved or the file type is unsupported.</returns>
-	public Stream GetStream(string url)
+	public async Task<Stream> GetStream(string url, CancellationToken cancellation = default)
 	{
 		var filename = System.IO.Path.GetFileName(url);
 		var text = Content(filename);
@@ -51,7 +51,7 @@ public class StreamExtensions
 			byte[] postData = utfEncoding.GetBytes(
 				text);
 			MemoryStream postDataStream = new(text.Length);
-			postDataStream.Write(postData, 0, postData.Length);
+			await postDataStream.WriteAsync(postData, cancellation);
 			postDataStream.Seek(0, SeekOrigin.Begin);
 			return postDataStream;
 		}
@@ -59,7 +59,7 @@ public class StreamExtensions
 		if (bytes is not null && IsBinary(filename))
 		{
 			MemoryStream postDataStream = new(bytes.Length);
-			postDataStream.Write(bytes, 0, bytes.Length);
+			await postDataStream.WriteAsync(bytes, cancellation);
 			postDataStream.Seek(0, SeekOrigin.Begin);
 			return postDataStream;
 		}

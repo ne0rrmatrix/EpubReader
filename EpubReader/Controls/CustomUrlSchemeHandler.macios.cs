@@ -27,7 +27,7 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 	/// <exception cref="InvalidOperationException">Thrown if the URL or the data stream is null, indicating an invalid request or resource.</exception>
 	[Export("webView:startURLSchemeTask:")]
 	[SupportedOSPlatform("ios11.0")]
-	public void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
+	public async void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
 	{
 		var url = urlSchemeTask.Request.Url.AbsoluteString ?? "";
 		if(!url.StartsWith("app://demo/"))
@@ -38,7 +38,7 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 		var path = url["app://demo/".Length..];
 		var filename = Path.GetFileName(path) ?? throw new InvalidOperationException("url is null");
 		var mimeType = FileService.GetMimeType(filename);
-		var stream = streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
+		var stream = await streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
 		var data = NSData.FromStream(stream) ?? throw new InvalidOperationException("data is null");
 		using var dic = new NSMutableDictionary<NSString, NSString>
 		{

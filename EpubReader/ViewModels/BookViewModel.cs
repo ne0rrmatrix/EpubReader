@@ -97,10 +97,10 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// outside of it, the popup is deactivated.</remarks>
 	/// <returns></returns>
 	[RelayCommand]
-	async Task ShowPopup()
+	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var result = await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current);
+		var result = await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current,null, cancellation);
 		if (result.WasDismissedByTappingOutsideOfPopup)
 		{
 			isPopupActive = false;

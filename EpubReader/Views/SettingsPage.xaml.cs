@@ -19,7 +19,9 @@ public partial class SettingsPage : Popup
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db;
-	Settings settings;
+	Settings? settings;
+	readonly Task settingsTask;
+
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="SettingsPage"/> class with the specified view model and database.
@@ -33,12 +35,19 @@ public partial class SettingsPage : Popup
         InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-		settings = db.GetSettings() ?? new();
+		settingsTask = InitializeSettings();
+		
+	}
+
+	async Task InitializeSettings()
+	{
+		settings = await db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;
 		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 	}
+
 
 	/// <summary>
 	/// Handles the event when the font size slider value changes.
@@ -47,14 +56,14 @@ public partial class SettingsPage : Popup
 	/// of the update.</remarks>
 	/// <param name="sender">The source of the event, typically the slider control.</param>
 	/// <param name="e">The <see cref="ValueChangedEventArgs"/> containing the old and new values of the slider.</param>
-	void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
+	async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
 	{
-		if((int)e.NewValue == 0)
+		if((int)e.NewValue == 0 || settings is null)
 		{
 			return;
 		}
 		settings.FontSize = (int)e.NewValue;
-		db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
@@ -66,11 +75,11 @@ public partial class SettingsPage : Popup
 	/// have been reset.</remarks>
 	/// <param name="sender">The source of the event that triggered the method.</param>
 	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
-	void RemoveAllSettings(object sender, EventArgs e)
+	async void RemoveAllSettings(object sender, EventArgs e)
 	{
-		db.RemoveAllSettings();
+		await db.RemoveAllSettings();
 		settings = new Settings();
-		db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
@@ -87,8 +96,13 @@ public partial class SettingsPage : Popup
 	/// to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">The event data.</param>
-	void ThemePicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void ThemePicker_SelectedIndexChanged(object sender, EventArgs e)
 	{
+		if(settings is null)
+		{
+			logger.Warn("Settings are null, cannot change theme.");
+			return;
+		}
 		var selectedTheme = ThemePicker.SelectedItem;
 		if (selectedTheme is not ColorScheme scheme || settings.ColorScheme == scheme.Name)
 		{
@@ -99,7 +113,7 @@ public partial class SettingsPage : Popup
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
 		logger.Info($"Changing color scheme to: {scheme.Name}");
-		db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
@@ -110,8 +124,13 @@ public partial class SettingsPage : Popup
 	/// updated settings to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event, typically the font picker control.</param>
 	/// <param name="e">The event data associated with the selection change.</param>
-	void FontPicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void FontPicker_SelectedIndexChanged(object sender, EventArgs e)
 	{
+		if(settings is null)
+		{
+			logger.Warn("Settings are null, cannot change font.");
+			return;
+		}
 		var selectedTheme = FontPicker.SelectedItem;
 		if (selectedTheme is not EpubFonts font || settings.FontFamily == font.FontFamily)
 		{
@@ -120,7 +139,7 @@ public partial class SettingsPage : Popup
 
 		settings.FontFamily = font.FontFamily;
 		logger.Info($"Chaging Font to: {font.FontFamily}");
-		db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
@@ -132,10 +151,15 @@ public partial class SettingsPage : Popup
 	/// is also updated to reflect the current state.</remarks>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">The event data.</param>
-	void ToggleMultipleColumns(object sender, EventArgs e)
+	async void ToggleMultipleColumns(object sender, EventArgs e)
 	{
+		if(settings is null)
+		{
+			logger.Warn("Settings are null, cannot toggle multiple columns.");
+			return;
+		}
 		settings.SupportMultipleColumns = !settings.SupportMultipleColumns;
-		db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 	}

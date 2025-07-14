@@ -64,7 +64,7 @@ public static partial class WebViewExtensions
 		args.Handled = true;
 	}
 
-	static void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
+	static async void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		var url = e.Request.Uri ?? string.Empty;
@@ -76,14 +76,16 @@ public static partial class WebViewExtensions
 			return;
 		}
 
+		CancellationTokenSource cancellationTokenSource = new();
+		var getData = await StreamAsync(url, cancellationTokenSource.Token);
 		var mimeType = StreamExtensions.GetMimeType(filename);
-		var stream = streamExtensions.GetStream(url);
-		if (stream is null)
+		if (getData is null)
 		{
 			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
 			return;
 		}
-		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
+        e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
+		cancellationTokenSource.Dispose();
 	}
 	static string GenerateHeaders(string contentType)
 	{
@@ -93,4 +95,16 @@ public static partial class WebViewExtensions
 		return completeHeaders;
 	}
 
+	/// <summary>
+	/// Asynchronously retrieves a stream from the specified URL.
+	/// </summary>
+	/// <param name="url">The URL from which to retrieve the stream. Must be a valid, accessible URL.</param>
+	/// <param name="cancellation">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+	/// <returns>A task that represents the asynchronous operation. The task result contains the stream retrieved from the specified
+	/// URL.</returns>
+	static async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
+	{
+		var result = await streamExtensions.GetStream(url, cancellation);
+		return result;
+	}
 }

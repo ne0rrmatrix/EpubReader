@@ -35,7 +35,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 	readonly IFolderPicker folderPicker;
 	readonly FilePickerFileType customFileType;
-
+	readonly Task? initializationTask;
 	#endregion
 
 	#region Properties
@@ -59,9 +59,20 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </remarks>
 	public LibraryViewModel()
 	{
+		Books = [];
 		folderPicker = GetFolderPickerService();
 		customFileType = CreateCustomFileType();
-		Books = new ObservableCollection<Book>(db.GetAllBooks() ?? []);
+		initializationTask = InitializeLibraryAsync();
+		if(initializationTask?.IsFaulted == true || initializationTask?.IsCanceled == true)
+		{
+			logger.Error("Error initializing library: {Message}", initializationTask.Exception);
+		}
+	}
+
+	async Task? InitializeLibraryAsync()
+	{
+		var temp = await db.GetAllBooks();
+		Books = new ObservableCollection<Book>(temp ?? []);
 	}
 
 	#endregion
@@ -79,7 +90,7 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			var existingBook = db.GetBook(book);
+			var existingBook = await db.GetBook(book);
 			ArgumentNullException.ThrowIfNull(existingBook);
 
 			Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true)
@@ -159,7 +170,7 @@ public partial class LibraryViewModel : BaseViewModel
 				return;
 			}
 
-			var ebook = EbookService.GetListing(result.FullPath);
+			var ebook = await EbookService.GetListingAsync(result.FullPath);
 			if (ebook is null)
 			{
 				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
@@ -290,7 +301,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 			using (stream)
 			{
-				var ebook = EbookService.GetListing(stream, filePath);
+				var ebook = await EbookService.GetListingAsync(stream, filePath);
 				if (ebook is null)
 				{
 					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}", cancellationToken);
@@ -335,12 +346,12 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
+			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
 			{
-				db.SaveBookData(ebook);
+				await db.SaveBookData(ebook, cancellationToken);
 				Books.Add(ebook);
 				await ShowInfoToastAsync("Book added to library", cancellationToken);
 				logger.Info($"Book added to library: {ebook.Title}");
@@ -369,12 +380,12 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
 			{
-				db.SaveBookData(ebook);
+				await db.SaveBookData(ebook, cancellationToken);
 				Books.Add(ebook);
 				logger.Info($"Book saved successfully: {ebook.Title}");
 			}
@@ -425,11 +436,11 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	/// <param name="options">The options for picking files.</param>
 	/// <returns>The selected file, or null if no file was selected or an error occurred.</returns>
-	static async Task<FileResult?> PickAndShowAsync(PickOptions options)
+	static async Task<FileResult?> PickAndShowAsync(PickOptions options, CancellationToken cancellationToken = default)
 	{
 		try
 		{
-			return await FilePicker.PickAsync(options).WaitAsync(CancellationToken.None);
+			return await FilePicker.PickAsync(options).WaitAsync(cancellationToken);
 		}
 		catch (Exception ex)
 		{

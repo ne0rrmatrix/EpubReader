@@ -38,7 +38,7 @@ public partial class BookPage : ContentPage
 		webViewHelper = new(webView);
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); UpdateUiAppearance(); });
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
 	/// <summary>
@@ -117,7 +117,7 @@ public partial class BookPage : ContentPage
 		var methodName = GetMethodNameFromUrl(url);
 		var data = BookPage.GetDataFromUrl(url);
 		await HandleWebViewActionAsync(methodName, data);
-		UpdateUiAppearance();
+		await UpdateUiAppearance();
 	}
 
 	/// <summary>
@@ -168,7 +168,7 @@ public partial class BookPage : ContentPage
 			}
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
-			db.UpdateBookMark(book);
+			await db.UpdateBookMark(book);
 		}
 	}
 	static async Task TryHandleExternalLinkAsync(string url)
@@ -226,7 +226,7 @@ public partial class BookPage : ContentPage
 				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
-				UpdateUiAppearance();
+				await UpdateUiAppearance();
 				if (currentPage == 0 && book.CurrentPage > 0)
 				{
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
@@ -235,7 +235,7 @@ public partial class BookPage : ContentPage
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
-				db.UpdateBookMark(book);
+				await db.UpdateBookMark(book);
 
 				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
 				{
@@ -263,10 +263,10 @@ public partial class BookPage : ContentPage
 		return WebViewHelper.GetSyntheticPageInfo(book);
 	}
 
-	void UpdateUiAppearance()
+	async Task UpdateUiAppearance()
 	{
 		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
-		var settings = db.GetSettings() ?? new();
+		var settings = await db.GetSettings() ?? new();
 		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
 			settings.BackgroundColor = "#FFFFFF"; // Default background color
@@ -317,7 +317,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);
@@ -342,7 +342,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);
