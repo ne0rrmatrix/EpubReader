@@ -61,7 +61,7 @@ public static partial class EbookService
 	public static async Task<Book?> GetListingAsync(string path)
 	{
 		var book = await OpenEpubBookAsync(path);
-		return book is null ? null : await CreateBookListingAsync(book, path);
+		return book is null ? null : await CreateBookListingAsync(book, path).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -73,8 +73,8 @@ public static partial class EbookService
 	/// langword="null"/> if the EPUB file cannot be opened or processed.</returns>
 	public static async Task<Book?> GetListingAsync(Stream stream, string path)
 	{
-		var book = await OpenEpubBook(stream);
-		return book is null ? null : await CreateBookListingAsync(book, path);
+		var book = await OpenEpubBook(stream).ConfigureAwait(false);
+		return book is null ? null : await CreateBookListingAsync(book, path).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -86,8 +86,8 @@ public static partial class EbookService
 	/// eBook's metadata, content, and resources. Returns <see langword="null"/> if the eBook cannot be opened.</returns>
 	public static async Task<Book?> OpenEbookAsync(string path)
 	{
-		var book = await OpenEpubBookAsync(path);
-		return book is null ? null : await CreateFullBookAsync(book, path);
+		var book = await OpenEpubBookAsync(path).ConfigureAwait(false);
+		return book is null ? null : await CreateFullBookAsync(book, path).ConfigureAwait(false);
 	}
 
 	#endregion

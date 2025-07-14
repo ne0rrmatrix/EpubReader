@@ -163,14 +163,14 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			var result = await PickEpubFileAsync();
+			var result = await PickEpubFileAsync().ConfigureAwait(false);
 			if (result is null)
 			{
 				logger.Info("No file selected");
 				return;
 			}
 
-			var ebook = await EbookService.GetListingAsync(result.FullPath);
+			var ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
 			if (ebook is null)
 			{
 				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
@@ -183,7 +183,7 @@ public partial class LibraryViewModel : BaseViewModel
 				return;
 			}
 
-			await SaveBookToLibraryAsync(ebook, result, cancellationToken);
+			await SaveBookToLibraryAsync(ebook, result, cancellationToken).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -260,7 +260,7 @@ public partial class LibraryViewModel : BaseViewModel
 			PickerTitle = "Please select an EPUB book"
 		};
 
-		return await PickAndShowAsync(options);
+		return await PickAndShowAsync(options).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -278,7 +278,7 @@ public partial class LibraryViewModel : BaseViewModel
 				break;
 			}
 
-			await ProcessSingleEpubFileAsync(file, cancellationToken);
+			await ProcessSingleEpubFileAsync(file, cancellationToken).ConfigureAwait(false);
 		}
 	}
 
@@ -301,7 +301,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 			using (stream)
 			{
-				var ebook = await EbookService.GetListingAsync(stream, filePath);
+				var ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
 				if (ebook is null)
 				{
 					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}", cancellationToken);
@@ -351,7 +351,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 			if (ValidateBookFiles(ebook))
 			{
-				await db.SaveBookData(ebook, cancellationToken);
+				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 				Books.Add(ebook);
 				await ShowInfoToastAsync("Book added to library", cancellationToken);
 				logger.Info($"Book added to library: {ebook.Title}");
@@ -385,7 +385,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 			if (ValidateBookFiles(ebook))
 			{
-				await db.SaveBookData(ebook, cancellationToken);
+				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 				Books.Add(ebook);
 				logger.Info($"Book saved successfully: {ebook.Title}");
 			}
@@ -440,7 +440,7 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			return await FilePicker.PickAsync(options).WaitAsync(cancellationToken);
+			return await FilePicker.PickAsync(options).WaitAsync(cancellationToken).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{

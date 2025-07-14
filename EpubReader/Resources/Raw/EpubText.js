@@ -732,7 +732,6 @@ function gotoPage(page) {
         currentPage = 0;
         return;
     }
-    //navigationUtils.scrollToPage(page);
     adjustVirtualColumns();
 
 

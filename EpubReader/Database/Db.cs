@@ -14,6 +14,7 @@ namespace EpubReader.Database;
 /// necessary tables are created upon initialization and provides methods to handle data persistence.</remarks>
 public partial class Db : IDb
 {
+	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
 	SQLiteAsyncConnection? conn;
@@ -58,7 +59,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		var results = await conn.Table<Settings>().ToListAsync().WaitAsync(cancellationToken);
@@ -75,7 +76,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		var results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken);
@@ -92,7 +93,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		var result = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
@@ -110,7 +111,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null) 
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		var item = await conn.Table<Settings>()
@@ -138,7 +139,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
@@ -163,7 +164,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 
@@ -190,7 +191,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		logger.Info("Removing all settings");
@@ -208,7 +209,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		logger.Info("Removing book");
@@ -225,7 +226,7 @@ public partial class Db : IDb
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
 		{
-			logger.Error("Database connection is null. Ensure that the database is initialized.");
+			logger.Error(errorMsg);
 			throw new InvalidOperationException("Database connection is not initialized.");
 		}
 		logger.Info("Removing all books");

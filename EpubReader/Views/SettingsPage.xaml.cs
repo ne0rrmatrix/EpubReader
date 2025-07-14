@@ -32,11 +32,14 @@ public partial class SettingsPage : Popup
 	/// <param name="db">The database interface used to retrieve and store settings.</param>
 	public SettingsPage(SettingsPageViewModel viewModel, IDb db)
 	{
-        InitializeComponent();
+		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		settingsTask = InitializeSettings();
-		
+		if (settingsTask.IsFaulted || settingsTask.IsCanceled)
+		{
+			logger.Error($"Failed to initialize settings: {settingsTask.Exception}");
+		}
 	}
 
 	async Task InitializeSettings()
