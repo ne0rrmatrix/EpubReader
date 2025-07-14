@@ -212,7 +212,7 @@ public partial class BookPage : ContentPage
 	{
 		var tempCurrentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
 		var currentPage = int.TryParse(tempCurrentPage, out int parsedPage) ? parsedPage : 0;
-		
+
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
@@ -236,7 +236,7 @@ public partial class BookPage : ContentPage
 			case "characterposition":
 				book.CurrentPage = currentPage;
 				db.UpdateBookMark(book);
-				
+
 				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
 				{
 					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
@@ -256,7 +256,7 @@ public partial class BookPage : ContentPage
 	async Task<string> GetCurrentPageInfoAsync()
 	{
 		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
-		if(int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
+		if (int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
 		{
 			return WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
 		}

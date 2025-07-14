@@ -13,44 +13,60 @@ using LoggerFactory = MetroLog.LoggerFactory;
 namespace EpubReader.ViewModels;
 
 /// <summary>
-/// Represents the view model for managing a library of books, providing functionality to add, remove, and navigate
-/// books.
+/// Represents the view model for managing a library of books, providing functionality to add, remove, and navigate books.
 /// </summary>
-/// <remarks>The <see cref="LibraryViewModel"/> class is responsible for handling operations related to a
-/// collection of books, including adding books from files, removing books, and navigating to a book's page. It
-/// interacts with services for file picking, database operations, and ebook processing. This class is designed to be
-/// used in a UI context where users can manage their book library.</remarks>
+/// <remarks>
+/// The <see cref="LibraryViewModel"/> class is responsible for handling operations related to a collection of books,
+/// including adding books from files, removing books, and navigating to a book's page. It interacts with services
+/// for file picking, database operations, and ebook processing.
+/// </remarks>
 public partial class LibraryViewModel : BaseViewModel
 {
+	#region Constants and Static Fields
+
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
-	readonly IFolderPicker folderPicker = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>() ?? throw new InvalidOperationException();
-	static readonly string[] epub = [".epub", ".epub"];
-    static readonly string[] android_epub = ["application/epub+zip", ".epub"];
-	readonly FilePickerFileType customFileType = new(
-		  new Dictionary<DevicePlatform, IEnumerable<string>>
-		  {
-			 { DevicePlatform.iOS, new[] { "org.idpf.epub-container" } },
-			 { DevicePlatform.MacCatalyst, new[] { "org.idpf.epub-container" } },
-			 { DevicePlatform.Android, android_epub },
-			 { DevicePlatform.WinUI, epub },
-			 { DevicePlatform.Tizen, epub },
-		  });
+	static readonly string[] epubExtensions = [".epub"];
+	static readonly string[] androidEpubTypes = ["application/epub+zip", ".epub"];
+	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
+
+	#endregion
+
+	#region Fields
+
+	readonly IFolderPicker folderPicker;
+	readonly FilePickerFileType customFileType;
+
+	#endregion
+
+	#region Properties
 
 	/// <summary>
-	/// Gets or sets the collection of books.
+	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
-    public partial ObservableCollection<Book> Books { get; set; }
-   
+	public partial ObservableCollection<Book> Books { get; set; }
+
+	#endregion
+
+	#region Constructor
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
 	/// </summary>
-	/// <remarks>This constructor initializes the <see cref="Books"/> collection with all available books retrieved
-	/// from the database. If no books are found, the collection is initialized as empty.</remarks>
+	/// <remarks>
+	/// This constructor initializes the <see cref="Books"/> collection with all available books
+	/// retrieved from the database. If no books are found, the collection is initialized as empty.
+	/// </remarks>
 	public LibraryViewModel()
-    {
-		Books = [.. db.GetAllBooks() ?? []];
+	{
+		folderPicker = GetFolderPickerService();
+		customFileType = CreateCustomFileType();
+		Books = new ObservableCollection<Book>(db.GetAllBooks() ?? []);
 	}
+
+	#endregion
+
+	#region Commands
 
 	/// <summary>
 	/// Navigates to the book page asynchronously, opening the specified book and setting its current state.
@@ -58,184 +74,399 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <param name="book">The book to open and navigate to. Must not be <see langword="null"/>.</param>
 	/// <returns>A task that represents the asynchronous operation.</returns>
 	/// <exception cref="InvalidOperationException">Thrown if there is an error opening the ebook.</exception>
-    [RelayCommand]
-    public async Task GotoBookPageAsync(Book book)
-    {
-		var temp = db.GetBook(book);
-		ArgumentNullException.ThrowIfNull(temp);
-		Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true) ?? throw new InvalidOperationException("Error opening ebook");
-		Book.CurrentChapter = temp.CurrentChapter;
-		Book.CurrentPage = temp.CurrentPage;
-		Book.Id = temp.Id;
-		StreamExtensions.Instance?.SetBook(Book);
-		var navigationParams = new Dictionary<string, object>
-        {
-            { "Book", Book }
-        };
-        await Shell.Current.GoToAsync($"BookPage", navigationParams);
-    }
-
-	/// <summary>
-	/// Asynchronously adds EPUB files from a selected folder to the library.
-	/// </summary>
-	/// <remarks>This method allows the user to select a folder and processes all EPUB files within it. If no folder
-	/// is selected or no EPUB files are found, appropriate messages are logged and displayed. Each EPUB file is processed
-	/// to extract book information, which is then saved to the library if it does not already exist.</remarks>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
-	/// <returns></returns>
 	[RelayCommand]
-	async Task AddFolderAsync(CancellationToken cancellationToken = default)
+	public async Task GotoBookPageAsync(Book book)
 	{
-		var folderUri = await folderPicker.PickFolderAsync();
-		if (string.IsNullOrEmpty(folderUri))
+		try
 		{
-			logger.Info("No folder selected");
-			return;
-		}
-		logger.Info($"Selected folder: {folderUri}");
-		var epubFiles = await folderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
-		if (epubFiles.Count == 0)
-		{
-			logger.Info("No epub files found in the selected folder");
-			await Dispatcher.DispatchAsync(async () => await Toast.Make("No epub files found in the selected folder", ToastDuration.Short, 12).Show(cancellationToken));
-			return;
-		}
-		logger.Info($"Found {epubFiles.Count} epub files in the selected folder");
-		string message = string.Empty;
+			var existingBook = db.GetBook(book);
+			ArgumentNullException.ThrowIfNull(existingBook);
 
-		
-		foreach (var file in epubFiles)
-		{
-			var stream = await folderPicker.PerformFileOperationOnEpubAsync(file);
-			if (stream is null)
-			{
-				logger.Info($"Failed to open stream for file: {file}");
-				continue;
-			}
-			Book? ebook = null;
-			ebook = EbookService.GetListing(stream, file);
-			stream.Seek(0, SeekOrigin.Begin); // Reset stream position for reading
-			if (ebook is null)
-			{
-				message = $"Error opening Book: {file}";
-				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-				logger.Info(message);
-				continue;
-			}
-			if (Books.Any(x => x.Title == ebook.Title))
-			{
-				message = $"Book already exists in library: {ebook.Title}";
-				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-				logger.Info(message);
-				continue;
-			}
-			
-			ebook.FilePath = await FileService.SaveFileAsync(stream, file);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(file, ebook.CoverImage);
-			if (File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath))
-			{
-				logger.Info($"Book {ebook.Title} saved successfully.");
-			}
-			else
-			{
-				logger.Error($"Failed to save book {ebook.Title} or its cover image.");
-				message = $"Failed to save book {ebook.Title} or its cover image.";
-				await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-				continue;
-			}
+			Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true)
+				?? throw new InvalidOperationException("Error opening ebook");
 
-			db.SaveBookData(ebook);
-			Books.Add(ebook);
+			// Restore reading position
+			Book.CurrentChapter = existingBook.CurrentChapter;
+			Book.CurrentPage = existingBook.CurrentPage;
+			Book.Id = existingBook.Id;
+
+			StreamExtensions.Instance?.SetBook(Book);
+
+			var navigationParams = new Dictionary<string, object>
+			{
+				{ "Book", Book }
+			};
+
+			await Shell.Current.GoToAsync("BookPage", navigationParams);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error navigating to book page: {ex.Message}");
+			await ShowErrorToastAsync("Error opening book. Please try again.");
 		}
 	}
 
 	/// <summary>
-	/// Asynchronously adds a selected ePub book to the library.
+	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
-	/// <remarks>This method prompts the user to select an ePub file, verifies its uniqueness in the library, and
-	/// saves it to the database. If the book already exists, a notification is shown.</remarks>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
-	/// <returns></returns>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-    async Task AddAsync(CancellationToken cancellationToken = default)
-    {
-		string message = string.Empty;
-        var result = await PickAndShowAsync(new PickOptions
-        {
-            FileTypes = customFileType,
-            PickerTitle = "Please select a epub book"
-        }).ConfigureAwait(false);
-		if(result is null)
+	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
+	{
+		try
 		{
-			logger.Info("No file selected");
-			return;
-		}
+			var folderUri = await folderPicker.PickFolderAsync();
+			if (string.IsNullOrEmpty(folderUri))
+			{
+				logger.Info("No folder selected");
+				return;
+			}
 
-		var ebook = EbookService.GetListing(result.FullPath);
-		if (ebook is null)
-		{
-			message = "Error opening Book.";
-			await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-			logger.Info(message);
-			return;
-		}
-		if (Books.Any(x => x.Title == ebook.Title))
-		{
-			message = $"Book already exists in library: {ebook.Title}";
-			await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-			logger.Info(message);
-			return;
-		}
-		
-		ebook.FilePath =  await FileService.SaveFileAsync(result, ebook.FilePath).ConfigureAwait(false);
-		ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
-		db.SaveBookData(ebook);
-		Books.Add(ebook);
+			logger.Info($"Selected folder: {folderUri}");
+			var epubFiles = await folderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
 
-		message = "Book added to library";
-		await Dispatcher.DispatchAsync(async () => await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-		logger.Info(message);
+			if (epubFiles.Count == 0)
+			{
+				await ShowInfoToastAsync("No EPUB files found in the selected folder", cancellationToken);
+				return;
+			}
+
+			logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
+			await ProcessEpubFilesAsync(epubFiles, cancellationToken);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error adding folder: {ex.Message}");
+			await ShowErrorToastAsync("Error processing folder. Please try again.", cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// Asynchronously adds a selected EPUB book to the library.
+	/// </summary>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	[RelayCommand]
+	public async Task AddAsync(CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var result = await PickEpubFileAsync();
+			if (result is null)
+			{
+				logger.Info("No file selected");
+				return;
+			}
+
+			var ebook = EbookService.GetListing(result.FullPath);
+			if (ebook is null)
+			{
+				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
+				return;
+			}
+
+			if (IsBookAlreadyInLibrary(ebook))
+			{
+				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+				return;
+			}
+
+			await SaveBookToLibraryAsync(ebook, result, cancellationToken);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error adding book: {ex.Message}");
+			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
+		}
 	}
 
 	/// <summary>
 	/// Removes the specified book from the library.
 	/// </summary>
-	/// <remarks>This method deletes the directory containing the book's file and removes the book from the database
-	/// and the in-memory collection.</remarks>
-	/// <param name="book">The book to be removed. The book's file path must not be null.</param>
-    [RelayCommand]
-    void RemoveBook(Book book)
-    {
-		logger.Info($"Removing book {book.FilePath}");
-		var directory = Path.GetDirectoryName(book.FilePath);
-		if(directory is not null)
+	/// <param name="book">The book to be removed.</param>
+	[RelayCommand]
+	public void RemoveBook(Book book)
+	{
+		try
 		{
-			Directory.Delete(directory, true);
+			ArgumentNullException.ThrowIfNull(book);
+
+			logger.Info($"Removing book: {book.Title}");
+
+			DeleteBookFiles(book);
+			db.RemoveBook(book);
+			Books.Remove(book);
+
+			logger.Info("Book removed from library");
 		}
-		
-		db.RemoveBook(book);
-		Books.Remove(book);
-		logger.Info("Book removed from library.");
-		OnPropertyChanged(nameof(Books));
+		catch (Exception ex)
+		{
+			logger.Error($"Error removing book: {ex.Message}");
+		}
+	}
+
+	#endregion
+
+	#region Private Helper Methods
+
+	/// <summary>
+	/// Gets the folder picker service from the application's service container.
+	/// </summary>
+	/// <returns>The folder picker service instance.</returns>
+	/// <exception cref="InvalidOperationException">Thrown if the service cannot be resolved.</exception>
+	static IFolderPicker GetFolderPickerService()
+	{
+		return Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
+			?? throw new InvalidOperationException("IFolderPicker service not available");
+	}
+
+	/// <summary>
+	/// Creates the custom file type configuration for EPUB files across different platforms.
+	/// </summary>
+	/// <returns>A configured FilePickerFileType for EPUB files.</returns>
+	static FilePickerFileType CreateCustomFileType()
+	{
+		return new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+		{
+			{ DevicePlatform.iOS, iOSEpubTypes},
+			{ DevicePlatform.MacCatalyst, iOSEpubTypes },
+			{ DevicePlatform.Android, androidEpubTypes },
+			{ DevicePlatform.WinUI, epubExtensions },
+			{ DevicePlatform.Tizen, epubExtensions },
+		});
+	}
+
+	/// <summary>
+	/// Prompts the user to select an EPUB file.
+	/// </summary>
+	/// <returns>The selected file result, or null if cancelled.</returns>
+	async Task<FileResult?> PickEpubFileAsync()
+	{
+		var options = new PickOptions
+		{
+			FileTypes = customFileType,
+			PickerTitle = "Please select an EPUB book"
+		};
+
+		return await PickAndShowAsync(options);
+	}
+
+	/// <summary>
+	/// Processes a collection of EPUB files from a folder.
+	/// </summary>
+	/// <param name="epubFiles">The list of EPUB file paths to process.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task ProcessEpubFilesAsync(List<string> epubFiles, CancellationToken cancellationToken)
+	{
+		foreach (var file in epubFiles)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				break;
+			}
+
+			await ProcessSingleEpubFileAsync(file, cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// Processes a single EPUB file from a folder operation.
+	/// </summary>
+	/// <param name="filePath">The path to the EPUB file.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task ProcessSingleEpubFileAsync(string filePath, CancellationToken cancellationToken)
+	{
+		try
+		{
+			var stream = await folderPicker.PerformFileOperationOnEpubAsync(filePath);
+			if (stream is null)
+			{
+				logger.Info($"Failed to open stream for file: {filePath}");
+				return;
+			}
+
+			using (stream)
+			{
+				var ebook = EbookService.GetListing(stream, filePath);
+				if (ebook is null)
+				{
+					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}", cancellationToken);
+					return;
+				}
+
+				if (IsBookAlreadyInLibrary(ebook))
+				{
+					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+					return;
+				}
+
+				stream.Seek(0, SeekOrigin.Begin);
+				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken);
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error processing file {filePath}: {ex.Message}");
+			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}", cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// Checks if a book is already in the library based on its title.
+	/// </summary>
+	/// <param name="ebook">The book to check.</param>
+	/// <returns>True if the book already exists in the library, false otherwise.</returns>
+	bool IsBookAlreadyInLibrary(Book ebook)
+	{
+		return Books.Any(x => string.Equals(x.Title, ebook.Title, StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// Saves a book to the library from a FileResult.
+	/// </summary>
+	/// <param name="ebook">The book to save.</param>
+	/// <param name="fileResult">The file result containing the book data.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task SaveBookToLibraryAsync(Book ebook, FileResult fileResult, CancellationToken cancellationToken)
+	{
+		try
+		{
+			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage).ConfigureAwait(false);
+
+			if (ValidateBookFiles(ebook))
+			{
+				db.SaveBookData(ebook);
+				Books.Add(ebook);
+				await ShowInfoToastAsync("Book added to library", cancellationToken);
+				logger.Info($"Book added to library: {ebook.Title}");
+			}
+			else
+			{
+				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error saving book to library: {ex.Message}");
+			await ShowErrorToastAsync("Error saving book to library", cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// Saves a book to the library from a stream.
+	/// </summary>
+	/// <param name="ebook">The book to save.</param>
+	/// <param name="stream">The stream containing the book data.</param>
+	/// <param name="filePath">The original file path.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task SaveBookToLibraryAsync(Book ebook, Stream stream, string filePath, CancellationToken cancellationToken)
+	{
+		try
+		{
+			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage);
+
+			if (ValidateBookFiles(ebook))
+			{
+				db.SaveBookData(ebook);
+				Books.Add(ebook);
+				logger.Info($"Book saved successfully: {ebook.Title}");
+			}
+			else
+			{
+				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error saving book from stream: {ex.Message}");
+			await ShowErrorToastAsync("Error saving book", cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// Validates that the book files were saved successfully.
+	/// </summary>
+	/// <param name="ebook">The book to validate.</param>
+	/// <returns>True if both the book file and cover image exist, false otherwise.</returns>
+	static bool ValidateBookFiles(Book ebook)
+	{
+		return File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath);
+	}
+
+	/// <summary>
+	/// Deletes the files associated with a book.
+	/// </summary>
+	/// <param name="book">The book whose files should be deleted.</param>
+	static void DeleteBookFiles(Book book)
+	{
+		try
+		{
+			var directory = Path.GetDirectoryName(book.FilePath);
+			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+			{
+				Directory.Delete(directory, true);
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error deleting book files: {ex.Message}");
+		}
 	}
 
 	/// <summary>
 	/// Asynchronously presents a file picker dialog to the user and returns the selected file.
 	/// </summary>
 	/// <param name="options">The options for picking files.</param>
-	/// <returns>A task that represents the asynchronous operation. The task result contains the selected file, or null if no file was selected.</returns>
-	/// <exception cref="Exception">Thrown if an error occurs while picking the file.</exception>
-	public static async Task<FileResult?> PickAndShowAsync(PickOptions options)
-    {
-        try
-        {
-            return await FilePicker.PickAsync(options).WaitAsync(CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Exception choosing file: {ex.Message}");
-            return null;
-        }
-    }
+	/// <returns>The selected file, or null if no file was selected or an error occurred.</returns>
+	static async Task<FileResult?> PickAndShowAsync(PickOptions options)
+	{
+		try
+		{
+			return await FilePicker.PickAsync(options).WaitAsync(CancellationToken.None);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Exception choosing file: {ex.Message}");
+			return null;
+		}
+	}
 
+	#endregion
+
+	#region Toast Helper Methods
+
+	/// <summary>
+	/// Shows an informational toast message.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task ShowInfoToastAsync(string message, CancellationToken cancellationToken = default)
+	{
+		await Dispatcher.DispatchAsync(async () =>
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+		logger.Info(message);
+	}
+
+	/// <summary>
+	/// Shows an error toast message.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	async Task ShowErrorToastAsync(string message, CancellationToken cancellationToken = default)
+	{
+		await Dispatcher.DispatchAsync(async () =>
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+		logger.Error(message);
+	}
+
+	#endregion
 }

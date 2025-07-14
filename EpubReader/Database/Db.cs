@@ -128,7 +128,7 @@ public partial class Db : IDb, IDisposable
 		item.CurrentChapter = book.CurrentChapter;
 		item.CurrentPage = book.CurrentPage;
 		conn.Update(item);
-		logger.Info("Updating book");
+		logger.Info($"Updating bookmark for book: {book.Title}, Chapter: {book.CurrentChapter}, Page: {book.CurrentPage}");
 	}
 
 	/// <summary>

@@ -33,7 +33,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		Url = url,
 	};
-	
+
 	/// <summary>
 	/// Gets or sets the cover image for the item.
 	/// </summary>
@@ -106,7 +106,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			isPopupActive = false;
 		}
 	}
-	
+
 	/// <summary>
 	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
 	/// </summary>
