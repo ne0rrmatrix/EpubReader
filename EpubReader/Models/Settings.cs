@@ -13,9 +13,9 @@ public class Settings
 	/// <summary>
 	/// Gets or sets the unique identifier for the entity.
 	/// </summary>
-	[PrimaryKey, AutoIncrement]
+	[PrimaryKey]
 	[Column("Id")]
-	public Guid Id { get; set; }
+	public Guid Id { get; set; } 
 
 	/// <summary>
 	/// Gets or sets the font family name used for text rendering.

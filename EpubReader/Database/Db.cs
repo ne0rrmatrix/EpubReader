@@ -63,8 +63,7 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		var results = await conn.Table<Settings>().ToListAsync().WaitAsync(cancellationToken);
-		return results.FirstOrDefault();
+		return await conn.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -115,17 +114,9 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		var item = await conn.Table<Settings>()
-			.FirstOrDefaultAsync(x => x.Id == settings.Id).WaitAsync(cancellationToken);
-		if (item is null)
-		{
-						logger.Info("Inserting settings");
-			await conn.InsertAsync(settings);
-			return;
-		}
 		
-		await conn.UpdateAsync(settings).WaitAsync(cancellationToken);
-		logger.Info("Updating settings");
+		logger.Info("Inserting or updating settings");
+		await conn.InsertOrReplaceAsync(settings).WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -143,6 +134,7 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
+
 		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		if (item is null)
 		{
@@ -211,7 +203,7 @@ public partial class Db : IDb
 		if (conn is null)
 		{
 			logger.Error(errorMsg);
-			throw new InvalidOperationException("Database connection is not initialized.");
+			throw new InvalidOperationException(dbErrorMsg);
 		}
 		logger.Info("Removing book");
 		await conn.DeleteAsync(book).WaitAsync(cancellationToken);

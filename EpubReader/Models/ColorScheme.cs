@@ -10,12 +10,12 @@ public class ColorScheme
 	/// <summary>
 	/// Gets or sets the background color as a string.
 	/// </summary>
-	public string BackgroundColor { get; set; } = string.Empty;
+	public string BackgroundColor { get; set; } = "#f4ecd8";
 
 	/// <summary>
 	/// Gets or sets the text color as a string representation.
 	/// </summary>
-	public string TextColor { get; set; } = string.Empty;
+	public string TextColor { get; set; } = "#5b4636";
 
 	/// <summary>
 	/// Gets or sets the name associated with the <code>ColorScheme</code>.

@@ -42,7 +42,26 @@ const domUtils = {
             isWindows: /win32|win64|windows|wince/.test(userAgent),
             isAndroid: /android/.test(userAgent)
         };
-    }
+    },
+
+    isCssVariableSet(element, variableName) {
+        const computedStyle = getComputedStyle(element);
+        const variableValue = computedStyle.getPropertyValue(variableName).trim();
+        return variableValue !== '';
+    },
+
+    hasCssVariableChanged(element, variableName, oldValue) {
+        const computedStyle = getComputedStyle(element);
+        const variableValue = computedStyle.getPropertyValue(variableName).trim();
+        if (variableValue === oldValue) {
+            console.log(`CSS variable '${variableName}' has not changed: ${variableValue}`);
+            return false;
+        }
+        else {
+            console.log(`CSS variable '${variableName}' has changed from '${oldValue}' to '${variableValue}'`);
+            return true;
+        }
+    },
 };
 
 /**
@@ -407,6 +426,11 @@ const styleUtils = {
             return;
         }
 
+        const hasCssVariableChanged = domUtils.hasCssVariableChanged(root, property, value);
+        if (!hasCssVariableChanged) {
+            console.log(`CSS variable '${property}' has not changed: ${value}`);
+            return;
+        }
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
 
@@ -443,7 +467,11 @@ const styleUtils = {
             document.documentElement.style.removeProperty('--background-color');
             return;
         }
-
+        const hasCssVariableChanged = domUtils.hasCssVariableChanged(document.documentElement, '--background-color', color);
+        if (!hasCssVariableChanged) {
+            console.log(`CSS variable '--background-color' has not changed: ${color}`);
+            return;
+        }
         console.log(`Setting background color to: ${color}`);
         document.documentElement.style.setProperty('--background-color', color);
     },
@@ -608,7 +636,11 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Set initial dimensions and add resize listener
-    layoutUtils.setDimensions(body, root);
+    if (!domUtils.isCssVariableSet(root, '--root-width') || !domUtils.isCssVariableSet(root, '--root-height')) {
+        console.log("Root dimensions already set, skipping initial resize.");
+        layoutUtils.setDimensions(body, root);
+    }
+    
     frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
 
     // Handle iframe load events

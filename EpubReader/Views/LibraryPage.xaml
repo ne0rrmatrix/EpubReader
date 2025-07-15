@@ -55,16 +55,12 @@
                     </SwipeView.RightItems>
 
                     <Border Style="{x:StaticResource EbookCardStyle}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="{StaticResource CardHeight}" />
-                            </Grid.RowDefinitions>
+                        <VerticalStackLayout>
 
                             <Image
-                                Grid.Row="0"
-                                Margin="8,4,8,8"
+                                Margin="10"
                                 Aspect="AspectFit"
-                                HeightRequest="{StaticResource CardHeight}"
+                                HeightRequest="280"
                                 HorizontalOptions="Center"
                                 Source="{Binding CoverImagePath}">
 
@@ -83,7 +79,7 @@
                                 </Image.GestureRecognizers>
                             </Image>
 
-                        </Grid>
+                        </VerticalStackLayout>
                     </Border>
                 </SwipeView>
             </DataTemplate>

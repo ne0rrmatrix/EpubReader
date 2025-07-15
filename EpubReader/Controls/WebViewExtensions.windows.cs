@@ -55,8 +55,14 @@ public static partial class WebViewExtensions
 		ArgumentNullException.ThrowIfNull(webViewHandler);
 		var settings = webViewHandler.PlatformView.CoreWebView2.Settings;
 		var coreWebView = webViewHandler.PlatformView.CoreWebView2;
+#if DEBUG
 		settings.AreDevToolsEnabled = true;
+#endif
+#if RELEASE
+		settings.AreDevToolsEnabled = false;
+#endif
 		settings.AreBrowserAcceleratorKeysEnabled = true;
+		settings.AreDefaultContextMenusEnabled = false;
 		settings.IsReputationCheckingRequired = false;
 		settings.AreHostObjectsAllowed = true;
 		settings.IsWebMessageEnabled = true;
