@@ -5,7 +5,6 @@ using EpubReader.Interfaces;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
-using FFImageLoading.Maui;
 using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
@@ -36,17 +35,17 @@ public static class MauiProgram
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 		})
-		.UseFFImageLoading()
-		.UseMauiCommunityToolkit(options =>
+		.UseMauiCommunityToolkit(static options =>
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);
+			options.SetPopupDefaults(new DefaultPopupSettings());
+			options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
 		})
 		.ConfigureSyncfusionToolkit()
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
-			handlers.AddHandler<CarouselView, Microsoft.Maui.Controls.Handlers.Items2.CarouselViewHandler2>();
 #endif
 		});
 #if ANDROID

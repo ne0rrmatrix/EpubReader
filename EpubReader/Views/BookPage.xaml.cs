@@ -38,7 +38,7 @@ public partial class BookPage : ContentPage
 		webViewHelper = new(webView);
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); UpdateUiAppearance(); });
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
 	/// <summary>
@@ -115,8 +115,9 @@ public partial class BookPage : ContentPage
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
-		await HandleWebViewActionAsync(methodName);
-		UpdateUiAppearance();
+		var data = BookPage.GetDataFromUrl(url);
+		await HandleWebViewActionAsync(methodName, data);
+		await UpdateUiAppearance();
 	}
 
 	/// <summary>
@@ -129,25 +130,36 @@ public partial class BookPage : ContentPage
 	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
 	{
 		var url = e.Url;
-		
+
 		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
 			return;
 		}
-		
+
 		e.Cancel = true;
 		await HandleJavascriptAsync(e.Url);
 	}
+
+	static string GetDataFromUrl(string url)
+	{
+		var parts = url.Split('?');
+		if (parts.Length > 1)
+		{
+			var data = parts[1].Split('#')[0];
+			return data;
+		}
+		return string.Empty;
+	}
+
 	async Task TryHandleInternalLinkAsync(string url)
-	{	
+	{
 		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
-			System.Diagnostics.Trace.TraceInformation($"Not a valid internal link. : {url}");
 			return;
 		}
-		
+
 		var urlParts = url.Split('?')[1].Split('#')[0];
-		if(!string.IsNullOrEmpty(urlParts))
+		if (!string.IsNullOrEmpty(urlParts))
 		{
 			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 			if (chapter is null)
@@ -156,7 +168,7 @@ public partial class BookPage : ContentPage
 			}
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
-			db.UpdateBookMark(book);
+			await db.UpdateBookMark(book);
 		}
 	}
 	static async Task TryHandleExternalLinkAsync(string url)
@@ -196,8 +208,11 @@ public partial class BookPage : ContentPage
 		return funcToCall[0][..^1]; // Assumes format like "method()"
 	}
 
-	async Task HandleWebViewActionAsync(string methodName)
+	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
+		var tempCurrentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
+		var currentPage = int.TryParse(tempCurrentPage, out int parsedPage) ? parsedPage : 0;
+
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
@@ -211,35 +226,48 @@ public partial class BookPage : ContentPage
 				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
-				UpdateUiAppearance();
+				await UpdateUiAppearance();
+				if (currentPage == 0 && book.CurrentPage > 0)
+				{
+					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
 				break;
-			case "updatepageinfo":
-				pageLabel.Text = await GetCurrentPageInfoAsync();
+			case "characterposition":
+				book.CurrentPage = currentPage;
+				await db.UpdateBookMark(book);
+
+				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
+				{
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
+				}
+				else
+				{
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
+				}
 				break;
 		}
 	}
 
+	/// <summary>
+	/// Gets the current page information using synthetic page numbers.
+	/// </summary>
+	/// <returns>A formatted string with synthetic page information.</returns>
 	async Task<string> GetCurrentPageInfoAsync()
 	{
-		var tempPageResult = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
-		var tempPageCount = await webView.EvaluateJavaScriptAsync("getPageCount()");
-		var pageCount = tempPageCount?.ToString();
-		var result = Int32.TryParse(pageCount, out var pageCountValue) ? pageCountValue : 0;
-		pageCount = pageCountValue > 0 ? result.ToString() : string.Empty;
-		var currentPage = tempPageResult?.ToString();
-		if (!string.IsNullOrEmpty(pageCount) || !string.IsNullOrEmpty(currentPage))
+		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
+		if (int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
 		{
-			return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty} (Page {currentPage} of {pageCount})";		
+			return WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
 		}
-		return $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+		return WebViewHelper.GetSyntheticPageInfo(book);
 	}
 
-	void UpdateUiAppearance()
+	async Task UpdateUiAppearance()
 	{
 		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
-		var settings = db.GetSettings() ?? new();
-		if(string.IsNullOrEmpty(settings.BackgroundColor))
+		var settings = await db.GetSettings() ?? new();
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
 			settings.BackgroundColor = "#FFFFFF"; // Default background color
 			settings.TextColor = "#000000"; // Default text color
@@ -289,8 +317,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
-					pageLabel.Text = await GetCurrentPageInfoAsync();
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);
@@ -315,8 +342,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
-					pageLabel.Text = await GetCurrentPageInfoAsync();
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);

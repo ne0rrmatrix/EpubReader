@@ -85,6 +85,15 @@ public static class FilePathExtensions
 		return modifiedCss;
 	}
 
+	/// <summary>
+	/// Replaces the font path in a CSS URL match with just the filename, preserving quotes.
+	/// </summary>
+	/// <remarks>This method is useful for simplifying font URLs in CSS by removing directory paths and leaving only
+	/// the filename.</remarks>
+	/// <param name="match">A <see cref="Match"/> object containing the CSS URL to be processed. The match should have groups representing the
+	/// quote, URL, and file extension.</param>
+	/// <returns>A string with the URL replaced by just the filename if the URL contains a path; otherwise, returns the original
+	/// match value.</returns>
 	static string ReplaceFontPath(Match match)
 	{
 		string urlValue = match.Groups[2].Value;

@@ -13,5 +13,13 @@ public partial class App : Application
 		this.appShell = appShell;
 	}
 
-	protected override Window CreateWindow(IActivationState? activationState) => new(appShell);
+	protected override Window CreateWindow(IActivationState? activationState)
+	{
+		if (appShell is null)
+		{
+			return new Window(new AppShell());
+		}
+
+		return new Window(appShell);
+	}
 }

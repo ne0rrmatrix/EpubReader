@@ -1,4 +1,5 @@
-﻿using EpubReader.Interfaces;
+﻿using System.Threading.Tasks;
+using EpubReader.Interfaces;
 using EpubReader.Models;
 using MetroLog;
 using SQLite;
@@ -11,13 +12,20 @@ namespace EpubReader.Database;
 /// <remarks>The <see cref="Db"/> class manages the connection to a SQLite database, allowing for operations such
 /// as retrieving, saving, updating, and removing data related to application settings and books. It ensures that
 /// necessary tables are created upon initialization and provides methods to handle data persistence.</remarks>
-public partial class Db : IDb, IDisposable
+public partial class Db : IDb
 {
+	static readonly string dbErrorMsg = "Database connection is not initialized.";
+	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
-	readonly SQLiteConnection conn;
-	readonly SQLiteConnectionString options;
-	bool disposedValue;
+	SQLiteAsyncConnection? conn;
+	readonly SQLite.SQLiteOpenFlags flags =
+		// open the database in read/write mode
+		SQLite.SQLiteOpenFlags.ReadWrite |
+		// create the database if it doesn't exist
+		SQLite.SQLiteOpenFlags.Create |
+		// enable multi-threaded database access
+		SQLite.SQLiteOpenFlags.SharedCache;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="Db"/> class, setting up the database connection and creating necessary
@@ -31,24 +39,31 @@ public partial class Db : IDb, IDisposable
 		{
 			Directory.CreateDirectory(Util.FileService.SaveDirectory);
 		}
-		options = new(DbPath, false);
-		conn = new SQLiteConnection(options);
+	}
+
+	async Task InitializeAsync(CancellationToken cancellationToken = default)
+	{
+		conn = new SQLiteAsyncConnection(DbPath, flags);
 		logger.Info("Database created");
-		conn.CreateTable<Settings>();
+		await conn.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 		logger.Info("Settings Table created");
-		conn.CreateTable<Book>();
+		await conn.CreateTableAsync<Book>().WaitAsync(cancellationToken);
 		logger.Info("Book Table created");
 	}
-	
 	/// <summary>
 	/// Retrieves the current application settings from the database.
 	/// </summary>
 	/// <returns>The <see cref="Settings"/> object representing the current settings, or <see langword="null"/> if no settings are
 	/// found.</returns>
-	public Settings? GetSettings()
+	public async Task<Settings?> GetSettings(CancellationToken cancellationToken = default)
 	{
-		var results = conn.Table<Settings>().ToList().FirstOrDefault();
-		return results;
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+		return await conn.Table<Settings>().FirstOrDefaultAsync().WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -56,10 +71,16 @@ public partial class Db : IDb, IDisposable
 	/// </summary>
 	/// <returns>A list of <see cref="Book"/> objects representing all books in the database. The list will be empty if no books are
 	/// found.</returns>
-	public List<Book> GetAllBooks()
+	public async Task<List<Book>> GetAllBooks(CancellationToken cancellationToken = default)
 	{
-		var results = conn.Table<Book>().ToList();
-		return results;
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+		var results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken);
+		return results ?? [];
 	}
 
 	/// <summary>
@@ -67,9 +88,15 @@ public partial class Db : IDb, IDisposable
 	/// </summary>
 	/// <param name="book">The book containing the ID to search for in the database.</param>
 	/// <returns>The <see cref="Book"/> object with the matching ID, or <see langword="null"/> if no match is found.</returns>
-	public Book? GetBook(Book book)
+	public async Task<Book?> GetBook(Book book, CancellationToken cancellationToken = default)
 	{
-		var result = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+		var result = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		return result;
 	}
 
@@ -79,17 +106,17 @@ public partial class Db : IDb, IDisposable
 	/// <remarks>If the settings with the specified <c>Id</c> already exist in the database, they are updated;
 	/// otherwise, new settings are inserted.</remarks>
 	/// <param name="settings">The settings to be saved. The settings object must have a valid <c>Id</c> property.</param>
-	public void SaveSettings(Settings settings)
+	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
 	{
-		var item = conn.Table<Settings>().ToList().Exists(x => x.Id == settings.Id);
-		if (item)
+		await InitializeAsync(cancellationToken);
+		if (conn is null) 
 		{
-			logger.Info("Updating settings");
-			conn.Update(settings);
-			return;
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
 		}
-		logger.Info("Inserting settings");
-		conn.Insert(settings);
+		
+		logger.Info("Inserting or updating settings");
+		await conn.InsertOrReplaceAsync(settings).WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -99,15 +126,24 @@ public partial class Db : IDb, IDisposable
 	/// ensures that no duplicate book entries are created.</remarks>
 	/// <param name="book">The book object containing data to be saved. Must not be null and must have a unique identifier.</param>
 	/// <exception cref="InvalidOperationException">Thrown if a book with the same identifier already exists in the database.</exception>
-	public void SaveBookData(Book book)
+	public async Task SaveBookData(Book book, CancellationToken cancellationToken = default)
 	{
-		var item = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
-		if (item is not null)
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
 		{
-			throw new InvalidOperationException("Book already exists");
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
 		}
-		logger.Info("Inserting book");
-		conn.Insert(book);
+
+		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
+		if (item is null)
+		{
+			logger.Info("Inserting book");
+			await conn.InsertAsync(book).WaitAsync(cancellationToken);
+			return;
+		}
+		logger.Info("Updating book");
+		await conn.UpdateAsync(book).WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -116,18 +152,26 @@ public partial class Db : IDb, IDisposable
 	/// <remarks>If the book does not exist in the database, it will be inserted as a new entry. Otherwise, the
 	/// existing book's bookmark will be updated.</remarks>
 	/// <param name="book">The book object containing the updated bookmark information. The book must have a valid <see cref="Book.Id"/>.</param>
-	public void UpdateBookMark(Book book)
+	public async Task UpdateBookMark(Book book, CancellationToken cancellationToken = default)
 	{
-		var item = conn.Table<Book>().ToList().Find(x => x.Id == book.Id);
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		if (item is null)
 		{
-			conn.Insert(book);
+			await conn.InsertAsync(book).WaitAsync(cancellationToken);
 			logger.Info("Inserting book");
 			return;
 		}
 		item.CurrentChapter = book.CurrentChapter;
-		conn.Update(item);
-		logger.Info("Updating book");
+		item.CurrentPage = book.CurrentPage;
+		await conn.UpdateAsync(item).WaitAsync(cancellationToken);
+		logger.Info($"Updating bookmark for book: {book.Title}, Chapter: {book.CurrentChapter}, Page: {book.CurrentPage}");
 	}
 
 	/// <summary>
@@ -135,10 +179,16 @@ public partial class Db : IDb, IDisposable
 	/// </summary>
 	/// <remarks>This method deletes all entries of type <c>Settings</c> from the connected data store. Ensure that
 	/// this operation is intended, as it cannot be undone.</remarks>
-	public void RemoveAllSettings()
+	public async Task RemoveAllSettings(CancellationToken cancellationToken = default)
 	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
 		logger.Info("Removing all settings");
-		conn.DeleteAll<Settings>();
+		await conn.DeleteAllAsync<Settings>().WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -147,10 +197,16 @@ public partial class Db : IDb, IDisposable
 	/// <remarks>This method logs the removal operation and deletes the book from the database. Ensure that the book
 	/// exists in the collection before calling this method.</remarks>
 	/// <param name="book">The book to be removed. Cannot be null.</param>
-	public void RemoveBook(Book book)
+	public async Task RemoveBook(Book book, CancellationToken cancellationToken = default)
 	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
 		logger.Info("Removing book");
-		conn.Delete(book);
+		await conn.DeleteAsync(book).WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -158,30 +214,15 @@ public partial class Db : IDb, IDisposable
 	/// </summary>
 	/// <remarks>This method deletes all entries of type <see cref="Book"/> from the database. Ensure that this
 	/// operation is intended, as it cannot be undone.</remarks>
-	public void RemoveAllBooks()
+	public async Task RemoveAllBooks(CancellationToken cancellationToken = default)
 	{
-		logger.Info("Removing all books");
-		conn.DeleteAll<Book>();
-	}
-
-	protected virtual void Dispose(bool disposing)
-	{
-		if (!disposedValue)
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
 		{
-			if (disposing && conn is not null)
-			{
-				conn.Close();
-				conn.Dispose();
-				logger.Info("Database closed");
-			}
-
-			disposedValue = true;
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
 		}
-	}
-
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
+		logger.Info("Removing all books");
+		await conn.DeleteAllAsync<Book>().WaitAsync(cancellationToken);
 	}
 }

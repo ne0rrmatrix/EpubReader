@@ -23,7 +23,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 ];
 	readonly List<ColorScheme> colorSchemes =
 		[
-			new ColorScheme() { Name = "Light", BackgroundColor = "#FFFFFF" , TextColor = "#000000"},
+			new ColorScheme() { Name = "Light", BackgroundColor = "#f4ecd8" , TextColor = "#5b4636"},
 			new ColorScheme() { Name = "Dark", BackgroundColor = "#121212", TextColor = "#E1E1E1" },
 			new ColorScheme() { Name = "Sepia", BackgroundColor = "#f4ecd8", TextColor = "#5b4636" },
 			new ColorScheme() { Name = "Ocean", BackgroundColor = "#e0f7fa", TextColor = "#01579b" },

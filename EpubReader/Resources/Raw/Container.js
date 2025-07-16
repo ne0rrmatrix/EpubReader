@@ -25,12 +25,11 @@ function detectPlatform() {
 
 // Helper function to send messages to parent
 function sendMessageToParent(message) {
-    if(detectPlatform().isIOS || detectPlatform().isMac) {
+    if (detectPlatform().isIOS || detectPlatform().isMac) {
         window.parent.postMessage(message, TARGET_ORIGIN_MACIOS);
         console.log(`Sent message from ios/mac: ${message}`);
     }
-    else
-    {
+    else {
         window.parent.postMessage(message, TARGET_ORIGIN);
         console.log(`Sent message: ${message}`);
     }
@@ -44,7 +43,7 @@ function handleLinkClick(href) {
 
 // Handle navigation regions - updated to work with both touch and click events
 function handleNavigationClick(event) {
-    event.preventDefault();
+   
 
     // Get coordinates from either touch or click event
     let clickX;
@@ -108,7 +107,7 @@ window.addEventListener('click', function (event) {
         console.log('iframe window event listener clicked');
         return;
     }
-    if(detectPlatform().isIOS || detectPlatform().isMac) {
+    if (detectPlatform().isIOS || detectPlatform().isMac) {
         console.log('iframe window event listener clicked');
         return;
     }
@@ -124,7 +123,7 @@ window.addEventListener('click', function (event) {
     if (parentLink) {
         return handleLinkClick(parentLink.href);
     }
-
+    event.preventDefault();
     // Handle navigation click
     handleNavigationClick(event);
 });

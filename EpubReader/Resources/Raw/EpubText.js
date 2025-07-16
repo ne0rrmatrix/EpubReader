@@ -5,7 +5,7 @@
 
 // Global state
 let isPreviousPage = false;
-let currentPage = 1;
+let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
@@ -42,126 +42,26 @@ const domUtils = {
             isWindows: /win32|win64|windows|wince/.test(userAgent),
             isAndroid: /android/.test(userAgent)
         };
-    }
-};
-
-/**
- * Image handling utilities
- */
-const imageUtils = {
-    /**
-     * Creates and injects CSS styles for images
-     * @param {Document} doc - The document to inject styles into
-     */
-    injectImageStyles(doc) {
-        if (doc.getElementById('image-position-fixes')) return;
-
-        const styleEl = doc.createElement('style');
-        styleEl.id = 'image-position-fixes';
-        styleEl.textContent = `
-            img, svg {
-                max-width: 100%;
-                height: auto !important;
-                width: auto !important;
-                max-height: 95vh;
-                object-fit: contain;
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-            
-            /* For multicolumn layouts, ensure images respect column boundaries */
-            body[style*="column-count"] img,
-            body[style*="column-width"] img,
-            html[style*="column-count"] img,
-            html[style*="column-width"] img {
-                max-width: 100%; 
-                display: inline-block;
-                vertical-align: top;
-                margin: 0.5em 0;
-            }
-            
-            /* Handle images in paragraphs and divs */
-            p img, div img {
-                vertical-align: top;
-                margin: 0.2em 0;
-            }
-            
-            /* Figure handling */
-            figure {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                margin: 0.5em 0;
-                max-width: 100%;
-            }
-            
-            figcaption {
-                font-size: 0.9em;
-                margin-top: 0.3em;
-            }
-        `;
-        doc.head.appendChild(styleEl);
     },
 
-    /**
-     * Processes a single image for proper layout
-     * @param {HTMLImageElement} img - The image to process
-     */
-    processImage(img) {
-        // Skip images that have already been processed
-        if (img.hasAttribute('data-positioned')) return;
-
-        this.convertRelativeDimensions(img);
-        this.markAsProcessed(img);
-        this.handleInlineImage(img);
+    isCssVariableSet(element, variableName) {
+        const computedStyle = getComputedStyle(element);
+        const variableValue = computedStyle.getPropertyValue(variableName).trim();
+        return variableValue !== '';
     },
 
-    /**
-     * Converts em/rem dimensions to fixed pixel values
-     * @param {HTMLImageElement} img - The image to process
-     */
-    convertRelativeDimensions(img) {
-        const hasRelativeWidth = img.style.width && (img.style.width.includes('em') || img.style.width.includes('rem'));
-        const hasRelativeHeight = img.style.height && (img.style.height.includes('em') || img.style.height.includes('rem'));
-
-        if (!hasRelativeWidth && !hasRelativeHeight) return;
-
-        // Get computed dimensions
-        const computedStyle = window.getComputedStyle(img);
-        const computedWidth = parseInt(computedStyle.width);
-        const computedHeight = parseInt(computedStyle.height);
-
-        if (!isNaN(computedWidth)) img.width = computedWidth;
-        if (!isNaN(computedHeight)) img.height = computedHeight;
-
-        // Clear relative units
-        if (hasRelativeWidth) img.style.width = 'auto';
-        if (hasRelativeHeight) img.style.height = 'auto';
-    },
-
-    /**
-     * Marks an image as processed
-     * @param {HTMLImageElement} img - The image to mark
-     */
-    markAsProcessed(img) {
-        img.setAttribute('data-positioned', 'true');
-    },
-
-    /**
-     * Applies special handling for inline images
-     * @param {HTMLImageElement} img - The image to process
-     */
-    handleInlineImage(img) {
-        const parent = img.parentElement;
-        const isInParagraphOrDiv = parent && (parent.tagName === 'P' || parent.tagName === 'DIV');
-        const isNotInContainer = !parent.classList.contains('image-container');
-        const isNotInFigure = !img.closest('figure');
-
-        if (isInParagraphOrDiv && isNotInContainer && isNotInFigure && colCount > 1) {
-            img.style.display = 'inline-block';
-            img.style.verticalAlign = 'top';
-            img.classList.add('multicolumn-image');
+    hasCssVariableChanged(element, variableName, oldValue) {
+        const computedStyle = getComputedStyle(element);
+        const variableValue = computedStyle.getPropertyValue(variableName).trim();
+        if (variableValue === oldValue) {
+            console.log(`CSS variable '${variableName}' has not changed: ${variableValue}`);
+            return false;
         }
-    }
+        else {
+            console.log(`CSS variable '${variableName}' has changed from '${oldValue}' to '${variableValue}'`);
+            return true;
+        }
+    },
 };
 
 /**
@@ -214,12 +114,13 @@ const navigationUtils = {
                 behavior: "smooth"
             });
         }
-        if (currentPage > 1) {
+        if (currentPage > 0) {
             currentPage--;
         } else {
             console.warn("Already at the first page, cannot scroll left.");
         }
-        window.location.href = 'https://runcsharp.updatepageinfo?true';
+        console.log("Scrolled left to page:", currentPage);
+        updateCharacterPosition();
     },
 
     /**
@@ -242,7 +143,26 @@ const navigationUtils = {
             });
         }
         currentPage++;
-        window.location.href = 'https://runcsharp.updatepageinfo?true';
+        console.log("Scrolled right to page:", currentPage);
+        updateCharacterPosition();
+    },
+
+    /**
+     * Scrolls to a specific page in the iframe content
+     * @param {number} page - The page number to scroll to (0-based index)
+     * @returns {void}
+     */
+    scrollToPage(page) {
+        const contentWindow = domUtils.getContentWindow();
+        if (!contentWindow) return;
+        for (let i = 0; i < page; i++) {
+            if (this.isHorizontallyScrolledToEnd()) {
+                console.warn("Already at the last page, cannot scroll further.");
+                return;
+            }
+            const scrollAmount = this.calculateScrollAmount(contentWindow);
+            contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
+        }
     },
 
     /**
@@ -274,8 +194,6 @@ const navigationUtils = {
             const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
             console.log("Scrolling to end of container.");
             frame.contentWindow.scrollTo(maxScrollLeft, 0);
-            currentPage = getPageCount();
-            window.location.href = 'https://runcsharp.updatepageinfo?true';
         } else {
             // If iframe not ready, set onload to call this function again
             frame.onload = function () {
@@ -339,6 +257,160 @@ const layoutUtils = {
 };
 
 /**
+ * Column management utilities
+ */
+const columnUtils = {
+    /**
+     * Gets the number of columns per screen based on CSS column properties
+     * @param {Window} contentWindow - The iframe content window
+     * @returns {number|null} The number of columns per screen, or null if in scroll mode
+     */
+    getColumnCountPerScreen(contentWindow) {
+        if (!contentWindow?.document) {
+            console.warn("Content window not available for column count calculation.");
+            return null;
+        }
+
+        const doc = contentWindow.document;
+        const computedStyle = contentWindow.getComputedStyle(doc.documentElement);
+
+        // Check if we're in column mode by looking for column-count or column-width
+        const columnCount = computedStyle.getPropertyValue('column-count');
+        const columnWidth = computedStyle.getPropertyValue('column-width');
+
+        if (columnCount && columnCount !== 'auto') {
+            return parseInt(columnCount, 10);
+        }
+
+        if (columnWidth && columnWidth !== 'auto') {
+            const width = parseFloat(columnWidth);
+            const containerWidth = contentWindow.innerWidth;
+            const gap = parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
+            return Math.floor((containerWidth + gap) / (width + gap));
+        }
+
+        // Default to 1 column if no column properties are set
+        return 1;
+    },
+
+    /**
+     * Gets the content height of the document element
+     * @param {HTMLElement} documentElement - The document element
+     * @returns {number} The content height in pixels
+     */
+    getContentHeight(documentElement) {
+        if (!documentElement) {
+            console.warn("Document element not available for height calculation.");
+            return 0;
+        }
+
+        // Get the computed style height or use scrollHeight as fallback
+        const computedStyle = window.getComputedStyle(documentElement);
+        const height = parseFloat(computedStyle.height);
+
+        return isNaN(height) ? documentElement.scrollHeight : height;
+    },
+
+    /**
+     * We have to make sure that the total number of columns is a multiple 
+     * of the number of columns per screen. 
+     * Otherwise it causes snapping and page turning issues. 
+     * To fix this, we insert and remove blank virtual columns at the end of the resource.
+     * @param {Window} contentWindow - The iframe content window
+     * @returns {boolean} True if virtual columns were added or removed
+     */
+    appendVirtualColumnIfNeeded(contentWindow) {
+        if (!contentWindow?.document) {
+            console.warn("Content window not available for virtual column management.");
+            return false;
+        }
+
+        const colCountPerScreen = this.getColumnCountPerScreen(contentWindow);
+        console.log(`Column count per screen: ${colCountPerScreen}`);
+
+        if (!colCountPerScreen) {
+            // This has been triggered while in scroll mode
+            console.log("In scroll mode, skipping virtual column adjustment.");
+            return false;
+        }
+
+        const doc = contentWindow.document;
+        const virtualCols = doc.querySelectorAll("div[id^='readium-virtual-page']");
+
+        // Remove first so that we don't end up with an incorrect scrollWidth
+        // Even when removing their width we risk having an incorrect scrollWidth
+        // so removing them entirely is the most robust solution
+        for (const virtualCol of virtualCols) {
+            virtualCol.remove();
+        }
+        const virtualColsCount = virtualCols.length;
+        console.log(`Found ${virtualColsCount} existing virtual columns.`);
+
+        const documentWidth = doc.scrollingElement ? doc.scrollingElement.scrollWidth : doc.documentElement.scrollWidth;
+        const windowWidth = contentWindow.visualViewport ? contentWindow.visualViewport.width : contentWindow.innerWidth;
+
+        console.log(`Document width: ${documentWidth}, Window width: ${windowWidth}`);
+
+        const totalColCount = Math.round((documentWidth / windowWidth) * colCountPerScreen);
+        const lonelyColCount = totalColCount % colCountPerScreen;
+
+        const needed = colCountPerScreen === 1 || lonelyColCount === 0
+            ? 0
+            : colCountPerScreen - lonelyColCount;
+
+        console.log(`Virtual columns - Total: ${totalColCount}, Per screen: ${colCountPerScreen}, Lonely: ${lonelyColCount}, Needed: ${needed}`);
+
+        if (needed > 0) {
+            for (let i = 0; i < needed; i++) {
+                const virtualCol = doc.createElement("div");
+                virtualCol.setAttribute("id", `readium-virtual-page-${i}`);
+                virtualCol.dataset.readium = "true";
+
+                // Check for CSS column break support
+                if (CSS?.supports("break-before", "column")) {
+                    virtualCol.style.breakBefore = "column";
+                } else if (CSS?.supports("break-inside", "avoid-column")) {
+                    virtualCol.style.breakInside = "avoid-column";
+                    virtualCol.style.height = this.getContentHeight(doc.documentElement) + "px";
+                } else {
+                    virtualCol.style.height = this.getContentHeight(doc.documentElement) + "px";
+                }
+
+                virtualCol.innerHTML = "&#8203;"; // zero-width space
+                doc.body.appendChild(virtualCol);
+            }
+
+            console.log(`Added ${needed} virtual columns to fix column alignment.`);
+        }
+        else {
+            console.log("No virtual columns needed, document is already aligned.");
+        }
+
+        return virtualColsCount !== needed;
+    }
+};
+
+/**
+ * Applies virtual column adjustment to fix column alignment issues
+ * This should be called after content is loaded or when layout changes
+ * @returns {boolean} True if virtual columns were adjusted
+ */
+function adjustVirtualColumns() {
+    const contentWindow = domUtils.getContentWindow();
+    if (!contentWindow) {
+        console.warn("Cannot adjust virtual columns - iframe content not available.");
+        return false;
+    }
+
+    try {
+        return columnUtils.appendVirtualColumnIfNeeded(contentWindow);
+    } catch (error) {
+        console.error("Error adjusting virtual columns:", error);
+        return false;
+    }
+}
+
+/**
  * Style and property utilities
  */
 const styleUtils = {
@@ -354,26 +426,19 @@ const styleUtils = {
             return;
         }
 
+        const hasCssVariableChanged = domUtils.hasCssVariableChanged(root, property, value);
+        if (!hasCssVariableChanged) {
+            console.log(`CSS variable '${property}' has not changed: ${value}`);
+            return;
+        }
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
 
-        // Handle special properties
-        this.handleSpecialProperties(property, value);
-    },
-
-    /**
-     * Handles special property changes
-     * @param {string} property - The CSS property name
-     * @param {string} value - The CSS property value
-     */
-    handleSpecialProperties(property, value) {
-        if (property === '--USER__colCount') {
-            colCount = parseInt(value);
-            setTimeout(fixImagePositioning, 100);
-        }
-
-        if (property.includes('fontSize') || property.includes('font-size')) {
-            setTimeout(fixImagePositioning, 100);
+        // Adjust virtual columns after column-related property changes
+        if (property.includes('column')) {
+            setTimeout(() => {
+                adjustVirtualColumns();
+            }, 50);
         }
     },
 
@@ -402,7 +467,11 @@ const styleUtils = {
             document.documentElement.style.removeProperty('--background-color');
             return;
         }
-
+        const hasCssVariableChanged = domUtils.hasCssVariableChanged(document.documentElement, '--background-color', color);
+        if (!hasCssVariableChanged) {
+            console.log(`CSS variable '--background-color' has not changed: ${color}`);
+            return;
+        }
         console.log(`Setting background color to: ${color}`);
         document.documentElement.style.setProperty('--background-color', color);
     },
@@ -446,11 +515,12 @@ function handleMessage(event, platform) {
  * Handles the "next" command
  */
 function handleNextCommand() {
+    let platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
         window.location.href = 'https://runcsharp.next?true';
     } else {
-        navigationUtils.scrollRight(domUtils.detectPlatform());
+        navigationUtils.scrollRight(platform);
     }
 }
 
@@ -458,30 +528,91 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
+    let platform = domUtils.detectPlatform();
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
         window.location.href = 'https://runcsharp.prev?true';
     } else {
-        navigationUtils.scrollLeft(domUtils.detectPlatform());
+        navigationUtils.scrollLeft(platform);
+    }
+}
+
+
+/**
+ * Calculates the approximate character position based on current scroll position
+ * This is used to determine which synthetic page is currently being displayed
+ * @returns {number} The estimated character position in the current document
+ */
+function getCharacterPositionFromScroll() {
+    const contentWindow = domUtils.getContentWindow();
+    const doc = domUtils.getIframeDocument();
+
+    if (!contentWindow || !doc) {
+        console.warn("Cannot calculate character position - iframe content not accessible");
+        return 0;
+    }
+
+    try {
+        // Get the current scroll position and total scrollable width
+        const currentScrollX = contentWindow.scrollX;
+        const totalScrollWidth = doc.documentElement.scrollWidth;
+        const viewportWidth = contentWindow.innerWidth;
+
+        // Calculate the scroll progress as a percentage (0-1)
+        const maxScrollX = Math.max(0, totalScrollWidth - viewportWidth);
+        const scrollProgress = maxScrollX > 0 ? Math.min(1, currentScrollX / maxScrollX) : 0;
+
+        // Get the total text content from the document
+        const textContent = extractTextFromDocument(doc);
+        const totalCharacters = textContent.length;
+
+        // Calculate character position based on scroll progress
+        const characterPosition = Math.floor(scrollProgress * totalCharacters);
+
+        console.log(`Character position calculated: ${characterPosition} (scroll: ${scrollProgress.toFixed(3)}, total chars: ${totalCharacters})`);
+
+        return Math.max(0, characterPosition);
+    } catch (error) {
+        console.error("Error calculating character position:", error);
+        return 0;
     }
 }
 
 /**
- * Prevents images from moving down when font size changes
- * This function stabilizes image positioning while preserving multicolumn layout
+ * Extracts text content from the document, similar to the C# ExtractTextFromHtml method
+ * @param {Document} doc - The document to extract text from
+ * @returns {string} The extracted text content
  */
-function fixImagePositioning() {
-    const doc = domUtils.getIframeDocument();
-    if (!doc) return;
+function extractTextFromDocument(doc) {
+    if (!doc?.body) {
+        return "";
+    }
 
-    const images = doc.querySelectorAll('img, svg');
+    try {
+        // Get the text content from the body, which automatically excludes HTML tags
+        let textContent = doc.body.textContent || doc.body.innerText || "";
 
-    // Add style element with image fixes
-    imageUtils.injectImageStyles(doc);
+        // Normalize whitespace while preserving paragraph breaks
+        textContent = textContent.replace(/\s+/g, " ").trim();
 
-    // Process each image
-    images.forEach(img => imageUtils.processImage(img));
+        return textContent;
+    } catch (error) {
+        console.error("Error extracting text from document:", error);
+        return "";
+    }
 }
+
+/**
+ * Gets the character position for the current page and notifies the C# code
+ * This is called when pages change to update synthetic page information
+ */
+function updateCharacterPosition() {
+    const characterPosition = getCharacterPositionFromScroll();
+    console.log(`Updating character position: ${characterPosition}`);
+    // Notify C# code about the character position change
+    window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
+}
+
 
 /**
  * Initialize the reader when the DOM is fully loaded
@@ -503,9 +634,13 @@ document.addEventListener("DOMContentLoaded", function () {
         body.classList.add('windows-platform');
         frame.classList.add('windows-platform');
     }
-    
+
     // Set initial dimensions and add resize listener
-    layoutUtils.setDimensions(body, root);
+    if (!domUtils.isCssVariableSet(root, '--root-width') || !domUtils.isCssVariableSet(root, '--root-height')) {
+        console.log("Root dimensions already set, skipping initial resize.");
+        layoutUtils.setDimensions(body, root);
+    }
+    
     frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
 
     // Handle iframe load events
@@ -516,14 +651,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.error("Cannot access iframe content - likely CORS restriction or iframe not fully loaded.");
                 return;
             }
+            if (!isPreviousPage) {
+                // Adjust virtual columns after content loads
+                setTimeout(() => {
+                    adjustVirtualColumns();
+                }, 100); // Small delay to ensure content is fully rendered
+            }
 
-            // Fix image positioning when page loads
-            setTimeout(fixImagePositioning, 100);
+            window.location.href = 'https://runcsharp.pageLoad?true';
         } catch (error) {
             console.error("Error during iframe onload:", error);
-        } finally {
-            // Notify via URL change after processing
-            window.location.href = 'https://runcsharp.pageLoad?true';
         }
     };
 
@@ -562,7 +699,7 @@ function getPageCount() {
 
     const width = Math.ceil(contentWindow.innerWidth);
     const containerWidth = Math.ceil(contentWindow.document.documentElement.scrollWidth);
-    return Math.ceil(Math.max(1, containerWidth / width));
+    return Math.ceil(Math.max(1, containerWidth / width)) - 1;
 }
 
 /**
@@ -578,8 +715,16 @@ function getCurrentPage() {
  */
 function gotoEnd() {
     if (isPreviousPage) {
-        navigationUtils.scrollToHorizontalEnd();
-        isPreviousPage = false;
+        adjustVirtualColumns();
+
+        // Adjust virtual columns after positioning content at the end
+        // This ensures virtual columns are calculated with the correct final position
+        setTimeout(() => {
+            navigationUtils.scrollToHorizontalEnd();
+            isPreviousPage = false;
+            currentPage = getPageCount();
+            updateCharacterPosition();
+        }, 200);
     }
 }
 
@@ -588,7 +733,7 @@ function gotoEnd() {
  */
 function setPreviousPage() {
     isPreviousPage = true;
-    currentPage = 1; // Reset current page on previous navigation
+    currentPage = 0; // Reset current page on previous navigation
 }
 
 /**
@@ -603,8 +748,33 @@ function loadPage(page) {
     }
     console.log("Frame found. Loading page:", page);
     frame.setAttribute('src', page);
-    currentPage = 1; // Reset current page on new load
+    currentPage = 0; // Reset current page on new load
     return true;
+}
+
+/**
+ * Goes to a specific page in the iframe content
+ * @param {number} page property - The page number to navigate to
+ * @returns {void}
+ */
+function gotoPage(page) {
+    console.log("Jumping to page:", page);
+    if (page < 1) {
+        console.warn("Page number must be 1 or greater. Current page:", page);
+        currentPage = 0;
+        return;
+    }
+    adjustVirtualColumns();
+
+
+    // Adjust virtual columns after positioning content at the end
+    // This ensures virtual columns are calculated with the correct final position
+    setTimeout(() => {
+        navigationUtils.scrollToPage(page);
+        isPreviousPage = false;
+        currentPage = getPageCount();
+        updateCharacterPosition();
+    }, 200);
 }
 
 /**

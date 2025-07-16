@@ -11,8 +11,19 @@ namespace EpubReader.Util;
 /// directory, which is determined by the application's local data folder.</remarks>
 public static partial class FileService
 {
+	#region Constants and Static Fields
+
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
 	public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
+
+	// Cache for invalid characters to avoid repeated allocations
+	static readonly char[] invalidPathChars = Path.GetInvalidPathChars();
+	static readonly char[] invalidFileNameChars = Path.GetInvalidFileNameChars();
+	static readonly char[] additionalInvalidChars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|', '$', '%'];
+
+	#endregion
+
+	#region File and Directory Deletion
 
 	/// <summary>
 	/// Deletes the specified directory and its contents.
@@ -23,6 +34,12 @@ public static partial class FileService
 	/// <param name="directoryName">The path of the directory to delete. Must not be null or empty.</param>
 	public static void DeleteDirectory(string directoryName)
 	{
+		if (string.IsNullOrWhiteSpace(directoryName))
+		{
+			logger.Warn("Directory name is null or empty");
+			return;
+		}
+
 		try
 		{
 			if (Directory.Exists(directoryName))
@@ -33,7 +50,7 @@ public static partial class FileService
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error deleting directory: {directoryName}, Messsage: {ex.Message}");
+			logger.Error($"Error deleting directory: {directoryName}, Message: {ex.Message}");
 		}
 	}
 
@@ -45,6 +62,12 @@ public static partial class FileService
 	/// <param name="fileName">The path of the file to be deleted. Cannot be null or empty.</param>
 	public static void DeleteFile(string fileName)
 	{
+		if (string.IsNullOrWhiteSpace(fileName))
+		{
+			logger.Warn("File name is null or empty");
+			return;
+		}
+
 		try
 		{
 			if (File.Exists(fileName))
@@ -55,9 +78,13 @@ public static partial class FileService
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error deleting file: {fileName}, Messsage: {ex.Message}");
+			logger.Error($"Error deleting file: {fileName}, Message: {ex.Message}");
 		}
 	}
+
+	#endregion
+
+	#region File Saving Operations
 
 	/// <summary>
 	/// Asynchronously saves an image to a directory based on the provided book name.
@@ -68,40 +95,45 @@ public static partial class FileService
 	/// <param name="imageBytes">The byte array representing the image to be saved.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved image file,
 	/// or an empty string if the operation fails.</returns>
-	public static async Task<string> SaveImageAsync(string bookName, byte[] imageBytes)
+	public static async Task<string> SaveImageAsync(string bookName, byte[] imageBytes, CancellationToken cancellation = default)
 	{
-		var partialPath = Path.GetFileNameWithoutExtension(bookName);
-		var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(partialPath));
-		if (!Directory.Exists(fullPath))
+		if (string.IsNullOrWhiteSpace(bookName))
 		{
-			Directory.CreateDirectory(fullPath);
-			logger.Info($"Created directory: {fullPath}");
+			logger.Warn("Book name is null or empty");
+			return string.Empty;
 		}
-		
-		string fileName;
-		
+
+		if (imageBytes == null || imageBytes.Length == 0)
+		{
+			logger.Warn("Image bytes are null or empty");
+			return string.Empty;
+		}
+
 		try
 		{
-			using var memoryStream = new MemoryStream(imageBytes);
-			var type = ImageExtensions.GetFileExtension(memoryStream);
-			var newfileName = Path.ChangeExtension(bookName, type.ToString().ToLower());
-			fileName = Path.Combine(fullPath, ValidateAndFixFileName(newfileName));
-			
-			memoryStream.Seek(0, SeekOrigin.Begin);
-			
-			// Simplified file writing with less chances of handle leaks
-			await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
+			var directoryPath = CreateBookDirectoryAsync(bookName);
+			if (string.IsNullOrEmpty(directoryPath))
+			{
+				return string.Empty;
+			}
+
+			var fileName = GenerateImageFileName(imageBytes, bookName, directoryPath);
+			if (string.IsNullOrEmpty(fileName))
+			{
+				return string.Empty;
+			}
+
+			await File.WriteAllBytesAsync(fileName, imageBytes, cancellation).ConfigureAwait(false);
 			logger.Info($"Image saved: {bookName}");
+			return fileName;
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving image: {bookName}, Message: {ex.Message}");
 			return string.Empty;
 		}
-		
-		return fileName;
 	}
-	
+
 	/// <summary>
 	/// Asynchronously saves a stream to a file with the specified book name in the designated directory.
 	/// </summary>
@@ -112,28 +144,32 @@ public static partial class FileService
 	/// <param name="bookName">The name of the book, used to determine the file name and directory. The name should not include an extension.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved file if
 	/// successful; otherwise, an empty string.</returns>
-	public static async Task<string> SaveFileAsync(Stream stream, string bookName)
+	public static async Task<string> SaveFileAsync(Stream stream, string bookName, CancellationToken cancellation = default)
 	{
+		if (stream == null)
+		{
+			logger.Warn("Stream is null");
+			return string.Empty;
+		}
+
+		if (string.IsNullOrWhiteSpace(bookName))
+		{
+			logger.Warn("Book name is null or empty");
+			return string.Empty;
+		}
+
 		try
 		{
-			var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName)));
-			if (!Directory.Exists(fullPath))
+			var directoryPath = CreateBookDirectoryAsync(bookName);
+			if (string.IsNullOrEmpty(directoryPath))
 			{
-				Directory.CreateDirectory(fullPath);
-				logger.Info($"Created directory: {fullPath}");
+				return string.Empty;
 			}
-			
-			var fileName = Path.Combine(fullPath, ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName)));
-			fileName = Path.ChangeExtension(fileName, ".epub");
-			
-			// Create a memory buffer to ensure we're not locking the original stream
-			using var memoryStream = new MemoryStream();
-			await stream.CopyToAsync(memoryStream);
-			memoryStream.Position = 0;
-			
-			// Write to file in one operation
-			await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
-			
+
+			var fileName = GenerateEpubFileName(bookName, directoryPath);
+			var fileBytes = await ReadStreamToBytesAsync(stream, cancellation).ConfigureAwait(false);
+
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellation).ConfigureAwait(false);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -143,7 +179,7 @@ public static partial class FileService
 			return string.Empty;
 		}
 	}
-	
+
 	/// <summary>
 	/// Asynchronously saves a file to a specified directory based on the provided book name.
 	/// </summary>
@@ -154,31 +190,34 @@ public static partial class FileService
 	/// <param name="bookName">The name of the book used to determine the directory path. The directory will be created if it does not exist.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the full path of the saved file, or an
 	/// empty string if an error occurs.</returns>
-	public static async Task<string> SaveFileAsync(FileResult result, string bookName)
+	public static async Task<string> SaveFileAsync(FileResult result, string bookName, CancellationToken cancellationToken = default)
 	{
+		if (result == null)
+		{
+			logger.Warn("FileResult is null");
+			return string.Empty;
+		}
+
+		if (string.IsNullOrWhiteSpace(bookName))
+		{
+			logger.Warn("Book name is null or empty");
+			return string.Empty;
+		}
+
 		try
 		{
-			bookName = Path.GetFileNameWithoutExtension(bookName);
-			var fullPath = Path.Combine(SaveDirectory, ValidateAndFixDirectoryName(bookName));
-			if (!Directory.Exists(fullPath))
+			var directoryPath = CreateBookDirectoryAsync(bookName);
+			if (string.IsNullOrEmpty(directoryPath))
 			{
-				Directory.CreateDirectory(fullPath);
-				logger.Info($"Created directory: {fullPath}");
+				return string.Empty;
 			}
 
-			var fileName = Path.Combine(fullPath, ValidateAndFixFileName(result.FileName));
-			
-			// Use a memory buffer to avoid file handle issues
-			using (Stream fileStream = await result.OpenReadAsync())
-			{
-				using var memoryStream = new MemoryStream();
-				await fileStream.CopyToAsync(memoryStream);
-				memoryStream.Position = 0;
-				
-				// Write the bytes in one operation
-				await File.WriteAllBytesAsync(fileName, memoryStream.ToArray());
-			}
-			
+			var fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
+
+			using var fileStream = await result.OpenReadAsync().ConfigureAwait(false);
+			var fileBytes = await ReadStreamToBytesAsync(fileStream, cancellationToken).ConfigureAwait(false);
+
+			await File.WriteAllBytesAsync(fileName, fileBytes, cancellationToken).ConfigureAwait(false);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -188,6 +227,10 @@ public static partial class FileService
 			return string.Empty;
 		}
 	}
+
+	#endregion
+
+	#region MIME Type Detection
 
 	/// <summary>
 	/// Determines the MIME type based on the file extension of the specified file name.
@@ -199,6 +242,11 @@ public static partial class FileService
 	/// returns <see langword="application/octet-stream"/>.</returns>
 	public static string GetMimeType(string fileName)
 	{
+		if (string.IsNullOrWhiteSpace(fileName))
+		{
+			return "application/octet-stream";
+		}
+
 		var extension = Path.GetExtension(fileName).ToLowerInvariant();
 
 		return extension switch
@@ -219,39 +267,166 @@ public static partial class FileService
 		};
 	}
 
+	#endregion
+
+	#region Private Helper Methods
+
+	/// <summary>
+	/// Creates a directory for the specified book name if it doesn't exist.
+	/// </summary>
+	/// <param name="bookName">The name of the book to create directory for.</param>
+	/// <returns>The full path of the created directory, or empty string if failed.</returns>
+	static string CreateBookDirectoryAsync(string bookName)
+	{
+		var sanitizedBookName = ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName));
+		var directoryPath = Path.Combine(SaveDirectory, sanitizedBookName);
+
+		try
+		{
+			if (!Directory.Exists(directoryPath))
+			{
+				Directory.CreateDirectory(directoryPath);
+				logger.Info($"Created directory: {directoryPath}");
+			}
+			return directoryPath;
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error creating directory: {directoryPath}, Message: {ex.Message}");
+			return string.Empty;
+		}
+	}
+
+	/// <summary>
+	/// Generates a file name for an image based on its content and the book name.
+	/// </summary>
+	/// <param name="imageBytes">The image bytes to determine file extension.</param>
+	/// <param name="bookName">The name of the book.</param>
+	/// <param name="directoryPath">The directory path where the file will be saved.</param>
+	/// <returns>The full file path with appropriate extension.</returns>
+	static string GenerateImageFileName(byte[] imageBytes, string bookName, string directoryPath)
+	{
+		try
+		{
+			using var memoryStream = new MemoryStream(imageBytes);
+			var fileExtension = ImageExtensions.GetFileExtension(memoryStream);
+
+			if (string.IsNullOrEmpty(fileExtension))
+			{
+				logger.Warn($"Could not determine image type for {bookName}");
+				return string.Empty;
+			}
+
+			var baseFileName = Path.GetFileNameWithoutExtension(bookName);
+			var fileName = Path.ChangeExtension(baseFileName, fileExtension.ToLowerInvariant());
+			var sanitizedFileName = ValidateAndFixFileName(fileName);
+
+			return Path.Combine(directoryPath, sanitizedFileName);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error generating image file name: {ex.Message}");
+			return string.Empty;
+		}
+	}
+
+	/// <summary>
+	/// Generates a file name for an EPUB file.
+	/// </summary>
+	/// <param name="bookName">The name of the book.</param>
+	/// <param name="directoryPath">The directory path where the file will be saved.</param>
+	/// <returns>The full file path with .epub extension.</returns>
+	static string GenerateEpubFileName(string bookName, string directoryPath)
+	{
+		var baseFileName = Path.GetFileNameWithoutExtension(bookName);
+		var sanitizedFileName = ValidateAndFixFileName(baseFileName);
+		var fileName = Path.ChangeExtension(sanitizedFileName, ".epub");
+
+		return Path.Combine(directoryPath, fileName);
+	}
+
+	/// <summary>
+	/// Reads a stream to a byte array asynchronously.
+	/// </summary>
+	/// <param name="stream">The stream to read from.</param>
+	/// <returns>A byte array containing the stream content.</returns>
+	static async Task<byte[]> ReadStreamToBytesAsync(Stream stream, CancellationToken cancellation = default)
+	{
+		if (stream.CanSeek)
+		{
+			stream.Position = 0;
+		}
+
+		using var memoryStream = new MemoryStream();
+		await stream.CopyToAsync(memoryStream, cancellation).ConfigureAwait(false);
+		return memoryStream.ToArray();
+	}
+
+	/// <summary>
+	/// Validates and fixes a directory name by removing invalid characters.
+	/// </summary>
+	/// <param name="directoryName">The directory name to validate and fix.</param>
+	/// <returns>A sanitized directory name safe for file system use.</returns>
 	static string ValidateAndFixDirectoryName(string directoryName)
 	{
-		char[] invalidChars = Path.GetInvalidPathChars();
-		foreach (char invalidChar in invalidChars)
+		if (string.IsNullOrWhiteSpace(directoryName))
+		{
+			return "Unknown";
+		}
+
+		// Remove invalid path characters
+		foreach (var invalidChar in invalidPathChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
 		}
 
-		directoryName = directoryName.Replace("\\", "");
-		directoryName = directoryName.Replace("/", "");
-		directoryName = directoryName.Replace(":", "");
-		directoryName = directoryName.Replace("*", "");
-		directoryName = directoryName.Replace("?", "");
-		directoryName = directoryName.Replace("\"", "");
-		directoryName = directoryName.Replace("<", "");
-		directoryName = directoryName.Replace(">", "");
-		directoryName = directoryName.Replace("|", "");
-		directoryName = directoryName.Replace("$", "");
-		directoryName = directoryName.Replace("%", "");
+		// Remove additional problematic characters
+		foreach (var invalidChar in additionalInvalidChars)
+		{
+			directoryName = directoryName.Replace(invalidChar, '_');
+		}
+
+		// Remove spaces and trim
 		directoryName = directoryName.Replace(" ", "").Trim();
-		directoryName = Path.GetFileNameWithoutExtension(directoryName);
+
+		// Ensure we have a valid directory name
+		if (string.IsNullOrWhiteSpace(directoryName))
+		{
+			return "Unknown";
+		}
+
 		return directoryName;
 	}
 
+	/// <summary>
+	/// Validates and fixes a file name by removing invalid characters.
+	/// </summary>
+	/// <param name="fileName">The file name to validate and fix.</param>
+	/// <returns>A sanitized file name safe for file system use.</returns>
 	static string ValidateAndFixFileName(string fileName)
 	{
-		char[] invalidChars = Path.GetInvalidFileNameChars();
-		foreach (char invalidChar in invalidChars)
+		if (string.IsNullOrWhiteSpace(fileName))
+		{
+			return "unknown";
+		}
+
+		// Remove invalid file name characters
+		foreach (var invalidChar in invalidFileNameChars)
 		{
 			fileName = fileName.Replace(invalidChar, '_');
 		}
+
+		// Remove spaces and trim
 		fileName = fileName.Replace(" ", "").Trim();
+
+		// Ensure we have a valid file name
+		if (string.IsNullOrWhiteSpace(fileName))
+		{
+			return "unknown";
+		}
+
 		return fileName;
 	}
 
+	#endregion
 }

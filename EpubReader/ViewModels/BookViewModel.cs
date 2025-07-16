@@ -1,8 +1,11 @@
 ﻿using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EpubReader.Models;
 using EpubReader.Util;
+using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
@@ -22,7 +25,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
 
-	readonly IPopupService popupService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	/// <summary>
@@ -33,7 +35,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		Url = url,
 	};
-	
+
 	/// <summary>
 	/// Gets or sets the cover image for the item.
 	/// </summary>
@@ -61,12 +63,9 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
-	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with the specified <paramref
-	/// name="popupService"/>. It also triggers an initial call to the <c>Press</c> method upon instantiation.</remarks>
-	/// <param name="popupService">The service used to display pop-up messages or dialogs.</param>
-	public BookViewModel(IPopupService popupService)
+	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
+	public BookViewModel()
 	{
-		this.popupService = popupService;
 		Press();
 	}
 
@@ -97,16 +96,28 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// outside of it, the popup is deactivated.</remarks>
 	/// <returns></returns>
 	[RelayCommand]
-	async Task ShowPopup()
+	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var result = await this.popupService.ShowPopupAsync<SettingsPageViewModel>(Shell.Current);
+		var popup = new SettingsPage(new SettingsPageViewModel());
+		PopupOptions options = new()
+		{
+			CanBeDismissedByTappingOutsideOfPopup = true,
+		};
+		
+		IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(popup, options, cancellation);
 		if (result.WasDismissedByTappingOutsideOfPopup)
 		{
+			System.Diagnostics.Debug.WriteLine("Popup was dismissed by tapping outside of it.");
+			isPopupActive = false;
+		}
+		else
+		{
+			System.Diagnostics.Debug.WriteLine("Popup was closed by other means.");
 			isPopupActive = false;
 		}
 	}
-	
+
 	/// <summary>
 	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
 	/// </summary>
