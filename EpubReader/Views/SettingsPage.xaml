@@ -15,6 +15,7 @@
                                       Light=White}"
     HeightRequest="{OnPlatform WinUI=450,
                                Default=350}"
+    Loaded="CurrentPage_Loaded"
     Unloaded="CurrentPage_Unloaded"
     WidthRequest="300">
 
