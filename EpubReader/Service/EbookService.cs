@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using EpubReader.Models;
 using EpubReader.Util;
 using MetroLog;
