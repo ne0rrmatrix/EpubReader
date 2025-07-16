@@ -95,9 +95,11 @@ public static partial class EbookService
 
 	static async Task<Book> CreateBookListingAsync(EpubBookRef book, string path)
 	{
+		var Authors = ExtractAuthors(book);
 		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		return new Book
 		{
+			Author = Authors[0],
 			Title = book.Title,
 			FilePath = path,
 			CoverImage = coverImage,
@@ -114,11 +116,11 @@ public static partial class EbookService
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
 		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
-
+		
 		return new Book
 		{
 			Title = book.Title.Trim(),
-			Authors = authors,
+			Author = authors[0],
 			FilePath = path,
 			Files = sharedFiles,
 			Fonts = fonts,
@@ -302,11 +304,11 @@ public static partial class EbookService
         return images;
     }
 
-	static List<Author> ExtractAuthors(EpubBookRef book)
+	static List<string> ExtractAuthors(EpubBookRef book)
 	{
-		return [.. book.AuthorList
-			.Where(author => !string.IsNullOrEmpty(author))
-			.Select(author => new Author { Name = author })];
+		return [.. book.Schema.Package.Metadata.Creators
+			.Where(author => !string.IsNullOrEmpty(author.Creator))
+			.Select(author =>   author.Creator )];
 	}
 
 	#endregion

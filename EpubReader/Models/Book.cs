@@ -81,10 +81,11 @@ public class Book
 	public Byte[] CoverImage { get; set; } = [];
 
 	/// <summary>
-	/// Gets or sets the list of authors.
+	/// Gets or sets the author.
 	/// </summary>
-	[Ignore]
-	public List<Author> Authors { get; set; } = [];
+	[Column("Author")]
+	public string Author { get; set; } = string.Empty;
+
 
 	/// <summary>
 	/// Gets or sets the collection of images associated with the entity.

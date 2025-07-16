@@ -100,7 +100,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	{
 		isPopupActive = true;
 		var popup = new SettingsPage(new SettingsPageViewModel());
-		PopupOptions options = new PopupOptions
+		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = true,
 		};

@@ -1,4 +1,8 @@
+using System.Collections.ObjectModel;
+using EpubReader.Interfaces;
+using EpubReader.Models;
 using EpubReader.ViewModels;
+using MetroLog;
 
 namespace EpubReader.Views;
 
@@ -11,6 +15,9 @@ namespace EpubReader.Views;
 /// displayed.</remarks>
 public partial class LibraryPage : ContentPage
 {
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryPage));
+	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryPage"/> class with the specified view model.
 	/// </summary>
@@ -20,12 +27,47 @@ public partial class LibraryPage : ContentPage
 	public LibraryPage(LibraryViewModel viewModel)
 	{
 		InitializeComponent();
-        BindingContext = viewModel;
+		BindingContext = viewModel;
 	}
 
-    protected override void OnNavigatedTo(NavigatedToEventArgs args)
-    {
-        base.OnNavigatedTo(args);
-        Shell.SetNavBarIsVisible(this, true);
-    }
+	protected override void OnNavigatedTo(NavigatedToEventArgs args)
+	{
+		base.OnNavigatedTo(args);
+		Shell.SetNavBarIsVisible(this, true);
+	}
+	
+	/// <summary>
+	/// Handles the text changed event for the search bar, updating the displayed list of books based on the search query.
+	/// </summary>
+	/// <remarks>If the search text is empty or consists only of whitespace, all books are displayed. Otherwise, the
+	/// list is filtered to include books whose titles or authors contain the search text, ignoring case. The search
+	/// results are logged for informational purposes.</remarks>
+	/// <param name="sender">The source of the event, typically the search bar control.</param>
+	/// <param name="e">The <see cref="TextChangedEventArgs"/> containing the event data, including the new text value.</param>
+	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs e)
+	{
+		var viewModel = (LibraryViewModel)BindingContext;
+		var books = viewModel.Books;
+		var results = e.NewTextValue;
+		System.Diagnostics.Debug.WriteLine($"Search results: {results}");
+		if (string.IsNullOrWhiteSpace(results))
+		{
+			books.Clear();
+			var epubBooks = await db.GetAllBooks();
+			viewModel.Books = new ObservableCollection<Book>(epubBooks);
+			viewModel.AlphabeticalTitleSort();
+			logger.Info("Search text is empty, showing all books");
+			return;
+		}
+		logger.Info($"Searching for books with title containing: {results}");
+		var filteredBooks = books.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		var filteredAuthors = books.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		if (filteredBooks.Count == 0 && filteredAuthors.Count == 0)
+		{
+			logger.Info("No books found matching the search criteria");
+		}
+		filteredBooks.AddRange(filteredAuthors.Where(b => !filteredBooks.Contains(b))); // Avoid duplicates
+		viewModel.Books = new ObservableCollection<Book>(filteredBooks);
+
+	}
 }

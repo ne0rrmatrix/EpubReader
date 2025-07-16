@@ -28,6 +28,7 @@ public partial class LibraryViewModel : BaseViewModel
 	static readonly string[] epubExtensions = [".epub"];
 	static readonly string[] androidEpubTypes = ["application/epub+zip", ".epub"];
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
+	bool isAlphabeticalSorted = true;
 
 	#endregion
 
@@ -73,6 +74,7 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		var temp = await db.GetAllBooks();
 		Books = new ObservableCollection<Book>(temp ?? []);
+		AlphabeticalTitleSort();
 	}
 
 	#endregion
@@ -214,6 +216,123 @@ public partial class LibraryViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error removing book: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Searches for books with authors whose names contain the specified search text.
+	/// </summary>
+	/// <remarks>This method updates the <see cref="Books"/> collection with the search results. If no books match
+	/// the search criteria, a notification is displayed to the user.</remarks>
+	/// <param name="searchText">The text to search for within author names. If the text is null, empty, or consists only of whitespace, all books
+	/// are displayed.</param>
+	/// <returns></returns>
+	[RelayCommand]
+	public async Task SearchAuthorName(string searchText)
+	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			logger.Info("Search text is empty, showing all books");
+			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
+			return;
+		}
+		logger.Info($"Searching for books with author containing: {searchText}");
+		var filteredBooks = await db.GetAllBooks();
+			filteredBooks = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		if (filteredBooks.Count == 0)
+		{
+			logger.Info("No books found matching the search criteria");
+			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
+		}
+		Books = new ObservableCollection<Book>(filteredBooks);
+	}
+
+	/// <summary>
+	/// Searches for books with titles containing the specified search text and updates the book collection accordingly.
+	/// </summary>
+	/// <remarks>If the <paramref name="searchText"/> is null or consists only of whitespace, the method retrieves
+	/// and displays all available books. Otherwise, it filters the books to include only those whose titles contain the
+	/// specified text, ignoring case. If no books match the search criteria, an informational message is displayed to the
+	/// user.</remarks>
+	/// <param name="searchText">The text to search for within book titles. If null or whitespace, all books are shown.</param>
+	/// <returns></returns>
+	[RelayCommand]
+	public async Task SearchBookName(string searchText)
+	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			logger.Info("Search text is empty, showing all books");
+			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
+			return;
+		}
+		logger.Info($"Searching for books with title containing: {searchText}");
+		var filteredBooks = await db.GetAllBooks();
+			filteredBooks = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		if (filteredBooks.Count == 0)
+		{
+			logger.Info("No books found matching the search criteria");
+			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
+		}
+		Books = new ObservableCollection<Book>(filteredBooks);
+	}
+
+	/// <summary>
+	/// Sorts the collection of books in alphabetical order by the first author's name.
+	/// </summary>
+	/// <remarks>This method orders the books based on the name of the first author in each book's author list,
+	/// using a case-insensitive comparison. The sorted order is applied directly to the existing collection.</remarks>
+	[RelayCommand]
+	public void AlphabeticalAuthorSort()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+
+		if(!isAlphabeticalSorted)
+		{
+			logger.Info("Sorting books by author");
+			var sortedBooks = Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
+			Books.Clear();
+			foreach (var book in sortedBooks)
+			{
+				Books.Add(book);
+			}
+			logger.Info("Alphabetical author sort disabled, no changes made");
+			return;
+		}
+		logger.Info("Sorting books by reverse Alphabetical sort");
+		var reverseAlphabeticalBooks = Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
+		Books.Clear();
+		foreach (var book in reverseAlphabeticalBooks)
+		{
+			Books.Add(book);
+		}
+	}
+
+	/// <summary>
+	/// Sorts the collection of books in alphabetical order by their titles.
+	/// </summary>
+	/// <remarks>This method sorts the books in a case-insensitive manner using the ordinal string comparison. After
+	/// sorting, the original collection is cleared and repopulated with the sorted books.</remarks>
+	[RelayCommand]
+	public void AlphabeticalTitleSort()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+		if(!isAlphabeticalSorted)
+		{
+			logger.Info("Sorting books by title");
+			var sortedBooks = Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
+			Books.Clear();
+			foreach (var book in sortedBooks)
+			{
+				Books.Add(book);
+			}
+			return;
+		}
+		logger.Info("Sorting books by reverse title");
+		var reverseSortedBooks = Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
+		Books.Clear();
+		foreach (var book in reverseSortedBooks)
+		{
+			Books.Add(book);
 		}
 	}
 
