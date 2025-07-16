@@ -15,10 +15,10 @@ namespace EpubReader.Views;
 /// as font size, theme, and layout preferences. It interacts with a database to retrieve and persist settings, and
 /// updates the UI components to reflect the current settings. The page also sends notifications to other components
 /// when settings are changed.</remarks>
-public partial class SettingsPage : Popup
+public partial class SettingsPage : Popup<bool>
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
-	readonly IDb db;
+	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
 	readonly Task settingsTask;
 
@@ -29,24 +29,21 @@ public partial class SettingsPage : Popup
 	/// <remarks>This constructor sets up the settings page by initializing the component, setting the data binding
 	/// context, and configuring UI elements based on the current settings retrieved from the database.</remarks>
 	/// <param name="viewModel">The view model that provides data binding for the settings page.</param>
-	/// <param name="db">The database interface used to retrieve and store settings.</param>
-	public SettingsPage(SettingsPageViewModel viewModel, IDb db)
+	public SettingsPage(SettingsPageViewModel viewModel)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
-		this.db = db;
 		settingsTask = InitializeSettings();
 		if (settingsTask.IsFaulted || settingsTask.IsCanceled)
 		{
 			logger.Error($"Failed to initialize settings: {settingsTask.Exception}");
 		}
 	}
-
 	async Task InitializeSettings()
 	{
 		settings = await db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;
-		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
+		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 	}
@@ -83,7 +80,7 @@ public partial class SettingsPage : Popup
 		await db.RemoveAllSettings();
 		settings = new Settings();
 		await db.SaveSettings(settings);
-		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
+		switchControl.IsToggled = settings.SupportMultipleColumns;
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
@@ -146,24 +143,39 @@ public partial class SettingsPage : Popup
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	/// <summary>
-	/// Toggles the support for multiple columns in the application settings.
-	/// </summary>
-	/// <remarks>This method updates the application settings to enable or disable support for multiple columns,
-	/// saves the updated settings to the database, and sends a notification message indicating the change. The button text
-	/// is also updated to reflect the current state.</remarks>
-	/// <param name="sender">The source of the event.</param>
-	/// <param name="e">The event data.</param>
-	async void ToggleMultipleColumns(object sender, EventArgs e)
+	void CurrentPage_Unloaded(object sender, EventArgs e)
 	{
-		if(settings is null)
+		System.Diagnostics.Debug.WriteLine("Unloaded event fired");
+		stackLayout.Remove(switchControl);
+	}
+
+	/// <summary>
+	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
+	/// </summary>
+	/// <remarks>This method updates the <see cref="settings"/> to reflect the current toggle state of the switch
+	/// control. It logs a warning if the settings or switch control is null and does not proceed with the update. After
+	/// updating the settings, it saves the changes to the database and sends a message indicating the update.</remarks>
+	/// <param name="sender">The source of the event, typically the switch control.</param>
+	/// <param name="e">The event data containing the toggle state.</param>
+	async void switchControl_Toggled(object? sender, ToggledEventArgs e)
+	{
+		if(sender is null)
+		{
+			logger.Warn("Sender is null, cannot toggle multiple columns.");
+			return;
+		}
+		if (settings is null)
 		{
 			logger.Warn("Settings are null, cannot toggle multiple columns.");
 			return;
 		}
-		settings.SupportMultipleColumns = !settings.SupportMultipleColumns;
+		if (switchControl is null)
+		{
+			logger.Warn("Switch control is null, cannot toggle multiple columns.");
+			return;
+		}
+		settings.SupportMultipleColumns = switchControl.IsToggled;
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-		ButtonColumn.Text = settings.SupportMultipleColumns ? "Disable Multiple Columns" : "Enable Multiple Columns";
 	}
 }

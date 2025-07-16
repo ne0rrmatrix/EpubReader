@@ -35,9 +35,11 @@ public static class MauiProgram
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 		})
-		.UseMauiCommunityToolkit(options =>
+		.UseMauiCommunityToolkit(static options =>
 		{
 			options.SetShouldEnableSnackbarOnWindows(true);
+			options.SetPopupDefaults(new DefaultPopupSettings());
+			options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
 		})
 		.ConfigureSyncfusionToolkit()
 		.ConfigureMauiHandlers(handlers =>
