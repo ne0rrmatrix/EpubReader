@@ -17,38 +17,59 @@ First public beta of app can be found here: https://github.com/ne0rrmatrix/EpubR
 ### Images ###
 
 Windows:
-Light Mode Sepia Theme
-![image](https://github.com/user-attachments/assets/eff82e68-3c1a-4a9d-aafc-2f2bb5050996)
-![image](https://github.com/user-attachments/assets/d100b5a1-2ed3-4598-8ab1-60c44a77db36)
-![image](https://github.com/user-attachments/assets/678405d4-9c6f-435d-835b-3e5479ca8c42)
-![image](https://github.com/user-attachments/assets/e8fe2180-0249-47b3-9b18-ab058b03346f)
-![image](https://github.com/user-attachments/assets/bd3ae77a-3cae-45c7-81ae-8e6f2fec8428)
+Default Light Mode Theme
+<p align="center">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/8c56538b-5c70-4af7-8e83-c931abaccf2d" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/9ec33ec1-bdc7-4cb6-aeb2-0a927157e6b3" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/40aaab79-28da-4620-ad70-01fd007baa44" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/fd8ff6bf-f585-423e-91a7-176f6c620e20" style="padding-right: 5px;">
+</p>
+<p align="center">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/2568b0e4-77a5-4f0e-b08a-16a785701546" style="padding-right: 5px;">
+</p>
 
-Light Mode Dark Theme
-![image](https://github.com/user-attachments/assets/23600f94-1eda-4cfe-80ff-e48b87a56a6f)
-![image](https://github.com/user-attachments/assets/19fed97a-ae00-4e41-aaeb-dd735da75e6b)
+---
 
+Default Dark Mode Theme
+<p align="center">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/d442a75c-17f3-49dd-823e-2c9ba0ab0f03" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/dff7cbf1-0126-434b-921c-58a1f4b5c5ea" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/7d3ab4b8-cc1e-4842-9b02-638da5d1a1ed" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/ad1a37ce-e864-4b4f-8b08-6cb21c584821" style="padding-right: 5px;">
+</p>
 
-Dark Mode
-![image](https://github.com/user-attachments/assets/b85345d4-33a0-4275-a262-35c86bcf1788)
-![image](https://github.com/user-attachments/assets/4d8fdf42-6108-47ca-9b44-9c7c380cf21a)
-![image](https://github.com/user-attachments/assets/8b5f85fd-885f-4815-895d-8a117aa16c4d)
-![image](https://github.com/user-attachments/assets/bb940254-77f5-4ab4-94b3-543d79b6b307)
-![image](https://github.com/user-attachments/assets/27ff87df-eb3f-4c15-baf5-9c3f8331b74a)
+---
 
+Dark Mode Sepia Theme
+<p align="center">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/cfadfc53-7555-45f8-b4ad-368bdadba4e0" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/d7f035eb-e536-4d47-8098-b27758781b0d" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/73645134-a988-41b0-94f1-8153a67100ce" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/11826280-3b55-4fe1-9e83-5f0166d5ac11" style="padding-right: 5px;">
+</p>
+<p align="center">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/67de4591-a95f-45e7-a515-2205bae85629" style="padding-right: 5px;">
+  <img width="240" height="126" alt="image" src="https://github.com/user-attachments/assets/114847c1-0a5e-4d16-8293-0f9d1c0651e0" style="padding-right: 5px;">
+</p>
 Android:
 
-Light Mode
-![Screenshot_1742266802](https://github.com/user-attachments/assets/ef05c4b9-4a7e-4465-b88e-3e2fc5b46313)
-![Screenshot_1742266870](https://github.com/user-attachments/assets/8c783d7d-2f3d-4ae9-b890-54514ab99231)
-![Screenshot_1742266911](https://github.com/user-attachments/assets/af7a6634-eb86-42f4-b97c-f3911d0d309e)
-![Screenshot_1742266925](https://github.com/user-attachments/assets/9c8f70f2-2a56-4c6d-ab3e-28622fc1e756)
-![Screenshot_1742266939](https://github.com/user-attachments/assets/68f1caad-d228-42eb-9724-e516502bc7f4)
+Default Light Mode Theme
+<p align="center">
+<img width="240" height="520" alt="Screenshot_1752705932" src="https://github.com/user-attachments/assets/c3d47aaf-694e-428d-b608-96f4cf63f610" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752705943" src="https://github.com/user-attachments/assets/9e9415fe-b141-4a20-a2a5-fe2cff2e6d1d" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752705947" src="https://github.com/user-attachments/assets/e896eb68-7a1d-4264-aef8-8da233f6d35e" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752705966" src="https://github.com/user-attachments/assets/e5940399-4ac8-431e-bfbe-017f1a2b37f0" style="padding-right: 5px;">
+</p>
+<p align="center">
+  <img width="240" height="520" alt="Screenshot_1752705975" src="https://github.com/user-attachments/assets/18e6901b-0b9c-4e19-b86c-f5b17b90fe1d" style="padding-right: 5px;">
+</p>
 
 Dark Mode
-![Screenshot_1742267029](https://github.com/user-attachments/assets/32b9cf6f-4855-4672-916c-18465f411be2)
-![Screenshot_1742267050](https://github.com/user-attachments/assets/d19c7cab-95dc-4d92-875a-612a025f71e7)
-![Screenshot_1742267068](https://github.com/user-attachments/assets/d75c1650-d12e-4ec1-a655-f230d26e0d5f)
-![Screenshot_1742267082](https://github.com/user-attachments/assets/3c9860ed-2b42-4fe5-ae64-4f3e0532daa5)
+<p align="center">
+<img width="240" height="520" alt="Screenshot_1752706552" src="https://github.com/user-attachments/assets/c55041c5-79dd-4646-a777-5faab81e6925" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752706555" src="https://github.com/user-attachments/assets/9cb60942-6fc9-4e4b-9ec8-0ddca95afe7b" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752706558" src="https://github.com/user-attachments/assets/887dc8a5-d9fa-4df2-af93-a0a8062af626" style="padding-right: 5px;">
+<img width="240" height="520" alt="Screenshot_1752706561" src="https://github.com/user-attachments/assets/ba7955e7-039e-4173-b591-252ffcf0bcb7" style="padding-right: 5px;">
+</p>
 
 
