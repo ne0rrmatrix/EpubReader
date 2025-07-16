@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using EpubReader.Models;
 using EpubReader.Util;
 using MetroLog;
@@ -167,7 +167,11 @@ public static partial class EbookService
 
 	static void ConfigureContentFileMissingHandler()
 	{
-		options.ContentReaderOptions.ContentFileMissing += (sender, e) => e.SuppressException = true;
+		options.ContentReaderOptions.ContentFileMissing += (sender, e) =>
+		{
+			logger.Warn($"Content file missing: {e.FileKey}. Exception suppressed.");
+			e.SuppressException = true;
+		};
 	}
 
 	static EpubReaderOptions CreateEpubReaderOptions()

@@ -210,8 +210,8 @@ public partial class BookPage : ContentPage
 
 	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
-		var tempCurrentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage()");
-		var currentPage = int.TryParse(tempCurrentPage, out int parsedPage) ? parsedPage : 0;
+		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), 
+			out int parsedPage) ? parsedPage : 0;
 
 		switch (methodName.ToLowerInvariant())
 		{

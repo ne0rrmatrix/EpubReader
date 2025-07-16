@@ -16,7 +16,7 @@ namespace EpubReader.Views;
 public partial class LibraryPage : ContentPage
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryPage));
-	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly IDb db;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryPage"/> class with the specified view model.
@@ -24,16 +24,21 @@ public partial class LibraryPage : ContentPage
 	/// <remarks>This constructor sets up the library page by initializing its components and setting the data
 	/// context to the provided view model.</remarks>
 	/// <param name="viewModel">The view model that provides data and commands for the library page. Cannot be <see langword="null"/>.</param>
-	public LibraryPage(LibraryViewModel viewModel)
+	public LibraryPage(LibraryViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		this.db = db ?? throw new ArgumentNullException(nameof(db), "Database cannot be null");
 	}
 
-	protected override void OnNavigatedTo(NavigatedToEventArgs args)
+	protected override async void OnNavigatedTo(NavigatedToEventArgs args)
 	{
 		base.OnNavigatedTo(args);
 		Shell.SetNavBarIsVisible(this, true);
+		var viewModel = (LibraryViewModel)BindingContext;
+		var temp = await db.GetAllBooks();
+		viewModel.Books = new ObservableCollection<Book>(temp ?? []);
+		viewModel.AlphabeticalTitleSort();
 	}
 	
 	/// <summary>

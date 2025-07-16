@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,7 +36,6 @@ public partial class LibraryViewModel : BaseViewModel
 
 	readonly IFolderPicker folderPicker;
 	readonly FilePickerFileType customFileType;
-	readonly Task? initializationTask;
 	#endregion
 
 	#region Properties
@@ -63,18 +62,6 @@ public partial class LibraryViewModel : BaseViewModel
 		Books = [];
 		folderPicker = GetFolderPickerService();
 		customFileType = CreateCustomFileType();
-		initializationTask = InitializeLibraryAsync();
-		if(initializationTask?.IsFaulted == true || initializationTask?.IsCanceled == true)
-		{
-			logger.Error("Error initializing library: {Message}", initializationTask.Exception);
-		}
-	}
-
-	async Task? InitializeLibraryAsync()
-	{
-		var temp = await db.GetAllBooks();
-		Books = new ObservableCollection<Book>(temp ?? []);
-		AlphabeticalTitleSort();
 	}
 
 	#endregion

@@ -20,7 +20,6 @@ public partial class SettingsPage : Popup<bool>
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
-	readonly Task settingsTask;
 
 
 	/// <summary>
@@ -33,21 +32,7 @@ public partial class SettingsPage : Popup<bool>
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
-		settingsTask = InitializeSettings();
-		if (settingsTask.IsFaulted || settingsTask.IsCanceled)
-		{
-			logger.Error($"Failed to initialize settings: {settingsTask.Exception}");
-		}
 	}
-	async Task InitializeSettings()
-	{
-		settings = await db.GetSettings() ?? new();
-		FontSizeSlider.Value = settings.FontSize;
-		switchControl.IsToggled = settings.SupportMultipleColumns;
-		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
-		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
-	}
-
 
 	/// <summary>
 	/// Handles the event when the font size slider value changes.
@@ -177,5 +162,14 @@ public partial class SettingsPage : Popup<bool>
 		settings.SupportMultipleColumns = switchControl.IsToggled;
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+	}
+
+	async void CurrentPage_Loaded(object sender, EventArgs e)
+	{
+		settings = await db.GetSettings() ?? new();
+		FontSizeSlider.Value = settings.FontSize;
+		switchControl.IsToggled = settings.SupportMultipleColumns;
+		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 	}
 }
