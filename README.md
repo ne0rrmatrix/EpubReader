@@ -26,7 +26,7 @@
 
 The first public beta of the app is available for download:
 
-➡️ [**Download EpubReader Beta v0.0.1**](https://github.com/ne0rrmatrix/EpubReader/releases/tag/0.0.3)
+➡️ [**Download EpubReader Beta v0.0.3**](https://github.com/ne0rrmatrix/EpubReader/releases/tag/0.0.3)
 
 ---
 
