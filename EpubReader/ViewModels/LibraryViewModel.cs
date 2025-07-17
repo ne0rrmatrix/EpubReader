@@ -343,7 +343,8 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 		finally
 		{
-			WeakReferenceMessenger.Default.UnregisterAll(this);
+			WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
+			WeakReferenceMessenger.Default.Unregister<SettingsMessage>(this);
 		}
 	}
 
