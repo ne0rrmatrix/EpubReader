@@ -31,7 +31,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel, IQueryAttributab
 
 	CancellationTokenSource cancellationTokenSource { get; set; } = new CancellationTokenSource();
 
-	public FolderDialogePageViewModel()
+	public FolderDialogPageViewModel()
 	{
 		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => { Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; });
 	}

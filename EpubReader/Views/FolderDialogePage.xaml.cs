@@ -13,7 +13,7 @@ namespace EpubReader.Views;
 public partial class FolderDialogePage : Popup
 {
 	FolderDialogPageViewModel ViewModel => (FolderDialogPageViewModel)BindingContext;
-	public FolderDialogPage(FolderDialogPageViewModel viewModel)
+	public FolderDialogePage(FolderDialogPageViewModel viewModel)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
