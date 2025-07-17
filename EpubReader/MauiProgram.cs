@@ -114,7 +114,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
 		builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
-
+		builder.Services.AddSingleton<ProcessEpubFiles>();
 		builder.Services.AddSingleton<WebViewHelper>();
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");

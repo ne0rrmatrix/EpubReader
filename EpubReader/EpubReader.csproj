@@ -8,7 +8,8 @@
 		<UseMaui>true</UseMaui>
 		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 		<SingleProject>true</SingleProject>
-		
+    <DefaultLanguage>en-us</DefaultLanguage>
+    
 		<!-- Display name -->
 		<ApplicationTitle>EpubReader</ApplicationTitle>
 
@@ -17,7 +18,7 @@
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>4</ApplicationVersion>
+		<ApplicationVersion>6</ApplicationVersion>
 
 		<!--
 		Uncomment the line below if you need to debug the SG code
