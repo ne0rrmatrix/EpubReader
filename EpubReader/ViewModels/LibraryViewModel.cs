@@ -1,12 +1,16 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EpubReader.Interfaces;
+using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
+using EpubReader.Views;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 
@@ -22,49 +26,58 @@ namespace EpubReader.ViewModels;
 /// </remarks>
 public partial class LibraryViewModel : BaseViewModel
 {
-	#region Constants and Static Fields
-
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
-	static readonly string[] epubExtensions = [".epub"];
-	static readonly string[] androidEpubTypes = ["application/epub+zip", ".epub"];
-	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
+
 	bool isAlphabeticalSorted = true;
 
-	#endregion
-
-	#region Fields
-
-	readonly IFolderPicker folderPicker;
-	readonly FilePickerFileType customFileType;
-	#endregion
-
-	#region Properties
-
+	/// <summary>
+	/// Provides a read-only instance of the <see cref="ProcessEpubFiles"/> service.
+	/// </summary>
+	/// <remarks>This field retrieves the <see cref="ProcessEpubFiles"/> service from the current application's
+	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
+	/// thrown.</remarks>
+	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
+	
 	/// <summary>
 	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
-
-	#endregion
-
-	#region Constructor
-
+	
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
 	/// </summary>
-	/// <remarks>
-	/// This constructor initializes the <see cref="Books"/> collection with all available books
-	/// retrieved from the database. If no books are found, the collection is initialized as empty.
-	/// </remarks>
 	public LibraryViewModel()
 	{
-		Books = [];
-		folderPicker = GetFolderPickerService();
-		customFileType = CreateCustomFileType();
+		Books ??= [];
 	}
 
-	#endregion
+	/// <summary>
+	/// Adds a book to the library if it does not already exist.
+	/// </summary>
+	/// <remarks>If the book already exists in the library, it will not be added again, and an informational log
+	/// entry will be created. If the provided book is <see langword="null"/>, a warning log entry will be
+	/// generated.</remarks>
+	/// <param name="value">The book to be added. Cannot be <see langword="null"/>.</param>
+	void OnAddBooks(Book value)
+	{
+		if (value is not null)
+		{
+			var ebook = value;
+			if (Books.Any(b => b.Title == ebook.Title))
+			{
+				logger.Info($"Book already exists in library: {ebook.Title}");
+				return;
+			}
+			Books.Add(ebook);
+			logger.Info($"Book message received: {ebook.Title}");
+		}
+		else
+		{
+			logger.Warn("Received null book message");
+		}
+	}
+
 
 	#region Commands
 
@@ -106,81 +119,7 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 
-	/// <summary>
-	/// Asynchronously adds EPUB files from a selected folder to the library.
-	/// </summary>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	[RelayCommand]
-	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
-	{
-		try
-		{
-			var folderUri = await folderPicker.PickFolderAsync();
-			if (string.IsNullOrEmpty(folderUri))
-			{
-				logger.Info("No folder selected");
-				return;
-			}
-
-			logger.Info($"Selected folder: {folderUri}");
-			var epubFiles = await folderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
-
-			if (epubFiles.Count == 0)
-			{
-				await ShowInfoToastAsync("No EPUB files found in the selected folder", cancellationToken);
-				return;
-			}
-
-			logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
-			await ProcessEpubFilesAsync(epubFiles, cancellationToken);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error adding folder: {ex.Message}");
-			await ShowErrorToastAsync("Error processing folder. Please try again.", cancellationToken);
-		}
-	}
-
-	/// <summary>
-	/// Asynchronously adds a selected EPUB book to the library.
-	/// </summary>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	[RelayCommand]
-	public async Task AddAsync(CancellationToken cancellationToken = default)
-	{
-		try
-		{
-			var result = await PickEpubFileAsync().ConfigureAwait(false);
-			if (result is null)
-			{
-				logger.Info("No file selected");
-				return;
-			}
-
-			var ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
-			if (ebook is null)
-			{
-				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
-				return;
-			}
-
-			if (IsBookAlreadyInLibrary(ebook))
-			{
-				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
-				return;
-			}
-
-			await SaveBookToLibraryAsync(ebook, result, cancellationToken).ConfigureAwait(false);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error adding book: {ex.Message}");
-			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
-		}
-	}
-
+	
 	/// <summary>
 	/// Removes the specified book from the library.
 	/// </summary>
@@ -193,7 +132,7 @@ public partial class LibraryViewModel : BaseViewModel
 			ArgumentNullException.ThrowIfNull(book);
 
 			logger.Info($"Removing book: {book.Title}");
-
+			
 			DeleteBookFiles(book);
 			db.RemoveBook(book);
 			Books.Remove(book);
@@ -204,317 +143,6 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			logger.Error($"Error removing book: {ex.Message}");
 		}
-	}
-
-	/// <summary>
-	/// Searches for books with authors whose names contain the specified search text.
-	/// </summary>
-	/// <remarks>This method updates the <see cref="Books"/> collection with the search results. If no books match
-	/// the search criteria, a notification is displayed to the user.</remarks>
-	/// <param name="searchText">The text to search for within author names. If the text is null, empty, or consists only of whitespace, all books
-	/// are displayed.</param>
-	/// <returns></returns>
-	[RelayCommand]
-	public async Task SearchAuthorName(string searchText)
-	{
-		if (string.IsNullOrWhiteSpace(searchText))
-		{
-			logger.Info("Search text is empty, showing all books");
-			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
-			return;
-		}
-		logger.Info($"Searching for books with author containing: {searchText}");
-		var filteredBooks = await db.GetAllBooks();
-			filteredBooks = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		if (filteredBooks.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
-		}
-		Books = new ObservableCollection<Book>(filteredBooks);
-	}
-
-	/// <summary>
-	/// Searches for books with titles containing the specified search text and updates the book collection accordingly.
-	/// </summary>
-	/// <remarks>If the <paramref name="searchText"/> is null or consists only of whitespace, the method retrieves
-	/// and displays all available books. Otherwise, it filters the books to include only those whose titles contain the
-	/// specified text, ignoring case. If no books match the search criteria, an informational message is displayed to the
-	/// user.</remarks>
-	/// <param name="searchText">The text to search for within book titles. If null or whitespace, all books are shown.</param>
-	/// <returns></returns>
-	[RelayCommand]
-	public async Task SearchBookName(string searchText)
-	{
-		if (string.IsNullOrWhiteSpace(searchText))
-		{
-			logger.Info("Search text is empty, showing all books");
-			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
-			return;
-		}
-		logger.Info($"Searching for books with title containing: {searchText}");
-		var filteredBooks = await db.GetAllBooks();
-			filteredBooks = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		if (filteredBooks.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
-		}
-		Books = new ObservableCollection<Book>(filteredBooks);
-	}
-
-	/// <summary>
-	/// Sorts the collection of books in alphabetical order by the first author's name.
-	/// </summary>
-	/// <remarks>This method orders the books based on the name of the first author in each book's author list,
-	/// using a case-insensitive comparison. The sorted order is applied directly to the existing collection.</remarks>
-	[RelayCommand]
-	public void AlphabeticalAuthorSort()
-	{
-		isAlphabeticalSorted = !isAlphabeticalSorted;
-
-		if(!isAlphabeticalSorted)
-		{
-			logger.Info("Sorting books by author");
-			var sortedBooks = Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
-			Books.Clear();
-			foreach (var book in sortedBooks)
-			{
-				Books.Add(book);
-			}
-			logger.Info("Alphabetical author sort disabled, no changes made");
-			return;
-		}
-		logger.Info("Sorting books by reverse Alphabetical sort");
-		var reverseAlphabeticalBooks = Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
-		Books.Clear();
-		foreach (var book in reverseAlphabeticalBooks)
-		{
-			Books.Add(book);
-		}
-	}
-
-	/// <summary>
-	/// Sorts the collection of books in alphabetical order by their titles.
-	/// </summary>
-	/// <remarks>This method sorts the books in a case-insensitive manner using the ordinal string comparison. After
-	/// sorting, the original collection is cleared and repopulated with the sorted books.</remarks>
-	[RelayCommand]
-	public void AlphabeticalTitleSort()
-	{
-		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if(!isAlphabeticalSorted)
-		{
-			logger.Info("Sorting books by title");
-			var sortedBooks = Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
-			Books.Clear();
-			foreach (var book in sortedBooks)
-			{
-				Books.Add(book);
-			}
-			return;
-		}
-		logger.Info("Sorting books by reverse title");
-		var reverseSortedBooks = Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
-		Books.Clear();
-		foreach (var book in reverseSortedBooks)
-		{
-			Books.Add(book);
-		}
-	}
-
-	#endregion
-
-	#region Private Helper Methods
-
-	/// <summary>
-	/// Gets the folder picker service from the application's service container.
-	/// </summary>
-	/// <returns>The folder picker service instance.</returns>
-	/// <exception cref="InvalidOperationException">Thrown if the service cannot be resolved.</exception>
-	static IFolderPicker GetFolderPickerService()
-	{
-		return Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
-			?? throw new InvalidOperationException("IFolderPicker service not available");
-	}
-
-	/// <summary>
-	/// Creates the custom file type configuration for EPUB files across different platforms.
-	/// </summary>
-	/// <returns>A configured FilePickerFileType for EPUB files.</returns>
-	static FilePickerFileType CreateCustomFileType()
-	{
-		return new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-		{
-			{ DevicePlatform.iOS, iOSEpubTypes},
-			{ DevicePlatform.MacCatalyst, iOSEpubTypes },
-			{ DevicePlatform.Android, androidEpubTypes },
-			{ DevicePlatform.WinUI, epubExtensions },
-			{ DevicePlatform.Tizen, epubExtensions },
-		});
-	}
-
-	/// <summary>
-	/// Prompts the user to select an EPUB file.
-	/// </summary>
-	/// <returns>The selected file result, or null if cancelled.</returns>
-	async Task<FileResult?> PickEpubFileAsync()
-	{
-		var options = new PickOptions
-		{
-			FileTypes = customFileType,
-			PickerTitle = "Please select an EPUB book"
-		};
-
-		return await PickAndShowAsync(options).ConfigureAwait(false);
-	}
-
-	/// <summary>
-	/// Processes a collection of EPUB files from a folder.
-	/// </summary>
-	/// <param name="epubFiles">The list of EPUB file paths to process.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ProcessEpubFilesAsync(List<string> epubFiles, CancellationToken cancellationToken)
-	{
-		foreach (var file in epubFiles)
-		{
-			if (cancellationToken.IsCancellationRequested)
-			{
-				break;
-			}
-
-			await ProcessSingleEpubFileAsync(file, cancellationToken).ConfigureAwait(false);
-		}
-	}
-
-	/// <summary>
-	/// Processes a single EPUB file from a folder operation.
-	/// </summary>
-	/// <param name="filePath">The path to the EPUB file.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ProcessSingleEpubFileAsync(string filePath, CancellationToken cancellationToken)
-	{
-		try
-		{
-			var stream = await folderPicker.PerformFileOperationOnEpubAsync(filePath);
-			if (stream is null)
-			{
-				logger.Info($"Failed to open stream for file: {filePath}");
-				return;
-			}
-
-			using (stream)
-			{
-				var ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
-				if (ebook is null)
-				{
-					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}", cancellationToken);
-					return;
-				}
-
-				if (IsBookAlreadyInLibrary(ebook))
-				{
-					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
-					return;
-				}
-
-				stream.Seek(0, SeekOrigin.Begin);
-				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken);
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error processing file {filePath}: {ex.Message}");
-			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}", cancellationToken);
-		}
-	}
-
-	/// <summary>
-	/// Checks if a book is already in the library based on its title.
-	/// </summary>
-	/// <param name="ebook">The book to check.</param>
-	/// <returns>True if the book already exists in the library, false otherwise.</returns>
-	bool IsBookAlreadyInLibrary(Book ebook)
-	{
-		return Books.Any(x => string.Equals(x.Title, ebook.Title, StringComparison.OrdinalIgnoreCase));
-	}
-
-	/// <summary>
-	/// Saves a book to the library from a FileResult.
-	/// </summary>
-	/// <param name="ebook">The book to save.</param>
-	/// <param name="fileResult">The file result containing the book data.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task SaveBookToLibraryAsync(Book ebook, FileResult fileResult, CancellationToken cancellationToken)
-	{
-		try
-		{
-			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
-
-			if (ValidateBookFiles(ebook))
-			{
-				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
-				Books.Add(ebook);
-				await ShowInfoToastAsync("Book added to library", cancellationToken);
-				logger.Info($"Book added to library: {ebook.Title}");
-			}
-			else
-			{
-				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error saving book to library: {ex.Message}");
-			await ShowErrorToastAsync("Error saving book to library", cancellationToken);
-		}
-	}
-
-	/// <summary>
-	/// Saves a book to the library from a stream.
-	/// </summary>
-	/// <param name="ebook">The book to save.</param>
-	/// <param name="stream">The stream containing the book data.</param>
-	/// <param name="filePath">The original file path.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task SaveBookToLibraryAsync(Book ebook, Stream stream, string filePath, CancellationToken cancellationToken)
-	{
-		try
-		{
-			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
-
-			if (ValidateBookFiles(ebook))
-			{
-				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
-				Books.Add(ebook);
-				logger.Info($"Book saved successfully: {ebook.Title}");
-			}
-			else
-			{
-				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error saving book from stream: {ex.Message}");
-			await ShowErrorToastAsync("Error saving book", cancellationToken);
-		}
-	}
-
-	/// <summary>
-	/// Validates that the book files were saved successfully.
-	/// </summary>
-	/// <param name="ebook">The book to validate.</param>
-	/// <returns>True if both the book file and cover image exist, false otherwise.</returns>
-	static bool ValidateBookFiles(Book ebook)
-	{
-		return File.Exists(ebook.FilePath) && File.Exists(ebook.CoverImagePath);
 	}
 
 	/// <summary>
@@ -538,25 +166,232 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// Asynchronously presents a file picker dialog to the user and returns the selected file.
+	/// Searches for books with authors whose names contain the specified search text.
 	/// </summary>
-	/// <param name="options">The options for picking files.</param>
-	/// <returns>The selected file, or null if no file was selected or an error occurred.</returns>
-	static async Task<FileResult?> PickAndShowAsync(PickOptions options, CancellationToken cancellationToken = default)
+	/// <remarks>If no books are found matching the search criteria, an informational message is displayed to the
+	/// user.</remarks>
+	/// <param name="searchText">The text to search for within author names. If null or whitespace, all books are shown.</param>
+	/// <returns></returns>
+	[RelayCommand]
+	public async Task SearchAuthorName(string searchText)
 	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			logger.Info("Search text is empty, showing all books");
+			var tempList = await db.GetAllBooks();
+			if (Books.Count == tempList.Count)
+			{
+				logger.Info("No changes made, books already loaded");
+				return;
+			}
+			Books = [.. tempList];
+			return;
+		}
+
+		logger.Info($"Searching for books with author containing: {searchText}");
+		var filteredBooks = await db.GetAllBooks();
+		Books = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+	}
+
+	/// <summary>
+	/// Searches for books with titles containing the specified search text and updates the book collection accordingly.
+	/// </summary>
+	/// <remarks>If the <paramref name="searchText"/> is null or consists only of whitespace, the method retrieves
+	/// and displays all available books. Otherwise, it filters the books to include only those whose titles contain the
+	/// specified text, ignoring case. If no books match the search criteria, an informational message is displayed to the
+	/// user.</remarks>
+	/// <param name="searchText">The text to search for within book titles. If null or whitespace, all books are shown.</param>
+	/// <returns></returns>
+	[RelayCommand]
+	public async Task SearchBookName(string searchText)
+	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			logger.Info("Search text is empty, showing all books");
+			var tempList = await db.GetAllBooks();
+			if (Books.Count == tempList.Count)
+			{
+				logger.Info("No changes made, books already loaded");
+				return;
+			}
+			Books = [.. tempList];
+			return;
+		}
+
+		logger.Info($"Searching for books with title containing: {searchText}");
+		var filteredBooks = await db.GetAllBooks();
+			Books = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+	}
+
+	/// <summary>
+	/// Sorts the collection of books in alphabetical order by the first author's name.
+	/// </summary>
+	/// <remarks>This method orders the books based on the name of the first author in each book's author list,
+	/// using a case-insensitive comparison. The sorted order is applied directly to the existing collection.</remarks>
+	[RelayCommand]
+	public void AlphabeticalAuthorSort()
+    {
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+
+		if(!isAlphabeticalSorted)
+        {
+			logger.Info("Sorting books by author");
+			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+			logger.Info("Alphabetical author sort disabled, no changes made");
+			return;
+        }
+
+		logger.Info("Sorting books by reverse Alphabetical sort");
+		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+        }
+
+	/// <summary>
+	/// Sorts the collection of books in alphabetical order by their titles.
+	/// </summary>
+	/// <remarks>This method sorts the books in a case-insensitive manner using the ordinal string comparison. After
+	/// sorting, the original collection is cleared and repopulated with the sorted books.</remarks>
+	[RelayCommand]
+	public void AlphabeticalTitleSort()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+		if(!isAlphabeticalSorted)
+		{
+			logger.Info("Sorting books by title");
+			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+			return;
+		}
+
+		logger.Info("Sorting books by reverse title");
+		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+	}
+
+	/// <summary>
+	/// Asynchronously adds EPUB files from a selected folder to the library.
+	/// </summary>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	[RelayCommand]
+	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
+	{
+		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
+		var popup = new FolderDialogePage(new FolderDialogPageViewModel());
+		PopupOptions options = new()
+		{
+			CanBeDismissedByTappingOutsideOfPopup = false,
+		};
+
 		try
 		{
-			return await FilePicker.PickAsync(options).WaitAsync(cancellationToken).ConfigureAwait(false);
+			var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+			if (string.IsNullOrEmpty(folderUri))
+			{
+				logger.Info("No folder selected");
+				return;
+			}
+
+			logger.Info($"Selected folder: {folderUri}");
+			var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
+
+			if (epubFiles.Count == 0)
+			{
+				await ShowInfoToastAsync("No EPUB files found in the selected folder", cancellationToken);
+				return;
+			}
+
+			logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
+			var navigationParams = new Dictionary<string, object>
+			{
+				{ "Epubfiles", epubFiles }
+			};
+
+			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) =>
+			{
+				System.Diagnostics.Debug.WriteLine($"SettingsMessage received: {m.Value}");
+				if (m.Value)
+				{
+					MainThread.BeginInvokeOnMainThread(async () =>
+					{
+						var tempResult = await Shell.Current.ClosePopupAsync(popup, cancellationToken);
+						if (tempResult.Result is not null)
+						{
+							logger.Info("Folder dialog popup closed successfully");
+						}
+						else
+						{
+							logger.Warn("Folder dialog popup was not closed successfully");
+						}
+						logger.Info("SettingsMessage received, closing popup");
+					});
+					
+				}
+				else
+				{
+					logger.Warn("Received null book message");
+				}
+			});
+			var result = await Shell.Current.ShowPopupAsync(popup, options, navigationParams, cancellationToken);
+			if (result is not null)
+			{
+				// Process the result if needed
+				logger.Info("Folder dialog popup closed successfully");
+			}
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Exception choosing file: {ex.Message}");
-			return null;
+			logger.Error($"Error adding folder: {ex.Message}");
+			await ShowErrorToastAsync("Error processing folder. Please try again.", cancellationToken);
+		}
+		finally
+		{
+			WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
+			WeakReferenceMessenger.Default.Unregister<SettingsMessage>(this);
 		}
 	}
 
-	#endregion
+	/// <summary>
+	/// Asynchronously adds a selected EPUB book to the library.
+	/// </summary>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	[RelayCommand]
+	public async Task AddAsync(CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
+			var result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
+			if (result is null)
+			{
+				logger.Info("No file selected");
+				return;
+			}
 
+			var ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
+			if (ebook is null)
+			{
+				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
+				return;
+			}
+
+			if (await processEpubFiles.IsBookAlreadyInLibrary(ebook))
+			{
+				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+				return;
+			}
+
+			await processEpubFiles.SaveBookToLibraryAsync(ebook, result, cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error adding book: {ex.Message}");
+			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
+		}
+		finally
+		{
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+		}
+	}
+	#endregion
 	#region Toast Helper Methods
 
 	/// <summary>

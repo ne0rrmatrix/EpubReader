@@ -36,8 +36,14 @@ public partial class LibraryPage : ContentPage
 		base.OnNavigatedTo(args);
 		Shell.SetNavBarIsVisible(this, true);
 		var viewModel = (LibraryViewModel)BindingContext;
+		
+		if (viewModel.Books is not null && viewModel.Books.Count > 0)
+		{
+			logger.Info("Books already loaded, skipping database fetch");
+			return;
+		}
 		var temp = await db.GetAllBooks();
-		viewModel.Books = new ObservableCollection<Book>(temp ?? []);
+		viewModel.Books = [.. temp ?? []];
 		viewModel.AlphabeticalTitleSort();
 	}
 	
@@ -59,7 +65,7 @@ public partial class LibraryPage : ContentPage
 		{
 			books.Clear();
 			var epubBooks = await db.GetAllBooks();
-			viewModel.Books = new ObservableCollection<Book>(epubBooks);
+			viewModel.Books = [.. epubBooks];
 			viewModel.AlphabeticalTitleSort();
 			logger.Info("Search text is empty, showing all books");
 			return;
@@ -72,7 +78,7 @@ public partial class LibraryPage : ContentPage
 			logger.Info("No books found matching the search criteria");
 		}
 		filteredBooks.AddRange(filteredAuthors.Where(b => !filteredBooks.Contains(b))); // Avoid duplicates
-		viewModel.Books = new ObservableCollection<Book>(filteredBooks);
+		viewModel.Books = [.. filteredBooks];
 
 	}
 }
