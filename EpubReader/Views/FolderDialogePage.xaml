@@ -13,7 +13,7 @@
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
     Unloaded="CurrentPage_Unloaded">
-    <VerticalStackLayout Spacing="10">
+    <VerticalStackLayout Spacing="10" WidthRequest="225">
         <Label
             HorizontalOptions="Center"
             Text="{Binding Text}"

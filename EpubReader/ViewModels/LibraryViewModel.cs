@@ -43,12 +43,13 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
+	
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
 	/// </summary>
 	public LibraryViewModel()
 	{
-		Books = [];
+		Books ??= [];
 	}
 
 	/// <summary>
@@ -63,7 +64,7 @@ public partial class LibraryViewModel : BaseViewModel
 		if (value is not null)
 		{
 			var ebook = value;
-			if (Books.Any(b => b.Id == ebook.Id))
+			if (Books.Any(b => b.Title == ebook.Title))
 			{
 				logger.Info($"Book already exists in library: {ebook.Title}");
 				return;
@@ -131,7 +132,7 @@ public partial class LibraryViewModel : BaseViewModel
 			ArgumentNullException.ThrowIfNull(book);
 
 			logger.Info($"Removing book: {book.Title}");
-
+			
 			DeleteBookFiles(book);
 			db.RemoveBook(book);
 			Books.Remove(book);
@@ -177,18 +178,19 @@ public partial class LibraryViewModel : BaseViewModel
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			logger.Info("Search text is empty, showing all books");
-			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
+			var tempList = await db.GetAllBooks();
+			if (Books.Count == tempList.Count)
+			{
+				logger.Info("No changes made, books already loaded");
+				return;
+			}
+			Books = [.. tempList];
 			return;
 		}
+
 		logger.Info($"Searching for books with author containing: {searchText}");
 		var filteredBooks = await db.GetAllBooks();
-			filteredBooks = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		if (filteredBooks.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
-		}
-		Books = new ObservableCollection<Book>(filteredBooks);
+		Books = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
 	}
 
 	/// <summary>
@@ -206,18 +208,19 @@ public partial class LibraryViewModel : BaseViewModel
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			logger.Info("Search text is empty, showing all books");
-			Books = new ObservableCollection<Book>(db.GetAllBooks().Result);
+			var tempList = await db.GetAllBooks();
+			if (Books.Count == tempList.Count)
+			{
+				logger.Info("No changes made, books already loaded");
+				return;
+			}
+			Books = [.. tempList];
 			return;
 		}
+
 		logger.Info($"Searching for books with title containing: {searchText}");
 		var filteredBooks = await db.GetAllBooks();
-			filteredBooks = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		if (filteredBooks.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-			await ShowInfoToastAsync("No books found matching your search criteria").ConfigureAwait(false);
-		}
-		Books = new ObservableCollection<Book>(filteredBooks);
+			Books = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
 	}
 
 	/// <summary>
@@ -227,29 +230,20 @@ public partial class LibraryViewModel : BaseViewModel
 	/// using a case-insensitive comparison. The sorted order is applied directly to the existing collection.</remarks>
 	[RelayCommand]
 	public void AlphabeticalAuthorSort()
-	{
+    {
 		isAlphabeticalSorted = !isAlphabeticalSorted;
 
 		if(!isAlphabeticalSorted)
-		{
+        {
 			logger.Info("Sorting books by author");
-			var sortedBooks = Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
-			Books.Clear();
-			foreach (var book in sortedBooks)
-			{
-				Books.Add(book);
-			}
+			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
 			logger.Info("Alphabetical author sort disabled, no changes made");
 			return;
-		}
+        }
+
 		logger.Info("Sorting books by reverse Alphabetical sort");
-		var reverseAlphabeticalBooks = Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase).ToList();
-		Books.Clear();
-		foreach (var book in reverseAlphabeticalBooks)
-		{
-			Books.Add(book);
-		}
-	}
+		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+        }
 
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by their titles.
@@ -263,21 +257,12 @@ public partial class LibraryViewModel : BaseViewModel
 		if(!isAlphabeticalSorted)
 		{
 			logger.Info("Sorting books by title");
-			var sortedBooks = Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
-			Books.Clear();
-			foreach (var book in sortedBooks)
-			{
-				Books.Add(book);
-			}
+			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 			return;
 		}
+
 		logger.Info("Sorting books by reverse title");
-		var reverseSortedBooks = Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList();
-		Books.Clear();
-		foreach (var book in reverseSortedBooks)
-		{
-			Books.Add(book);
-		}
+		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 
 	/// <summary>
