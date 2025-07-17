@@ -358,7 +358,7 @@ public partial class LibraryViewModel : BaseViewModel
 		try
 		{
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
-			var result = await processEpubFiles.PickEpubFileAsync().ConfigureAwait(false);
+			var result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
 			if (result is null)
 			{
 				logger.Info("No file selected");

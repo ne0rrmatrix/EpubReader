@@ -146,7 +146,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// </summary>
 	/// <param name="options">The options for picking files.</param>
 	/// <returns>The selected file, or null if no file was selected or an error occurred.</returns>
-	static async Task<FileResult?> PickAndShowAsync(PickOptions options, CancellationToken cancellationToken = default)
+	static async Task<FileResult?> PickAndShowAsync(PickOptions options, CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -191,7 +191,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// Prompts the user to select an EPUB file.
 	/// </summary>
 	/// <returns>The selected file result, or null if cancelled.</returns>
-	public async Task<FileResult?> PickEpubFileAsync()
+	public async Task<FileResult?> PickEpubFileAsync(CancellationToken cancellationToken = default)
 	{
 		var options = new PickOptions
 		{
@@ -199,7 +199,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			PickerTitle = "Please select an EPUB book"
 		};
 
-		return await PickAndShowAsync(options).ConfigureAwait(false);
+		return await PickAndShowAsync(options, cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
