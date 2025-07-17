@@ -19,7 +19,7 @@
             Text="{Binding Text}"
             VerticalOptions="Center" />
         <Button
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModel:FolderDialogePageViewModel}}, Path=CancelCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModel:FolderDialogPageViewModel}}, Path=CancelCommand}"
             HorizontalOptions="Center"
             Text="Cancel"
             VerticalOptions="End" />
