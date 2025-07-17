@@ -5,7 +5,7 @@ using EpubReader.Messages;
 using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
-public partial class FolderDialogePageViewModel : BaseViewModel, IQueryAttributable
+public partial class FolderDialogPageViewModel : BaseViewModel, IQueryAttributable
 {
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	[ObservableProperty]
