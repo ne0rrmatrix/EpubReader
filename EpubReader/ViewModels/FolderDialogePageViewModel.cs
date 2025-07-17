@@ -29,11 +29,10 @@ public partial class FolderDialogPageViewModel : BaseViewModel, IQueryAttributab
 	[ObservableProperty]
 	public partial bool ShouldBeVisible { get; set; } = false;
 
-	CancellationTokenSource cancellationTokenSource { get; set; }
+	CancellationTokenSource cancellationTokenSource { get; set; } = new CancellationTokenSource();
 
 	public FolderDialogePageViewModel()
 	{
-		cancellationTokenSource = new CancellationTokenSource();
 		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => { Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; });
 	}
 
