@@ -274,7 +274,7 @@ public partial class LibraryViewModel : BaseViewModel
 	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
 	{
 		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
-		var popup = new FolderDialogePage(new FolderDialogePageViewModel());
+		var popup = new FolderDialogePage(new FolderDialogPageViewModel());
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = false,
