@@ -29,6 +29,13 @@ public partial class LibraryViewModel : BaseViewModel
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
 
 	bool isAlphabeticalSorted = true;
+
+	/// <summary>
+	/// Provides a read-only instance of the <see cref="ProcessEpubFiles"/> service.
+	/// </summary>
+	/// <remarks>This field retrieves the <see cref="ProcessEpubFiles"/> service from the current application's
+	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
+	/// thrown.</remarks>
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	
 	/// <summary>
@@ -44,6 +51,13 @@ public partial class LibraryViewModel : BaseViewModel
 		Books = [];
 	}
 
+	/// <summary>
+	/// Adds a book to the library if it does not already exist.
+	/// </summary>
+	/// <remarks>If the book already exists in the library, it will not be added again, and an informational log
+	/// entry will be created. If the provided book is <see langword="null"/>, a warning log entry will be
+	/// generated.</remarks>
+	/// <param name="value">The book to be added. Cannot be <see langword="null"/>.</param>
 	void OnAddBooks(Book value)
 	{
 		if (value is not null)
