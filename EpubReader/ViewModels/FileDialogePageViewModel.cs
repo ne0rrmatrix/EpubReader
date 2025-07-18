@@ -1,9 +1,8 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 public partial class FileDialogePageViewModel : BaseViewModel
@@ -48,6 +47,7 @@ public partial class FileDialogePageViewModel : BaseViewModel
 		if (disposing)
 		{
 			cancellationTokenSource?.Dispose();
+			WeakReferenceMessenger.Default.UnregisterAll(this);
 		}
 		base.Dispose(disposing);
 	}
@@ -63,7 +63,15 @@ public partial class FileDialogePageViewModel : BaseViewModel
 	{
 		cancellationTokenSource.Cancel();
 		ShouldBeVisible = false;
-		WeakReferenceMessenger.Default.Unregister<FileMessage>(this);
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		try
+		{
+			Shell.Current.ClosePopupAsync(cancellationTokenSource.Token);
+		}
+		catch(Exception ex)
+		{
+			System.Diagnostics.Trace.WriteLine($"Error closing popup: {ex.Message}");
+		}
 	}
 
 	/// <summary>
@@ -75,7 +83,7 @@ public partial class FileDialogePageViewModel : BaseViewModel
 	public void OnClose()
 	{
 		ShouldBeVisible = false;
-		WeakReferenceMessenger.Default.Unregister<FileMessage>(this);
+		WeakReferenceMessenger.Default.UnregisterAll(this);
 	}
 
 }

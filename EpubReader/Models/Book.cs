@@ -112,4 +112,9 @@ public class Book
 	/// Gets or sets the URL used for downloading resources.
 	/// </summary>
 	public string DownloadUrl { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether the item is currently in the library.
+	/// </summary>
+	public bool IsInLibrary { get; set; } = false;
 }

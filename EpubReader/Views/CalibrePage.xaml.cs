@@ -6,16 +6,21 @@ public partial class CalibrePage : ContentPage, IDisposable
 {
 	CalibrePageViewModel ViewModel => (CalibrePageViewModel)BindingContext;
 	bool disposedValue;
-
+	readonly bool isLoaded = false;
 	public CalibrePage(CalibrePageViewModel viewModel)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		isLoaded = true;
 	}
 
 	protected override async void OnAppearing()
 	{
 		base.OnAppearing();
+		if (!isLoaded)
+		{
+			return;
+		}
 		await ViewModel.LoadBooks();
 	}
 

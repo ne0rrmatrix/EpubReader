@@ -3,6 +3,7 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -27,7 +28,11 @@ namespace EpubReader.ViewModels;
 public partial class LibraryViewModel : BaseViewModel
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
-
+	readonly Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
+	readonly PopupOptions options = new()
+	{
+		CanBeDismissedByTappingOutsideOfPopup = false,
+	};
 	bool isAlphabeticalSorted = true;
 
 	/// <summary>
@@ -69,6 +74,7 @@ public partial class LibraryViewModel : BaseViewModel
 				logger.Info($"Book already exists in library: {ebook.Title}");
 				return;
 			}
+			Book.IsInLibrary = true; // Ensure the book is marked as in library
 			Books.Add(ebook);
 			logger.Info($"Book message received: {ebook.Title}");
 		}
@@ -285,80 +291,42 @@ public partial class LibraryViewModel : BaseViewModel
 	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
 	{
 		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
-		var popup = new FolderDialogePage(new FolderDialogPageViewModel());
-		PopupOptions options = new()
+		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+		if (string.IsNullOrEmpty(folderUri))
 		{
-			CanBeDismissedByTappingOutsideOfPopup = false,
+			logger.Info("No folder selected");
+			return;
+		}
+
+		logger.Info($"Selected folder: {folderUri}");
+		popup.Closed += (s, e) =>
+		{
+			logger.Info("File dialog popup closed.");
+			WeakReferenceMessenger.Default.UnregisterAll(this);
 		};
+		LoadPopup();
 
-		try
+		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri).ConfigureAwait(false);
+
+		logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
+
+		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, cancellationToken).ConfigureAwait(false);
+		if (cancellationToken.IsCancellationRequested)
 		{
-			var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
-			if (string.IsNullOrEmpty(folderUri))
-			{
-				logger.Info("No folder selected");
-				return;
-			}
-
-			logger.Info($"Selected folder: {folderUri}");
-			var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri);
-
-			if (epubFiles.Count == 0)
-			{
-				await ShowInfoToastAsync("No EPUB files found in the selected folder", cancellationToken);
-				return;
-			}
-
-			logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
-			var navigationParams = new Dictionary<string, object>
-			{
-				{ "Epubfiles", epubFiles }
-			};
-
-			WeakReferenceMessenger.Default.Register<SettingsMessage>(this, (r, m) =>
-			{
-				System.Diagnostics.Debug.WriteLine($"SettingsMessage received: {m.Value}");
-				if (m.Value)
-				{
-					MainThread.BeginInvokeOnMainThread(async () =>
-					{
-						var tempResult = await Shell.Current.ClosePopupAsync(popup, cancellationToken);
-						if (tempResult.Result is not null)
-						{
-							logger.Info("Folder dialog popup closed successfully");
-						}
-						else
-						{
-							logger.Warn("Folder dialog popup was not closed successfully");
-						}
-						logger.Info("SettingsMessage received, closing popup");
-					});
-					
-				}
-				else
-				{
-					logger.Warn("Received null book message");
-				}
-			});
-			var result = await Shell.Current.ShowPopupAsync(popup, options, navigationParams, cancellationToken);
-			if (result is not null)
-			{
-				// Process the result if needed
-				logger.Info("Folder dialog popup closed successfully");
-			}
+			WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error adding folder: {ex.Message}");
-			await ShowErrorToastAsync("Error processing folder. Please try again.", cancellationToken);
-		}
-		finally
-		{
-			WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
-			WeakReferenceMessenger.Default.Unregister<SettingsMessage>(this);
-		}
+		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(cancellationToken); });
 	}
 
+	void LoadPopup()
+	{
+		Shell.Current.ShowPopup(popup, options);
+	}
+
+	public void UnloadPage()
+	{
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+	}
 	/// <summary>
 	/// Asynchronously adds a selected EPUB book to the library.
 	/// </summary>

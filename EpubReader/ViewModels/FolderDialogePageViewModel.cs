@@ -5,7 +5,7 @@ using EpubReader.Messages;
 using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
-public partial class FolderDialogPageViewModel : BaseViewModel, IQueryAttributable
+public partial class FolderDialogPageViewModel : BaseViewModel
 {
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	[ObservableProperty]
@@ -74,36 +74,5 @@ public partial class FolderDialogPageViewModel : BaseViewModel, IQueryAttributab
 	{
 		ShouldBeVisible = false;
 		WeakReferenceMessenger.Default.UnregisterAll(this);
-	}
-
-	/// <summary>
-	/// Applies query attributes to process a list of EPUB files asynchronously.
-	/// </summary>
-	/// <remarks>This method processes the EPUB files specified in the query and updates the count of processed
-	/// files. If the processing completes successfully or is canceled, a <see cref="SettingsMessage"/> is sent via the
-	/// <see cref="WeakReferenceMessenger"/>.</remarks>
-	/// <param name="query">A dictionary containing query parameters. Must include a key "Epubfiles" with a value of type <see
-	/// cref="List{String}"/>.</param>
-	/// <exception cref="ArgumentNullException">Thrown if <paramref name="query"/> is null.</exception>
-	/// <exception cref="InvalidOperationException">Thrown if the query does not contain a valid 'List&lt;string&gt;' entry under the key "Epubfiles".</exception>
-	public async void ApplyQueryAttributes(IDictionary<string, object> query)
-	{
-		if (query is null)
-		{
-			throw new ArgumentNullException(nameof(query), "Query cannot be null");
-		}
-		if (query.TryGetValue("Epubfiles", out var EpubObj) && EpubObj is List<string> EpubFilesList)
-		{
-			EpubFiles = EpubFilesList;
-			Count = await processEpubFiles.ProcessEpubFilesAsync(EpubFiles, cancellationTokenSource.Token).ConfigureAwait(false);
-			if(Count == EpubFiles.Count || cancellationTokenSource.Token.IsCancellationRequested)
-			{
-				WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-			}
-		}
-		else
-		{
-			throw new InvalidOperationException("Query does not contain a valid 'List<string>' entry");
-		}
 	}
 }

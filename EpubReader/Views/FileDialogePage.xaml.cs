@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.ViewModels;
-using Syncfusion.Maui.Toolkit.Carousel;
 
 namespace EpubReader.Views;
 
@@ -24,6 +23,7 @@ public partial class FileDialogePage : Popup
 
 	void CurrentPage_Unloaded(object sender, EventArgs e)
 	{
+		WeakReferenceMessenger.Default.UnregisterAll(this);
 		viewModel?.OnClose();
 	}
 }

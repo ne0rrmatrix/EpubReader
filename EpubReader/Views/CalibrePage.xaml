@@ -10,6 +10,12 @@
     x:Name="CurrentPage"
     x:DataType="viewModels:CalibrePageViewModel">
 
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
     <Grid>
         <CollectionView
             Grid.Row="1"
@@ -58,6 +64,7 @@
                             Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
                             CommandParameter="{Binding .}"
                             HeightRequest="50"
+                            IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}, Mode=TwoWay}"
                             Text="Download"
                             WidthRequest="100" />
                     </Grid>
