@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="EpubReader.Views.FileDialogePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:page="clr-namespace:EpubReader.Views"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    x:Name="CurrentPage"
+    x:DataType="viewModels:FileDialogePageViewModel"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                      Light=White}"
+    Unloaded="CurrentPage_Unloaded">
+    <VerticalStackLayout Spacing="10" WidthRequest="225">
+        <Label
+            HorizontalOptions="Center"
+            Text="{Binding Text}"
+            VerticalOptions="Center" />
+        <Button
+            Command="{Binding CancelCommand, x:DataType=viewModels:FileDialogePageViewModel}"
+            CommandParameter="{Binding .}"
+            HorizontalOptions="Center"
+            Text="Cancel"
+            VerticalOptions="End" />
+    </VerticalStackLayout>
+</toolkit:Popup>

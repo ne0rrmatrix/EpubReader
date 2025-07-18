@@ -117,8 +117,10 @@ public static class MauiProgram
 		builder.Services.AddSingleton<ProcessEpubFiles>();
 		builder.Services.AddSingleton<WebViewHelper>();
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
+		builder.Services.AddTransientPopup<FileDialogePage, FileDialogePageViewModel>();
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
+		builder.Services.AddTransientWithShellRoute<CalibrePage, CalibrePageViewModel>("CalibrePage");
 		return builder.Build();
     }
 }

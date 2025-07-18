@@ -13,6 +13,10 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=CalibreCommand}"
+            IconImageSource="calibre.png"
+            Order="Primary" />
+        <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add.png"
             Order="Primary" />

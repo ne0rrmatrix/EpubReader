@@ -98,4 +98,18 @@ public class Book
 	/// </summary>
 	public string Description { get; set; } = string.Empty;
 
+	/// <summary>
+	/// Gets or sets the date as a string.
+	/// </summary>
+	public string Date { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the URL of the thumbnail image.
+	/// </summary>
+	public string ThumbnailUrl { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the URL used for downloading resources.
+	/// </summary>
+	public string DownloadUrl { get; set; } = string.Empty;
 }

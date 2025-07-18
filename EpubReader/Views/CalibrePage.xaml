@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.CalibrePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    xmlns:views="clr-namespace:EpubReader.Views"
+    x:Name="CurrentPage"
+    x:DataType="viewModels:CalibrePageViewModel">
+
+    <Grid>
+        <CollectionView
+            Grid.Row="1"
+            Margin="{StaticResource CollectionMargin}"
+            HorizontalScrollBarVisibility="Never"
+            ItemsSource="{Binding Books}"
+            SelectionMode="None"
+            VerticalScrollBarVisibility="Never">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout
+                    HorizontalItemSpacing="4"
+                    Orientation="Vertical"
+                    Span="{StaticResource GridSpan}"
+                    VerticalItemSpacing="4" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:Book">
+                    <Grid BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}" HeightRequest="270">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Label
+                            Grid.Row="0"
+                            Margin="0,5,0,0"
+                            FontAttributes="Bold"
+                            HorizontalTextAlignment="Center"
+                            Text="{Binding Title}" />
+                        <Image
+                            Grid.Row="1"
+                            Aspect="AspectFit"
+                            HeightRequest="92"
+                            HorizontalOptions="Center"
+                            Source="{Binding ThumbnailUrl}" />
+
+                        <Label
+                            Grid.Row="2"
+                            Margin="0,5,0,10"
+                            HorizontalTextAlignment="Center"
+                            Text="{Binding Author}" />
+                        <Button
+                            Grid.Row="3"
+                            Margin="0,5,5,10"
+                            Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
+                            CommandParameter="{Binding .}"
+                            HeightRequest="50"
+                            Text="Download"
+                            WidthRequest="100" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>
