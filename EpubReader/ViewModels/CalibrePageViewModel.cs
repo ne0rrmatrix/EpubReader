@@ -198,7 +198,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 	}
 	async Task LoadCalibreDataFromUrl(string ipAddress, int port)
 	{
+#pragma warning disable S5332 // Using http protocol is insecure. Use https instead.
 		var url = $"http://{ipAddress}:{port}/mobile";
+#pragma warning restore S5332 // Using http protocol is insecure. Use https instead.
 		int numberOfBooks = await calibreScraper.GetTotalBooksAsync(url);
 		int count = 0;
 		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(url, cancellationTokenSource.Token))
