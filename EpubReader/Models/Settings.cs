@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using SQLite;
 
 namespace EpubReader.Models;
 
@@ -8,7 +9,7 @@ namespace EpubReader.Models;
 /// <remarks>This class is used to store various display and layout preferences such as font settings, color
 /// schemes, and layout options. It is mapped to a database table named "settings".</remarks>
 [Table("settings")]
-public class Settings
+public partial class Settings : ObservableObject
 {
 	/// <summary>
 	/// Gets or sets the unique identifier for the entity.
@@ -52,4 +53,15 @@ public class Settings
 	/// </summary>
 	[Column("SupportMultipleColumns")]
 	public bool SupportMultipleColumns { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether Calibre Server auto-discovery is enabled.
+	/// </summary>
+	[Column("CalibreAutoDiscovery")]
+	[ObservableProperty]
+	public partial bool CalibreAutoDiscovery { get; set; } = true;
+
+	public int Port { get; set; } = 8080; // Default Calibre server port
+
+	public string IPAddress { get; set; } = "localhost"; // Default Calibre server IP address
 }

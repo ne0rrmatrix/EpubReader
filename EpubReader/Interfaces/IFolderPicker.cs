@@ -22,7 +22,7 @@ public interface IFolderPicker
 	/// <returns>A task representing the asynchronous operation. The task result contains a list of file paths for all EPUB files
 	/// found in the specified folder. The list will be empty if no EPUB files are found or if <paramref name="folderUri"/>
 	/// is null.</returns>
-	Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri);
+	Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default);
 
 	/// <summary>
 	/// Asynchronously performs a file operation on the specified EPUB file and returns the resulting stream.
@@ -31,5 +31,5 @@ public interface IFolderPicker
 	/// <returns>A task representing the asynchronous operation. The task result contains a <see cref="Stream"/> of the processed
 	/// EPUB file.</returns>
 
-	Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath);
+	Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath, CancellationToken cancellationToken = default);
 }

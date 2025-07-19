@@ -23,6 +23,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		FolderPicker = GetFolderPickerService();
 		CustomFileType = CreateCustomFileType();
 	}
+
 	/// <summary>
 	/// Processes a collection of EPUB files from a folder.
 	/// </summary>
@@ -46,7 +47,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 		return count;
 	}
-
+	
 	/// <summary>
 	/// Processes a single EPUB file from a folder operation.
 	/// </summary>
@@ -57,7 +58,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			var stream = await FolderPicker.PerformFileOperationOnEpubAsync(filePath);
+			var stream = await FolderPicker.PerformFileOperationOnEpubAsync(filePath, cancellationToken).ConfigureAwait(false);
 			if (stream is null)
 			{
 				logger.Info($"Failed to open stream for file: {filePath}");
@@ -66,6 +67,11 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 			using (stream)
 			{
+				if(cancellationToken.IsCancellationRequested)
+				{
+					logger.Info("Operation cancelled by user.");
+					return;
+				}
 				var ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
 				if (ebook is null)
 				{
@@ -95,7 +101,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}", cancellationToken);
 		}
 	}
-
+	
 	/// <summary>
 	/// Saves a book to the library from a stream.
 	/// </summary>
@@ -110,7 +116,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		{
 			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath, cancellationToken).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
-
+			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			if (ValidateBookFiles(ebook))
 			{
 				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
@@ -130,7 +136,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync("Error saving book", cancellationToken);
 		}
 	}
-
+	
 	/// <summary>
 	/// Validates that the book files were saved successfully.
 	/// </summary>
@@ -212,7 +218,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		var books = await db.GetAllBooks();
 		return books.Any(x => string.Equals(x.Title, ebook.Title, StringComparison.OrdinalIgnoreCase));
 	}
-
+	
 	/// <summary>
 	/// Saves a book to the library from a FileResult.
 	/// </summary>
@@ -245,7 +251,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync("Error saving book to library", cancellationToken);
 		}
 	}
-
+	
 	#endregion
 	#region Toast Helper Methods
 
@@ -282,6 +288,49 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
 		logger.Error(message);
 	}
+	
+	public async Task ProcessFileAsync(Book book, CancellationToken cancellationToken)
+	{
+		using var httpClient = new HttpClient();
+		using var stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
+		
+		var memoryStream = new MemoryStream();
+		await stream.CopyToAsync(memoryStream, cancellationToken);
+		memoryStream.Seek(0, SeekOrigin.Begin);
+		
+		var cacheDirectory = FileSystem.Current.CacheDirectory;
+		var invalidPathChars = Path.GetInvalidFileNameChars();
+		book.Title = string.Concat(book.Title.Split(invalidPathChars, StringSplitOptions.RemoveEmptyEntries));
+		book.FilePath = Path.Combine(cacheDirectory, $"{book.Title}.epub");
 
+		var fileBytes = memoryStream.ToArray();
+		await File.WriteAllBytesAsync(book.FilePath, fileBytes, cancellationToken).ConfigureAwait(false);
+		logger.Info($"File saved: {book.FilePath}");
+
+		try
+		{
+
+			var ebook = await EbookService.GetListingAsync(book.FilePath).ConfigureAwait(false);
+			if (ebook is null)
+			{
+				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
+				return;
+			}
+
+			if (await IsBookAlreadyInLibrary(ebook))
+			{
+				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+				return;
+			}
+			memoryStream.Seek(0, SeekOrigin.Begin);
+			await SaveBookToLibraryAsync(ebook, memoryStream, book.FilePath, cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error adding book: {ex.Message}");
+			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
+		}
+	}
+	
 	#endregion
 }

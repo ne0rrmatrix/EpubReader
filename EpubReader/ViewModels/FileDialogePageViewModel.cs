@@ -1,15 +1,14 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Messages;
-using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
-public partial class FolderDialogPageViewModel : BaseViewModel
+public partial class FileDialogePageViewModel : BaseViewModel
 {
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	[ObservableProperty]
-	public partial string Text { get; set; } = "Please wait...";
+	public partial string Text { get; set; } = "Looking for Calibre library.\nPlease wait...";
 
 	/// <summary>
 	/// Gets or sets the list of EPUB file paths.
@@ -29,9 +28,12 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial bool ShouldBeVisible { get; set; } = false;
 
-	public FolderDialogPageViewModel()
+	public FileDialogePageViewModel()
 	{
-		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => { Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; });
+		WeakReferenceMessenger.Default.Register<FileMessage>(this, (r, m) => 
+		{
+			Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; 
+		});
 	}
 
 	/// <summary>
@@ -43,7 +45,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	{
 		if (disposing)
 		{
-			processEpubFiles?.Dispose();
+			WeakReferenceMessenger.Default.UnregisterAll(this);
 		}
 		base.Dispose(disposing);
 	}
@@ -57,8 +59,17 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[RelayCommand]
 	void Cancel()
 	{
-		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
 		ShouldBeVisible = false;
+		WeakReferenceMessenger.Default.UnregisterAll(this);
+		try
+		{
+			WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
+			Dispatcher.DispatchAsync(async () => { await Shell.Current.ClosePopupAsync(); });
+		}
+		catch(Exception ex)
+		{
+			System.Diagnostics.Trace.TraceInformation($"Error closing popup: {ex.Message}");
+		}
 	}
 
 	/// <summary>
@@ -72,4 +83,5 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 		ShouldBeVisible = false;
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 	}
+
 }

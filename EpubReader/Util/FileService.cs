@@ -350,7 +350,7 @@ public static partial class FileService
 	/// </summary>
 	/// <param name="stream">The stream to read from.</param>
 	/// <returns>A byte array containing the stream content.</returns>
-	static async Task<byte[]> ReadStreamToBytesAsync(Stream stream, CancellationToken cancellation = default)
+	public static async Task<byte[]> ReadStreamToBytesAsync(Stream stream, CancellationToken cancellation = default)
 	{
 		if (stream.CanSeek)
 		{

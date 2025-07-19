@@ -69,7 +69,7 @@ public partial class FolderPicker : IFolderPicker
 	/// returned.</param>
 	/// <returns>A task representing the asynchronous operation. The task result contains a list of file paths to EPUB files found
 	/// in the specified folder. The list will be empty if no EPUB files are found or if the folder cannot be accessed.</returns>
-	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
+	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default)
     {
         List<string> epubFiles = [];
 
@@ -136,7 +136,7 @@ public partial class FolderPicker : IFolderPicker
 	/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Stream"/> of the EPUB
 	/// file.</returns>
 	/// <exception cref="NotImplementedException">Thrown if the method is not implemented for the current platform.</exception>
-	public Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath)
+	public Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath, CancellationToken cancellationToken = default)
 	{
 		throw new NotImplementedException("PerformFileOperationOnEpubAsync is not implemented for iOS.");
 	}

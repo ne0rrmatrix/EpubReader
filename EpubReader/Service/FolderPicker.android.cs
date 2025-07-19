@@ -30,7 +30,7 @@ public partial class FolderPicker : IFolderPicker
 	/// <param name="folderUri">The URI of the folder to search for EPUB files. Can be null or empty, in which case an empty list is returned.</param>
 	/// <returns>A task representing the asynchronous operation. The task result contains a list of file paths to EPUB files found
 	/// in the specified folder. Returns an empty list if no EPUB files are found or if the folder URI is null or empty.</returns>
-	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri)
+	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default)
 	{
 		List<string> epubFiles = [];
 		
@@ -66,7 +66,7 @@ public partial class FolderPicker : IFolderPicker
 	/// <param name="epubFilePath">The file path of the EPUB file to operate on. Cannot be null or empty.</param>
 	/// <returns>A <see cref="Stream"/> representing the EPUB file content. Returns <see cref="Stream.Null"/> if the file path is
 	/// empty or an error occurs during the operation.</returns>
-	public async Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath)
+	public async Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath, CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrEmpty(epubFilePath))
 		{
