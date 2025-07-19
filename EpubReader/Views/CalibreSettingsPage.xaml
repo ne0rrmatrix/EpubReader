@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="EpubReader.Views.CalibreSettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:page="clr-namespace:EpubReader.Views"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:Name="CurrentPage"
+    x:DataType="viewModel:CalibreSettingsPageViewModel"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                      Light=White}"
+    Loaded="CurrentPage_Loaded"
+    Unloaded="CurrentPage_Unloaded">
+    <Grid
+        Padding="10"
+        BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                          Light=White}"
+        ColumnSpacing="3"
+        RowSpacing="3">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Label
+            Grid.Row="0"
+            FontAttributes="Bold"
+            HorizontalOptions="Center"
+            Text="Calibre Settings"
+            TextColor="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor},
+                                        Light={StaticResource AppBackgroundDarkColor}}" />
+        <HorizontalStackLayout
+            x:Name="horizontalStacklayout"
+            Grid.Row="1"
+            Margin="0,10,0,0"
+            Spacing="10">
+            <Switch
+                x:Name="switchController"
+                HorizontalOptions="Start"
+                IsToggled="{Binding CalibreAutoDiscovery}"
+                Toggled="Switch_Toggled"
+                VerticalOptions="Center" />
+            <Label
+                Text="Auto Discovery"
+                TextColor="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor},
+                                            Light={StaticResource AppBackgroundDarkColor}}"
+                VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
+    </Grid>
+</toolkit:Popup>

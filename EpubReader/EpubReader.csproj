@@ -38,9 +38,7 @@
 		<WindowsPackageType>None</WindowsPackageType>
 	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Release' 
-                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'
-                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' &#xD;&#xA;                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'&#xD;&#xA;                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
     <!-- Ahead-of-time compilation is not yet supported net8.0-tizen -->
     <!-- Cross-OS native compilation is not supported net8.0-android -->
     <!-- Only iOS + MacCatalyst support AOT in .NET 9 -->
@@ -97,6 +95,12 @@
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.1" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <MauiXaml Update="Views\CalibreSettingsPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
   </ItemGroup>
   
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">

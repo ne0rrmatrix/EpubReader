@@ -5,6 +5,7 @@ using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Models;
 using EpubReader.Util;
@@ -19,13 +20,18 @@ public partial class CalibrePageViewModel : BaseViewModel
 #pragma warning disable S1075 // URIs should not be hardcoded
 	static string baseUrl = "http://localhost:8080"; // Replace with your actual Calibre server URL
 #pragma warning restore S1075 // URIs should not be hardcoded
-	readonly CalibreScraper calibreScraper = new(baseUrl);
+	readonly CalibreScraper calibreScraper = new();
 	CancellationTokenSource cancellationTokenSource = new();
 	readonly bool isLoaded = false;
+	readonly Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
 	readonly Popup popup = new FileDialogePage(new FileDialogePageViewModel());
 	readonly PopupOptions options = new()
 	{
 		CanBeDismissedByTappingOutsideOfPopup = false,
+	};
+	readonly PopupOptions settingsOptions = new()
+	{
+		CanBeDismissedByTappingOutsideOfPopup = true,
 	};
 
 	[ObservableProperty]
@@ -73,18 +79,29 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// found, it sets the base URL to the first discovered server's address. If no servers are found, a default base URL
 	/// is used.</remarks>
 	/// <returns>A task that represents the asynchronous operation.</returns>
-	static async Task InitializeIpAddress()
+	static async Task<(string IPAddress, int Port)> InitializeIpAddress()
 	{
-		List<(string IpAddress, int Port)> servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+		var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
+		var settings = await db.GetSettings() ?? new Settings();
+		List<(string IpAddress, int Port)> servers = [];
+		if (settings.CalibreAutoDiscovery)
+		{
+			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+			baseUrl = $"http://{servers[0].IpAddress}:{servers[0].Port}";
+		}
+	
 		if(servers.Count > 0)
 		{
-			baseUrl = $"http://{servers[0].IpAddress}:{servers[0].Port}";
 			logger.Info($"Using discovered Calibre server at {baseUrl}");
 		}
 		else
 		{
+			servers.Clear();
+			servers.Add((settings.IPAddress, settings.Port));
+			baseUrl = $"http://{settings.IPAddress}:{settings.Port}";
 			logger.Warn("No Calibre servers found. Using default base URL.");
 		}
+		return (servers[0].IpAddress, servers[0].Port);
 	}
 	
 	/// <summary>
@@ -117,6 +134,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 		Cancelled = true;
 	}
 
+
+	[RelayCommand]
+	public void Settings()
+	{
+		Shell.Current.ShowPopup(settingsPopup, settingsOptions);
+	}
+
 	/// <summary>
 	/// Asynchronously loads books from a Calibre server if they are not already loaded.
 	/// </summary>
@@ -124,6 +148,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// logs the process and handles any exceptions that occur during the loading operation. If books are already loaded,
 	/// the method logs a warning and exits early.</remarks>
 	/// <returns></returns>
+	[RelayCommand]
 	public async Task LoadBooks()
 	{
 		if(Books.Count > 0)
@@ -143,10 +168,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
 			logger.Info("Initializing Url...");
 			LoadPopup();
-			await InitializeIpAddress().ConfigureAwait(true);
-			
+			var (ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
+			logger.Info($"Base URL initialized to http://{ipAddress}:{port}");
 			logger.Info("Loading books from Calibre server...");
-			await LoadCalibreDataFromUrl();
+			await LoadCalibreDataFromUrl(ipAddress, port);
 			logger.Info("Books loaded successfully from Calibre server.");
 			
 			popup.Closed += (s, e) =>
@@ -171,12 +196,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		Shell.Current.ShowPopup(popup, options);
 	}
-	async Task LoadCalibreDataFromUrl()
+	async Task LoadCalibreDataFromUrl(string ipAddress, int port)
 	{
-		var url = baseUrl + "/mobile";
+		var url = $"http://{ipAddress}:{port}/mobile";
 		int numberOfBooks = await calibreScraper.GetTotalBooksAsync(url);
 		int count = 0;
-		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(cancellationTokenSource.Token))
+		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(url, cancellationTokenSource.Token))
 		{
 			if(cancellationTokenSource.IsCancellationRequested)
 			{

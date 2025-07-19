@@ -8,9 +8,8 @@ using HtmlAgilityPack;
 using MetroLog;
 
 namespace EpubReader.Util;
-public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs = 100) : IDisposable
+public partial class CalibreScraper(int delayBetweenRequestsMs = 100) : IDisposable
 {
-	readonly string baseUrl = baseUrl.TrimEnd('/');
 	readonly HttpClient httpClient = new();
 	readonly int delayBetweenRequests = delayBetweenRequestsMs;
 	bool disposed;
@@ -99,10 +98,10 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 	/// Scrapes all books from the Calibre server and returns them as a list.
 	/// </summary>
 	/// <returns>A list of Book objects containing all metadata.</returns>
-	public async Task<List<Book>> GetAllBooksAsync(CancellationToken cancellationToken = default)
+	public async Task<List<Book>> GetAllBooksAsync(string url, CancellationToken cancellationToken = default)
 	{
 		var allBooks = new List<Book>();
-		await foreach (var book in GetBooksAsyncEnumerable(cancellationToken))
+		await foreach (var book in GetBooksAsyncEnumerable(url, cancellationToken))
 		{
 			if(cancellationToken.IsCancellationRequested)
 			{
@@ -120,7 +119,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 	/// </summary>
 	/// <returns>An async enumerable of Book objects.</returns>
 	
-	public async IAsyncEnumerable<Book> GetBooksAsyncEnumerable([EnumeratorCancellation] CancellationToken cancellationToken = default)
+	public async IAsyncEnumerable<Book> GetBooksAsyncEnumerable(string url, [EnumeratorCancellation] CancellationToken cancellationToken = default)
 	{
 		string? currentPageUrl = "/mobile";
 		int pageCount = 0;
@@ -130,7 +129,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		while (!string.IsNullOrEmpty(currentPageUrl))
 		{
 			pageCount++;
-			var fullUrl = baseUrl + currentPageUrl;
+			var fullUrl = url.Replace("/mobile", "") + currentPageUrl;
 			logger.Info($"Scraping page {pageCount}: {fullUrl}");
 			if(cancellationToken.IsCancellationRequested)
 			{
@@ -163,7 +162,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 			{
 				foreach (var node in bookNodes)
 				{
-					var book = ParseBookFromNode(node);
+					var book = ParseBookFromNode(url, node);
 					if (book is not null)
 					{
 						yield return book; // Return each book immediately as it's parsed
@@ -206,15 +205,15 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		yield break; // End of the async enumerable
 	}
 
-	Book? ParseBookFromNode(HtmlNode node)
+	static Book? ParseBookFromNode(string url, HtmlNode node)
 	{
 		var book = new Book();
-		
+		url = url.Replace("/mobile", "");
 		var thumbnailNode = node.SelectSingleNode(".//img[@class='thumbnail']");
-		book.ThumbnailUrl = baseUrl + thumbnailNode?.GetAttributeValue("src", "");
+		book.ThumbnailUrl = url + thumbnailNode?.GetAttributeValue("src", "");
 
 		var downloadNode = node.SelectSingleNode(".//a[contains(@href, '/legacy/get/')]");
-		book.DownloadUrl = baseUrl + downloadNode?.GetAttributeValue("href", "");
+		book.DownloadUrl = url + downloadNode?.GetAttributeValue("href", "");
 
 		var firstLineNode = node.SelectSingleNode(".//span[@class='first-line']");
 		if (firstLineNode is not null)

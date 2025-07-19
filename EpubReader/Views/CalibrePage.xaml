@@ -10,6 +10,17 @@
     x:Name="CurrentPage"
     x:DataType="viewModels:CalibrePageViewModel">
 
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=LoadBooksCommand}"
+            IconImageSource="sync_24dp.png"
+            Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SettingsCommand}"
+            IconImageSource="settings_lightmode.png"
+            Order="Primary" />
+    </ContentPage.ToolbarItems>
+
     <ContentPage.Resources>
         <ResourceDictionary>
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
@@ -70,6 +81,13 @@
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
+            <CollectionView.EmptyView>
+                <Label
+                    HorizontalOptions="Center"
+                    HorizontalTextAlignment="Center"
+                    Text="No books available. Please sync with Calibre."
+                    VerticalOptions="Center" />
+            </CollectionView.EmptyView>
         </CollectionView>
     </Grid>
 </ContentPage>
