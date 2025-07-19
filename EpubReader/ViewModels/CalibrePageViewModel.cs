@@ -87,10 +87,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 		if (settings.CalibreAutoDiscovery)
 		{
 			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+#pragma warning disable S5332 // Using http protocol is insecure. Use https instead.
 			baseUrl = $"http://{servers[0].IpAddress}:{servers[0].Port}";
+#pragma warning restore S5332 // Using http protocol is insecure. Use https instead.
 		}
-	
-		if(servers.Count > 0)
+
+		if (servers.Count > 0)
 		{
 			logger.Info($"Using discovered Calibre server at {baseUrl}");
 		}
@@ -98,7 +100,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			servers.Clear();
 			servers.Add((settings.IPAddress, settings.Port));
+#pragma warning disable S5332 // Using http protocol is insecure. Use https instead.
 			baseUrl = $"http://{settings.IPAddress}:{settings.Port}";
+#pragma warning restore S5332 // Using http protocol is insecure. Use https instead.
 			logger.Warn("No Calibre servers found. Using default base URL.");
 		}
 		return (servers[0].IpAddress, servers[0].Port);
