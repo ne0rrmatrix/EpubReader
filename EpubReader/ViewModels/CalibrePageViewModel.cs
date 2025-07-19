@@ -14,16 +14,13 @@ using FileInfo = EpubReader.Models.FileInfo;
 namespace EpubReader.ViewModels;
 public partial class CalibrePageViewModel : BaseViewModel
 {
-	//TODO: Implement a method to refresh the book list from the Calibre server
-	//TODO: Implement a method to cancel the Calibre server download process if needed
-
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibrePageViewModel));
 #pragma warning disable S1075 // URIs should not be hardcoded
 	static string baseUrl = "http://localhost:8080"; // Replace with your actual Calibre server URL
 #pragma warning restore S1075 // URIs should not be hardcoded
 	readonly CalibreScraper calibreScraper = new(baseUrl);
-	readonly CancellationTokenSource cancellationTokenSource = new();
+	CancellationTokenSource cancellationTokenSource = new();
 	readonly bool isLoaded = false;
 	readonly Popup popup = new FileDialogePage(new FileDialogePageViewModel());
 	readonly PopupOptions options = new()
@@ -45,8 +42,28 @@ public partial class CalibrePageViewModel : BaseViewModel
 			logger.Warn("CalibrePageViewModel is already loaded, skipping initialization.");
 			return;
 		}
-
+		WeakReferenceMessenger.Default.Register<CalibreMessage>(this, (r, m) =>
+		{
+			if (m.Value)
+			{
+				Cancelled = true;
+				cancellationTokenSource.Cancel();
+				logger.Info("Calibre loading cancelled by user.");
+			}
+		});
 		isLoaded = true;
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if(disposing)
+		{
+			// Dispose of any resources that are disposable
+			cancellationTokenSource?.Dispose();
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+			logger.Info("CalibrePageViewModel disposed.");
+		}
+		base.Dispose(disposing);
 	}
 	
 	/// <summary>
@@ -69,7 +86,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			logger.Warn("No Calibre servers found. Using default base URL.");
 		}
 	}
-
+	
 	/// <summary>
 	/// Adds a book to the collection of books.
 	/// </summary>
@@ -78,12 +95,16 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <param name="book">The book to add to the collection. Cannot be null.</param>
 	/// <returns></returns>
 	[RelayCommand]
-	public async Task AddBook(Book book, CancellationToken cancellationToken = default)
+	public async Task AddBook(Book book)
 	{
+		if(cancellationTokenSource.IsCancellationRequested)
+		{
+			cancellationTokenSource = new CancellationTokenSource();
+		}
 		book.IsInLibrary = true; // Ensure the book is marked as in library
 		await processEpubFiles.ProcessFileAsync(book, cancellationTokenSource.Token).ConfigureAwait(false);
 	}
-
+	
 	/// <summary>
 	/// Cancels the current operation.
 	/// </summary>
@@ -110,6 +131,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 			logger.Warn("Books are already loaded, skipping load operation.");
 			return;
 		}
+
+		if (cancellationTokenSource.IsCancellationRequested)
+		{
+			cancellationTokenSource = new CancellationTokenSource();
+			logger.Info("Cancellation token source reset.");
+		}
+
 		try
 		{
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
@@ -118,7 +146,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			await InitializeIpAddress().ConfigureAwait(true);
 			
 			logger.Info("Loading books from Calibre server...");
-			await LoadCalibreDataFromUrl(cancellationTokenSource.Token);
+			await LoadCalibreDataFromUrl();
 			logger.Info("Books loaded successfully from Calibre server.");
 			
 			popup.Closed += (s, e) =>
@@ -143,13 +171,20 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		Shell.Current.ShowPopup(popup, options);
 	}
-	async Task LoadCalibreDataFromUrl(CancellationToken cancellationToken = default)
+	async Task LoadCalibreDataFromUrl()
 	{
 		var url = baseUrl + "/mobile";
 		int numberOfBooks = await calibreScraper.GetTotalBooksAsync(url);
 		int count = 0;
-		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(cancellationToken))
+		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(cancellationTokenSource.Token))
 		{
+			if(cancellationTokenSource.IsCancellationRequested)
+			{
+				Cancelled = true;
+				logger.Info("Loading books cancelled by user.");
+				await popup.CloseAsync(cancellationTokenSource.Token);
+				break;
+			}
 			var folderinfo = new FileInfo
 			{
 				Count = count,

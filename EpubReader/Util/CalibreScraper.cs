@@ -37,13 +37,13 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		}
 		catch (HttpRequestException httpEx)
 		{
-			Console.WriteLine($"HTTP Request Error: {httpEx.Message}");
+			logger.Warn($"HTTP Request Error: {httpEx.Message}");
 			// Handle specific HTTP errors (e.g., 404 Not Found, 500 Internal Server Error)
 			return null;
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"An unexpected error occurred while fetching HTML: {ex.Message}");
+			logger.Warn($"An unexpected error occurred while fetching HTML: {ex.Message}");
 			return null;
 		}
 	}
@@ -66,7 +66,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 
 		var navigationSpan = htmlDoc.DocumentNode.SelectSingleNode("//div[@class='navigation']/span[contains(text(), 'Books 1 to')]");
 
-		if (navigationSpan != null)
+		if (navigationSpan is not null)
 		{
 			string spanText = navigationSpan.InnerText;
 			Match match = MatchNumber().Match(spanText);
@@ -104,6 +104,11 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		var allBooks = new List<Book>();
 		await foreach (var book in GetBooksAsyncEnumerable(cancellationToken))
 		{
+			if(cancellationToken.IsCancellationRequested)
+			{
+				logger.Info("Scraping cancelled by user.");
+				break; // Exit the loop if cancellation is requested
+			}
 			allBooks.Add(book);
 		}
 		return allBooks;
@@ -120,14 +125,20 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		string? currentPageUrl = "/mobile";
 		int pageCount = 0;
 
-		Console.WriteLine("Starting scrape of Calibre server...");
+		logger.Info("Starting scrape of Calibre server...");
 
 		while (!string.IsNullOrEmpty(currentPageUrl))
 		{
 			pageCount++;
 			var fullUrl = baseUrl + currentPageUrl;
-			Console.WriteLine($"Scraping page {pageCount}: {fullUrl}");
-			
+			logger.Info($"Scraping page {pageCount}: {fullUrl}");
+			if(cancellationToken.IsCancellationRequested)
+			{
+				logger.Info("Scraping cancelled by user.");
+				
+				// Exit the loop if cancellation is requested
+				yield break; 
+			}
 			// Download the HTML from the current page
 			string htmlContent;
 			try
@@ -148,7 +159,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 			// Select all table rows from the main listing table
 			var bookNodes = htmlDoc.DocumentNode.SelectNodes("//table[@id='listing']/tr");
 
-			if (bookNodes != null)
+			if (bookNodes is not null)
 			{
 				foreach (var node in bookNodes)
 				{
@@ -162,7 +173,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 
 			// Find the "Next" link to determine the next page to scrape
 			var nextLinkNode = htmlDoc.DocumentNode.SelectSingleNode("//a[text()='Next']");
-			if (nextLinkNode != null)
+			if (nextLinkNode is not null)
 			{
 				var rawHref = nextLinkNode.GetAttributeValue("href", "");
 				// Decode the HTML entities (like &amp;) in the URL to get a valid request URI
@@ -198,7 +209,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 	Book? ParseBookFromNode(HtmlNode node)
 	{
 		var book = new Book();
-
+		
 		var thumbnailNode = node.SelectSingleNode(".//img[@class='thumbnail']");
 		book.ThumbnailUrl = baseUrl + thumbnailNode?.GetAttributeValue("src", "");
 
@@ -206,7 +217,7 @@ public partial class CalibreScraper(string baseUrl, int delayBetweenRequestsMs =
 		book.DownloadUrl = baseUrl + downloadNode?.GetAttributeValue("href", "");
 
 		var firstLineNode = node.SelectSingleNode(".//span[@class='first-line']");
-		if (firstLineNode != null)
+		if (firstLineNode is not null)
 		{
 			var text = HtmlEntity.DeEntitize(firstLineNode.InnerText)?.Trim();
 			var parts = text?.Split([" by "], StringSplitOptions.RemoveEmptyEntries);

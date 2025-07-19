@@ -64,7 +64,7 @@
                             Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
                             CommandParameter="{Binding .}"
                             HeightRequest="50"
-                            IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}, Mode=TwoWay}"
+                            IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"
                             Text="Download"
                             WidthRequest="100" />
                     </Grid>

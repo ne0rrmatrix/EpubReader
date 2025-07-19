@@ -8,7 +8,7 @@ namespace EpubReader.ViewModels;
 public partial class FileDialogePageViewModel : BaseViewModel
 {
 	[ObservableProperty]
-	public partial string Text { get; set; } = "Please wait...";
+	public partial string Text { get; set; } = "Looking for Calibre library.\nPlease wait...";
 
 	/// <summary>
 	/// Gets or sets the list of EPUB file paths.
@@ -28,7 +28,6 @@ public partial class FileDialogePageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial bool ShouldBeVisible { get; set; } = false;
 
-	CancellationTokenSource cancellationTokenSource { get; set; } = new CancellationTokenSource();
 	public FileDialogePageViewModel()
 	{
 		WeakReferenceMessenger.Default.Register<FileMessage>(this, (r, m) => 
@@ -46,7 +45,6 @@ public partial class FileDialogePageViewModel : BaseViewModel
 	{
 		if (disposing)
 		{
-			cancellationTokenSource?.Dispose();
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		}
 		base.Dispose(disposing);
@@ -61,16 +59,16 @@ public partial class FileDialogePageViewModel : BaseViewModel
 	[RelayCommand]
 	void Cancel()
 	{
-		cancellationTokenSource.Cancel();
 		ShouldBeVisible = false;
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 		try
 		{
-			Shell.Current.ClosePopupAsync(cancellationTokenSource.Token);
+			WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
+			Dispatcher.DispatchAsync(async () => { await Shell.Current.ClosePopupAsync(); });
 		}
 		catch(Exception ex)
 		{
-			System.Diagnostics.Trace.WriteLine($"Error closing popup: {ex.Message}");
+			System.Diagnostics.Trace.TraceInformation($"Error closing popup: {ex.Message}");
 		}
 	}
 

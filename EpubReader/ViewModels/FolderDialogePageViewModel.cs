@@ -29,8 +29,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial bool ShouldBeVisible { get; set; } = false;
 
-	CancellationTokenSource cancellationTokenSource { get; set; } = new CancellationTokenSource();
-
 	public FolderDialogPageViewModel()
 	{
 		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => { Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; });
@@ -45,7 +43,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	{
 		if (disposing)
 		{
-			cancellationTokenSource?.Dispose();
 			processEpubFiles?.Dispose();
 		}
 		base.Dispose(disposing);
@@ -60,7 +57,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[RelayCommand]
 	void Cancel()
 	{
-		cancellationTokenSource.Cancel();
+		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
 		ShouldBeVisible = false;
 	}
 

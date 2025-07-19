@@ -27,6 +27,7 @@ namespace EpubReader.ViewModels;
 /// </remarks>
 public partial class LibraryViewModel : BaseViewModel
 {
+	CancellationTokenSource cancellationTokenSource = new();
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
 	readonly Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
 	readonly PopupOptions options = new()
@@ -55,6 +56,24 @@ public partial class LibraryViewModel : BaseViewModel
 	public LibraryViewModel()
 	{
 		Books ??= [];
+
+		WeakReferenceMessenger.Default.Register<CalibreMessage>(this, (r, m) =>
+		{
+			if (m.Value)
+			{
+				cancellationTokenSource.Cancel();
+			}
+		});
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			cancellationTokenSource?.Dispose();
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+		}
+		base.Dispose(disposing);
 	}
 
 	/// <summary>
@@ -66,22 +85,19 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <param name="value">The book to be added. Cannot be <see langword="null"/>.</param>
 	void OnAddBooks(Book value)
 	{
-		if (value is not null)
+		if(cancellationTokenSource.IsCancellationRequested)
 		{
-			var ebook = value;
-			if (Books.Any(b => b.Title == ebook.Title))
-			{
-				logger.Info($"Book already exists in library: {ebook.Title}");
-				return;
-			}
-			Book.IsInLibrary = true; // Ensure the book is marked as in library
-			Books.Add(ebook);
-			logger.Info($"Book message received: {ebook.Title}");
+			cancellationTokenSource = new CancellationTokenSource();
 		}
-		else
+		var ebook = value;
+		if (Books.Any(b => b.Title == ebook.Title))
 		{
-			logger.Warn("Received null book message");
+			logger.Info($"Book already exists in library: {ebook.Title}");
+			return;
 		}
+		Book.IsInLibrary = true; // Ensure the book is marked as in library
+		Books.Add(ebook);
+		logger.Info($"Book message received: {ebook.Title}");
 	}
 
 
@@ -274,22 +290,28 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <summary>
 	/// Initiates the Calibre integration process asynchronously.
 	/// </summary>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
 	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
 	/// placeholder for future implementation.</returns>
 	[RelayCommand]
-	static async Task Calibre(CancellationToken cancellationToken = default)
+	async Task Calibre()
 	{
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(cancellationToken);
+		if(cancellationTokenSource.IsCancellationRequested)
+		{
+			cancellationTokenSource = new CancellationTokenSource();
+		}
+		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(cancellationTokenSource.Token);
 	}
 	/// <summary>
 	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
-	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
+	public async Task AddFolderAsync()
 	{
+		if (cancellationTokenSource.IsCancellationRequested)
+		{
+			cancellationTokenSource = new();
+		}
 		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
 		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
 		if (string.IsNullOrEmpty(folderUri))
@@ -306,16 +328,16 @@ public partial class LibraryViewModel : BaseViewModel
 		};
 		LoadPopup();
 
-		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri).ConfigureAwait(false);
+		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, cancellationTokenSource.Token).ConfigureAwait(false);
 
 		logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
 
-		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, cancellationToken).ConfigureAwait(false);
-		if (cancellationToken.IsCancellationRequested)
+		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, cancellationTokenSource.Token).ConfigureAwait(false);
+		if (cancellationTokenSource.Token.IsCancellationRequested)
 		{
 			WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 		}
-		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(cancellationToken); });
+		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
 	}
 
 	void LoadPopup()
@@ -335,6 +357,10 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddAsync(CancellationToken cancellationToken = default)
 	{
+		if(cancellationTokenSource.IsCancellationRequested)
+		{
+			cancellationTokenSource = new CancellationTokenSource();
+		}
 		try
 		{
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));

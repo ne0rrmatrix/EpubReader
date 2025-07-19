@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using SQLite;
 
 namespace EpubReader.Models;
 
@@ -9,7 +10,7 @@ namespace EpubReader.Models;
 /// the book's title, file path, current chapter, and cover image path. It also includes collections for related
 /// entities such as authors, chapters, and images, which are not persisted in the database.</remarks>
 [Table("Book")]
-public class Book
+public partial class Book : ObservableObject
 {
 	/// <summary>
 	/// Gets or sets the unique identifier for the entity.
@@ -116,5 +117,7 @@ public class Book
 	/// <summary>
 	/// Gets or sets a value indicating whether the item is currently in the library.
 	/// </summary>
-	public bool IsInLibrary { get; set; } = false;
+	[Column("IsInLibrary")]
+	[ObservableProperty]
+	public partial bool IsInLibrary { get; set; } = false;
 }

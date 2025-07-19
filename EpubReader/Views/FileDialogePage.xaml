@@ -20,7 +20,6 @@
             VerticalOptions="Center" />
         <Button
             Command="{Binding CancelCommand, x:DataType=viewModels:FileDialogePageViewModel}"
-            CommandParameter="{Binding .}"
             HorizontalOptions="Center"
             Text="Cancel"
             VerticalOptions="End" />
