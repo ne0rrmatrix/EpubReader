@@ -124,6 +124,14 @@ public partial class CalibreScraper(int delayBetweenRequestsMs = 100) : IDisposa
 		string? currentPageUrl = "/mobile";
 		int pageCount = 0;
 
+#if WINDOWS
+		var prefix = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Scheme) : string.Empty;
+		if(string.IsNullOrEmpty(prefix) && prefix == "https" && !await NetworkChecker.ValidateSSLCerticate(url))
+		{
+			logger.Error($"Invalid URI scheme {prefix} provided. Please ensure the URL uses SSL");
+			yield break; // Exit if the URL is invalid
+		}
+#endif
 		logger.Info("Starting scrape of Calibre server...");
 
 		while (!string.IsNullOrEmpty(currentPageUrl))

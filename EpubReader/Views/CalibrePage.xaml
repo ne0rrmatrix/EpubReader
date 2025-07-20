@@ -85,7 +85,7 @@
                 <Label
                     HorizontalOptions="Center"
                     HorizontalTextAlignment="Center"
-                    Text="No books available. Please sync with Calibre."
+                    Text="{Binding EmptyLabelText}"
                     VerticalOptions="Center" />
             </CollectionView.EmptyView>
         </CollectionView>

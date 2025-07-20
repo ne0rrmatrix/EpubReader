@@ -9,6 +9,10 @@ let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
+document.addEventListener('selectstart', function (e) {
+    e.preventDefault();
+});
+
 /**
  * DOM and Platform Utilities
  */

@@ -1,12 +1,10 @@
 ﻿using MetroLog;
 using Zeroconf;
 
-
 #if ANDROID
 using Android.Content;
 using Android.Net.Wifi;
 using Android.App;
-[assembly: UsesPermission(Android.Manifest.Permission.ChangeWifiMulticastState)]
 #endif
 
 namespace EpubReader.Util;
@@ -60,14 +58,18 @@ public partial class CalibreZeroConf
 	static async Task<List<(string IpAddress, int Port)>> GetData(int scanTimeSeconds)
 	{
 		List<(string IpAddress, int Port)> calibreServers = [];
+
 		TimeSpan scanTime = TimeSpan.FromSeconds(scanTimeSeconds);
 
 		logger.Info($"Scanning for services on the local network for {scanTimeSeconds} seconds...");
 
 		try
 		{
+#if WINDOWS
 			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync("_calibre._tcp.local.", scanTime);
-
+#else
+			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync("_calibre._tcp", scanTime);
+#endif
 			foreach (var host in hosts)
 			{
 				logger.Info($"Discovered Host: {host.DisplayName} (IP: {host.IPAddress})");

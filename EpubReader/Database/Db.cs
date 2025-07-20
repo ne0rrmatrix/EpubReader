@@ -14,6 +14,7 @@ namespace EpubReader.Database;
 /// necessary tables are created upon initialization and provides methods to handle data persistence.</remarks>
 public partial class Db : IDb
 {
+	bool isInitialized = false;
 	static readonly string dbErrorMsg = "Database connection is not initialized.";
 	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
@@ -43,12 +44,17 @@ public partial class Db : IDb
 
 	async Task InitializeAsync(CancellationToken cancellationToken = default)
 	{
-		conn = new SQLiteAsyncConnection(DbPath, flags);
+		if (isInitialized)
+		{
+			return;
+		}
+		conn ??= new SQLiteAsyncConnection(DbPath, flags);
 		logger.Info("Database created");
 		await conn.CreateTableAsync<Settings>().WaitAsync(cancellationToken);
 		logger.Info("Settings Table created");
 		await conn.CreateTableAsync<Book>().WaitAsync(cancellationToken);
 		logger.Info("Book Table created");
+		isInitialized = true;
 	}
 	/// <summary>
 	/// Retrieves the current application settings from the database.

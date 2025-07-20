@@ -9,7 +9,7 @@ namespace EpubReader.Models;
 /// <remarks>This class is used to store various display and layout preferences such as font settings, color
 /// schemes, and layout options. It is mapped to a database table named "settings".</remarks>
 [Table("settings")]
-public partial class Settings : ObservableObject
+public class Settings
 {
 	/// <summary>
 	/// Gets or sets the unique identifier for the entity.
@@ -58,10 +58,23 @@ public partial class Settings : ObservableObject
 	/// Gets or sets a value indicating whether Calibre Server auto-discovery is enabled.
 	/// </summary>
 	[Column("CalibreAutoDiscovery")]
-	[ObservableProperty]
-	public partial bool CalibreAutoDiscovery { get; set; } = true;
+	public bool CalibreAutoDiscovery { get; set; } = true;
 
+	/// <summary>
+	/// Gets or sets the port number used by the server.
+	/// </summary>
+	[Column("Port")]
 	public int Port { get; set; } = 8080; // Default Calibre server port
 
+	/// <summary>
+	/// Gets or sets the IP address of the Calibre server.
+	/// </summary>
+	[Column("IPAddress")]
 	public string IPAddress { get; set; } = "localhost"; // Default Calibre server IP address
+
+	/// <summary>
+	/// Gets or sets the URL prefix used for the Calibre server.
+	/// </summary>
+	[Column("UrlPrefix")]
+	public string UrlPrefix { get; set; } = "http"; // Default URL prefix for Calibre server
 }
