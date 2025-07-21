@@ -59,24 +59,26 @@ public partial class LibraryPage : ContentPage
 	{
 		var books = viewModel.Books;
 		var results = e.NewTextValue;
+		var allBooks = await db.GetAllBooks();
 		System.Diagnostics.Debug.WriteLine($"Search results: {results}");
 		if (string.IsNullOrWhiteSpace(results))
 		{
 			books.Clear();
-			var epubBooks = await db.GetAllBooks();
-			viewModel.Books = [.. epubBooks];
+			if(allBooks.Count == books.Count)
+			{
+				logger.Info("Search text is empty, showing all books");
+				return; // No need to update if already showing all books
+			}
+			viewModel.Books = [.. allBooks];
 			viewModel.AlphabeticalTitleSort();
 			logger.Info("Search text is empty, showing all books");
 			return;
 		}
 		logger.Info($"Searching for books with title containing: {results}");
-		var filteredBooks = books.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		var filteredAuthors = books.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		if (filteredBooks.Count == 0 && filteredAuthors.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-		}
-		filteredBooks.AddRange(filteredAuthors.Where(b => !filteredBooks.Contains(b))); // Avoid duplicates
+		var filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+
+		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();		
 		viewModel.Books = [.. filteredBooks];
 
 	}

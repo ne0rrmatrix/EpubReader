@@ -194,22 +194,23 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task SearchAuthorName(string searchText)
 	{
+		var allBooks = await db.GetAllBooks();
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			Logger.Info("Search text is empty, showing all books");
-			var tempList = await db.GetAllBooks();
-			if (Books.Count == tempList.Count)
+			if (Books.Count == allBooks.Count)
 			{
 				Logger.Info("No changes made, books already loaded");
 				return;
 			}
-			Books = [.. tempList];
-			return;
+			Books = [.. allBooks];
 		}
 
 		Logger.Info($"Searching for books with author containing: {searchText}");
-		var filteredBooks = await db.GetAllBooks();
-		Books = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		
+		var filteredBooks = allBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+		Books = [.. filteredBooks];
 	}
 
 	/// <summary>
@@ -224,22 +225,22 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task SearchBookName(string searchText)
 	{
+		var allBooks = await db.GetAllBooks();
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			Logger.Info("Search text is empty, showing all books");
-			var tempList = await db.GetAllBooks();
-			if (Books.Count == tempList.Count)
+			if (Books.Count == allBooks.Count)
 			{
 				Logger.Info("No changes made, books already loaded");
 				return;
 			}
-			Books = [.. tempList];
-			return;
+			Books = [.. allBooks];
 		}
 
 		Logger.Info($"Searching for books with title containing: {searchText}");
-		var filteredBooks = await db.GetAllBooks();
-			Books = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		var filteredBooks = allBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
+		
+		Books = [.. filteredBooks];
 	}
 
 	/// <summary>
@@ -262,7 +263,7 @@ public partial class LibraryViewModel : BaseViewModel
 
 		Logger.Info("Sorting books by reverse Alphabetical sort");
 		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-        }
+    }
 
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by their titles.
