@@ -43,7 +43,7 @@ public partial class LibraryPage : ContentPage
 		}
 		var temp = await db.GetAllBooks();
 		temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
-		viewModel.Books = [.. temp ?? []];
+		viewModel.Books = [.. temp];
 		viewModel.AlphabeticalTitleSort();
 	}
 	

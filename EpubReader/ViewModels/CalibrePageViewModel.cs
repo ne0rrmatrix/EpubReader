@@ -300,7 +300,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 				DownloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty,
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 				Thumbnail = baseUrl + "/" + imageUrl,
-				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry?.Title ?? string.Empty })
+				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
 			};
 
 #if WINDOWS || MACCATALYST
@@ -496,7 +496,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 		else
 		{
-			servers.Clear();
 			servers.Add((settings.IPAddress, settings.Port));
 			baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
 			Logger.Warn("No Calibre servers found. Using default base URL.");

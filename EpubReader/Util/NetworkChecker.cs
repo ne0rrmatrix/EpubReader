@@ -231,40 +231,41 @@ public class NetworkChecker
 		{
 			return true;
 		}
-
-		// Check against common private IP ranges
-		foreach (string rangeCidr in localIpRanges)
+		if(localIpRanges.Any(rangeCidr => CheckIPBytes(ipBytes, rangeCidr)))
 		{
-			// Simple parsing assuming CIDR format like "192.168.0.0/16"
-			string[] parts = rangeCidr.Split('/');
-			if (parts.Length == 2 && IPAddress.TryParse(parts[0], out _) && int.TryParse(parts[1], out _))
+			return true; // If it matches any private range, return true.
+		}
+		return false; // If it doesn't match any range, return false.
+	}
+
+	static bool CheckIPBytes(byte[] ipBytes, string rangeCidr)
+	{
+		// Simple parsing assuming CIDR format like "192.168.0.0/16"
+		string[] parts = rangeCidr.Split('/');
+		if (parts.Length == 2 && IPAddress.TryParse(parts[0], out IPAddress? rangeAddress) && int.TryParse(parts[1], out int prefixLength))
+		{
+			byte[] rangeBytes = rangeAddress.GetAddressBytes();
+			int bytesToCompare = prefixLength / 8;
+			if (prefixLength % 8 != 0)
 			{
-				// This is a simplified check. For full CIDR matching,
-				// you'd typically convert to int and use bitwise operations.
-				// For demonstration, we'll use string comparison on initial bytes.
-				// A more robust solution would involve proper CIDR subnet calculation.
-				// For example, 192.168.0.0/16 means 192.168.x.x
-				// 10.0.0.0/8 means 10.x.x.x
-				// 172.16.0.0/12 means 172.16.x.x - 172.31.x.x
+				bytesToCompare++;
+			}
 
-				// Simple check for common private ranges
-				if (ipBytes[0] == 10)
-				{
-					return true; // 10.x.x.x
-				}
+			if (ipBytes.Length != rangeBytes.Length)
+			{
+				return false;
+			}
 
-				if (ipBytes[0] == 172 && ipBytes[1] >= 16 && ipBytes[1] <= 31)
+			for (int i = 0; i < bytesToCompare; i++)
+			{
+				if (ipBytes[i] != rangeBytes[i])
 				{
-					return true; // 172.16-31.x.x
-				}
-
-				if (ipBytes[0] == 192 && ipBytes[1] == 168)
-				{
-					return true; // 192.168.x.x
+					return false;
 				}
 			}
-		}
 
+			return true;
+		}
 		return false;
 	}
 }
