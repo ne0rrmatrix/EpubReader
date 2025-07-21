@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using EpubReader.Interfaces;
 using EpubReader.ViewModels;
 using MetroLog;
 
@@ -7,7 +8,11 @@ namespace EpubReader.Views;
 public partial class CalibreSettingsPage : Popup
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreSettingsPage));
-	CalibreSettingsPageViewModel viewModel => (CalibreSettingsPageViewModel)BindingContext;
+
+	/// <summary>
+	/// Gets or sets the database service used by the application.
+	/// </summary>
+	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	public CalibreSettingsPage(CalibreSettingsPageViewModel viewModel)
 	{
 		InitializeComponent();
@@ -16,14 +21,23 @@ public partial class CalibreSettingsPage : Popup
 
 	async void CurrentPage_Loaded(object sender, EventArgs e)
 	{
-		var db = viewModel.db;
 		if (db is null)
 		{
 			logger.Error("Database service is not available.");
 			return;
 		}
 		var settings = await db.GetSettings() ?? new Models.Settings();
-		switchController.IsToggled = settings.CalibreAutoDiscovery;
+		if(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+		{
+			logger.Info("CalibreSettingsPage loaded on Windows or macOS, setting EntryText to visible.");
+			switchController.IsToggled = settings.CalibreAutoDiscovery;
+		}
+		else
+		{
+			logger.Info("CalibreSettingsPage loaded on Android or iOS, setting EntryText to not visible.");
+			switchController.IsToggled = false;
+		}
+		
 		EntryText.Text = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
 		logger.Info("CalibreSettingsPage loaded.");
 	}
@@ -40,11 +54,11 @@ public partial class CalibreSettingsPage : Popup
 			logger.Warn("Sender is not a Switch control, cannot toggle Calibre auto discovery.");
 			return;
 		}
-		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
+		var settings = await db.GetSettings() ?? new Models.Settings();
 		settings.CalibreAutoDiscovery = switchControl.IsToggled;
 		EntryText.IsVisible = !settings.CalibreAutoDiscovery;
 		logger.Info($"Calibre auto discovery toggled to: {settings.CalibreAutoDiscovery}");
-		await viewModel.db.SaveSettings(settings);
+		await db.SaveSettings(settings);
 		logger.Info("Settings saved successfully.");
 	}
 
@@ -58,9 +72,11 @@ public partial class CalibreSettingsPage : Popup
 
 	async void Entry_Completed(object? sender, EventArgs e)
 	{
-		string iPAddress = "localhost"; // Default IP address
-		string urlPrefix = "http"; // Default URL prefix
-		int port = 8080; // Default port
+		if(sender is null)
+		{
+			logger.Warn("Sender is null, cannot process completed event.");
+			return;
+		}
 		if (sender is not Entry entry)
 		{
 			logger.Warn("Sender is not an Entry control, cannot process completed event.");
@@ -75,44 +91,13 @@ public partial class CalibreSettingsPage : Popup
 			return;
 		}
 		logger.Info($"Processing URL: {text}");
-		
-		Uri.TryCreate(text, UriKind.Absolute, out var uri);
-		if (uri is not null && uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-		{
-			logger.Warn("URL scheme is not http or https. Defaulting to http.");
-			uri = new UriBuilder(uri) { Scheme = Uri.UriSchemeHttp }.Uri;
-		}
 
-		if (uri is not null && Uri.IsWellFormedUriString(text, UriKind.Absolute))
-		{
-			iPAddress = string.Concat(uri.Host, uri.AbsolutePath.AsSpan(1));
-			urlPrefix = uri.Scheme;
-			port = uri.Port;
-			await SaveUrlData(urlPrefix, iPAddress, port);
-			logger.Info($"URL updated to: {urlPrefix}://{iPAddress}:{port}");
-		}
-		else if (uri is null || !Uri.IsWellFormedUriString(text, UriKind.Absolute))
-		{
-			await SaveUrlData(urlPrefix, iPAddress, port);
-			logger.Warn("Invalid URL format. Please enter a valid URL.");
-		}
-		else
-		{
-			EntryText.Text = string.Empty;
-			await SaveUrlData(urlPrefix, iPAddress, port);
-			logger.Warn("Invalid URL format. Please enter a valid URL.");
-		}
-	}
-
-	async Task SaveUrlData(string urlPrefix, string ipAddress, int port)
-	{
-		var settings = await viewModel.db.GetSettings() ?? new Models.Settings
-		{
-			UrlPrefix = urlPrefix,
-			IPAddress = ipAddress,
-			Port = port
-		};
-		await viewModel.db.SaveSettings(settings);
-		logger.Info($"URL data saved: {settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}");
+		var settings = await db.GetSettings() ?? new Models.Settings();
+		var uri = new Uri(text);
+		settings.IPAddress = string.Concat(uri.Host, uri.AbsolutePath.AsSpan(1));
+		settings.UrlPrefix = uri.Scheme;
+		settings.Port = uri.Port;
+		await db.SaveSettings(settings);
+		logger.Info($"URL updated to: {settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}");
 	}
 }

@@ -1,6 +1,4 @@
-﻿using CommunityToolkit.Maui.Alerts;
-using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Mvvm.Messaging;
+﻿using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Models;
@@ -9,6 +7,14 @@ using EpubReader.ViewModels;
 using MetroLog;
 
 namespace EpubReader.Util;
+
+/// <summary>
+/// Provides functionality to process EPUB files, including selecting, validating, and saving them to a library.
+/// </summary>
+/// <remarks>This class is responsible for handling EPUB files by allowing users to select files, process them
+/// asynchronously, and save them to a library. It supports operations such as checking if a book is already in the
+/// library and validating the saved files. The class uses platform-specific file type configurations for EPUB files and
+/// integrates with services for file operations and messaging.</remarks>
 public partial class ProcessEpubFiles : BaseViewModel
 {
 	static readonly string[] epubExtensions = [".epub"];
@@ -253,49 +259,27 @@ public partial class ProcessEpubFiles : BaseViewModel
 	}
 	
 	#endregion
-	#region Toast Helper Methods
-
-	/// <summary>
-	/// Shows an informational toast message.
-	/// </summary>
-	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ShowInfoToastAsync(string message, CancellationToken cancellationToken = default)
-	{
-		if(cancellationToken.IsCancellationRequested)
-		{
-			return;
-		}
-		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-		logger.Info(message);
-	}
-
-	/// <summary>
-	/// Shows an error toast message.
-	/// </summary>
-	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ShowErrorToastAsync(string message, CancellationToken cancellationToken = default)
-	{
-		if(cancellationToken.IsCancellationRequested)
-		{
-			return;
-		}
-		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-		logger.Error(message);
-	}
 	
-	public async Task<bool> ProcessFileAsync(Book book, CancellationToken cancellationToken)
+	/// <summary>
+	/// Downloads and processes an EPUB file for a given book, saving it to the cache directory and adding it to the
+	/// library if not already present.
+	/// </summary>
+	/// <remarks>This method downloads the EPUB file from the specified URL, saves it to the cache directory, and
+	/// attempts to add it to the library. If the book already exists in the library, it will not be added again. Errors
+	/// during processing will be logged and a user notification will be shown.</remarks>
+	/// <param name="book">The book object containing metadata and download URL information.</param>
+	/// <param name="baseUrl">The base URL used to construct the full download URI for the book.</param>
+	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+	/// <returns><see langword="true"/> if the file is successfully processed and added to the library; otherwise, <see
+	/// langword="false"/>.</returns>
+	public async Task<bool> ProcessFileAsync(Book book, string baseUrl, CancellationToken cancellationToken)
 	{
 		using var httpClient = new HttpClient();
 		var memoryStream = new MemoryStream();
 		try
 		{
-			using var stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
+			var downloadUri = new Uri(new Uri(baseUrl), book.DownloadUrl);
+			using var stream = await httpClient.GetStreamAsync(downloadUri, cancellationToken);
 			await stream.CopyToAsync(memoryStream, cancellationToken);
 			memoryStream.Seek(0, SeekOrigin.Begin);
 
@@ -342,6 +326,4 @@ public partial class ProcessEpubFiles : BaseViewModel
 		}
 		return true;
 	}
-	
-	#endregion
 }

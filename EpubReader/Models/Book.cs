@@ -105,10 +105,10 @@ public partial class Book : ObservableObject
 	public string Date { get; set; } = string.Empty;
 
 	/// <summary>
-	/// Gets or sets the URL of the thumbnail image.
+	/// Gets or sets the thumbnail image as a byte array.
 	/// </summary>
-	public string ThumbnailUrl { get; set; } = string.Empty;
-
+	[Ignore]
+	public string Thumbnail { get; set; } = string.Empty;
 	/// <summary>
 	/// Gets or sets the URL used for downloading resources.
 	/// </summary>
@@ -120,4 +120,31 @@ public partial class Book : ObservableObject
 	[Column("IsInLibrary")]
 	[ObservableProperty]
 	public partial bool IsInLibrary { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets the published date of the book.
+	/// </summary>
+	[Ignore]
+	public DateTime? PublishedDate { get; set; }
+
+	/// <summary>
+	/// Gets or sets the book's ISBN if available.
+	/// </summary>
+	public string Isbn { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's language code.
+	/// </summary>
+	public string Language { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's series information.
+	/// </summary>
+	public string Series { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's categories/tags.
+	/// </summary>
+	[Ignore]
+	public List<string> Categories { get; set; } = [];
 }

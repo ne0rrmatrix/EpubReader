@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Maui;
-using CommunityToolkit.Maui.Alerts;
-using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -28,8 +26,7 @@ namespace EpubReader.ViewModels;
 public partial class LibraryViewModel : BaseViewModel
 {
 	CancellationTokenSource cancellationTokenSource = new();
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryViewModel));
-	readonly Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
+	Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
 	readonly PopupOptions options = new()
 	{
 		CanBeDismissedByTappingOutsideOfPopup = false,
@@ -64,6 +61,7 @@ public partial class LibraryViewModel : BaseViewModel
 				cancellationTokenSource.Cancel();
 			}
 		});
+		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
 	}
 
 	protected override void Dispose(bool disposing)
@@ -92,12 +90,12 @@ public partial class LibraryViewModel : BaseViewModel
 		var ebook = value;
 		if (Books.Any(b => b.Title == ebook.Title))
 		{
-			logger.Info($"Book already exists in library: {ebook.Title}");
+			Logger.Info($"Book already exists in library: {ebook.Title}");
 			return;
 		}
 		Book.IsInLibrary = true; // Ensure the book is marked as in library
 		Books.Add(ebook);
-		logger.Info($"Book message received: {ebook.Title}");
+		Logger.Info($"Book message received: {ebook.Title}");
 	}
 
 
@@ -136,12 +134,11 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error navigating to book page: {ex.Message}");
+			Logger.Error($"Error navigating to book page: {ex.Message}");
 			await ShowErrorToastAsync("Error opening book. Please try again.");
 		}
 	}
 
-	
 	/// <summary>
 	/// Removes the specified book from the library.
 	/// </summary>
@@ -153,17 +150,17 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			ArgumentNullException.ThrowIfNull(book);
 
-			logger.Info($"Removing book: {book.Title}");
+			Logger.Info($"Removing book: {book.Title}");
 			
 			DeleteBookFiles(book);
 			db.RemoveBook(book);
 			Books.Remove(book);
 
-			logger.Info("Book removed from library");
+			Logger.Info("Book removed from library");
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error removing book: {ex.Message}");
+			Logger.Error($"Error removing book: {ex.Message}");
 		}
 	}
 
@@ -171,7 +168,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// Deletes the files associated with a book.
 	/// </summary>
 	/// <param name="book">The book whose files should be deleted.</param>
-	static void DeleteBookFiles(Book book)
+	void DeleteBookFiles(Book book)
 	{
 		try
 		{
@@ -183,7 +180,7 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error deleting book files: {ex.Message}");
+			Logger.Error($"Error deleting book files: {ex.Message}");
 		}
 	}
 
@@ -199,18 +196,18 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
-			logger.Info("Search text is empty, showing all books");
+			Logger.Info("Search text is empty, showing all books");
 			var tempList = await db.GetAllBooks();
 			if (Books.Count == tempList.Count)
 			{
-				logger.Info("No changes made, books already loaded");
+				Logger.Info("No changes made, books already loaded");
 				return;
 			}
 			Books = [.. tempList];
 			return;
 		}
 
-		logger.Info($"Searching for books with author containing: {searchText}");
+		Logger.Info($"Searching for books with author containing: {searchText}");
 		var filteredBooks = await db.GetAllBooks();
 		Books = [.. filteredBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
 	}
@@ -229,18 +226,18 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
-			logger.Info("Search text is empty, showing all books");
+			Logger.Info("Search text is empty, showing all books");
 			var tempList = await db.GetAllBooks();
 			if (Books.Count == tempList.Count)
 			{
-				logger.Info("No changes made, books already loaded");
+				Logger.Info("No changes made, books already loaded");
 				return;
 			}
 			Books = [.. tempList];
 			return;
 		}
 
-		logger.Info($"Searching for books with title containing: {searchText}");
+		Logger.Info($"Searching for books with title containing: {searchText}");
 		var filteredBooks = await db.GetAllBooks();
 			Books = [.. filteredBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
 	}
@@ -257,13 +254,13 @@ public partial class LibraryViewModel : BaseViewModel
 
 		if(!isAlphabeticalSorted)
         {
-			logger.Info("Sorting books by author");
+			Logger.Info("Sorting books by author");
 			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-			logger.Info("Alphabetical author sort disabled, no changes made");
+			Logger.Info("Alphabetical author sort disabled, no changes made");
 			return;
         }
 
-		logger.Info("Sorting books by reverse Alphabetical sort");
+		Logger.Info("Sorting books by reverse Alphabetical sort");
 		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
         }
 
@@ -278,12 +275,12 @@ public partial class LibraryViewModel : BaseViewModel
 		isAlphabeticalSorted = !isAlphabeticalSorted;
 		if(!isAlphabeticalSorted)
 		{
-			logger.Info("Sorting books by title");
+			Logger.Info("Sorting books by title");
 			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 			return;
 		}
 
-		logger.Info("Sorting books by reverse title");
+		Logger.Info("Sorting books by reverse title");
 		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 
@@ -301,36 +298,32 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(cancellationTokenSource.Token);
 	}
+
 	/// <summary>
 	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddFolderAsync()
+	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
 	{
-		if (cancellationTokenSource.IsCancellationRequested)
-		{
-			cancellationTokenSource = new();
-		}
-		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
 		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
 		if (string.IsNullOrEmpty(folderUri))
 		{
-			logger.Info("No folder selected");
+			Logger.Info("No folder selected");
 			return;
 		}
 
-		logger.Info($"Selected folder: {folderUri}");
+		Logger.Info($"Selected folder: {folderUri}");
 		popup.Closed += (s, e) =>
 		{
-			logger.Info("File dialog popup closed.");
+			Logger.Info("File dialog popup closed.");
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		};
 		LoadPopup();
 
-		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, cancellationTokenSource.Token).ConfigureAwait(false);
+		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, cancellationToken).ConfigureAwait(false);
 
-		logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
+		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
 
 		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, cancellationTokenSource.Token).ConfigureAwait(false);
 		if (cancellationTokenSource.Token.IsCancellationRequested)
@@ -340,15 +333,28 @@ public partial class LibraryViewModel : BaseViewModel
 		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
 	}
 
+	/// <summary>
+	/// Loads and displays a folder dialog popup.
+	/// </summary>
+	/// <remarks>This method initializes a new folder dialog page and displays it as a popup using the current
+	/// shell.</remarks>
 	void LoadPopup()
 	{
+		popup = new FolderDialogePage(new FolderDialogPageViewModel());
 		Shell.Current.ShowPopup(popup, options);
 	}
 
+	/// <summary>
+	/// Unregisters all messages associated with this instance from the default messenger.
+	/// </summary>
+	/// <remarks>This method should be called to clean up message registrations when the page is no longer needed,
+	/// preventing potential memory leaks by ensuring that this instance is no longer referenced by the
+	/// messenger.</remarks>
 	public void UnloadPage()
 	{
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 	}
+
 	/// <summary>
 	/// Asynchronously adds a selected EPUB book to the library.
 	/// </summary>
@@ -357,17 +363,13 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddAsync(CancellationToken cancellationToken = default)
 	{
-		if(cancellationTokenSource.IsCancellationRequested)
-		{
-			cancellationTokenSource = new CancellationTokenSource();
-		}
 		try
 		{
-			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
+		
 			var result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
 			if (result is null)
 			{
-				logger.Info("No file selected");
+				Logger.Info("No file selected");
 				return;
 			}
 
@@ -388,43 +390,11 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error adding book: {ex.Message}");
+			Logger.Error($"Error adding book: {ex.Message}");
 			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
 		}
-		finally
-		{
-			WeakReferenceMessenger.Default.UnregisterAll(this);
-		}
 	}
 	#endregion
-	#region Toast Helper Methods
-
-	/// <summary>
-	/// Shows an informational toast message.
-	/// </summary>
-	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ShowInfoToastAsync(string message, CancellationToken cancellationToken = default)
-	{
-		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-		logger.Info(message);
-	}
-
-	/// <summary>
-	/// Shows an error toast message.
-	/// </summary>
-	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
-	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ShowErrorToastAsync(string message, CancellationToken cancellationToken = default)
-	{
-		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
-		logger.Error(message);
-	}
-
-	#endregion
+	
 }
 

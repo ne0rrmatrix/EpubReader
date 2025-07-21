@@ -8,9 +8,9 @@ using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
 using EpubReader.Models;
+using EpubReader.ODPS;
 using EpubReader.Util;
 using EpubReader.Views;
-using MetroLog;
 using FileInfo = EpubReader.Models.FileInfo;
 namespace EpubReader.ViewModels;
 public partial class CalibrePageViewModel : BaseViewModel
@@ -18,17 +18,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial string EmptyLabelText { get; set; } = "No books found in Calibre library.\nPlease load books from your Calibre server.";
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibrePageViewModel));
-	static string baseUrl = string.Empty; // Replace with your actual Calibre server URL
-	readonly CalibreScraper calibreScraper = new();
+	string baseUrl = string.Empty; // Replace with your actual Calibre server URL
 	CancellationTokenSource cancellationTokenSource = new();
 	readonly bool isLoaded = false;
 	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
-	Popup popup = new FileDialogePage(new FileDialogePageViewModel());
-	readonly PopupOptions options = new()
-	{
-		CanBeDismissedByTappingOutsideOfPopup = false,
-	};
 	readonly PopupOptions settingsOptions = new()
 	{
 		CanBeDismissedByTappingOutsideOfPopup = true,
@@ -36,16 +29,21 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	[ObservableProperty]
 	public partial bool Cancelled { get; set; } = false;
-	
+
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
-	
+
+	public List<Book> BookList { get; set; } = [];
+
+	[ObservableProperty]
+	public partial OpdsFeed Feed { get; set; } = new();
+
 	public CalibrePageViewModel()
 	{
 		Books = [];
-		if(isLoaded)
+		if (isLoaded)
 		{
-			logger.Warn("CalibrePageViewModel is already loaded, skipping initialization.");
+			Logger.Warn("CalibrePageViewModel is already loaded, skipping initialization.");
 			return;
 		}
 		WeakReferenceMessenger.Default.Register<CalibreMessage>(this, (r, m) =>
@@ -54,7 +52,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			{
 				Cancelled = true;
 				cancellationTokenSource.Cancel();
-				logger.Info("Calibre loading cancelled by user.");
+				Logger.Info("Calibre loading cancelled by user.");
 			}
 		});
 		isLoaded = true;
@@ -62,51 +60,17 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	protected override void Dispose(bool disposing)
 	{
-		if(disposing)
+		if (disposing)
 		{
-			// Dispose of any resources that are disposable
 			cancellationTokenSource?.Dispose();
+			processEpubFiles.Dispose();
 			WeakReferenceMessenger.Default.UnregisterAll(this);
-			logger.Info("CalibrePageViewModel disposed.");
+			Logger.Info("CalibrePageViewModel disposed.");
 		}
 		base.Dispose(disposing);
 	}
-	
-	/// <summary>
-	/// Initializes the base URL by discovering available Calibre servers on the network.
-	/// </summary>
-	/// <remarks>This method attempts to find Calibre servers using a network discovery process. If servers are
-	/// found, it sets the base URL to the first discovered server's address. If no servers are found, a default base URL
-	/// is used.</remarks>
-	/// <returns>A task that represents the asynchronous operation.</returns>
-	static async Task<(string IPAddress, int Port)> InitializeIpAddress()
-	{
-		var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
-		var settings = await db.GetSettings() ?? new Settings();
-		var urlPrefix = settings.UrlPrefix;
-		baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
-		List<(string IpAddress, int Port)> servers = [];
-		if (settings.CalibreAutoDiscovery)
-		{
-			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
-			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
-		}
 
-		if (servers.Count > 0)
-		{
-			logger.Info($"Using discovered Calibre server at {baseUrl}");
-		}
-		else
-		{
-			servers.Clear();
-			servers.Add((settings.IPAddress, settings.Port));
-			baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
-			logger.Warn("No Calibre servers found. Using default base URL.");
-		}
 
-		return (servers[0].IpAddress, servers[0].Port);
-	}
-	
 	/// <summary>
 	/// Adds a book to the collection of books.
 	/// </summary>
@@ -117,13 +81,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddBook(Book book)
 	{
-		if(cancellationTokenSource.IsCancellationRequested)
+		if (cancellationTokenSource.IsCancellationRequested)
 		{
 			cancellationTokenSource = new CancellationTokenSource();
 		}
-		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, cancellationTokenSource.Token).ConfigureAwait(false);
+		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, baseUrl, cancellationTokenSource.Token).ConfigureAwait(false);
 	}
-	
+
 	/// <summary>
 	/// Cancels the current operation.
 	/// </summary>
@@ -136,7 +100,11 @@ public partial class CalibrePageViewModel : BaseViewModel
 		Cancelled = true;
 	}
 
-
+	/// <summary>
+	/// Displays the settings page for configuring application settings.
+	/// </summary>
+	/// <remarks>Clears the current book list before displaying the settings page to ensure any changes to server
+	/// address or other settings are reflected.</remarks>
 	[RelayCommand]
 	public void Settings()
 	{
@@ -157,26 +125,34 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task LoadBooks()
 	{
-		if(Books.Count > 0)
+		if (Books.Count > 0)
 		{
 			Books.Clear();
-			logger.Warn("Books are already loaded, clearing list and continuing.");
+			Logger.Warn("Books are already loaded, clearing list and continuing.");
+		}
+		if (Feed?.Entries.Count > 0)
+		{
+			Feed.Entries.Clear();
 		}
 
 		if (cancellationTokenSource.IsCancellationRequested)
 		{
 			cancellationTokenSource = new CancellationTokenSource();
-			logger.Info("Cancellation token source reset.");
+			Logger.Info("Cancellation token source reset.");
 		}
 
 		try
 		{
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
-			logger.Info("Initializing Url...");
-			LoadPopup();
-			var (ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
-			var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
+			Logger.Info("Initializing Url...");
 			var settings = await db.GetSettings() ?? new Settings();
+#if WINDOWS
+			var (ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
+#endif
+#if ANDROID || IOS || MACCATALYST
+			var (ipAddress, port) = (settings.IPAddress, settings.Port);
+#endif
+
 			var urlPrefix = settings.UrlPrefix;
 			var prefix = urlPrefix.ToLowerInvariant() switch
 			{
@@ -184,74 +160,188 @@ public partial class CalibrePageViewModel : BaseViewModel
 				"https" => "https",
 				_ => "http"
 			};
-			var url = $"{prefix}://{ipAddress}:{port}";
-			System.Diagnostics.Debug.WriteLine($"Using URL: {url}");
-			System.Diagnostics.Debug.WriteLine($"Using IP address: {ipAddress}, Port: {port}, prefix: {prefix}");
-			var testUrl = $"{prefix}://{ipAddress}";
-			if (!await ValidateUrl(testUrl, prefix))
+			baseUrl = $"{prefix}://{ipAddress}:{port}";
+			Logger.Info($"Using IP address: {ipAddress}, Port: {port}, prefix: {prefix}");
+			if(!await ValidateAll(ipAddress, port, prefix))
 			{
-				logger.Warn($"Invalid URL: {testUrl}");
+				Logger.Warn("Validation of URL for security failed. Exiting LoadBooks method.");
 				return;
 			}
 
-			logger.Info($"Base URL initialized to {prefix}://{ipAddress}:{port}");
-			logger.Info("Loading books from Calibre server...");
+			Logger.Info("Loading books from Calibre server...");
 			await LoadCalibreDataFromUrl(ipAddress, port, prefix);
-			logger.Info("Books loaded successfully from Calibre server.");
-			
-			popup.Closed += (s, e) =>
-			{
-				logger.Info("File dialog popup closed.");
-				WeakReferenceMessenger.Default.UnregisterAll(this);
-			};
-			await popup.CloseAsync(cancellationTokenSource.Token);
-
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"An error occurred while creating the popup dialog: {ex.Message}");
+			Logger.Error($"An error occurred while creating the popup dialog: {ex.Message}");
 		}
 		finally
 		{
 			WeakReferenceMessenger.Default.UnregisterAll(this);
-			logger.Info("LoadBooks completed successfully.");
+			Logger.Info("LoadBooks completed successfully.");
 		}
 	}
 
 	/// <summary>
-	/// Validates the specified URL to ensure it is either local or a permitted external address, and optionally checks the
-	/// SSL certificate if the URL uses HTTPS.
+	/// Validates the security, URL, and SSL certificate for a specified endpoint.
 	/// </summary>
-	/// <remarks>This method checks if the URL is local or a permitted external address. If the URL is not local or
-	/// permitted, it logs a warning and returns <see langword="false"/>. If the URL uses HTTPS, it also validates the SSL
-	/// certificate. If the certificate validation fails, it logs an error and returns <see langword="false"/>.</remarks>
-	/// <param name="url">The URL to validate. This should be a complete URL string.</param>
-	/// <param name="prefix">The expected protocol prefix, such as "http" or "https".</param>
-	/// <returns><see langword="true"/> if the URL is valid and accessible; otherwise, <see langword="false"/>.</returns>
-	async Task<bool> ValidateUrl(string url, string prefix)
+	/// <remarks>This method performs a series of asynchronous validations on the specified endpoint, including
+	/// security checks, URL format validation, and SSL certificate verification. It logs warnings or errors if any
+	/// validation fails.</remarks>
+	/// <param name="ipAddress">The IP address of the endpoint to validate.</param>
+	/// <param name="port">The port number of the endpoint to validate.</param>
+	/// <param name="prefix">The protocol prefix (e.g., "http" or "https") to use for the validation.</param>
+	/// <returns><see langword="true"/> if all validations pass; otherwise, <see langword="false"/>.</returns>
+	async Task<bool> ValidateAll(string ipAddress, int port, string prefix)
 	{
-
-		if (NetworkChecker.IsAddressLocalOrPermittedExternal(url))
+		var url = $"{prefix}://{ipAddress}:{port}/opds";
+		if (!await ValidateSecurity(ipAddress, port, prefix))
 		{
-			logger.Info($"Using local or permitted external URL address: {url}");
+			Logger.Warn($"Security validation failed for {url}");
+			return false;
+		}
+		if (!await ValidateUrl(url, prefix))
+		{
+			Logger.Warn($"URL validation failed for {url}");
+			return false;
+		}
+		if (!await ValidateSSLCerticate(url))
+		{
+			Logger.Error($"SSL certificate validation failed for {url}");
+			return false;
+		}
+		Logger.Info($"All validations passed for {url}");
+		return true;
+	}
+
+	/// <summary>
+	/// Constructs and retrieves the URL of the newest feed entry from an OPDS feed.
+	/// </summary>
+	/// <remarks>This method constructs a base URL using the provided IP address, port, and prefix, then attempts to
+	/// retrieve the main feed. It searches for the "By Newest" entry within the feed and returns its URL. If the entry is
+	/// not found, an empty string is returned.</remarks>
+	/// <param name="feedReader">The <see cref="FeedReader"/> instance used to fetch the feed data.</param>
+	/// <param name="ipAddress">The IP address of the server hosting the OPDS feed.</param>
+	/// <param name="port">The port number on which the OPDS feed is accessible.</param>
+	/// <param name="prefix">The URL scheme prefix, such as "http" or "https".</param>
+	/// <returns>A <see cref="string"/> representing the URL of the newest feed entry. Returns an empty string if the "By Newest"
+	/// feed link is not found.</returns>
+	async Task<string> GetFeedUrl(FeedReader feedReader, string ipAddress, int port, string prefix)
+	{
+		var url = $"{prefix}://{ipAddress}:{port}/opds";
+		var mainFeed = await feedReader.GetFeedAsync(url, cancellationTokenSource.Token);
+		Logger.Info($"Main feed loaded from {url}");
+		var newestFeedLink = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Newest")?.Links.FirstOrDefault()?.Href;
+		Logger.Info($"Newest feed link found: {newestFeedLink}");
+		if (string.IsNullOrEmpty(newestFeedLink))
+		{
+			Logger.Warn("Could not find 'By Newest' feed link.");
+			return string.Empty;
+		}
+		return new Uri(new Uri(url), newestFeedLink).ToString();
+	}
+
+	/// <summary>
+	/// Loads book data from a Calibre server feed and populates the book collection.
+	/// </summary>
+	/// <remarks>This method retrieves the latest feed from the specified Calibre server and processes each entry to
+	/// populate the book collection. It logs the number of books found and handles cancellation requests. If no books are
+	/// found, a warning is logged and an appropriate message is set.</remarks>
+	/// <param name="ipAddress">The IP address of the Calibre server.</param>
+	/// <param name="port">The port number on which the Calibre server is running.</param>
+	/// <param name="prefix">The URL prefix for accessing the Calibre feed.</param>
+	/// <returns></returns>
+	async Task LoadCalibreDataFromUrl(string ipAddress, int port, string prefix)
+	{
+		var feedReader = new FeedReader();
+		var newestFeedUrl = await GetFeedUrl(feedReader, ipAddress, port, prefix);
+		Logger.Info($"Newest feed URL: {newestFeedUrl}");
+		Feed = await feedReader.GetFeedAsync(newestFeedUrl, cancellationTokenSource.Token);
+		int numberOfBooks = Feed.Entries.Count;
+		if (numberOfBooks == 0)
+		{
+			Logger.Warn("No books found in the Calibre feed.");
+			EmptyLabelText = "No books found in the Calibre feed.";
+			return;
+		}
+		Logger.Info($"Number of books found: {numberOfBooks}");
+		int count = 0;
+
+		using var client = new HttpClient();
+		foreach (var entry in Feed.Entries)
+		{
+			if (entry is null)
+			{
+				Logger.Warn("Encountered a null entry in the feed. Skipping...");
+				continue;
+			}
+			if (cancellationTokenSource.IsCancellationRequested)
+			{
+				Cancelled = true;
+				Logger.Info("Loading books cancelled by user.");
+				break;
+			}
+			var folderinfo = new FileInfo
+			{
+				Count = count,
+				MaxCount = numberOfBooks,
+				Title = entry.Title ?? string.Empty,
+			};
+
+			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
+
+			var book = new Book
+			{
+				Title = entry.Title ?? string.Empty,
+				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
+				Date = entry.Updated?.ToString("yyyy-MM-dd") ?? string.Empty,
+				Description = entry.Content ?? string.Empty,
+				DownloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty,
+				Thumbnail = baseUrl + "/" + imageUrl,
+				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry?.Title ?? string.Empty })
+			};
+
+#if WINDOWS || MACCATALYST
+			if (count % 100 == 0)
+			{
+				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
+			}
+#endif
+#if ANDROID || IOS
+			if (count % 5 == 0)
+			{
+				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
+			}
+#endif
+			Books.Add(book);
+			count++;
+		}
+	}
+
+	/// <summary>
+	/// Adds a book to the library if it does not already exist.
+	/// </summary>
+	/// <remarks>If the book already exists in the library, it will not be added again, and an informational log
+	/// entry will be created. If the book is <see langword="null"/>, a warning log entry will be created.</remarks>
+	/// <param name="book">The book to be added. Must not be <see langword="null"/>.</param>
+	void OnAddBooks(Book book)
+	{
+		if (book is not null)
+		{
+			if (Books.Any(b => b.Title == book.Title))
+			{
+				Logger.Info($"Book already exists in library: {book.Title}");
+				return;
+			}
+
+			book.IsInLibrary = true; // Mark the book as in library
+			Books.Add(book);
+			Logger.Info($"Book message received: {book.Title}");
 		}
 		else
 		{
-			// If the URL is not local and/or does not use https, log a warning and use localhost as a fallback
-
-			logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
-			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
-			return false;
+			Logger.Warn("Received null book message");
 		}
-
-		if (prefix.Equals("https") && !await ValidateSSLCerticate(url))
-		{
-			logger.Error($"SSL certificate validation failed for {url}");
-			EmptyLabelText = "SSL certificate validation failed.\nPlease check your Calibre server settings.";
-			return false;
-		}
-		logger.Info($"URL {url} is valid and accessible.");
-		return true;
 	}
 
 	/// <summary>
@@ -281,14 +371,14 @@ public partial class CalibrePageViewModel : BaseViewModel
 			string responseBody = await response.Content.ReadAsStringAsync(cancellationTokenSource.Token);
 			if (string.IsNullOrEmpty(responseBody))
 			{
-				logger.Warn("Received empty response from Calibre server.");
+				Logger.Warn("Received empty response from Calibre server.");
 				EmptyLabelText = "Received empty response from Calibre server.";
 				return false;
 			}
 		}
 		catch (HttpRequestException e)
 		{
-			logger.Error($"Error connecting to Calibre server at {url}: {e.Message}");
+			Logger.Error($"Error connecting to Calibre server at {url}: {e.Message}");
 			EmptyLabelText = $"Error connecting to Calibre server at {url}. Please check your settings.";
 			return false;
 		}
@@ -299,95 +389,118 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 		return true;
 	}
-	void LoadPopup()
+
+	/// <summary>
+	/// Validates the security of a specified URL by checking network connectivity,  address permissions, and SSL
+	/// certificate validity.
+	/// </summary>
+	/// <remarks>This method performs a series of checks to ensure that the specified URL is secure and accessible:
+	/// it verifies network connectivity, checks if the address is local or a permitted external address, and validates the
+	/// SSL certificate. If any of these checks fail, the method logs a warning or error and returns <see
+	/// langword="false"/>.</remarks>
+	/// <param name="ipAddress">The IP address of the server to validate.</param>
+	/// <param name="port">The port number on which the server is running.</param>
+	/// <param name="prefix">The URL prefix, typically "http" or "https".</param>
+	/// <returns><see langword="true"/> if the URL is valid and accessible; otherwise, <see langword="false"/>.</returns>
+	async Task<bool> ValidateSecurity(string ipAddress, int port, string prefix)
 	{
-		popup = new FileDialogePage(new FileDialogePageViewModel());
-		Shell.Current.ShowPopup(popup, options);
-	}
-	async Task LoadCalibreDataFromUrl(string ipAddress, int port, string prefix)
-	{
-		var url = $"{prefix}://{ipAddress}:{port}/mobile";
-		
+		var url = $"{prefix}://{ipAddress}:{port}/opds";
+
 		if (!await NetworkChecker.ValidateNetworkConnection(url))
 		{
-			logger.Warn($"Network connection failed for {url}");
+			Logger.Warn($"Network connection failed for {url}");
 			EmptyLabelText = "Network connection failed. Please check your settings.";
-			return;
+			return false;
 		}
 
 		if (!NetworkChecker.IsAddressLocalOrPermittedExternal(url))
 		{
-			logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
+			Logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
 			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
-			return;
+			return false;
 		}
 
 		if (!await ValidateSSLCerticate(url))
 		{
-			logger.Error($"SSL certificate validation failed for {url}");
+			Logger.Error($"SSL certificate validation failed for {url}");
 			EmptyLabelText = "SSL certificate validation failed.\nPlease check your Calibre server settings.";
-			return;
+			return false;
 		}
-		
-		logger.Info($"Loading books from Calibre server at {url}");
-		// Check if the URL is valid and accessible
-		
-
-
-		int numberOfBooks = await calibreScraper.GetTotalBooksAsync(url);
-		int count = 0;
-		
-		await foreach (var book in calibreScraper.GetBooksAsyncEnumerable(url, cancellationTokenSource.Token))
-		{
-			if(cancellationTokenSource.IsCancellationRequested)
-			{
-				Cancelled = true;
-				logger.Info("Loading books cancelled by user.");
-				await popup.CloseAsync(cancellationTokenSource.Token);
-				break;
-			}
-			var folderinfo = new FileInfo
-			{
-				Count = count,
-				MaxCount = numberOfBooks,
-				Title = book.Title
-			};
-#if WINDOWS || MACCATALYST
-			if(count % 100 == 0)
-			{
-				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
-			}
-#endif
-#if ANDROID || IOS
-			if(count % 5 == 0)
-			{
-				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
-			}
-#endif
-			book.IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(book);
-			Books.Add(book);
-			count++;
-		}
-		logger.Info($"Loaded {count} books from Calibre server at {url}");
+		Logger.Info($"URL {url} is valid and accessible.");
+		return true;
 	}
-	void OnAddBooks(Book book)
-	{
-		if (book is not null)
-		{
-			if (Books.Any(b => b.Title == book.Title))
-			{
-				logger.Info($"Book already exists in library: {book.Title}");
-				return;
-			}
 
-			//book.IsInLibrary = true; // Ensure the book is marked as in library
-			book.IsInLibrary = true; // Mark the book as in library
-			Books.Add(book);
-			logger.Info($"Book message received: {book.Title}");
+	/// <summary>
+	/// Validates the specified URL to ensure it is either local or a permitted external address, and optionally checks the
+	/// SSL certificate if the URL uses HTTPS.
+	/// </summary>
+	/// <remarks>This method checks if the URL is local or a permitted external address. If the URL is not local or
+	/// permitted, it logs a warning and returns <see langword="false"/>. If the URL uses HTTPS, it also validates the SSL
+	/// certificate. If the certificate validation fails, it logs an error and returns <see langword="false"/>.</remarks>
+	/// <param name="url">The URL to validate. This should be a complete URL string.</param>
+	/// <param name="prefix">The expected protocol prefix, such as "http" or "https".</param>
+	/// <returns><see langword="true"/> if the URL is valid and accessible; otherwise, <see langword="false"/>.</returns>
+	async Task<bool> ValidateUrl(string url, string prefix)
+	{
+
+		if (NetworkChecker.IsAddressLocalOrPermittedExternal(url))
+		{
+			Logger.Info($"Using local or permitted external URL address: {url}");
 		}
 		else
 		{
-			logger.Warn("Received null book message");
+			// If the URL is not local and/or does not use https, log a warning and use localhost as a fallback
+
+			Logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
+			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
+			return false;
 		}
+
+		if (prefix.Equals("https") && !await ValidateSSLCerticate(url))
+		{
+			Logger.Error($"SSL certificate validation failed for {url}");
+			EmptyLabelText = "SSL certificate validation failed.\nPlease check your Calibre server settings.";
+			return false;
+		}
+		Logger.Info($"URL {url} is valid and accessible.");
+		return true;
 	}
+
+
+#if WINDOWS
+	/// <summary>
+	/// Initializes the base URL by discovering available Calibre servers on the network.
+	/// </summary>
+	/// <remarks>This method attempts to find Calibre servers using a network discovery process. If servers are
+	/// found, it sets the base URL to the first discovered server's address. If no servers are found, a default base URL
+	/// is used.</remarks>
+	/// <returns>A task that represents the asynchronous operation.</returns>
+	async Task<(string IPAddress, int Port)> InitializeIpAddress()
+	{
+		var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
+		var settings = await db.GetSettings() ?? new Settings();
+		var urlPrefix = settings.UrlPrefix;
+		baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
+		List<(string IpAddress, int Port)> servers = [];
+		if (settings.CalibreAutoDiscovery)
+		{
+			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
+		}
+
+		if (servers.Count > 0)
+		{
+			Logger.Info($"Using discovered Calibre server at {baseUrl}");
+		}
+		else
+		{
+			servers.Clear();
+			servers.Add((settings.IPAddress, settings.Port));
+			baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
+			Logger.Warn("No Calibre servers found. Using default base URL.");
+		}
+
+		return (servers[0].IpAddress, servers[0].Port);
+	}
+#endif
 }

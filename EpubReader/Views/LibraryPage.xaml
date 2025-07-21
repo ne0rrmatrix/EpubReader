@@ -92,68 +92,56 @@
             VerticalScrollBarVisibility="Never">
 
             <CollectionView.ItemsLayout>
-                <GridItemsLayout
-                    HorizontalItemSpacing="8"
-                    Orientation="Vertical"
-                    Span="{StaticResource GridSpan}"
-                    VerticalItemSpacing="8" />
+                <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
             </CollectionView.ItemsLayout>
 
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="Models:Book">
-                    <SwipeView>
-                        <SwipeView.RightItems>
-                            <SwipeItems>
+                    <Grid Margin="4" Padding="4">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems>
 
-                                <SwipeItem
-                                    BackgroundColor="LightGray"
-                                    Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
-                                    CommandParameter="{Binding .}"
-                                    IconImageSource="delete.png"
-                                    Text="Delete" />
+                                    <SwipeItem
+                                        BackgroundColor="LightGray"
+                                        Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                        CommandParameter="{Binding .}"
+                                        IconImageSource="delete.png"
+                                        Text="Delete" />
 
-                            </SwipeItems>
-                        </SwipeView.RightItems>
+                                </SwipeItems>
+                            </SwipeView.RightItems>
 
-                        <Border Style="{x:StaticResource EbookCardStyle}">
-                            <VerticalStackLayout>
-                                <VerticalStackLayout HorizontalOptions="Center">
-                                    <Label
-                                        Margin="10,10,10,0"
-                                        FontAttributes="Bold"
-                                        HorizontalOptions="Center"
-                                        Text="{Binding Title}"
-                                        VerticalOptions="Start" />
-                                    <Label
-                                        Margin="10,0,10,10"
-                                        HorizontalOptions="Center"
-                                        Text="{Binding Author}"
-                                        VerticalOptions="End" />
+                            <Border Style="{x:StaticResource EbookCardStyle}">
+
+                                <VerticalStackLayout
+                                    Margin="4"
+                                    Padding="4"
+                                    HorizontalOptions="Center">
+
+                                    <Image Aspect="AspectFit" HeightRequest="250">
+                                        <Image.Source>
+                                            <FileImageSource File="{Binding CoverImagePath}" />
+                                        </Image.Source>
+                                        <FlyoutBase.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem
+                                                    Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IconImageSource="delete.png"
+                                                    Text="Delete" />
+                                            </MenuFlyout>
+                                        </FlyoutBase.ContextFlyout>
+
+                                        <Image.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
+                                        </Image.GestureRecognizers>
+                                    </Image>
+
                                 </VerticalStackLayout>
-                                <Image
-                                    Margin="10"
-                                    Aspect="AspectFit"
-                                    HeightRequest="280"
-                                    HorizontalOptions="Center"
-                                    Source="{Binding CoverImagePath}">
-                                    <FlyoutBase.ContextFlyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem
-                                                Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
-                                                CommandParameter="{Binding .}"
-                                                IconImageSource="delete.png"
-                                                Text="Delete" />
-                                        </MenuFlyout>
-                                    </FlyoutBase.ContextFlyout>
-
-                                    <Image.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
-                                    </Image.GestureRecognizers>
-                                </Image>
-
-                            </VerticalStackLayout>
-                        </Border>
-                    </SwipeView>
+                            </Border>
+                        </SwipeView>
+                    </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>

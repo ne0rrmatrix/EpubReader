@@ -1,9 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using EpubReader.Interfaces;
 using EpubReader.Models;
+using MetroLog;
+using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Core;
 
 #if ANDROID
-using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Core.Platform;
 #endif
 
@@ -18,7 +20,13 @@ namespace EpubReader.ViewModels;
 /// and includes a property for managing the current book instance.</remarks>
 public partial class BaseViewModel : ObservableObject, IDisposable
 {
-
+	/// <summary>
+	/// Gets the logger instance associated with the <see cref="BaseViewModel"/>.
+	/// </summary>
+	/// <remarks>This logger is used for logging messages related to the operations and state of the <see
+	/// cref="BaseViewModel"/>. It is initialized using the <see cref="LoggerFactory"/> with the name of the view
+	/// model.</remarks>
+	public readonly ILogger Logger = LoggerFactory.GetLogger(nameof(BaseViewModel));
 	/// <summary>
 	/// Gets the dispatcher associated with the current application.
 	/// </summary>
@@ -60,6 +68,36 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 		}
 	}
 #endif
+
+	#region Toast Helper Methods
+
+	/// <summary>
+	/// Shows an informational toast message.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	public async Task ShowInfoToastAsync(string message, CancellationToken cancellationToken = default)
+	{
+		await Dispatcher.DispatchAsync(async () =>
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+		Logger.Info(message);
+	}
+
+	/// <summary>
+	/// Shows an error toast message.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="cancellationToken">Cancellation token for the operation.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	public async Task ShowErrorToastAsync(string message, CancellationToken cancellationToken = default)
+	{
+		await Dispatcher.DispatchAsync(async () =>
+			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+		Logger.Error(message);
+	}
+
+	#endregion
 
 	protected virtual void Dispose(bool disposing)
 	{

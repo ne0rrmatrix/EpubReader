@@ -57,9 +57,17 @@
             <Switch
                 x:Name="switchController"
                 HorizontalOptions="Start"
+                IsVisible="{OnPlatform WinUI=True,
+                                       MacCatalyst=True,
+                                       Default=False}"
                 Toggled="Switch_Toggled"
                 VerticalOptions="Center" />
-            <Label Text="Auto Discovery" VerticalOptions="Center" />
+            <Label
+                IsVisible="{OnPlatform WinUI=True,
+                                       MacCatalyst=True,
+                                       Default=False}"
+                Text="Auto Discovery"
+                VerticalOptions="Center" />
         </HorizontalStackLayout>
         <Label
             Grid.Row="2"
@@ -68,15 +76,10 @@
         <Entry
             x:Name="EntryText"
             Grid.Row="3"
-            ClearButtonVisibility="WhileEditing"
             Completed="Entry_Completed"
-            CursorPosition="3"
-            IsPassword="False"
-            IsSpellCheckEnabled="False"
-            IsTextPredictionEnabled="False"
-            Keyboard="Url"
-            Placeholder="Enter Calibre URL"
-            VerticalOptions="Center">
+            ReturnType="Done"
+            VerticalOptions="Center"
+            WidthRequest="200">
             <Entry.Behaviors>
                 <toolkit:UriValidationBehavior
                     Flags="ValidateOnValueChanged"

@@ -1,14 +1,14 @@
 ﻿using MetroLog;
 using Zeroconf;
 
-#if ANDROID
-using Android.Content;
-using Android.Net.Wifi;
-using Android.App;
-#endif
-
 namespace EpubReader.Util;
 
+/// <summary>
+/// Provides functionality to discover Calibre content servers on the local network using Zeroconf.
+/// </summary>
+/// <remarks>This class utilizes Zeroconf to identify Calibre servers by scanning the local network for services
+/// that match the Calibre service type. It is designed to be used in environments where Calibre servers are expected to
+/// be running and accessible over the network.</remarks>
 public partial class CalibreZeroConf
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreZeroConf));
@@ -22,40 +22,6 @@ public partial class CalibreZeroConf
 	/// <param name="scanTimeSeconds">The duration in seconds to scan for services. Default is 5 seconds.</param>
 	/// <returns>A list of tuples containing the IP address and port of discovered Calibre servers.</returns>
 	public static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServers(int scanTimeSeconds = 5)
-	{
-#if ANDROID
-		var applicationContext = Android.App.Application.Context;
-		var wifi = (WifiManager?)applicationContext.GetSystemService(Context.WifiService) ?? throw new InvalidOperationException("Unable to get WifiManager");
-		var mlock = wifi.CreateMulticastLock("Zeroconf lock");
-		try
-		{
-			mlock?.Acquire();
-			if (mlock is null)
-			{
-				logger.Error("Multicast lock is null, cannot proceed with Zeroconf discovery.");
-				return [];
-			}
-			return await GetData(scanTimeSeconds).ConfigureAwait(false);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Failed to acquire multicast lock: {ex.Message}");
-			return [];
-		}
-		finally
-		{
-			if (mlock?.IsHeld == true)
-			{
-				mlock.Release();
-				logger.Info("Multicast lock released.");
-			}
-		}
-#else
-		return await GetData(scanTimeSeconds).ConfigureAwait(false);
-#endif
-	}
-
-	static async Task<List<(string IpAddress, int Port)>> GetData(int scanTimeSeconds)
 	{
 		List<(string IpAddress, int Port)> calibreServers = [];
 
@@ -83,6 +49,11 @@ public partial class CalibreZeroConf
 						calibreServers.Add((host.IPAddress, service.Value.Port));
 					}
 				}
+			}
+			if (calibreServers.Count == 0)
+			{
+				logger.Info("No Calibre content servers found on the local network.");
+				calibreServers.Add(("192.168.1.108", 8080)); // Example of adding a hardcoded server for testing purposes
 			}
 		}
 		catch (Exception ex)

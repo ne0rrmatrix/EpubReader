@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
+using EpubReader.Models;
 using MetroLog;
 
 namespace EpubReader.ODPS;
@@ -12,15 +13,10 @@ namespace EpubReader.ODPS;
 /// The FeedReader class handles the parsing of Atom XML feeds that conform to the OPDS specification,
 /// extracting feed metadata and entry information for book discovery and navigation.
 /// </remarks>
-public class FeedReader
+public class FeedReader(HttpClient? httpClient = null)
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FeedReader));
-	readonly HttpClient httpClient;
-
-	public FeedReader(HttpClient? httpClient = null)
-	{
-		this.httpClient = httpClient ?? new HttpClient();
-	}
+	readonly HttpClient httpClient = httpClient ?? new HttpClient();
 
 	/// <summary>
 	/// Asynchronously retrieves and parses an OPDS feed from the specified URL.
@@ -94,16 +90,15 @@ public class FeedReader
 
 		// Define namespaces
 		var atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
-		var dcNs = XNamespace.Get("http://purl.org/dc/terms/");
-		var opdsNs = XNamespace.Get("http://opds-spec.org/2010/catalog");
 
-		var feed = new OpdsFeed();
-
-		// Parse feed-level elements
-		feed.Title = GetElementValue(root, atomNs + "title");
-		feed.Subtitle = GetElementValue(root, atomNs + "subtitle");
-		feed.Id = GetElementValue(root, atomNs + "id");
-		feed.Icon = GetElementValue(root, atomNs + "icon");
+		var feed = new OpdsFeed
+		{
+			// Parse feed-level elements
+			Title = GetElementValue(root, atomNs + "title"),
+			Subtitle = GetElementValue(root, atomNs + "subtitle"),
+			Id = GetElementValue(root, atomNs + "id"),
+			Icon = GetElementValue(root, atomNs + "icon")
+		};
 
 		if (DateTime.TryParse(GetElementValue(root, atomNs + "updated"), new CultureInfo("en-US"), out DateTime updated))
 		{
@@ -122,7 +117,7 @@ public class FeedReader
 		}
 
 		// Parse feed-level links
-		feed.Links = ParseLinks(root.Elements(atomNs + "link")).ToList();
+		feed.Links = [.. ParseLinks(root.Elements(atomNs + "link"))];
 
 		// Parse entries
 		feed.Entries = root.Elements(atomNs + "entry")
@@ -150,26 +145,39 @@ public class FeedReader
 			{
 				Title = GetElementValue(entryElement, atomNs + "title"),
 				Id = GetElementValue(entryElement, atomNs + "id"),
-				Content = GetElementValue(entryElement, atomNs + "content")
+				Content = GetElementValue(entryElement, atomNs + "content"),
+				Summary = GetElementValue(entryElement, atomNs + "summary"),
+				DcDate = GetElementValue(entryElement, dcNs + "date")
 			};
 
-			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "updated"), new CultureInfo("en-US"), out var updated))
+			// Parse dates
+			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "updated"), CultureInfo.InvariantCulture, out var updated))
 			{
 				entry.Updated = updated;
 			}
 
+			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "published"), CultureInfo.InvariantCulture, out var published))
+			{
+				entry.Published = published;
+			}
+
 			// Parse entry links
-			entry.Links = ParseLinks(entryElement.Elements(atomNs + "link")).ToList();
+			entry.Links = [.. ParseLinks(entryElement.Elements(atomNs + "link"))];
 
 			// Parse authors
-			entry.Authors = entryElement.Elements(atomNs + "author")
+			entry.Authors = [.. entryElement.Elements(atomNs + "author")
 				.Select(authorElement => new OpdsAuthor
 				{
 					Name = GetElementValue(authorElement, atomNs + "name"),
 					Uri = GetElementValue(authorElement, atomNs + "uri")
 				})
-				.Where(author => !string.IsNullOrEmpty(author.Name))
-				.ToList();
+				.Where(author => !string.IsNullOrEmpty(author.Name))];
+
+			// Parse categories
+			entry.Categories = entryElement.Elements(atomNs + "category")
+				.Select(cat => cat.Attribute("term")?.Value)
+				.Where(term => !string.IsNullOrEmpty(term))
+				.ToList()!;
 
 			return entry;
 		}
@@ -237,52 +245,4 @@ public class FeedReader
 		logger.Info($"Searching OPDS catalog with terms: {searchTerms}");
 		return await GetFeedAsync(searchUrl, cancellationToken);
 	}
-}
-
-/// <summary>
-/// Represents an OPDS feed containing metadata and entries.
-/// </summary>
-public class OpdsFeed
-{
-	public string? Title { get; set; }
-	public string? Subtitle { get; set; }
-	public string? Id { get; set; }
-	public string? Icon { get; set; }
-	public DateTime? Updated { get; set; }
-	public OpdsAuthor? Author { get; set; }
-	public List<OpdsLink> Links { get; set; } = [];
-	public List<OpdsEntry> Entries { get; set; } = [];
-}
-
-/// <summary>
-/// Represents an individual entry in an OPDS feed.
-/// </summary>
-public class OpdsEntry
-{
-	public string? Title { get; set; }
-	public string? Id { get; set; }
-	public string? Content { get; set; }
-	public DateTime? Updated { get; set; }
-	public List<OpdsLink> Links { get; set; } = [];
-	public List<OpdsAuthor> Authors { get; set; } = [];
-}
-
-/// <summary>
-/// Represents a link in an OPDS feed or entry.
-/// </summary>
-public class OpdsLink
-{
-	public string? Href { get; set; }
-	public string? Type { get; set; }
-	public string? Rel { get; set; }
-	public string? Title { get; set; }
-}
-
-/// <summary>
-/// Represents an author in an OPDS feed or entry.
-/// </summary>
-public class OpdsAuthor
-{
-	public string? Name { get; set; }
-	public string? Uri { get; set; }
 }

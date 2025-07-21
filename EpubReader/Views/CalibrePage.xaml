@@ -24,6 +24,7 @@
     <ContentPage.Resources>
         <ResourceDictionary>
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -36,48 +37,38 @@
             SelectionMode="None"
             VerticalScrollBarVisibility="Never">
             <CollectionView.ItemsLayout>
-                <GridItemsLayout
-                    HorizontalItemSpacing="4"
-                    Orientation="Vertical"
-                    Span="{StaticResource GridSpan}"
-                    VerticalItemSpacing="4" />
+                <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:Book">
-                    <Grid BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}" HeightRequest="270">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Label
-                            Grid.Row="0"
-                            Margin="0,5,0,0"
-                            FontAttributes="Bold"
-                            HorizontalTextAlignment="Center"
-                            Text="{Binding Title}" />
-                        <Image
-                            Grid.Row="1"
-                            Aspect="AspectFit"
-                            HeightRequest="92"
-                            HorizontalOptions="Center"
-                            Source="{Binding ThumbnailUrl}" />
+                    <Grid
+                        Margin="8"
+                        Padding="8"
+                        BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                                          Light=White}">
+                        <Border
+                            HeightRequest="490"
+                            Style="{x:StaticResource EbookCardStyle}"
+                            WidthRequest=" 250">
+                            <Grid RowDefinitions="350,40" VerticalOptions="Center">
 
-                        <Label
-                            Grid.Row="2"
-                            Margin="0,5,0,10"
-                            HorizontalTextAlignment="Center"
-                            Text="{Binding Author}" />
-                        <Button
-                            Grid.Row="3"
-                            Margin="0,5,5,10"
-                            Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
-                            CommandParameter="{Binding .}"
-                            HeightRequest="50"
-                            IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"
-                            Text="Download"
-                            WidthRequest="100" />
+                                <Image
+                                    Grid.Row="0"
+                                    Aspect="AspectFit"
+                                    HeightRequest="300"
+                                    HorizontalOptions="Center"
+                                    Source="{Binding Thumbnail}" />
+
+                                <Button
+                                    Grid.Row="1"
+                                    Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
+                                    CommandParameter="{Binding .}"
+                                    HeightRequest="40"
+                                    IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"
+                                    Text="Download"
+                                    WidthRequest="100" />
+                            </Grid>
+                        </Border>
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
