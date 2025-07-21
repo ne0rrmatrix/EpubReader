@@ -53,7 +53,6 @@ public partial class CalibreZeroConf
 			if (calibreServers.Count == 0)
 			{
 				logger.Info("No Calibre content servers found on the local network.");
-				calibreServers.Add(("192.168.1.108", 8080)); // Example of adding a hardcoded server for testing purposes
 			}
 		}
 		catch (Exception ex)

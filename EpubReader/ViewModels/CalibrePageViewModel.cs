@@ -287,16 +287,18 @@ public partial class CalibrePageViewModel : BaseViewModel
 				MaxCount = numberOfBooks,
 				Title = entry.Title ?? string.Empty,
 			};
-
+#pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
-
+#pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var book = new Book
 			{
 				Title = entry.Title ?? string.Empty,
 				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
 				Date = entry.Updated?.ToString("yyyy-MM-dd") ?? string.Empty,
 				Description = entry.Content ?? string.Empty,
+#pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 				DownloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty,
+#pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 				Thumbnail = baseUrl + "/" + imageUrl,
 				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry?.Title ?? string.Empty })
 			};
