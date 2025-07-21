@@ -146,12 +146,19 @@ public partial class CalibrePageViewModel : BaseViewModel
 			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
 			Logger.Info("Initializing Url...");
 			var settings = await db.GetSettings() ?? new Settings();
-#if WINDOWS
-			var (ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
-#endif
-#if ANDROID || IOS || MACCATALYST
 			var (ipAddress, port) = (settings.IPAddress, settings.Port);
-#endif
+
+			if (settings.CalibreAutoDiscovery)
+			{
+				Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
+#if WINDOWS
+				(ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
+#endif	
+			}
+			else
+			{
+				Logger.Info("Calibre auto discovery is disabled, using settings from database.");
+			}
 
 			var urlPrefix = settings.UrlPrefix;
 			var prefix = urlPrefix.ToLowerInvariant() switch
@@ -162,9 +169,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 			};
 			baseUrl = $"{prefix}://{ipAddress}:{port}";
 			Logger.Info($"Using IP address: {ipAddress}, Port: {port}, prefix: {prefix}");
-			if(!await ValidateAll(ipAddress, port, prefix))
+			
+			if (!await ValidateUrl(baseUrl, prefix))
 			{
-				Logger.Warn("Validation of URL for security failed. Exiting LoadBooks method.");
+				Logger.Warn($"URL validation failed for {baseUrl}");
 				return;
 			}
 
@@ -180,38 +188,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 			Logger.Info("LoadBooks completed successfully.");
 		}
-	}
-
-	/// <summary>
-	/// Validates the security, URL, and SSL certificate for a specified endpoint.
-	/// </summary>
-	/// <remarks>This method performs a series of asynchronous validations on the specified endpoint, including
-	/// security checks, URL format validation, and SSL certificate verification. It logs warnings or errors if any
-	/// validation fails.</remarks>
-	/// <param name="ipAddress">The IP address of the endpoint to validate.</param>
-	/// <param name="port">The port number of the endpoint to validate.</param>
-	/// <param name="prefix">The protocol prefix (e.g., "http" or "https") to use for the validation.</param>
-	/// <returns><see langword="true"/> if all validations pass; otherwise, <see langword="false"/>.</returns>
-	async Task<bool> ValidateAll(string ipAddress, int port, string prefix)
-	{
-		var url = $"{prefix}://{ipAddress}:{port}/opds";
-		if (!await ValidateSecurity(ipAddress, port, prefix))
-		{
-			Logger.Warn($"Security validation failed for {url}");
-			return false;
-		}
-		if (!await ValidateUrl(url, prefix))
-		{
-			Logger.Warn($"URL validation failed for {url}");
-			return false;
-		}
-		if (!await ValidateSSLCerticate(url))
-		{
-			Logger.Error($"SSL certificate validation failed for {url}");
-			return false;
-		}
-		Logger.Info($"All validations passed for {url}");
-		return true;
 	}
 
 	/// <summary>
@@ -347,92 +323,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// Validates the SSL certificate of the specified URL by attempting an HTTP GET request.
-	/// </summary>
-	/// <remarks>This method performs an HTTP GET request to the specified URL using a custom server certificate
-	/// validation callback. It logs any errors encountered during the request and returns <see langword="false"/> if the
-	/// response is empty or if an exception occurs.</remarks>
-	/// <param name="url">The URL of the server whose SSL certificate is to be validated.</param>
-	/// <returns><see langword="true"/> if the SSL certificate is valid and the server responds successfully; otherwise, <see
-	/// langword="false"/>.</returns>
-	async Task<bool> ValidateSSLCerticate(string url)
-	{
-		HttpClientHandler handler = new()
-		{
-			ServerCertificateCustomValidationCallback = NetworkChecker.ServerCertificateCustomValidation
-		};
-		HttpClient client = new(handler)
-		{
-			Timeout = TimeSpan.FromSeconds(10)
-		};
-		try
-		{
-			HttpResponseMessage response = await client.GetAsync(url, cancellationTokenSource.Token);
-			response.EnsureSuccessStatusCode();
-
-			string responseBody = await response.Content.ReadAsStringAsync(cancellationTokenSource.Token);
-			if (string.IsNullOrEmpty(responseBody))
-			{
-				Logger.Warn("Received empty response from Calibre server.");
-				EmptyLabelText = "Received empty response from Calibre server.";
-				return false;
-			}
-		}
-		catch (HttpRequestException e)
-		{
-			Logger.Error($"Error connecting to Calibre server at {url}: {e.Message}");
-			EmptyLabelText = $"Error connecting to Calibre server at {url}. Please check your settings.";
-			return false;
-		}
-		finally
-		{
-			handler.Dispose();
-			client.Dispose();
-		}
-		return true;
-	}
-
-	/// <summary>
-	/// Validates the security of a specified URL by checking network connectivity,  address permissions, and SSL
-	/// certificate validity.
-	/// </summary>
-	/// <remarks>This method performs a series of checks to ensure that the specified URL is secure and accessible:
-	/// it verifies network connectivity, checks if the address is local or a permitted external address, and validates the
-	/// SSL certificate. If any of these checks fail, the method logs a warning or error and returns <see
-	/// langword="false"/>.</remarks>
-	/// <param name="ipAddress">The IP address of the server to validate.</param>
-	/// <param name="port">The port number on which the server is running.</param>
-	/// <param name="prefix">The URL prefix, typically "http" or "https".</param>
-	/// <returns><see langword="true"/> if the URL is valid and accessible; otherwise, <see langword="false"/>.</returns>
-	async Task<bool> ValidateSecurity(string ipAddress, int port, string prefix)
-	{
-		var url = $"{prefix}://{ipAddress}:{port}/opds";
-
-		if (!await NetworkChecker.ValidateNetworkConnection(url))
-		{
-			Logger.Warn($"Network connection failed for {url}");
-			EmptyLabelText = "Network connection failed. Please check your settings.";
-			return false;
-		}
-
-		if (!NetworkChecker.IsAddressLocalOrPermittedExternal(url))
-		{
-			Logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
-			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
-			return false;
-		}
-
-		if (!await ValidateSSLCerticate(url))
-		{
-			Logger.Error($"SSL certificate validation failed for {url}");
-			EmptyLabelText = "SSL certificate validation failed.\nPlease check your Calibre server settings.";
-			return false;
-		}
-		Logger.Info($"URL {url} is valid and accessible.");
-		return true;
-	}
-
-	/// <summary>
 	/// Validates the specified URL to ensure it is either local or a permitted external address, and optionally checks the
 	/// SSL certificate if the URL uses HTTPS.
 	/// </summary>
@@ -444,7 +334,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <returns><see langword="true"/> if the URL is valid and accessible; otherwise, <see langword="false"/>.</returns>
 	async Task<bool> ValidateUrl(string url, string prefix)
 	{
-
 		if (NetworkChecker.IsAddressLocalOrPermittedExternal(url))
 		{
 			Logger.Info($"Using local or permitted external URL address: {url}");
@@ -457,8 +346,16 @@ public partial class CalibrePageViewModel : BaseViewModel
 			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
 			return false;
 		}
-
-		if (prefix.Equals("https") && !await ValidateSSLCerticate(url))
+		
+		if (!await NetworkChecker.ValidateNetworkConnection(url))
+		{
+			Logger.Warn($"Network connection failed for {url}");
+			EmptyLabelText = "Network connection failed. Please check your settings.";
+			return false;
+		}
+	
+	
+		if (prefix.Equals("https") && !await NetworkChecker.ValidateSSLCertificate(url))
 		{
 			Logger.Error($"SSL certificate validation failed for {url}");
 			EmptyLabelText = "SSL certificate validation failed.\nPlease check your Calibre server settings.";
@@ -483,14 +380,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 		var settings = await db.GetSettings() ?? new Settings();
 		var urlPrefix = settings.UrlPrefix;
 		baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
+		
 		List<(string IpAddress, int Port)> servers = [];
-		if (settings.CalibreAutoDiscovery)
+		if(settings.CalibreAutoDiscovery)
 		{
 			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
 			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
 		}
-
-		if (servers.Count > 0)
+		
+		if (servers.Count > 1)
 		{
 			Logger.Info($"Using discovered Calibre server at {baseUrl}");
 		}

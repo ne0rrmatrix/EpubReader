@@ -1,13 +1,13 @@
 using CommunityToolkit.Maui.Views;
 using EpubReader.Interfaces;
 using EpubReader.ViewModels;
-using MetroLog;
 
 namespace EpubReader.Views;
 
 public partial class CalibreSettingsPage : Popup
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreSettingsPage));
+	CalibreSettingsPageViewModel viewModel => (CalibreSettingsPageViewModel)BindingContext;
+	MetroLog.ILogger logger => viewModel.Logger;
 
 	/// <summary>
 	/// Gets or sets the database service used by the application.

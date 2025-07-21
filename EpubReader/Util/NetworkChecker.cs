@@ -1,10 +1,8 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks; // For simplified IP range checking
+using MetroLog;
 
 namespace EpubReader.Util;
 
@@ -17,12 +15,22 @@ namespace EpubReader.Util;
 /// they are local, while permitting HTTPS connections regardless of locality.</remarks>
 public class NetworkChecker
 {
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(NetworkChecker));
 	protected NetworkChecker()
 	{
 		// This constructor is protected to prevent instantiation of this class.
 		// Use static methods instead.
 	}
 
+	/// <summary>
+	/// Validates the network connection by attempting to send a GET request to the specified URL.
+	/// </summary>
+	/// <remarks>This method logs information about any network request failures or timeouts. It uses a default
+	/// timeout of 10 seconds for the request.</remarks>
+	/// <param name="url">The URL to which the network connection is validated. Must be a valid URI.</param>
+	/// <param name="cancellationToken">A token to cancel the operation. Defaults to <see cref="CancellationToken.None"/>.</param>
+	/// <returns><see langword="true"/> if the network connection is successful and the response status code indicates success;
+	/// otherwise, <see langword="false"/>.</returns>
 	public static async Task<bool> ValidateNetworkConnection(string url, CancellationToken cancellationToken = default)
 	{
 		try
@@ -41,17 +49,17 @@ public class NetworkChecker
 		}
 		catch (HttpRequestException e)
 		{
-			System.Diagnostics.Trace.TraceError($"Network request failed: {e.Message}");
+			logger.Info($"Network request failed: {e.Message}");
 			return false;
 		}
 		catch (TaskCanceledException)
 		{
-			System.Diagnostics.Trace.TraceError("Network request timed out.");
+			logger.Info("Network request timed out.");
 			return false;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Trace.TraceError($"An unexpected error occurred: {ex.Message}");
+			logger.Info($"An unexpected error occurred: {ex.Message}");
 			return false;
 		}
 	}
@@ -71,21 +79,15 @@ public class NetworkChecker
 	/// langword="false"/>.</returns>
 	public static bool ServerCertificateCustomValidation(HttpRequestMessage requestMessage, X509Certificate2? certificate, X509Chain? chain, SslPolicyErrors sslErrors)
 	{
-		// It is possible to inspect the certificate provided by the server.
-		System.Diagnostics.Trace.TraceInformation($"Requested URI: {requestMessage.RequestUri}");
-		System.Diagnostics.Trace.TraceInformation($"Effective date: {certificate?.GetEffectiveDateString()}");
-		System.Diagnostics.Trace.TraceInformation($"Exp date: {certificate?.GetExpirationDateString()}");
-		System.Diagnostics.Trace.TraceInformation($"Issuer: {certificate?.Issuer}");
-		System.Diagnostics.Trace.TraceInformation($"Subject: {certificate?.Subject}");
+		logger.Info($"Requested URI: {requestMessage.RequestUri}");
+		logger.Info($"Effective date: {certificate?.GetEffectiveDateString()}");
+		logger.Info($"Exp date: {certificate?.GetExpirationDateString()}");
+		logger.Info($"Issuer: {certificate?.Issuer}");
+		logger.Info($"Subject: {certificate?.Subject}");
+		logger.Info($"Errors: {sslErrors}");
 
-		// Based on the custom logic it is possible to decide whether the client considers certificate valid or not
-		System.Diagnostics.Trace.TraceInformation($"Errors: {sslErrors}");
-		return sslErrors == SslPolicyErrors.RemoteCertificateChainErrors
-			|| sslErrors == SslPolicyErrors.RemoteCertificateNameMismatch
-			|| sslErrors == SslPolicyErrors.RemoteCertificateNotAvailable
-			|| sslErrors == SslPolicyErrors.RemoteCertificateChainErrors
-			|| sslErrors == SslPolicyErrors.RemoteCertificateNameMismatch
-			|| sslErrors == SslPolicyErrors.RemoteCertificateNotAvailable;
+		// Return true only when there are NO errors
+		return sslErrors == SslPolicyErrors.None;
 	}
 
 	/// <summary>
@@ -97,48 +99,57 @@ public class NetworkChecker
 	/// <param name="url">The URL of the server whose SSL certificate is to be validated. Must be a valid URI.</param>
 	/// <returns><see langword="true"/> if the SSL certificate is valid and the server responds successfully;  otherwise, <see
 	/// langword="false"/>. </returns>
-	public static async Task<bool> ValidateSSLCerticate(string url)
+	public static async Task<bool> ValidateSSLCertificate(string url)
 	{
+		bool certificateValid = false;
+
 		HttpClientHandler handler = new()
 		{
-			ServerCertificateCustomValidationCallback = ServerCertificateCustomValidation
+			ServerCertificateCustomValidationCallback = (request, cert, chain, errors) =>
+			{
+				certificateValid = ServerCertificateCustomValidation(request, cert, chain, errors);
+				return certificateValid; // Or return true to always allow connection for testing
+			}
 		};
-		HttpClient client = new(handler)
-		{
-			Timeout = TimeSpan.FromSeconds(10)
-		};
+
+		using HttpClient client = new(handler) { Timeout = TimeSpan.FromSeconds(10) };
+
 		try
 		{
 			HttpResponseMessage response = await client.GetAsync(url);
 			response.EnsureSuccessStatusCode();
-
-			string responseBody = await response.Content.ReadAsStringAsync();
-			if (string.IsNullOrEmpty(responseBody))
-			{
-				return false;
-			}
+			return certificateValid; // Return the actual certificate validation result
 		}
 		catch (HttpRequestException e)
 		{
-			System.Diagnostics.Trace.TraceError($"HTTP(S) request failed: {e.Message}");
+			logger.Info($"HTTP(S) request failed: {e.Message}");
 			return false;
 		}
-		finally
-		{
-			handler.Dispose();
-			client.Dispose();
-		}
-		return true;
 	}
+
 	// Define your local IP address ranges. These are common private IP ranges.
 	// You might need to adjust these based on your specific home network configuration.
 	// For example, if your router is 192.168.1.1, your local range is likely 192.168.1.0/24.
 	static readonly string[] localIpRanges =
 	[
+		// IPv4 Private Ranges (RFC 1918)
 		"10.0.0.0/8",      // 10.0.0.0 - 10.255.255.255
-        "172.16.0.0/12",   // 172.16.0.0 - 172.31.255.255
-        "192.168.0.0/16"   // 192.168.0.0 - 192.168.255.255
-    ];
+    "172.16.0.0/12",   // 172.16.0.0 - 172.31.255.255
+    "192.168.0.0/16",  // 192.168.0.0 - 192.168.255.255
+    
+    // IPv4 Additional Local Ranges
+    "127.0.0.0/8",     // 127.0.0.0 - 127.255.255.255 (Loopback)
+    "169.254.0.0/16",  // 169.254.0.0 - 169.254.255.255 (Link-local/APIPA)
+    
+    // IPv6 Private/Local Ranges
+    "::1/128",         // ::1 (IPv6 loopback)
+    "fc00::/7",        // fc00:: - fdff:: (Unique Local Addresses - ULA)
+    "fe80::/10",       // fe80:: - febf:: (Link-local addresses)
+    
+    // IPv6 Documentation/Reserved ranges (optional - for completeness)
+    "2001:db8::/32",   // 2001:db8:: (Documentation prefix - RFC 3849)
+    "::/128",          // :: (Unspecified address)
+];
 
 	/// <summary>
 	/// Checks if a given web address is local or external to a home network
@@ -161,7 +172,7 @@ public class NetworkChecker
 		{
 			// If the address is not a valid URI, we can't process it.
 			// You might want to throw an exception or return false here.
-			Console.WriteLine($"Error: Invalid URI format for '{webAddress}'");
+			logger.Info($"Error: Invalid URI format for '{webAddress}'");
 			return false;
 		}
 
@@ -179,7 +190,7 @@ public class NetworkChecker
 		catch (SocketException)
 		{
 			// Could not resolve the host, assume external and potentially problematic.
-			Console.WriteLine($"Warning: Could not resolve host '{uri.Host}'. Treating as external.");
+			logger.Info($"Warning: Could not resolve host '{uri.Host}'. Treating as external.");
 			// If it's HTTP and we can't resolve, it's safer to return false based on your rule.
 			return !(isHttp && !isHttps); // If HTTP and not HTTPS, return false. Otherwise, true.
 		}
@@ -238,34 +249,70 @@ public class NetworkChecker
 		return false; // If it doesn't match any range, return false.
 	}
 
+	/// <summary>
+	/// Determines whether the specified IP address bytes fall within a given CIDR range.
+	/// </summary>
+	/// <remarks>The method checks if the IP address, represented by <paramref name="ipBytes"/>, is within the range
+	/// specified by <paramref name="rangeCidr"/>. The CIDR notation must be valid, and the prefix length must be
+	/// appropriate for the address family (IPv4 or IPv6).</remarks>
+	/// <param name="ipBytes">The byte array representing the IP address to check.</param>
+	/// <param name="rangeCidr">The CIDR notation string representing the IP range, in the format "address/prefixLength".</param>
+	/// <returns><see langword="true"/> if the IP address bytes are within the specified CIDR range; otherwise, <see
+	/// langword="false"/>.</returns>
 	static bool CheckIPBytes(byte[] ipBytes, string rangeCidr)
 	{
-		// Simple parsing assuming CIDR format like "192.168.0.0/16"
 		string[] parts = rangeCidr.Split('/');
 		if (parts.Length == 2 && IPAddress.TryParse(parts[0], out IPAddress? rangeAddress) && int.TryParse(parts[1], out int prefixLength))
 		{
 			byte[] rangeBytes = rangeAddress.GetAddressBytes();
-			int bytesToCompare = prefixLength / 8;
-			if (prefixLength % 8 != 0)
-			{
-				bytesToCompare++;
-			}
 
-			if (ipBytes.Length != rangeBytes.Length)
+			// Determine max prefix length based on address family (IPv4 = 32, IPv6 = 128)
+			int maxPrefixLength = rangeBytes.Length == 4 ? 32 : 128;
+
+			if (ipBytes.Length != rangeBytes.Length || prefixLength < 0 || prefixLength > maxPrefixLength)
 			{
 				return false;
 			}
 
-			for (int i = 0; i < bytesToCompare; i++)
-			{
-				if (ipBytes[i] != rangeBytes[i])
-				{
-					return false;
-				}
-			}
+			int fullBytes = prefixLength / 8;
+			int remainingBits = prefixLength % 8;
 
-			return true;
+			return CompareIPBytes(ipBytes, rangeBytes, fullBytes, remainingBits);
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// Compares two IP address byte arrays to determine if they match up to a specified number of full bytes and remaining
+	/// bits.
+	/// </summary>
+	/// <param name="ipBytes">The byte array representing the IP address to compare.</param>
+	/// <param name="rangeBytes">The byte array representing the IP address range to compare against.</param>
+	/// <param name="fullBytes">The number of full bytes to compare between the two byte arrays.</param>
+	/// <param name="remainingBits">The number of bits to compare in the next byte after the full bytes.</param>
+	/// <returns><see langword="true"/> if the IP address matches the range up to the specified number of full bytes and remaining
+	/// bits; otherwise, <see langword="false"/>.</returns>
+	static bool CompareIPBytes(byte[] ipBytes, byte[] rangeBytes, int fullBytes, int remainingBits)
+	{
+		// Compare full bytes
+		for (int i = 0; i < fullBytes; i++)
+		{
+			if (ipBytes[i] != rangeBytes[i])
+			{
+				return false;
+			}
+		}
+
+		// Compare remaining bits if any
+		if (remainingBits > 0)
+		{
+			byte mask = (byte)(0xFF << (8 - remainingBits));
+			if ((ipBytes[fullBytes] & mask) != (rangeBytes[fullBytes] & mask))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 }
