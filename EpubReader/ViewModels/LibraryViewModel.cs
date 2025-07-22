@@ -24,7 +24,6 @@ namespace EpubReader.ViewModels;
 public partial class LibraryViewModel : BaseViewModel
 {
 	bool isAlphabeticalSorted = true;
-	CancellationTokenSource cancellationTokenSource = new();
 
 	Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
 	readonly PopupOptions options = new()
@@ -57,46 +56,36 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			if (m.Value)
 			{
-				cancellationTokenSource.Cancel();
+				CancellationTokenSource.Cancel();
 			}
 		});
-		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
+		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) =>
+		{
+			if (CancellationTokenSource.IsCancellationRequested)
+			{
+				CancellationTokenSource = new CancellationTokenSource();
+			}
+			var ebook = m.Value;
+			if (Books.Any(b => b.Title == ebook.Title))
+			{
+				Logger.Info($"Book already exists in library: {ebook.Title}");
+				return;
+			}
+			Book.IsInLibrary = true; // Ensure the book is marked as in library
+			Books.Add(ebook);
+			Logger.Info($"Book message received: {ebook.Title}");
+		});
 	}
 
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing)
 		{
-			cancellationTokenSource?.Dispose();
+			CancellationTokenSource?.Dispose();
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		}
 		base.Dispose(disposing);
 	}
-
-	/// <summary>
-	/// Adds a book to the library if it does not already exist.
-	/// </summary>
-	/// <remarks>If the book already exists in the library, it will not be added again, and an informational log
-	/// entry will be created. If the provided book is <see langword="null"/>, a warning log entry will be
-	/// generated.</remarks>
-	/// <param name="value">The book to be added. Cannot be <see langword="null"/>.</param>
-	void OnAddBooks(Book value)
-	{
-		if(cancellationTokenSource.IsCancellationRequested)
-		{
-			cancellationTokenSource = new CancellationTokenSource();
-		}
-		var ebook = value;
-		if (Books.Any(b => b.Title == ebook.Title))
-		{
-			Logger.Info($"Book already exists in library: {ebook.Title}");
-			return;
-		}
-		Book.IsInLibrary = true; // Ensure the book is marked as in library
-		Books.Add(ebook);
-		Logger.Info($"Book message received: {ebook.Title}");
-	}
-
 
 	#region Commands
 
@@ -148,10 +137,14 @@ public partial class LibraryViewModel : BaseViewModel
 		try
 		{
 			ArgumentNullException.ThrowIfNull(book);
-
 			Logger.Info($"Removing book: {book.Title}");
-			
-			DeleteBookFiles(book);
+
+			var directory = Path.GetDirectoryName(book.FilePath);
+			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+			{
+				Directory.Delete(directory, true);
+			}
+
 			db.RemoveBook(book);
 			Books.Remove(book);
 
@@ -162,80 +155,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Error($"Error removing book: {ex.Message}");
 		}
 	}
-
-	/// <summary>
-	/// Deletes the files associated with a book.
-	/// </summary>
-	/// <param name="book">The book whose files should be deleted.</param>
-	void DeleteBookFiles(Book book)
-	{
-		try
-		{
-			var directory = Path.GetDirectoryName(book.FilePath);
-			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
-			{
-				Directory.Delete(directory, true);
-			}
-		}
-		catch (Exception ex)
-		{
-			Logger.Error($"Error deleting book files: {ex.Message}");
-		}
-	}
-
-	/// <summary>
-	/// Searches for books with authors whose names contain the specified search text.
-	/// </summary>
-	/// <remarks>If no books are found matching the search criteria, an informational message is displayed to the
-	/// user.</remarks>
-	/// <param name="searchText">The text to search for within author names. If null or whitespace, all books are shown.</param>
-	/// <returns></returns>
-	[RelayCommand]
-	public async Task SearchAuthorName(string searchText)
-	{
-		var allBooks = await db.GetAllBooks();
-		if (string.IsNullOrWhiteSpace(searchText))
-		{
-			Logger.Info("Search text is empty, showing all books");
-			Books = [.. allBooks];
-			return;
-		}
-
-		Logger.Info($"Searching for books with author containing: {searchText}");
-		
-		var filteredBooks = allBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
-		
-		// Replace the entire collection with the filtered results
-		Books = [.. filteredBooks];
-	}
-
-	/// <summary>
-	/// Searches for books with titles containing the specified search text and updates the book collection accordingly.
-	/// </summary>
-	/// <remarks>If the <paramref name="searchText"/> is null or consists only of whitespace, the method retrieves
-	/// and displays all available books. Otherwise, it filters the books to include only those whose titles contain the
-	/// specified text, ignoring case. If no books match the search criteria, an informational message is displayed to the
-	/// user.</remarks>
-	/// <param name="searchText">The text to search for within book titles. If null or whitespace, all books are shown.</param>
-	/// <returns></returns>
-	[RelayCommand]
-	public async Task SearchBookName(string searchText)
-	{
-		var allBooks = await db.GetAllBooks();
-		if (string.IsNullOrWhiteSpace(searchText))
-		{
-			Logger.Info("Search text is empty, showing all books");
-			Books = [.. allBooks];
-			return;
-		}
-
-		Logger.Info($"Searching for books with title containing: {searchText}");
-		var filteredBooks = allBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
-		
-		// Replace the entire collection with the filtered results
-		Books = [.. filteredBooks];
-	}
-
+	
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by the first author's name.
 	/// </summary>
@@ -245,15 +165,7 @@ public partial class LibraryViewModel : BaseViewModel
 	public void AlphabeticalAuthorSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if(isAlphabeticalSorted)
-		{
-			Logger.Info("Sorting books by author (A-Z)");
-			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-			return;
-		}
-
-		Logger.Info("Sorting books by author (Z-A)");
-		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+		Books = [.. SortByAuthor([.. Books], isAlphabeticalSorted)];
 	}
 
 	/// <summary>
@@ -265,15 +177,7 @@ public partial class LibraryViewModel : BaseViewModel
 	public void AlphabeticalTitleSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if(isAlphabeticalSorted)
-		{
-			Logger.Info("Sorting books by title (A-Z)");
-			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
-			return;
-		}
-
-		Logger.Info("Sorting books by title (Z-A)");
-		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+		Books = [.. SortByTitle([.. Books], isAlphabeticalSorted)];
 	}
 
 	/// <summary>
@@ -284,11 +188,11 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	async Task Calibre()
 	{
-		if(cancellationTokenSource.IsCancellationRequested)
+		if(CancellationTokenSource.IsCancellationRequested)
 		{
-			cancellationTokenSource = new CancellationTokenSource();
+			CancellationTokenSource = new CancellationTokenSource();
 		}
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(cancellationTokenSource.Token);
+		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
 	}
 
 	/// <summary>
@@ -296,8 +200,13 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddFolderAsync(CancellationToken cancellationToken = default)
+	public async Task AddFolderAsync()
 	{
+		if (CancellationTokenSource.IsCancellationRequested)
+		{
+			CancellationTokenSource = new CancellationTokenSource();
+		}
+
 		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
 		if (string.IsNullOrEmpty(folderUri))
 		{
@@ -313,12 +222,17 @@ public partial class LibraryViewModel : BaseViewModel
 		};
 		LoadPopup();
 
-		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, cancellationToken).ConfigureAwait(false);
+		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
+		
+		if(CancellationTokenSource.IsCancellationRequested)
+		{
+			CancellationTokenSource = new CancellationTokenSource();
+		}
 
-		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, cancellationTokenSource.Token).ConfigureAwait(false);
-		if (cancellationTokenSource.Token.IsCancellationRequested)
+		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, CancellationTokenSource.Token).ConfigureAwait(false);
+		if (CancellationTokenSource.Token.IsCancellationRequested)
 		{
 			WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 		}
@@ -355,9 +269,13 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddAsync(CancellationToken cancellationToken = default)
 	{
+		if (CancellationTokenSource.IsCancellationRequested)
+		{
+			CancellationTokenSource = new CancellationTokenSource();
+		}
 		try
 		{
-		
+
 			var result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
 			if (result is null)
 			{

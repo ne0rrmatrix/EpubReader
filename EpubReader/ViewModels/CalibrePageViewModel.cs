@@ -34,25 +34,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 	
-	CancellationTokenSource cancellationTokenSource = new();
 	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
 
 	public CalibrePageViewModel()
 	{
 		Books = [];
 	}
-
-	protected override void Dispose(bool disposing)
-	{
-		if (disposing)
-		{
-			cancellationTokenSource?.Dispose();
-			processEpubFiles.Dispose();
-			Logger.Info("CalibrePageViewModel disposed.");
-		}
-		base.Dispose(disposing);
-	}
-
 
 	/// <summary>
 	/// Adds a book to the collection of books.
@@ -64,12 +51,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddBook(Book book)
 	{
-		if (cancellationTokenSource.IsCancellationRequested)
+		if (CancellationTokenSource.IsCancellationRequested)
 		{
-			cancellationTokenSource = new CancellationTokenSource();
+			CancellationTokenSource = new CancellationTokenSource();
 		}
 		var settings = await db.GetSettings() ?? new Settings();
-		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", cancellationTokenSource.Token).ConfigureAwait(false);
+		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", CancellationTokenSource.Token).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -80,7 +67,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public void Cancel()
 	{
-		cancellationTokenSource.Cancel();
+		CancellationTokenSource.Cancel();
 		Cancelled = true;
 	}
 
@@ -105,16 +92,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public void AlphabeticalAuthorSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if (isAlphabeticalSorted)
-		{
-			Logger.Info("Sorting books by author (A-Z)");
-			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-			return;
-		}
-
-		Logger.Info("Sorting books by author (Z-A)");
-		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+		Books = [.. SortByAuthor([.. Books], isAlphabeticalSorted)];
 	}
+	
 
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by their titles.
@@ -125,17 +105,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public void AlphabeticalTitleSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if (isAlphabeticalSorted)
-		{
-			Logger.Info("Sorting books by title (A-Z)");
-			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
-			return;
-		}
-
-		Logger.Info("Sorting books by title (Z-A)");
-		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+		Books = [.. SortByTitle([.. Books], isAlphabeticalSorted)];
 	}
-
+	
 
 	/// <summary>
 	/// Asynchronously loads books from a Calibre server if they are not already loaded.
@@ -154,9 +126,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 			Logger.Warn("Books are already loaded, clearing list and continuing.");
 		}
 
-		if (cancellationTokenSource.IsCancellationRequested)
+		if (CancellationTokenSource.IsCancellationRequested)
 		{
-			cancellationTokenSource = new CancellationTokenSource();
+			CancellationTokenSource = new CancellationTokenSource();
 			Logger.Info("Cancellation token source reset.");
 		}
 
@@ -167,12 +139,20 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
 #if WINDOWS
-				(settings.IPAddress, settings.Port) = await InitializeIpAddress().ConfigureAwait(true);
+			EmptyLabelText = "Connecting to Calibre server...\nPlease wait while the server is being discovered.";
+			(settings.IPAddress, settings.Port) = await InitializeIpAddress().ConfigureAwait(true);
+			if (settings.IPAddress == string.Empty || settings.Port == 0)
+			{
+				Logger.Warn("No Calibre servers found using Bonjour. Please check your network connection.");
+				EmptyLabelText = "No Calibre servers found on the network using Bonjour.\nPlease check your network connection.";
+				return;
+			}
 #endif
 		}
 		else
 		{
 			Logger.Info("Calibre auto discovery is disabled, using settings from database.");
+			EmptyLabelText = "Connecting to Calibre server...\nPlease wait while the server is being loaded.";
 		}
 
 		Logger.Info($"Using IP address: {settings.IPAddress}, Port: {settings.Port}, prefix: {settings.UrlPrefix}");
@@ -190,8 +170,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	async Task GetFeedList(FeedReader feedReader, string ipAddress, int port, string prefix)
 	{
 		var url = $"{prefix}://{ipAddress}:{port}/opds";
-		var mainFeed = await feedReader.GetFeedAsync(url, cancellationTokenSource.Token);
-		Logger.Info($"Main feed loaded from {url}");
+		var mainFeed = await feedReader.GetFeedAsync(url, CancellationTokenSource.Token);
 		var title = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Title")?.Links ?? [];
 		var authors = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Authors")?.Links ?? [];
 		var newestFeed = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Newest")?.Links ?? [];
@@ -222,21 +201,18 @@ public partial class CalibrePageViewModel : BaseViewModel
 	async Task LoadCalibreDataFromUrl(string ipAddress, int port, string prefix)
 	{
 		var settings = await db.GetSettings() ?? new Settings();
-		var url = $"{prefix}://{ipAddress}:{port}/opds";
 		var feedReader = new FeedReader();
 		var newestFeedUrl = OpdsFeed.FirstOrDefault(f => f.Title == "By Newest")?.Links.FirstOrDefault()?.Href ?? string.Empty;
 		Logger.Info($"Newest feed URL: {newestFeedUrl}");
-		var uri = new Uri(new Uri(url), newestFeedUrl);
-		Feed = await feedReader.GetFeedAsync(uri.AbsoluteUri, cancellationTokenSource.Token);
-		int numberOfBooks = Feed.Entries.Count;
-		if (numberOfBooks == 0)
+		var uri = new Uri(new Uri($"{prefix}://{ipAddress}:{port}/opds"), newestFeedUrl);
+		Feed = await feedReader.GetFeedAsync(uri.AbsoluteUri, CancellationTokenSource.Token);
+		if (Feed.Entries.Count == 0)
 		{
 			Logger.Warn("No books found in the Calibre feed.");
 			EmptyLabelText = "No books found in the Calibre feed.";
 			return;
 		}
-		Logger.Info($"Number of books found: {numberOfBooks}");
-		int count = 0;
+		Logger.Info($"Number of books found: {Feed.Entries.Count}");
 
 		using var client = new HttpClient();
 		foreach (var entry in Feed.Entries)
@@ -246,7 +222,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 				Logger.Warn("Encountered a null entry in the feed. Skipping...");
 				continue;
 			}
-			if (cancellationTokenSource.IsCancellationRequested)
+			if (CancellationTokenSource.IsCancellationRequested)
 			{
 				Cancelled = true;
 				Logger.Info("Loading books cancelled by user.");
@@ -271,7 +247,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 			Books.Add(book);
 			BookList.Add(book);
-			count++;
 		}
 	}
 
@@ -338,6 +313,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 		if(settings.CalibreAutoDiscovery)
 		{
 			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+			if(servers.Count == 0)
+			{
+				return (string.Empty, 0);
+			}
 			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
 		}
 		
