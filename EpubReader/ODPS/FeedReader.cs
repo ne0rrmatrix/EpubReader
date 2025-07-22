@@ -138,16 +138,20 @@ public class FeedReader(HttpClient? httpClient = null)
 	{
 		try
 		{
+			var publishedDate = default(DateTime?);
 			var atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
 			var dcNs = XNamespace.Get("http://purl.org/dc/terms/");
-
+			if (DateTime.TryParse(GetElementValue(entryElement, dcNs + "date"), CultureInfo.InvariantCulture, out var date))
+			{
+				publishedDate = date;
+			}
 			var entry = new OpdsEntry
 			{
 				Title = GetElementValue(entryElement, atomNs + "title"),
 				Id = GetElementValue(entryElement, atomNs + "id"),
 				Content = GetElementValue(entryElement, atomNs + "content"),
 				Summary = GetElementValue(entryElement, atomNs + "summary"),
-				DcDate = GetElementValue(entryElement, dcNs + "date")
+				DcDate = publishedDate,
 			};
 
 			// Parse dates

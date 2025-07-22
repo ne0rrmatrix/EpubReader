@@ -114,8 +114,23 @@ public partial class CalibrePageViewModel : BaseViewModel
 		isAlphabeticalSorted = !isAlphabeticalSorted;
 		Books = [.. SortByTitle([.. Books], isAlphabeticalSorted)];
 	}
-	
 
+	/// <summary>
+	/// Sorts a list of books by their titles in either ascending or descending order.
+	/// </summary>
+	[RelayCommand]
+	public void SortByDate()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+		if (isAlphabeticalSorted)
+		{
+			Logger.Info("Sorting books by date (Most Recent - Oldest)");
+			Books =  [.. Books.OrderBy(b => b.PublishedDate)];
+			return;
+		}
+		Logger.Info("Sorting books by date (Oldest - Most Recent)");
+		Books = [.. Books.OrderByDescending(b => b.PublishedDate)];
+	}
 	/// <summary>
 	/// Asynchronously loads books from a Calibre server if they are not already loaded.
 	/// </summary>
@@ -243,13 +258,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 			{
 				Title = entry.Title ?? string.Empty,
 				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
-				Date = entry.Updated?.ToString("yyyy-MM-dd") ?? string.Empty,
+				PublishedDate = entry.Published ?? DateTime.MinValue,
 				Description = entry.Content ?? string.Empty,
 				DownloadUrl = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{downloadUrl}",
 				Thumbnail = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{imageUrl}",
 				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
 			};
-
 			Books.Add(book);
 			BookList.Add(book);
 		}

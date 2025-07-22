@@ -10,7 +10,7 @@ public class OpdsEntry
 	public string? Content { get; set; }
 	public DateTime? Updated { get; set; }
 	public DateTime? Published { get; set; }
-	public string? DcDate { get; set; } // Dublin Core date
+	public DateTime? DcDate { get; set; } // Dublin Core date
 	public List<OpdsLink> Links { get; set; } = [];
 	public List<OpdsAuthor> Authors { get; set; } = [];
 	public string? Summary { get; set; }

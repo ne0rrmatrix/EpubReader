@@ -67,6 +67,15 @@
                     Source="sort_by_alpha_24dp.png"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}" />
+                <ImageButton
+                    Margin="10,10,0,0"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SortByDateCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="date_range.png"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}" />
             </HorizontalStackLayout>
             <HorizontalStackLayout
                 Grid.Row="0"
