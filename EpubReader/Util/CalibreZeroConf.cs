@@ -31,11 +31,7 @@ public partial class CalibreZeroConf
 
 		try
 		{
-#if WINDOWS
 			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync("_calibre._tcp.local.", scanTime);
-#else
-			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync("_calibre._tcp", scanTime);
-#endif
 			foreach (var host in hosts)
 			{
 				logger.Info($"Discovered Host: {host.DisplayName} (IP: {host.IPAddress})");

@@ -145,7 +145,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		if (settings.CalibreAutoDiscovery)
 		{
 			Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
-#if WINDOWS
 			EmptyLabelText = "Connecting to Calibre server...\nPlease wait while the server is being discovered.";
 			(settings.IPAddress, settings.Port) = await InitializeIpAddress().ConfigureAwait(true);
 			if (settings.IPAddress == string.Empty || settings.Port == 0)
@@ -154,7 +153,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 				EmptyLabelText = "No Calibre servers found on the network using Bonjour.\nPlease check your network connection.";
 				return;
 			}
-#endif
+			await db.SaveSettings(settings).ConfigureAwait(false);
 		}
 		else
 		{
@@ -299,8 +298,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		return true;
 	}
 
-
-#if WINDOWS
 	/// <summary>
 	/// Initializes the base URL by discovering available Calibre servers on the network.
 	/// </summary>
@@ -338,5 +335,4 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		return (servers[0].IpAddress, servers[0].Port);
 	}
-#endif
 }
