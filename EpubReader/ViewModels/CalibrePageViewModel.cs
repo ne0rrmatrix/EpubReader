@@ -55,8 +55,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			CancellationTokenSource = new CancellationTokenSource();
 		}
-		var settings = await db.GetSettings() ?? new Settings();
-		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", CancellationTokenSource.Token).ConfigureAwait(false);
+		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, CancellationTokenSource.Token);
+		if(book.IsInLibrary)
+		{
+			await ShowInfoToastAsync($"Book '{book.Title}' has been added to your library.", CancellationTokenSource.Token);
+		}
+		else
+		{
+			await ShowInfoToastAsync($"Book '{book.Title}' could not be added to your library.", CancellationTokenSource.Token);
+		}
 	}
 
 	/// <summary>
@@ -231,6 +238,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
+			var downloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty;
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var book = new Book
 			{
@@ -238,9 +246,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
 				Date = entry.Updated?.ToString("yyyy-MM-dd") ?? string.Empty,
 				Description = entry.Content ?? string.Empty,
-#pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
-				DownloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty,
-#pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
+				DownloadUrl = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{downloadUrl}",
 				Thumbnail = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{imageUrl}",
 				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
 			};

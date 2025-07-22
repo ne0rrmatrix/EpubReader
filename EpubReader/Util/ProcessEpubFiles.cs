@@ -268,18 +268,16 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// attempts to add it to the library. If the book already exists in the library, it will not be added again. Errors
 	/// during processing will be logged and a user notification will be shown.</remarks>
 	/// <param name="book">The book object containing metadata and download URL information.</param>
-	/// <param name="baseUrl">The base URL used to construct the full download URI for the book.</param>
 	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
 	/// <returns><see langword="true"/> if the file is successfully processed and added to the library; otherwise, <see
 	/// langword="false"/>.</returns>
-	public async Task<bool> ProcessFileAsync(Book book, string baseUrl, CancellationToken cancellationToken)
+	public async Task<bool> ProcessFileAsync(Book book, CancellationToken cancellationToken)
 	{
 		using var httpClient = new HttpClient();
 		var memoryStream = new MemoryStream();
 		try
 		{
-			var downloadUri = new Uri(new Uri(baseUrl), book.DownloadUrl);
-			using var stream = await httpClient.GetStreamAsync(downloadUri, cancellationToken);
+			using var stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
 			await stream.CopyToAsync(memoryStream, cancellationToken);
 			memoryStream.Seek(0, SeekOrigin.Begin);
 
@@ -295,7 +293,6 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file: {ex.Message}");
-			await ShowErrorToastAsync("Error processing file. Please try again.", cancellationToken);
 			return false;
 		}
 	
@@ -306,13 +303,11 @@ public partial class ProcessEpubFiles : BaseViewModel
 			var ebook = await EbookService.GetListingAsync(book.FilePath).ConfigureAwait(false);
 			if (ebook is null)
 			{
-				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
 				return false;
 			}
 
 			if (await IsBookAlreadyInLibrary(ebook))
 			{
-				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
 				return false;
 			}
 			memoryStream.Seek(0, SeekOrigin.Begin);
@@ -321,7 +316,6 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error adding book: {ex.Message}");
-			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
 			return false;
 		}
 		return true;
