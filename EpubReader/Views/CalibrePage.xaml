@@ -15,8 +15,7 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=LoadBooksCommand}"
-            IconImageSource="{AppThemeBinding Dark=sync_24dp.png,
-                                              Light=sync_ligtht_mode.png}"
+            IconImageSource="sync_24dp.png"
             Order="Primary" />
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SettingsCommand}"
