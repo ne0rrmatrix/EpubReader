@@ -37,39 +37,28 @@ The first public beta of the app is available for download:
 #### Default Light Mode Theme
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8c56538b-5c70-4af7-8e83-c931abaccf2d" width="240" alt="Windows Light Mode Screenshot 1">
-  <img src="https://github.com/user-attachments/assets/9ec33ec1-bdc7-4cb6-aeb2-0a927157e6b3" width="240" alt="Windows Light Mode Screenshot 2">
-  <img src="https://github.com/user-attachments/assets/40aaab79-28da-4620-ad70-01fd007baa44" width="240" alt="Windows Light Mode Screenshot 3">
-  <img src="https://github.com/user-attachments/assets/fd8ff6bf-f585-423e-91a7-176f6c620e20" width="240" alt="Windows Light Mode Screenshot 4">
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2568b0e4-77a5-4f0e-b08a-16a785701546" width="240" alt="Windows Light Mode Screenshot 5">
-</p>
-
----
-
-#### Default Dark Mode Theme
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/d442a75c-17f3-49dd-823e-2c9ba0ab0f03" width="240" alt="Windows Dark Mode Screenshot 1">
-  <img src="https://github.com/user-attachments/assets/dff7cbf1-0126-434b-921c-58a1f4b5c5ea" width="240" alt="Windows Dark Mode Screenshot 2">
-  <img src="https://github.com/user-attachments/assets/7d3ab4b8-cc1e-4842-9b02-638da5d1a1ed" width="240" alt="Windows Dark Mode Screenshot 3">
-  <img src="https://github.com/user-attachments/assets/ad1a37ce-e864-4b4f-8b08-6cb21c584821" width="240" alt="Windows Dark Mode Screenshot 4">
+ <img width="480" alt="Windows Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/cea99531-5f4d-476f-987e-06dabed2029a" />
+<img width="480" alt="Windows Dark Mode Screenshot 2" src="https://github.com/user-attachments/assets/f87c5feb-f020-42a6-b366-223d259b929f" />
+<img width="480" alt="Windows Dark Mode Screenshot 3" src="https://github.com/user-attachments/assets/6d583793-ee00-4fe0-b264-30dc975784af" />
+<img width="480" alt="Windows Dark Mode Screenshot 4" src="https://github.com/user-attachments/assets/6c1cedf2-ad1f-4eb9-a9a4-204edc492cb1" />
+<img width="480" alt="Windows Dark Mode Screenshot 5" src="https://github.com/user-attachments/assets/e896a905-24be-409f-9825-7c7240bed7d4" />
+<img width="480" alt="Windows Dark Mode Screenshot 6" src="https://github.com/user-attachments/assets/bd311d21-2cdf-46d6-bfbf-ae876f962ec7" />
+<img width="480" alt="Windows Dark Mode Screenshot 7" src="https://github.com/user-attachments/assets/1d469867-be82-43ca-bfea-01f918c63060" />
 </p>
 
 ---
 
-#### Dark Mode Sepia Theme
+
+#### Dark Mode Theme Sepia
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/cfadfc53-7555-45f8-b4ad-368bdadba4e0" width="240" alt="Windows Sepia Theme Screenshot 1">
-  <img src="https://github.com/user-attachments/assets/d7f035eb-e536-4d47-8098-b27758781b0d" width="240" alt="Windows Sepia Theme Screenshot 2">
-  <img src="https://github.com/user-attachments/assets/73645134-a988-41b0-94f1-8153a67100ce" width="240" alt="Windows Sepia Theme Screenshot 3">
-  <img src="https://github.com/user-attachments/assets/11826280-3b55-4fe1-9e83-5f0166d5ac11" width="240" alt="Windows Sepia Theme Screenshot 4">
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/67de4591-a95f-45e7-a515-2205bae85629" width="240" alt="Windows Sepia Theme Screenshot 5">
-  <img src="https://github.com/user-attachments/assets/114847c1-0a5e-4d16-8293-0f9d1c0651e0" width="240" alt="Windows Sepia Theme Screenshot 6">
+ <img src="https://github.com/user-attachments/assets/6dc6caf9-ba8e-4875-b700-64d63ae90d58" width="480" alt="Windows Dark Mode Screenshot 1">
+<img width="480" src="https://github.com/user-attachments/assets/3c83d016-caa4-467d-b509-ec368379baf4" alt="Windows Dark Mode Screenshot 2">
+<img width="480" src="https://github.com/user-attachments/assets/8b6715ba-4fdf-498d-af00-ecaeaed1a6fd" alt="Windows Dark Mode Screenshot 3">
+<img width="480" src="https://github.com/user-attachments/assets/28e1c8cb-e701-4baf-b514-3c2fadcfa3df" alt="Windows Dark Mode Screenshot 4">
+<img width="480" src="https://github.com/user-attachments/assets/de5a2963-75b4-4b9b-b7eb-d7f94c2e1b06" alt="Windows Dark Mode Screenshot 5">
+<img width="480" src="https://github.com/user-attachments/assets/d1741667-44e6-4290-8f24-8930d76e7b29" alt="Windows Dark Mode Screenshot 6">
+<img width="480" src="https://github.com/user-attachments/assets/3cd7d857-91dd-4dc2-8756-e269e5d357b7" alt="Windows Dark Mode Screenshot 7">
 </p>
 
 ---
