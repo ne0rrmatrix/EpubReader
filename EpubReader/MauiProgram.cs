@@ -6,6 +6,7 @@ using EpubReader.Service;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
+using FFImageLoading.Maui;
 using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
@@ -42,6 +43,7 @@ public static class MauiProgram
 			options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
 		})
 		.ConfigureSyncfusionToolkit()
+		.UseFFImageLoading()
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST

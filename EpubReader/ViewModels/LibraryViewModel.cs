@@ -10,8 +10,6 @@ using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
 using EpubReader.Views;
-using ILogger = MetroLog.ILogger;
-using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.ViewModels;
 
@@ -198,18 +196,15 @@ public partial class LibraryViewModel : BaseViewModel
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			Logger.Info("Search text is empty, showing all books");
-			if (Books.Count == allBooks.Count)
-			{
-				Logger.Info("No changes made, books already loaded");
-				return;
-			}
 			Books = [.. allBooks];
+			return;
 		}
 
 		Logger.Info($"Searching for books with author containing: {searchText}");
 		
 		var filteredBooks = allBooks.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
-
+		
+		// Replace the entire collection with the filtered results
 		Books = [.. filteredBooks];
 	}
 
@@ -229,17 +224,14 @@ public partial class LibraryViewModel : BaseViewModel
 		if (string.IsNullOrWhiteSpace(searchText))
 		{
 			Logger.Info("Search text is empty, showing all books");
-			if (Books.Count == allBooks.Count)
-			{
-				Logger.Info("No changes made, books already loaded");
-				return;
-			}
 			Books = [.. allBooks];
+			return;
 		}
 
 		Logger.Info($"Searching for books with title containing: {searchText}");
 		var filteredBooks = allBooks.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList();
 		
+		// Replace the entire collection with the filtered results
 		Books = [.. filteredBooks];
 	}
 
@@ -250,20 +242,18 @@ public partial class LibraryViewModel : BaseViewModel
 	/// using a case-insensitive comparison. The sorted order is applied directly to the existing collection.</remarks>
 	[RelayCommand]
 	public void AlphabeticalAuthorSort()
-    {
+	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-
-		if(!isAlphabeticalSorted)
-        {
-			Logger.Info("Sorting books by author");
+		if(isAlphabeticalSorted)
+		{
+			Logger.Info("Sorting books by author (A-Z)");
 			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-			Logger.Info("Alphabetical author sort disabled, no changes made");
 			return;
-        }
+		}
 
-		Logger.Info("Sorting books by reverse Alphabetical sort");
+		Logger.Info("Sorting books by author (Z-A)");
 		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
-    }
+	}
 
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by their titles.
@@ -274,14 +264,14 @@ public partial class LibraryViewModel : BaseViewModel
 	public void AlphabeticalTitleSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		if(!isAlphabeticalSorted)
+		if(isAlphabeticalSorted)
 		{
-			Logger.Info("Sorting books by title");
+			Logger.Info("Sorting books by title (A-Z)");
 			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 			return;
 		}
 
-		Logger.Info("Sorting books by reverse title");
+		Logger.Info("Sorting books by title (Z-A)");
 		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 

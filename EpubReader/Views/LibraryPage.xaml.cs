@@ -1,4 +1,3 @@
-using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.ViewModels;
 using MetroLog;
@@ -70,7 +69,6 @@ public partial class LibraryPage : ContentPage
 				return; // No need to update if already showing all books
 			}
 			viewModel.Books = [.. allBooks];
-			viewModel.AlphabeticalTitleSort();
 			logger.Info("Search text is empty, showing all books");
 			return;
 		}
@@ -78,7 +76,7 @@ public partial class LibraryPage : ContentPage
 		var filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
 		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
 
-		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();		
+		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
 		viewModel.Books = [.. filteredBooks];
 
 	}
