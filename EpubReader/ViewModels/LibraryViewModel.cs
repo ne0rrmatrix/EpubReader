@@ -226,16 +226,14 @@ public partial class LibraryViewModel : BaseViewModel
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
 		
-		if(CancellationTokenSource.IsCancellationRequested)
+		if(CancellationTokenSource.Token.IsCancellationRequested)
 		{
-			CancellationTokenSource = new CancellationTokenSource();
+			Logger.Info("Operation cancelled by user.");
+			await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
+			return;
 		}
 
 		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, CancellationTokenSource.Token).ConfigureAwait(false);
-		if (CancellationTokenSource.Token.IsCancellationRequested)
-		{
-			WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-		}
 		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
 	}
 
@@ -286,13 +284,13 @@ public partial class LibraryViewModel : BaseViewModel
 			var ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
 			if (ebook is null)
 			{
-				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.", cancellationToken);
+				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.");
 				return;
 			}
 
 			if (await processEpubFiles.IsBookAlreadyInLibrary(ebook))
 			{
-				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
 				return;
 			}
 
@@ -301,7 +299,7 @@ public partial class LibraryViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			Logger.Error($"Error adding book: {ex.Message}");
-			await ShowErrorToastAsync("Error adding book. Please try again.", cancellationToken);
+			await ShowErrorToastAsync("Error adding book. Please try again.");
 		}
 	}
 	#endregion

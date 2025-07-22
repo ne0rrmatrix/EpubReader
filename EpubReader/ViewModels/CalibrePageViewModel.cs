@@ -58,11 +58,11 @@ public partial class CalibrePageViewModel : BaseViewModel
 		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, CancellationTokenSource.Token);
 		if(book.IsInLibrary)
 		{
-			await ShowInfoToastAsync($"Book '{book.Title}' has been added to your library.", CancellationTokenSource.Token);
+			await ShowInfoToastAsync($"Book '{book.Title}' has been added to your library.");
 		}
 		else
 		{
-			await ShowInfoToastAsync($"Book '{book.Title}' could not be added to your library.", CancellationTokenSource.Token);
+			await ShowInfoToastAsync($"Book '{book.Title}' could not be added to your library.");
 		}
 	}
 

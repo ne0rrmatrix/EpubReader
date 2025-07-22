@@ -123,12 +123,11 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	/// Shows an informational toast message.
 	/// </summary>
 	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
-	public async Task ShowInfoToastAsync(string message, CancellationToken cancellationToken = default)
+	public async Task ShowInfoToastAsync(string message)
 	{
 		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+			await Toast.Make(message, ToastDuration.Short, 12).Show());
 		Logger.Info(message);
 	}
 
@@ -136,12 +135,11 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	/// Shows an error toast message.
 	/// </summary>
 	/// <param name="message">The message to display.</param>
-	/// <param name="cancellationToken">Cancellation token for the operation.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
-	public async Task ShowErrorToastAsync(string message, CancellationToken cancellationToken = default)
+	public async Task ShowErrorToastAsync(string message)
 	{
 		await Dispatcher.DispatchAsync(async () =>
-			await Toast.Make(message, ToastDuration.Short, 12).Show(cancellationToken));
+			await Toast.Make(message, ToastDuration.Short, 12).Show());
 		Logger.Error(message);
 	}
 

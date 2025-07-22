@@ -81,13 +81,13 @@ public partial class ProcessEpubFiles : BaseViewModel
 				var ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
 				if (ebook is null)
 				{
-					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}", cancellationToken);
+					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}");
 					return;
 				}
 
 				if (await IsBookAlreadyInLibrary(ebook))
 				{
-					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}", cancellationToken);
+					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
 					return;
 				}
 				WeakReferenceMessenger.Default.Send(new FolderMessage(new FolderInfo
@@ -104,7 +104,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file {filePath}: {ex.Message}");
-			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}", cancellationToken);
+			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}");
 		}
 	}
 	
@@ -132,14 +132,14 @@ public partial class ProcessEpubFiles : BaseViewModel
 			}
 			else
 			{
-				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
+				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}");
 				return;
 			}
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving book from stream: {ex.Message}");
-			await ShowErrorToastAsync("Error saving book", cancellationToken);
+			await ShowErrorToastAsync("Error saving book");
 		}
 	}
 	
@@ -243,18 +243,18 @@ public partial class ProcessEpubFiles : BaseViewModel
 			{
 				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
 				WeakReferenceMessenger.Default.Send(new BookMessage(ebook));
-				await ShowInfoToastAsync("Book added to library", cancellationToken);
+				await ShowInfoToastAsync("Book added to library");
 				logger.Info($"Book added to library: {ebook.Title}");
 			}
 			else
 			{
-				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}", cancellationToken);
+				await ShowErrorToastAsync($"Failed to save book: {ebook.Title}");
 			}
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error saving book to library: {ex.Message}");
-			await ShowErrorToastAsync("Error saving book to library", cancellationToken);
+			await ShowErrorToastAsync("Error saving book to library");
 		}
 	}
 	
