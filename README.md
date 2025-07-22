@@ -65,16 +65,18 @@ The first public beta of the app is available for download:
 
 ### Android
 
-#### Default Light Mode Theme
+#### Light Mode Sepia Theme
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c3d47aaf-694e-428d-b608-96f4cf63f610" width="240" alt="Android Light Mode Screenshot 1">
-  <img src="https://github.com/user-attachments/assets/9e9415fe-b141-4a20-a2a5-fe2cff2e6d1d" width="240" alt="Android Light Mode Screenshot 2">
-  <img src="https://github.com/user-attachments/assets/e896eb68-7a1d-4264-aef8-8da233f6d35e" width="240" alt="Android Light Mode Screenshot 3">
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/e5940399-4ac8-431e-bfbe-017f1a2b37f0" width="240" alt="Android Light Mode Screenshot 4">
-  <img src="https://github.com/user-attachments/assets/18e6901b-0b9c-4e19-b86c-f5b17b90fe1d" width="240" alt="Android Light Mode Screenshot 5">
+<img width="240" alt="Android Light Mode Screenshot 1" src="https://github.com/user-attachments/assets/a65c5247-ea0b-4517-89f9-023cf21c0eb5" />
+<img width="240" alt="Android Light Mode Screenshot 2" src="https://github.com/user-attachments/assets/68937493-a30e-4437-90fb-34a0a08d0b07" />
+<img width="240" alt="Android Light Mode Screenshot 3" src="https://github.com/user-attachments/assets/ab925b21-3734-4a9b-997e-17449f38122b" />
+<img width="240" alt="Android Light Mode Screenshot 4" src="https://github.com/user-attachments/assets/e107d0fe-267c-41c1-9918-83d4672ef9b0" />
+<img width="240" alt="Android Light Mode Screenshot 5" src="https://github.com/user-attachments/assets/7d4610b5-5ccd-4315-b99a-f016e45fb8a8" />
+<img width="240" alt="Android Light Mode Screenshot 6" src="https://github.com/user-attachments/assets/80decdb6-3ae4-4965-a734-615e0e7db2c5" />
+<img width="240" alt="Android Light Mode Screenshot 7" src="https://github.com/user-attachments/assets/4a7c5895-4876-4580-9c27-5684cc510ca5" />
+<img width="240" alt="Android Light Mode Screenshot 8" src="https://github.com/user-attachments/assets/7e282ce0-398e-4d1f-a48d-cbee51e7201c" />
+<img width="240" alt="Android Light Mode Screenshot 9" src="https://github.com/user-attachments/assets/a6d92143-2f4d-4013-874f-8a72e413f2d1" />
 </p>
 
 ---
@@ -82,10 +84,11 @@ The first public beta of the app is available for download:
 #### Dark Mode
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c55041c5-79dd-4646-a777-5faab81e6925" width="240" alt="Android Dark Mode Screenshot 1">
-  <img src="https://github.com/user-attachments/assets/9cb60942-6fc9-4e4b-9ec8-0ddca95afe7b" width="240" alt="Android Dark Mode Screenshot 2">
-  <img src="https://github.com/user-attachments/assets/887dc8a5-d9fa-4df2-af93-a0a8062af626" width="240" alt="Android Dark Mode Screenshot 3">
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/ba7955e7-039e-4173-b591-252ffcf0bcb7" width="240" alt="Android Dark Mode Screenshot 4">
+ <img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/a06691eb-ac19-445a-9ee3-1bfa2d2a37a4" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/f70c432a-5af1-4dc7-a282-e6f7e3b946ba" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/6c9bde8a-de68-4e3b-a37a-655fa1e627c2" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/1cdcb3ae-2a4f-422d-a725-80bfc8ac6463" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/8f87da66-e216-4f02-a478-727ca9c26808" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/a6495dba-f8df-45c8-b31f-76460241cc20" />
+<img width="240" alt="Android Dark Mode Screenshot 1" src="https://github.com/user-attachments/assets/240e440e-5d8f-4a58-a203-83bdb667bf03" />
 </p>
