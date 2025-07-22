@@ -23,13 +23,14 @@ namespace EpubReader.ViewModels;
 /// </remarks>
 public partial class LibraryViewModel : BaseViewModel
 {
+	bool isAlphabeticalSorted = true;
 	CancellationTokenSource cancellationTokenSource = new();
+
 	Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
 	readonly PopupOptions options = new()
 	{
 		CanBeDismissedByTappingOutsideOfPopup = false,
 	};
-	bool isAlphabeticalSorted = true;
 
 	/// <summary>
 	/// Provides a read-only instance of the <see cref="ProcessEpubFiles"/> service.

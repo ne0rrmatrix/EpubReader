@@ -9,10 +9,6 @@ public partial class CalibreSettingsPage : Popup
 	CalibreSettingsPageViewModel viewModel => (CalibreSettingsPageViewModel)BindingContext;
 	MetroLog.ILogger logger => viewModel.Logger;
 
-	/// <summary>
-	/// Gets or sets the database service used by the application.
-	/// </summary>
-	public IDb db { get; set; } = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	public CalibreSettingsPage(CalibreSettingsPageViewModel viewModel)
 	{
 		InitializeComponent();
@@ -21,12 +17,12 @@ public partial class CalibreSettingsPage : Popup
 
 	async void CurrentPage_Loaded(object sender, EventArgs e)
 	{
-		if (db is null)
+		if (viewModel.db is null)
 		{
 			logger.Error("Database service is not available.");
 			return;
 		}
-		var settings = await db.GetSettings() ?? new Models.Settings();
+		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
 		if(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
 		{
 			logger.Info("CalibreSettingsPage loaded on Windows or macOS, setting EntryText to visible.");
@@ -54,11 +50,11 @@ public partial class CalibreSettingsPage : Popup
 			logger.Warn("Sender is not a Switch control, cannot toggle Calibre auto discovery.");
 			return;
 		}
-		var settings = await db.GetSettings() ?? new Models.Settings();
+		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
 		settings.CalibreAutoDiscovery = switchControl.IsToggled;
 		EntryText.IsVisible = !settings.CalibreAutoDiscovery;
 		logger.Info($"Calibre auto discovery toggled to: {settings.CalibreAutoDiscovery}");
-		await db.SaveSettings(settings);
+		await viewModel.db.SaveSettings(settings);
 		logger.Info("Settings saved successfully.");
 	}
 
@@ -92,12 +88,12 @@ public partial class CalibreSettingsPage : Popup
 		}
 		logger.Info($"Processing URL: {text}");
 
-		var settings = await db.GetSettings() ?? new Models.Settings();
+		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
 		var uri = new Uri(text);
 		settings.IPAddress = string.Concat(uri.Host, uri.AbsolutePath.AsSpan(1));
 		settings.UrlPrefix = uri.Scheme;
 		settings.Port = uri.Port;
-		await db.SaveSettings(settings);
+		await viewModel.db.SaveSettings(settings);
 		logger.Info($"URL updated to: {settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}");
 	}
 }

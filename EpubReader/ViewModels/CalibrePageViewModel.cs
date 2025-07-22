@@ -15,17 +15,7 @@ using FileInfo = EpubReader.Models.FileInfo;
 namespace EpubReader.ViewModels;
 public partial class CalibrePageViewModel : BaseViewModel
 {
-	[ObservableProperty]
-	public partial string EmptyLabelText { get; set; } = "No books found in Calibre library.\nPlease load books from your Calibre server.";
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	string baseUrl = string.Empty; // Replace with your actual Calibre server URL
-	CancellationTokenSource cancellationTokenSource = new();
-	readonly bool isLoaded = false;
-	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
-	readonly PopupOptions settingsOptions = new()
-	{
-		CanBeDismissedByTappingOutsideOfPopup = true,
-	};
+	bool isAlphabeticalSorted = false;
 
 	[ObservableProperty]
 	public partial bool Cancelled { get; set; } = false;
@@ -33,29 +23,23 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
 
-	public List<Book> BookList { get; set; } = [];
+	[ObservableProperty]
+	public partial List<OpdsFeed> OpdsFeed { get; set; } = [];
 
 	[ObservableProperty]
 	public partial OpdsFeed Feed { get; set; } = new();
+	[ObservableProperty]
+	public partial string EmptyLabelText { get; set; } = "No books found in Calibre library.\nPlease load books from your Calibre server.";
+	public List<Book> BookList { get; set; } = [];
+
+	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
+	
+	CancellationTokenSource cancellationTokenSource = new();
+	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
 
 	public CalibrePageViewModel()
 	{
 		Books = [];
-		if (isLoaded)
-		{
-			Logger.Warn("CalibrePageViewModel is already loaded, skipping initialization.");
-			return;
-		}
-		WeakReferenceMessenger.Default.Register<CalibreMessage>(this, (r, m) =>
-		{
-			if (m.Value)
-			{
-				Cancelled = true;
-				cancellationTokenSource.Cancel();
-				Logger.Info("Calibre loading cancelled by user.");
-			}
-		});
-		isLoaded = true;
 	}
 
 	protected override void Dispose(bool disposing)
@@ -64,7 +48,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			cancellationTokenSource?.Dispose();
 			processEpubFiles.Dispose();
-			WeakReferenceMessenger.Default.UnregisterAll(this);
 			Logger.Info("CalibrePageViewModel disposed.");
 		}
 		base.Dispose(disposing);
@@ -85,7 +68,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			cancellationTokenSource = new CancellationTokenSource();
 		}
-		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, baseUrl, cancellationTokenSource.Token).ConfigureAwait(false);
+		var settings = await db.GetSettings() ?? new Settings();
+		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", cancellationTokenSource.Token).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -108,12 +92,50 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public void Settings()
 	{
-		// Clear the current book list before showing settings in case they change server address or other settings
-		Books.Clear();
-
 		settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
-		Shell.Current.ShowPopup(settingsPopup, settingsOptions);
+		Shell.Current.ShowPopup(settingsPopup);
 	}
+
+	/// <summary>
+	/// Toggles the sorting order of the book collection by author name.
+	/// </summary>
+	/// <remarks>When called, this method switches between sorting the books in ascending (A-Z) and descending (Z-A)
+	/// order based on the author's name. The current sorting order is logged for reference.</remarks>
+	[RelayCommand]
+	public void AlphabeticalAuthorSort()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+		if (isAlphabeticalSorted)
+		{
+			Logger.Info("Sorting books by author (A-Z)");
+			Books = [.. Books.OrderBy(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+			return;
+		}
+
+		Logger.Info("Sorting books by author (Z-A)");
+		Books = [.. Books.OrderByDescending(b => b.Author, StringComparer.OrdinalIgnoreCase)];
+	}
+
+	/// <summary>
+	/// Sorts the collection of books in alphabetical order by their titles.
+	/// </summary>
+	/// <remarks>This method sorts the books in a case-insensitive manner using the ordinal string comparison. After
+	/// sorting, the original collection is cleared and repopulated with the sorted books.</remarks>
+	[RelayCommand]
+	public void AlphabeticalTitleSort()
+	{
+		isAlphabeticalSorted = !isAlphabeticalSorted;
+		if (isAlphabeticalSorted)
+		{
+			Logger.Info("Sorting books by title (A-Z)");
+			Books = [.. Books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+			return;
+		}
+
+		Logger.Info("Sorting books by title (Z-A)");
+		Books = [.. Books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
+	}
+
 
 	/// <summary>
 	/// Asynchronously loads books from a Calibre server if they are not already loaded.
@@ -127,12 +149,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		if (Books.Count > 0)
 		{
+			Feed.Entries.Clear();
 			Books.Clear();
 			Logger.Warn("Books are already loaded, clearing list and continuing.");
-		}
-		if (Feed?.Entries.Count > 0)
-		{
-			Feed.Entries.Clear();
 		}
 
 		if (cancellationTokenSource.IsCancellationRequested)
@@ -141,80 +160,57 @@ public partial class CalibrePageViewModel : BaseViewModel
 			Logger.Info("Cancellation token source reset.");
 		}
 
-		try
-		{
-			WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) => OnAddBooks(m.Value));
-			Logger.Info("Initializing Url...");
-			var settings = await db.GetSettings() ?? new Settings();
-			var (ipAddress, port) = (settings.IPAddress, settings.Port);
+		Logger.Info("Initializing Url...");
+		var settings = await db.GetSettings() ?? new Settings();
 
-			if (settings.CalibreAutoDiscovery)
-			{
-				Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
+		if (settings.CalibreAutoDiscovery)
+		{
+			Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
 #if WINDOWS
-				(ipAddress, port) = await InitializeIpAddress().ConfigureAwait(true);
-#endif	
-			}
-			else
-			{
-				Logger.Info("Calibre auto discovery is disabled, using settings from database.");
-			}
-
-			var urlPrefix = settings.UrlPrefix;
-			var prefix = urlPrefix.ToLowerInvariant() switch
-			{
-				"http" => "http",
-				"https" => "https",
-				_ => "http"
-			};
-			baseUrl = $"{prefix}://{ipAddress}:{port}";
-			Logger.Info($"Using IP address: {ipAddress}, Port: {port}, prefix: {prefix}");
-			
-			if (!await ValidateUrl(baseUrl, prefix))
-			{
-				Logger.Warn($"URL validation failed for {baseUrl}");
-				return;
-			}
-
-			Logger.Info("Loading books from Calibre server...");
-			await LoadCalibreDataFromUrl(ipAddress, port, prefix);
+				(settings.IPAddress, settings.Port) = await InitializeIpAddress().ConfigureAwait(true);
+#endif
 		}
-		catch (Exception ex)
+		else
 		{
-			Logger.Error($"An error occurred while creating the popup dialog: {ex.Message}");
+			Logger.Info("Calibre auto discovery is disabled, using settings from database.");
 		}
-		finally
+
+		Logger.Info($"Using IP address: {settings.IPAddress}, Port: {settings.Port}, prefix: {settings.UrlPrefix}");
+
+		if (!await ValidateUrl($"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", settings.UrlPrefix))
 		{
-			WeakReferenceMessenger.Default.UnregisterAll(this);
-			Logger.Info("LoadBooks completed successfully.");
+			return;
 		}
+
+		Logger.Info("Loading books from Calibre server...");
+		await GetFeedList(new FeedReader(), settings.IPAddress, settings.Port, settings.UrlPrefix);
+		await LoadCalibreDataFromUrl(settings.IPAddress, settings.Port, settings.UrlPrefix);
+
 	}
-
-	/// <summary>
-	/// Constructs and retrieves the URL of the newest feed entry from an OPDS feed.
-	/// </summary>
-	/// <remarks>This method constructs a base URL using the provided IP address, port, and prefix, then attempts to
-	/// retrieve the main feed. It searches for the "By Newest" entry within the feed and returns its URL. If the entry is
-	/// not found, an empty string is returned.</remarks>
-	/// <param name="feedReader">The <see cref="FeedReader"/> instance used to fetch the feed data.</param>
-	/// <param name="ipAddress">The IP address of the server hosting the OPDS feed.</param>
-	/// <param name="port">The port number on which the OPDS feed is accessible.</param>
-	/// <param name="prefix">The URL scheme prefix, such as "http" or "https".</param>
-	/// <returns>A <see cref="string"/> representing the URL of the newest feed entry. Returns an empty string if the "By Newest"
-	/// feed link is not found.</returns>
-	async Task<string> GetFeedUrl(FeedReader feedReader, string ipAddress, int port, string prefix)
+	async Task GetFeedList(FeedReader feedReader, string ipAddress, int port, string prefix)
 	{
 		var url = $"{prefix}://{ipAddress}:{port}/opds";
 		var mainFeed = await feedReader.GetFeedAsync(url, cancellationTokenSource.Token);
 		Logger.Info($"Main feed loaded from {url}");
-		var newestFeedLink = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Newest")?.Links.FirstOrDefault()?.Href;
-		Logger.Info($"Newest feed link found: {newestFeedLink}");
-		if (string.IsNullOrEmpty(newestFeedLink))
+		var title = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Title")?.Links ?? [];
+		var authors = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Authors")?.Links ?? [];
+		var newestFeed = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Newest")?.Links ?? [];
+		OpdsFeed.Add(new OpdsFeed
 		{
-			Logger.Warn("Could not find 'By Newest' feed link.");
-			return string.Empty;
-		}
-		return new Uri(new Uri(url), newestFeedLink).ToString();
+			Title = "By Title",
+			Links = title,
+		});
+		OpdsFeed.Add(new OpdsFeed
+		{
+			Title = "By Authors",
+			Links = authors,
+		});
+		OpdsFeed.Add(new OpdsFeed
+		{
+			Title = "By Newest",
+			Links = newestFeed,
+		});
+		Logger.Info("Feedlist has been downloaded successfully");
 	}
 
 	/// <summary>
@@ -223,16 +219,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <remarks>This method retrieves the latest feed from the specified Calibre server and processes each entry to
 	/// populate the book collection. It logs the number of books found and handles cancellation requests. If no books are
 	/// found, a warning is logged and an appropriate message is set.</remarks>
-	/// <param name="ipAddress">The IP address of the Calibre server.</param>
-	/// <param name="port">The port number on which the Calibre server is running.</param>
-	/// <param name="prefix">The URL prefix for accessing the Calibre feed.</param>
-	/// <returns></returns>
 	async Task LoadCalibreDataFromUrl(string ipAddress, int port, string prefix)
 	{
+		var settings = await db.GetSettings() ?? new Settings();
+		var url = $"{prefix}://{ipAddress}:{port}/opds";
 		var feedReader = new FeedReader();
-		var newestFeedUrl = await GetFeedUrl(feedReader, ipAddress, port, prefix);
+		var newestFeedUrl = OpdsFeed.FirstOrDefault(f => f.Title == "By Newest")?.Links.FirstOrDefault()?.Href ?? string.Empty;
 		Logger.Info($"Newest feed URL: {newestFeedUrl}");
-		Feed = await feedReader.GetFeedAsync(newestFeedUrl, cancellationTokenSource.Token);
+		var uri = new Uri(new Uri(url), newestFeedUrl);
+		Feed = await feedReader.GetFeedAsync(uri.AbsoluteUri, cancellationTokenSource.Token);
 		int numberOfBooks = Feed.Entries.Count;
 		if (numberOfBooks == 0)
 		{
@@ -257,12 +252,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 				Logger.Info("Loading books cancelled by user.");
 				break;
 			}
-			var folderinfo = new FileInfo
-			{
-				Count = count,
-				MaxCount = numberOfBooks,
-				Title = entry.Title ?? string.Empty,
-			};
+	
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
@@ -275,50 +265,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 				DownloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty,
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
-				Thumbnail = baseUrl + "/" + imageUrl,
+				Thumbnail = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{imageUrl}",
 				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
 			};
 
-#if WINDOWS || MACCATALYST
-			if (count % 100 == 0)
-			{
-				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
-			}
-#endif
-#if ANDROID || IOS
-			if (count % 5 == 0)
-			{
-				WeakReferenceMessenger.Default.Send(new FileMessage(folderinfo));
-			}
-#endif
 			Books.Add(book);
+			BookList.Add(book);
 			count++;
-		}
-	}
-
-	/// <summary>
-	/// Adds a book to the library if it does not already exist.
-	/// </summary>
-	/// <remarks>If the book already exists in the library, it will not be added again, and an informational log
-	/// entry will be created. If the book is <see langword="null"/>, a warning log entry will be created.</remarks>
-	/// <param name="book">The book to be added. Must not be <see langword="null"/>.</param>
-	void OnAddBooks(Book book)
-	{
-		if (book is not null)
-		{
-			if (Books.Any(b => b.Title == book.Title))
-			{
-				Logger.Info($"Book already exists in library: {book.Title}");
-				return;
-			}
-
-			book.IsInLibrary = true; // Mark the book as in library
-			Books.Add(book);
-			Logger.Info($"Book message received: {book.Title}");
-		}
-		else
-		{
-			Logger.Warn("Received null book message");
 		}
 	}
 
@@ -379,7 +332,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
 		var settings = await db.GetSettings() ?? new Settings();
 		var urlPrefix = settings.UrlPrefix;
-		baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
+		var baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
 		
 		List<(string IpAddress, int Port)> servers = [];
 		if(settings.CalibreAutoDiscovery)
@@ -395,7 +348,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		else
 		{
 			servers.Add((settings.IPAddress, settings.Port));
-			baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
 			Logger.Warn("No Calibre servers found. Using default base URL.");
 		}
 
