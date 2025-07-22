@@ -9,12 +9,14 @@
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
-    x:DataType="viewModels:CalibrePageViewModel">
-
+    x:DataType="viewModels:CalibrePageViewModel"
+    Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                            Light={StaticResource Blue200Accent}}">
     <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=LoadBooksCommand}"
-            IconImageSource="sync_24dp.png"
+            IconImageSource="{AppThemeBinding Dark=sync_24dp.png,
+                                              Light=sync_ligtht_mode.png}"
             Order="Primary" />
         <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SettingsCommand}"
@@ -46,7 +48,8 @@
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
-                    Source="sort_24dp.png"
+                    Source="{AppThemeBinding Dark=sort_24dp.png,
+                                             Light=sort_24dp_light_mode.png}"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}">
                     <ImageButton.Margin>
@@ -64,7 +67,8 @@
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
-                    Source="sort_by_alpha_24dp.png"
+                    Source="{AppThemeBinding Dark=sort_by_alpha_24dp.png,
+                                             Light=sort_by_alpha_light_mode.png}"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}" />
                 <ImageButton
@@ -73,7 +77,8 @@
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
-                    Source="date_range.png"
+                    Source="{AppThemeBinding Dark=date_range.png,
+                                             Light=date_range_light_mode.png}"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}" />
             </HorizontalStackLayout>

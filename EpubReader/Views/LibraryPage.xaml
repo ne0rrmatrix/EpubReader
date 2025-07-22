@@ -42,7 +42,8 @@
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
-                    Source="sort_24dp.png"
+                    Source="{AppThemeBinding Dark=sort_24dp.png,
+                                             Light=sort_24dp_light_mode.png}"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}">
                     <ImageButton.Margin>
@@ -60,7 +61,8 @@
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
-                    Source="sort_by_alpha_24dp.png"
+                    Source="{AppThemeBinding Dark=sort_by_alpha_24dp.png,
+                                             Light=sort_by_alpha_light_mode.png}"
                     WidthRequest="{OnIdiom Phone=24,
                                            Default=40}" />
             </HorizontalStackLayout>
