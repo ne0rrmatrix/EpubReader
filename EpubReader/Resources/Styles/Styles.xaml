@@ -442,7 +442,7 @@
         <OnIdiom.Default>2</OnIdiom.Default>
         <OnIdiom.Phone>2</OnIdiom.Phone>
         <OnIdiom.Tablet>4</OnIdiom.Tablet>
-        <OnIdiom.Desktop>6</OnIdiom.Desktop>
+        <OnIdiom.Desktop>5</OnIdiom.Desktop>
     </OnIdiom>
 
     <OnIdiom x:Key="CollectionMargin" x:TypeArguments="Thickness">

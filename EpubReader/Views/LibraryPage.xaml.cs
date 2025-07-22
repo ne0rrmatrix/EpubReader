@@ -1,6 +1,4 @@
-using System.Collections.ObjectModel;
 using EpubReader.Interfaces;
-using EpubReader.Models;
 using EpubReader.ViewModels;
 using MetroLog;
 
@@ -17,6 +15,7 @@ public partial class LibraryPage : ContentPage
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryPage));
 	readonly IDb db;
+	ViewModels.LibraryViewModel viewModel => (ViewModels.LibraryViewModel)BindingContext;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryPage"/> class with the specified view model.
@@ -35,7 +34,6 @@ public partial class LibraryPage : ContentPage
 	{
 		base.OnNavigatedTo(args);
 		Shell.SetNavBarIsVisible(this, true);
-		var viewModel = (LibraryViewModel)BindingContext;
 		
 		if (viewModel.Books is not null && viewModel.Books.Count > 0)
 		{
@@ -43,7 +41,8 @@ public partial class LibraryPage : ContentPage
 			return;
 		}
 		var temp = await db.GetAllBooks();
-		viewModel.Books = [.. temp ?? []];
+		temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
+		viewModel.Books = [.. temp];
 		viewModel.AlphabeticalTitleSort();
 	}
 	
@@ -57,27 +56,27 @@ public partial class LibraryPage : ContentPage
 	/// <param name="e">The <see cref="TextChangedEventArgs"/> containing the event data, including the new text value.</param>
 	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs e)
 	{
-		var viewModel = (LibraryViewModel)BindingContext;
 		var books = viewModel.Books;
 		var results = e.NewTextValue;
+		var allBooks = await db.GetAllBooks();
 		System.Diagnostics.Debug.WriteLine($"Search results: {results}");
 		if (string.IsNullOrWhiteSpace(results))
 		{
 			books.Clear();
-			var epubBooks = await db.GetAllBooks();
-			viewModel.Books = [.. epubBooks];
-			viewModel.AlphabeticalTitleSort();
+			if(allBooks.Count == books.Count)
+			{
+				logger.Info("Search text is empty, showing all books");
+				return; // No need to update if already showing all books
+			}
+			viewModel.Books = [.. allBooks];
 			logger.Info("Search text is empty, showing all books");
 			return;
 		}
 		logger.Info($"Searching for books with title containing: {results}");
-		var filteredBooks = books.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		var filteredAuthors = books.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		if (filteredBooks.Count == 0 && filteredAuthors.Count == 0)
-		{
-			logger.Info("No books found matching the search criteria");
-		}
-		filteredBooks.AddRange(filteredAuthors.Where(b => !filteredBooks.Contains(b))); // Avoid duplicates
+		var filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+
+		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
 		viewModel.Books = [.. filteredBooks];
 
 	}

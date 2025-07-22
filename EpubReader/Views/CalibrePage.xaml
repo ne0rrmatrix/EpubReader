@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.CalibrePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    xmlns:views="clr-namespace:EpubReader.Views"
+    x:Name="CurrentPage"
+    x:DataType="viewModels:CalibrePageViewModel">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=LoadBooksCommand}"
+            IconImageSource="sync_24dp.png"
+            Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SettingsCommand}"
+            IconImageSource="settings_lightmode.png"
+            Order="Primary" />
+    </ContentPage.ToolbarItems>
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <toolkit:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
+                <ImageButton
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="sort_24dp.png"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}">
+                    <ImageButton.Margin>
+                        <OnIdiom x:TypeArguments="Thickness">
+                            <OnIdiom.Phone>10,10,0,0</OnIdiom.Phone>
+                            <OnIdiom.Tablet>50,10,0,0</OnIdiom.Tablet>
+                            <OnIdiom.Desktop>50,10,0,0</OnIdiom.Desktop>
+                        </OnIdiom>
+                    </ImageButton.Margin>
+                </ImageButton>
+
+                <ImageButton
+                    Margin="10,10,0,0"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=AlphabeticalTitleSortCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="sort_by_alpha_24dp.png"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}" />
+                <ImageButton
+                    Margin="10,10,0,0"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SortByDateCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="date_range.png"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}" />
+            </HorizontalStackLayout>
+            <HorizontalStackLayout
+                Grid.Row="0"
+                Grid.Column="1"
+                HorizontalOptions="Center">
+                <Label
+                    FontAttributes="Bold"
+                    Text="Library"
+                    VerticalOptions="Center" />
+                <SearchBar
+                    Margin="10,0,0,0"
+                    HorizontalOptions="Fill"
+                    Placeholder="Search books..."
+                    TextChanged="OnSearchBarTextChanged"
+                    VerticalOptions="Center"
+                    WidthRequest="{OnIdiom Desktop=300,
+                                           Tablet=300,
+                                           Phone=200}" />
+            </HorizontalStackLayout>
+        </Grid>
+        <Grid Grid.Row="1">
+            <CollectionView
+                Margin="{StaticResource CollectionMargin}"
+                HorizontalScrollBarVisibility="Never"
+                ItemsSource="{Binding Books}"
+                SelectionMode="None"
+                VerticalScrollBarVisibility="Never">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Book">
+                        <Grid
+                            Margin="8"
+                            Padding="8"
+                            BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                                              Light=White}">
+                            <Border
+                                HeightRequest="490"
+                                Style="{x:StaticResource EbookCardStyle}"
+                                WidthRequest=" 250">
+                                <Grid RowDefinitions="350,40" VerticalOptions="Center">
+
+                                    <ffimageloading:CachedImage
+                                        Grid.Row="0"
+                                        Aspect="AspectFit"
+                                        HeightRequest="300"
+                                        HorizontalOptions="Center"
+                                        Source="{Binding Thumbnail}" />
+
+                                    <Button
+                                        Grid.Row="1"
+                                        Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
+                                        CommandParameter="{Binding .}"
+                                        HeightRequest="40"
+                                        IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"
+                                        Text="Download"
+                                        WidthRequest="100" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <Label
+                        HorizontalOptions="Center"
+                        HorizontalTextAlignment="Center"
+                        Text="{Binding EmptyLabelText}"
+                        VerticalOptions="Center" />
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </Grid>
+    </Grid>
+</ContentPage>

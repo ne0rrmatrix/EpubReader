@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using SQLite;
 
 namespace EpubReader.Models;
 
@@ -9,7 +10,7 @@ namespace EpubReader.Models;
 /// the book's title, file path, current chapter, and cover image path. It also includes collections for related
 /// entities such as authors, chapters, and images, which are not persisted in the database.</remarks>
 [Table("Book")]
-public class Book
+public partial class Book : ObservableObject
 {
 	/// <summary>
 	/// Gets or sets the unique identifier for the entity.
@@ -98,4 +99,52 @@ public class Book
 	/// </summary>
 	public string Description { get; set; } = string.Empty;
 
+	/// <summary>
+	/// Gets or sets the date as a string.
+	/// </summary>
+	public string Date { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the thumbnail image as a byte array.
+	/// </summary>
+	[Ignore]
+	public string Thumbnail { get; set; } = string.Empty;
+	/// <summary>
+	/// Gets or sets the URL used for downloading resources.
+	/// </summary>
+	public string DownloadUrl { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether the item is currently in the library.
+	/// </summary>
+	[Column("IsInLibrary")]
+	[ObservableProperty]
+	public partial bool IsInLibrary { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets the published date of the book.
+	/// </summary>
+	[Ignore]
+	public DateTime? PublishedDate { get; set; }
+
+	/// <summary>
+	/// Gets or sets the book's ISBN if available.
+	/// </summary>
+	public string Isbn { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's language code.
+	/// </summary>
+	public string Language { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's series information.
+	/// </summary>
+	public string Series { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the book's categories/tags.
+	/// </summary>
+	[Ignore]
+	public List<string> Categories { get; set; } = [];
 }

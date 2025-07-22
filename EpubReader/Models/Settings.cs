@@ -1,4 +1,5 @@
-﻿using SQLite;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using SQLite;
 
 namespace EpubReader.Models;
 
@@ -52,4 +53,28 @@ public class Settings
 	/// </summary>
 	[Column("SupportMultipleColumns")]
 	public bool SupportMultipleColumns { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether Calibre Server auto-discovery is enabled.
+	/// </summary>
+	[Column("CalibreAutoDiscovery")]
+	public bool CalibreAutoDiscovery { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the port number used by the server.
+	/// </summary>
+	[Column("Port")]
+	public int Port { get; set; } = 8080; // Default Calibre server port
+
+	/// <summary>
+	/// Gets or sets the IP address of the Calibre server.
+	/// </summary>
+	[Column("IPAddress")]
+	public string IPAddress { get; set; } = "localhost"; // Default Calibre server IP address
+
+	/// <summary>
+	/// Gets or sets the URL prefix used for the Calibre server.
+	/// </summary>
+	[Column("UrlPrefix")]
+	public string UrlPrefix { get; set; } = "http"; // Default URL prefix for Calibre server
 }

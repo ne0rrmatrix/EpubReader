@@ -2,9 +2,11 @@
 using EpubReader.Controls;
 using EpubReader.Database;
 using EpubReader.Interfaces;
+using EpubReader.Service;
 using EpubReader.Util;
 using EpubReader.ViewModels;
 using EpubReader.Views;
+using FFImageLoading.Maui;
 using MetroLog;
 using MetroLog.Operators;
 using MetroLog.Targets;
@@ -13,7 +15,6 @@ using Microsoft.Maui.Handlers;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-using EpubReader.Service;
 
 #if IOS || MACCATALYST
 using CoreGraphics;
@@ -42,6 +43,7 @@ public static class MauiProgram
 			options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
 		})
 		.ConfigureSyncfusionToolkit()
+		.UseFFImageLoading()
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST
@@ -107,18 +109,25 @@ public static class MauiProgram
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
+		// Register services
 		builder.Services.AddSingleton<IDb, Db>();		
 		LoggerFactory.Initialize(config);
-        builder.Services.AddSingleton(LogOperatorRetriever.Instance);
+		builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();
 		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
 		builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
 		builder.Services.AddSingleton<WebViewHelper>();
+
+		// Register Popup pages and their view models
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
+		builder.Services.AddTransientPopup<CalibreSettingsPage, CalibreSettingsPageViewModel>();
+
+		// Register main pages and their view models
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
+		builder.Services.AddTransientWithShellRoute<CalibrePage, CalibrePageViewModel>("CalibrePage");
 		return builder.Build();
     }
 }
