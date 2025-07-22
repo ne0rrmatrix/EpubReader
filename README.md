@@ -14,11 +14,14 @@
 * **Reading Customization:**
     * Navigate seamlessly through **chapters and pages**.
     * Adjust **font and font size** to your preference.
+    * Connect to Calibre Server using **Bonjour** or by setting the **URL** directly. You can navigate your library and download ePub books.
+    * Supports tracking reading position when you leave book and read another or return to app.
     * Choose from various **color themes**, including support for system **dark and light modes** that switch automatically.
+    * Sort by title or author in library and on **Calibre Server** sort by date too.
 * **EPUB Support:**
     * Supports **EPUB 2 and 3.x versions**.
     * Includes enhanced compatibility for **out-of-spec and broken EPUBs**, ensuring most ebooks work seamlessly (with minor issues for extremely malformed files).
-* **Rich Content Display:** Renders embedded images with full support for **CSS styles** within the book.
+* **Rich Content Display:** Renders embedded images with full support for **CSS styles** within the book. Support for fonts embedded within ebook is also fully supported.
 
 ---
 
