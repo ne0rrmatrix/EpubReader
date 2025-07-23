@@ -1,4 +1,8 @@
 ﻿namespace EpubReader.Util;
+
+/// <summary>
+/// A utility class that provides methods for detecting image file types based on their content.
+/// </summary>
 public static class ImageExtensions
 {
 	static readonly List<string> jpgSignature = ["FF", "D8"];
@@ -47,6 +51,13 @@ public static class ImageExtensions
 		};
 	}
 
+	/// <summary>
+	/// Determines whether the beginning of the stream matches the specified byte signature.
+	/// </summary>
+	/// <param name="stream">The stream to compare against the signature. The stream's position will be reset to the beginning.</param>
+	/// <param name="signature">A list of hexadecimal string representations of bytes to match against the stream's content.</param>
+	/// <returns><see langword="true"/> if the stream's initial bytes match the specified signature; otherwise, <see
+	/// langword="false"/>.</returns>
 	static bool MatchesSignature(this Stream stream, List<string> signature)
 	{
 		stream.Seek(0, SeekOrigin.Begin);

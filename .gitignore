@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Keystore files
+/EpubReader/epubreader.keystore
+/EpubReader/epubreader.pem

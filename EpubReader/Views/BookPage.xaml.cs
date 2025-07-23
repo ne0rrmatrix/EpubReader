@@ -7,158 +7,70 @@ using EpubReader.ViewModels;
 
 namespace EpubReader.Views;
 
-public partial class BookPage : ContentPage, IDisposable
+/// <summary>
+/// Represents a page in a book application, providing functionality for displaying and interacting with book content.
+/// </summary>
+/// <remarks>The <see cref="BookPage"/> class is responsible for managing the user interface and interactions for
+/// a single page of a book. It handles navigation, animations, and JavaScript interactions within a web view. The page
+/// is initialized with a view model and a database interface, which are used for data binding and data operations,
+/// respectively.</remarks>
+public partial class BookPage : ContentPage
 {
-	Book? book;
+	const string externalLinkPrefix = "https://runcsharp.jump/?";
+	const uint animationDuration = 200u;
+	BookViewModel ViewModel => (BookViewModel)BindingContext;
+	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
-	
-#if ANDROID || IOS
-	readonly CommunityToolkit.Maui.Behaviors.TouchBehavior touchbehavior = new();
-#endif
-#if IOS || MACCATALYST
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_left = new()
-	{
-		Direction = SwipeDirection.Left,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_right = new()
-	{
-		Direction = SwipeDirection.Right,
-	};
-	readonly SwipeGestureRecognizer swipeGestureRecognizer_up = new()
-	{
-		Direction = SwipeDirection.Up,
-	};
-#endif
-	const uint animationDuration = 200u;
-	bool disposedValue;
-	bool loadIndex = true;
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
+	/// </summary>
+	/// <remarks>This constructor sets up the page's data binding context and initializes necessary components. It
+	/// also registers message handlers for JavaScript and settings messages using a weak reference messenger.</remarks>
+	/// <param name="viewModel">The view model that provides data binding for the page.</param>
+	/// <param name="db">The database interface used for data operations within the page.</param>
 	public BookPage(BookViewModel viewModel, IDb db)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
 		webViewHelper = new(webView);
 
-#if IOS || MACCATALYST
-		swipeGestureRecognizer_left.Swiped += SwipeGestureRecognizer_left_Swiped;
-		swipeGestureRecognizer_right.Swiped += SwipeGestureRecognizer_right_Swiped;
-		swipeGestureRecognizer_up.Swiped += SwipeGestureRecognizer_up_Swiped;
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_left);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_right);
-		webView.GestureRecognizers.Add(swipeGestureRecognizer_up);
-#endif
-#if IOS || ANDROID
-		webView.Behaviors.Add(touchbehavior);
-#endif
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
-	async void SwipeGestureRecognizer_left_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Left)
-		{
-			await webView.EvaluateJavaScriptAsync(" window.parent.postMessage(\"next\", \"app://demo\");");
-		}
-	}
-
-	void SwipeGestureRecognizer_up_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Up)
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-	}
-	async void SwipeGestureRecognizer_right_Swiped(object? sender, SwipedEventArgs e)
-	{
-		if (e.Direction == SwipeDirection.Right)
-		{
-			await webView.EvaluateJavaScriptAsync("window.parent.postMessage(\"prev\", \"app://demo\");");
-		}
-	}
-
+	/// <summary>
+	/// Handles the actions to be performed when the page is disappearing.
+	/// </summary>
+	/// <remarks>This method unregisters all messages for the current instance and clears the toolbar items if the
+	/// popup is not active. It also ensures the navigation bar is visible. Overrides the base <see cref="OnDisappearing"/>
+	/// method.</remarks>
 	protected override void OnDisappearing()
 	{
-		if (BindingContext is BookViewModel viewModel)
+		if (!ViewModel.isPopupActive)
 		{
-			viewModel.Dispose();
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+			Shell.Current.ToolbarItems.Clear();
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 		}
-#if WINDOWS
-		Controls.WebViewExtensions.WebView2_Unloaded();
-#endif
 		base.OnDisappearing();
 	}
 
-	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
-	{
-		System.Diagnostics.Debug.WriteLine($"Navigated event.");
-		ArgumentNullException.ThrowIfNull(book);
-		if (!loadIndex)
-		{
-			return;
-		}
-		loadIndex = false;
-		await webViewHelper.LoadPage(pageLabel, book);
-		Shimmer.IsActive = false;
-	}
-
-	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
-	{
-		System.Diagnostics.Debug.WriteLine($"Navigating event.");
-		var urlParts = e.Url.Split('.');
-		ArgumentNullException.ThrowIfNull(book);
-		if (!urlParts[0].Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
-		{
-			return;	
-		}
-		e.Cancel = true;
-		var funcToCall = urlParts[1].Split("?");
-		var methodName = funcToCall[0][..^1];
-		
-		if (Contains("next",methodName))
-		{
-			await webViewHelper.Next(pageLabel, book);
-		}
-		if (Contains("prev", methodName))
-		{
-			await webViewHelper.Prev(pageLabel, book);
-		}
-		if (Contains("menu", methodName))
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-		if (Contains("pageLoad", methodName))
-		{
-			await webViewHelper.OnSettingsClicked();
-		}
-	}
-	static bool Contains(string value, string methodName)
-	{
-		return methodName.Contains(value, StringComparison.CurrentCultureIgnoreCase);
-	}
-	void CurrentPage_Loaded(object sender, EventArgs e)
-	{
-		book = ((BookViewModel)BindingContext).Book ?? throw new InvalidOperationException("BookViewModel is null");
-		pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, (r, m) => { webViewHelper.OnJavaScriptMessageReceived(m, pageLabel, book); OnJavaScriptMessageReceived(m); });
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await webViewHelper.OnSettingsClicked());
-	}
-
-	void OnJavaScriptMessageReceived(JavaScriptMessage m)
-	{
-		if (Contains("menu", m.Value))
-		{
-			GridArea_Tapped(this, EventArgs.Empty);
-		}
-	}
-
+	/// <summary>
+	/// Handles the tap event on the grid area, triggering animations for translation, scaling, and fading.
+	/// </summary>
+	/// <remarks>This method initiates a sequence of animations on the grid area when it is tapped. The animations
+	/// include translating the grid, scaling it down, and fading it. The translation distance varies depending on the
+	/// operating system, with a larger translation on iOS and Android platforms.</remarks>
+	/// <param name="sender">The source of the event, typically the grid area that was tapped.</param>
+	/// <param name="e">The event data associated with the tap event.</param>
 	async void GridArea_Tapped(object sender, EventArgs e)
 	{
-		var viewModel = (BookViewModel)BindingContext;
-		viewModel.Press();
+		ViewModel.Press();
 		var width = this.Width * 0.4;
-		if(OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
+		if (OperatingSystem.IsIOS() || OperatingSystem.IsAndroid())
 		{
 			width = this.Width * 0.8;
 		}
@@ -167,42 +79,220 @@ public partial class BookPage : ContentPage, IDisposable
 		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
 	}
 
-	async void CloseMenu(object sender, EventArgs e)
+	/// <summary>
+	/// Handles the navigation event for the web view.
+	/// </summary>
+	/// <remarks>This method is triggered after the web view has completed navigation to a new page. It updates the
+	/// UI to reflect the navigation state.</remarks>
+	/// <param name="sender">The source of the event, typically the web view control.</param>
+	/// <param name="e">The event data containing information about the navigation event.</param>
+	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
 	{
-		var viewModel = (BookViewModel)BindingContext;
-		viewModel.Press();
-		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
-		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
-		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await webViewHelper.LoadPageAsync(pageLabel, book);
+		Shimmer.IsActive = false;
 	}
 
-	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+	/// <summary>
+	/// Handles the Loaded event for the current page, initializing toolbar items for each chapter in the book.
+	/// </summary>
+	/// <param name="sender">The source of the event.</param>
+	/// <param name="e">The event data.</param>
+	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
-		base.OnNavigatedFrom(args);
-
-		WeakReferenceMessenger.Default.UnregisterAll(this);
-		Shell.Current.ToolbarItems.Clear();
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
 
-	protected virtual void Dispose(bool disposing)
+	/// <summary>
+	/// Asynchronously handles a JavaScript action based on the provided URL.
+	/// </summary>
+	/// <remarks>This method processes the URL to determine the appropriate JavaScript action and updates the UI
+	/// accordingly. It attempts to handle both internal and external links before executing a specific web view
+	/// action.</remarks>
+	/// <param name="url">The URL that determines the JavaScript action to be handled. Cannot be null or empty.</param>
+	/// <returns></returns>
+	async Task HandleJavascriptAsync(string url)
 	{
-		if (!disposedValue)
+		await TryHandleInternalLinkAsync(url);
+		await BookPage.TryHandleExternalLinkAsync(url);
+		var methodName = GetMethodNameFromUrl(url);
+		var data = BookPage.GetDataFromUrl(url);
+		await HandleWebViewActionAsync(methodName, data);
+		await UpdateUiAppearance();
+	}
+
+	/// <summary>
+	/// Handles the navigation event for the web view, intercepting specific URLs for custom processing.
+	/// </summary>
+	/// <remarks>This method cancels navigation if the URL contains the substring "runcsharp", ignoring case, and
+	/// processes the URL asynchronously.</remarks>
+	/// <param name="sender">The source of the event, typically the web view control.</param>
+	/// <param name="e">The <see cref="WebNavigatingEventArgs"/> containing event data, including the URL being navigated to.</param>
+	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
+	{
+		var url = e.Url;
+
+		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
 		{
-			if (disposing)
+			return;
+		}
+
+		e.Cancel = true;
+		await HandleJavascriptAsync(e.Url);
+	}
+
+	static string GetDataFromUrl(string url)
+	{
+		var parts = url.Split('?');
+		if (parts.Length > 1)
+		{
+			var data = parts[1].Split('#')[0];
+			return data;
+		}
+		return string.Empty;
+	}
+
+	async Task TryHandleInternalLinkAsync(string url)
+	{
+		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
+		{
+			return;
+		}
+
+		var urlParts = url.Split('?')[1].Split('#')[0];
+		if (!string.IsNullOrEmpty(urlParts))
+		{
+			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
+			if (chapter is null)
 			{
-#if ANDROID || IOS
-				touchbehavior.Dispose();
-#endif
+				return;
 			}
-			disposedValue = true;
+			book.CurrentChapter = book.Chapters.IndexOf(chapter);
+			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
+			await db.UpdateBookMark(book);
+		}
+	}
+	static async Task TryHandleExternalLinkAsync(string url)
+	{
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
+		{
+			return;
+		}
+
+		var urlParts = url.Split('?');
+		if (urlParts.Length <= 1)
+		{
+			return;
+		}
+
+		var queryString = urlParts[1].Replace("http://", "https://");
+		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
+		{
+			await Launcher.OpenAsync(queryString);
 		}
 	}
 
-	public void Dispose()
+	static string GetMethodNameFromUrl(string url)
 	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
+		var urlParts = url.Split('.');
+		if (urlParts.Length < 2)
+		{
+			return string.Empty;
+		}
+
+		var funcToCall = urlParts[1].Split('?');
+		if (string.IsNullOrEmpty(funcToCall[0]) || funcToCall[0].Length <= 1)
+		{
+			return string.Empty;
+		}
+
+		return funcToCall[0][..^1]; // Assumes format like "method()"
+	}
+
+	async Task HandleWebViewActionAsync(string methodName, string data)
+	{
+		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), 
+			out int parsedPage) ? parsedPage : 0;
+
+		switch (methodName.ToLowerInvariant())
+		{
+			case "next":
+				await webViewHelper.Next(pageLabel, book);
+				break;
+			case "prev":
+				await webViewHelper.Prev(pageLabel, book);
+				break;
+			case "menu":
+				GridArea_Tapped(this, EventArgs.Empty);
+				break;
+			case "pageload":
+				await webViewHelper.OnSettingsClickedAsync();
+				await UpdateUiAppearance();
+				if (currentPage == 0 && book.CurrentPage > 0)
+				{
+					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+				}
+				pageLabel.Text = await GetCurrentPageInfoAsync();
+				break;
+			case "characterposition":
+				book.CurrentPage = currentPage;
+				await db.UpdateBookMark(book);
+
+				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
+				{
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
+				}
+				else
+				{
+					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
+				}
+				break;
+		}
+	}
+
+	/// <summary>
+	/// Gets the current page information using synthetic page numbers.
+	/// </summary>
+	/// <returns>A formatted string with synthetic page information.</returns>
+	async Task<string> GetCurrentPageInfoAsync()
+	{
+		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
+		if (int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
+		{
+			return WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
+		}
+		return WebViewHelper.GetSyntheticPageInfo(book);
+	}
+
+	async Task UpdateUiAppearance()
+	{
+		pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
+		var settings = await db.GetSettings() ?? new();
+		if (string.IsNullOrEmpty(settings.BackgroundColor))
+		{
+			settings.BackgroundColor = "#FFFFFF"; // Default background color
+			settings.TextColor = "#000000"; // Default text color
+		}
+		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+		{
+			grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
+			pageLabel.TextColor = Color.FromArgb(settings.TextColor);
+		}
+	}
+
+	/// <summary>
+	/// Asynchronously closes the menu by performing a series of animations.
+	/// </summary>
+	/// <remarks>This method triggers the ViewModel's press action and performs fade, scale, and translation
+	/// animations on the grid element to close the menu. The animations are executed sequentially with a specified
+	/// duration.</remarks>
+	/// <param name="sender">The source of the event that triggered the method.</param>
+	/// <param name="e">The event data associated with the event.</param>
+	async void CloseMenuAsync(object sender, EventArgs e)
+	{
+		ViewModel.Press();
+		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
+		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
+		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -227,11 +317,10 @@ public partial class BookPage : ContentPage, IDisposable
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
-					CloseMenu(this, EventArgs.Empty);
+					CloseMenuAsync(this, EventArgs.Empty);
 				});
 			})
 		});
@@ -253,11 +342,10 @@ public partial class BookPage : ContentPage, IDisposable
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
-					db.UpdateBookMark(book);
-					pageLabel.Text = $"{book.Chapters[book.CurrentChapter]?.Title ?? string.Empty}";
+					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
-					CloseMenu(this, EventArgs.Empty);
+					CloseMenuAsync(this, EventArgs.Empty);
 				});
 			})
 		};

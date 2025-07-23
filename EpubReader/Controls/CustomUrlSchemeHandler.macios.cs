@@ -5,12 +5,29 @@ using Foundation;
 using WebKit;
 
 namespace EpubReader.Controls;
+
+/// <summary>
+/// Provides a custom URL scheme handler for processing requests in a <see cref="WKWebView"/>.
+/// </summary>
+/// <remarks>This handler is designed to manage URL requests that begin with the "app://demo/" scheme. It
+/// retrieves the requested resource, determines its MIME type, and sends the appropriate response back to the web view.
+/// The handler also ensures that local caching is disabled to allow user scripts to execute correctly.</remarks>
 class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	
+	/// <summary>
+	/// Handles the start of a custom URL scheme task in a <see cref="WKWebView"/>.
+	/// </summary>
+	/// <remarks>This method processes requests with URLs starting with "app://demo/". If the URL does not match
+	/// this pattern, the task fails with an error. The method retrieves the requested resource, determines its MIME type,
+	/// and sends the appropriate response back to the web view, including headers to disable local caching.</remarks>
+	/// <param name="webView">The <see cref="WKWebView"/> that initiated the URL scheme task.</param>
+	/// <param name="urlSchemeTask">The URL scheme task to be processed.</param>
+	/// <exception cref="InvalidOperationException">Thrown if the URL or the data stream is null, indicating an invalid request or resource.</exception>
 	[Export("webView:startURLSchemeTask:")]
 	[SupportedOSPlatform("ios11.0")]
-	public void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
+	public async void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
 	{
 		var url = urlSchemeTask.Request.Url.AbsoluteString ?? "";
 		if(!url.StartsWith("app://demo/"))
@@ -21,16 +38,15 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 		var path = url["app://demo/".Length..];
 		var filename = Path.GetFileName(path) ?? throw new InvalidOperationException("url is null");
 		var mimeType = FileService.GetMimeType(filename);
-		var stream = streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
+		var stream = await streamExtensions.GetStream(path) ?? throw new InvalidOperationException("stream is null");
 		var data = NSData.FromStream(stream) ?? throw new InvalidOperationException("data is null");
-		using var dic = new NSMutableDictionary<NSString, NSString>();
-		if (mimeType is not null)
+		using var dic = new NSMutableDictionary<NSString, NSString>
 		{
-			dic[(NSString)"Content-Type"] = (NSString)mimeType;
-		}
-		// Disable local caching which would otherwise prevent user scripts from executing correctly.
-		dic[(NSString)"Cache-Control"] = (NSString)"no-cache, max-age=0, must-revalidate, no-store";
-		dic[(NSString)"Content-Length"] = (NSString)data.Length.ToString(CultureInfo.InvariantCulture);
+			[(NSString)"Content-Type"] = (NSString)mimeType,
+			// Disable local caching which would otherwise prevent user scripts from executing correctly.
+			[(NSString)"Cache-Control"] = (NSString)"no-cache, max-age=0, must-revalidate, no-store",
+			[(NSString)"Content-Length"] = (NSString)data.Length.ToString(CultureInfo.InvariantCulture)
+		};
 
 		using var response = new NSHttpUrlResponse(urlSchemeTask.Request.Url, 200, "HTTP/1.1", dic);
 		// 2.a. Send the response

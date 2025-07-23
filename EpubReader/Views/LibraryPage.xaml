@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:Models="clr-namespace:EpubReader.Models"
-    xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
@@ -14,78 +14,141 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=CalibreCommand}"
+            IconImageSource="globe_book_24dp.png"
+            Order="Primary" />
+        <ToolbarItem
             Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add.png"
             Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddFolderCommand}"
+            IconImageSource="folder_24dp.png"
+            Order="Primary" />
     </ContentPage.ToolbarItems>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
+                <ImageButton
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AlphabeticalAuthorSortCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="{AppThemeBinding Dark=sort_24dp.png,
+                                             Light=sort_24dp_light_mode.png}"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}">
+                    <ImageButton.Margin>
+                        <OnIdiom x:TypeArguments="Thickness">
+                            <OnIdiom.Phone>10,10,0,0</OnIdiom.Phone>
+                            <OnIdiom.Tablet>50,10,0,0</OnIdiom.Tablet>
+                            <OnIdiom.Desktop>50,10,0,0</OnIdiom.Desktop>
+                        </OnIdiom>
+                    </ImageButton.Margin>
+                </ImageButton>
 
-    <CollectionView
-        x:Name="collectionView"
-        Grid.Row="1"
-        Margin="{StaticResource CollectionMargin}"
-        HorizontalScrollBarVisibility="Never"
-        ItemsSource="{Binding Books}"
-        SelectionMode="None"
-        VerticalScrollBarVisibility="Never">
+                <ImageButton
+                    Margin="10,10,0,0"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AlphabeticalTitleSortCommand}"
+                    HeightRequest="{OnIdiom Phone=24,
+                                            Default=40}"
+                    HorizontalOptions="Start"
+                    Source="{AppThemeBinding Dark=sort_by_alpha_24dp.png,
+                                             Light=sort_by_alpha_light_mode.png}"
+                    WidthRequest="{OnIdiom Phone=24,
+                                           Default=40}" />
+            </HorizontalStackLayout>
+            <HorizontalStackLayout
+                Grid.Row="0"
+                Grid.Column="1"
+                HorizontalOptions="Center">
+                <Label
+                    FontAttributes="Bold"
+                    Text="Library"
+                    VerticalOptions="Center" />
+                <SearchBar
+                    Margin="10,0,0,0"
+                    HorizontalOptions="Fill"
+                    Placeholder="Search books..."
+                    TextChanged="OnSearchBarTextChanged"
+                    VerticalOptions="Center"
+                    WidthRequest="{OnIdiom Desktop=300,
+                                           Tablet=300,
+                                           Phone=200}" />
+            </HorizontalStackLayout>
+        </Grid>
 
-        <CollectionView.ItemsLayout>
-            <GridItemsLayout
-                HorizontalItemSpacing="8"
-                Orientation="Vertical"
-                Span="{StaticResource GridSpan}"
-                VerticalItemSpacing="8" />
-        </CollectionView.ItemsLayout>
+        <CollectionView
+            Grid.Row="1"
+            Margin="{StaticResource CollectionMargin}"
+            HorizontalScrollBarVisibility="Never"
+            ItemsSource="{Binding Books}"
+            ItemsUpdatingScrollMode="KeepScrollOffset"
+            SelectionMode="None"
+            VerticalScrollBarVisibility="Never">
 
-        <CollectionView.ItemTemplate>
-            <DataTemplate x:DataType="Models:Book">
-                <SwipeView>
-                    <SwipeView.RightItems>
-                        <SwipeItems>
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
+            </CollectionView.ItemsLayout>
 
-                            <SwipeItem
-                                BackgroundColor="LightGray"
-                                Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
-                                CommandParameter="{Binding .}"
-                                IconImageSource="delete.png"
-                                Text="Delete" />
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="Models:Book">
+                    <Grid Margin="4" Padding="4">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems>
 
-                        </SwipeItems>
-                    </SwipeView.RightItems>
+                                    <SwipeItem
+                                        BackgroundColor="LightGray"
+                                        Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                        CommandParameter="{Binding .}"
+                                        IconImageSource="delete.png"
+                                        Text="Delete" />
 
-                    <Border Style="{x:StaticResource EbookCardStyle}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="{StaticResource CardHeight}" />
-                            </Grid.RowDefinitions>
+                                </SwipeItems>
+                            </SwipeView.RightItems>
 
-                            <ffimage:CachedImage
-                                Grid.Row="0"
-                                Margin="8,4,8,8"
-                                Aspect="AspectFit"
-                                CacheDuration="1000000"
-                                HeightRequest="{StaticResource CardHeight}"
-                                HorizontalOptions="Center"
-                                Source="{Binding CoverImagePath}">
+                            <Border Style="{x:StaticResource EbookCardStyle}">
 
-                                <FlyoutBase.ContextFlyout>
-                                    <MenuFlyout>
-                                        <MenuFlyoutItem
-                                            Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
-                                            CommandParameter="{Binding .}"
-                                            IconImageSource="delete.png"
-                                            Text="Delete" />
-                                    </MenuFlyout>
-                                </FlyoutBase.ContextFlyout>
+                                <VerticalStackLayout
+                                    Margin="4"
+                                    Padding="4"
+                                    HorizontalOptions="Center">
+                                    <ffimageloading:CachedImage
+                                        Aspect="AspectFit"
+                                        HeightRequest="250"
+                                        Source="{Binding CoverImagePath}">
 
-                                <ffimage:CachedImage.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
-                                </ffimage:CachedImage.GestureRecognizers>
-                            </ffimage:CachedImage>
 
-                        </Grid>
-                    </Border>
-                </SwipeView>
-            </DataTemplate>
-        </CollectionView.ItemTemplate>
-    </CollectionView>
+                                        <FlyoutBase.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem
+                                                    Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IconImageSource="delete.png"
+                                                    Text="Delete" />
+                                            </MenuFlyout>
+                                        </FlyoutBase.ContextFlyout>
+
+                                        <ffimageloading:CachedImage.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
+                                        </ffimageloading:CachedImage.GestureRecognizers>
+                                    </ffimageloading:CachedImage>
+
+                                </VerticalStackLayout>
+                            </Border>
+                        </SwipeView>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
 </ContentPage>

@@ -1,27 +1,31 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<mct:Popup
+<toolkit:Popup
     x:Class="EpubReader.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:mct="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui"
     xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:page="clr-namespace:EpubReader.Views"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    Size="400,600">
-
+    x:DataType="viewModel:SettingsPageViewModel"
+    x:TypeArguments="system:Boolean"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                      Light=White}"
+    HeightRequest="{OnPlatform WinUI=450,
+                               Default=350}"
+    Loaded="CurrentPage_Loaded"
+    Unloaded="CurrentPage_Unloaded"
+    WidthRequest="300">
 
     <Grid
-        Padding="20"
-        ColumnSpacing="10"
+        x:Name="grid"
+        Padding="3"
+        ColumnSpacing="2"
         RowSpacing="20">
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -39,7 +43,6 @@
         <Label
             Grid.Row="0"
             FontAttributes="Bold"
-            FontSize="Medium"
             HorizontalOptions="Center"
             Text="Select Font Size" />
 
@@ -48,7 +51,8 @@
             Grid.Row="1"
             Maximum="36"
             Minimum="8"
-            ValueChanged="OnFontSizeSliderChanged" />
+            ValueChanged="OnFontSizeSliderChanged"
+            WidthRequest="250" />
 
         <Label
             x:Name="FontSizeLabel"
@@ -57,43 +61,47 @@
             HorizontalOptions="Center"
             Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}" />
 
-        <Label
-            Grid.Row="3"
-            FontAttributes="Bold"
-            FontSize="Medium"
-            HorizontalOptions="Center"
-            Text="Select Font" />
 
         <Picker
             x:Name="FontPicker"
-            Grid.Row="4"
-            HeightRequest="40"
+            Title="Select Font"
+            Grid.Row="3"
             ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
             ItemsSource="{Binding Fonts, x:DataType=viewModel:SettingsPageViewModel}"
-            SelectedIndexChanged="FontPicker_SelectedIndexChanged" />
-
-        <Label
-            Grid.Row="7"
-            FontAttributes="Bold"
-            FontSize="Medium"
-            HorizontalOptions="Center"
-            Text="Theme" />
+            SelectedIndexChanged="FontPicker_SelectedIndexChanged"
+            WidthRequest="250" />
 
         <Picker
             x:Name="ThemePicker"
-            Title="Choose a theme"
-            Grid.Row="8"
-            HeightRequest="70"
+            Title="Theme"
+            Grid.Row="4"
             ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
             ItemsSource="{Binding ColorSchemes, x:DataType=viewModel:SettingsPageViewModel}"
-            SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
+            SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
+            WidthRequest="250" />
 
         <Button
-            Grid.Row="10"
+            Grid.Row="5"
             Clicked="RemoveAllSettings"
             HeightRequest="45"
             Text="Reset"
             WidthRequest="120" />
+
+        <HorizontalStackLayout
+            x:Name="stackLayout"
+            Grid.Row="6"
+            HorizontalOptions="Center"
+            IsVisible="{OnPlatform WinUI=true,
+                                   Default=false}"
+            Spacing="100"
+            WidthRequest="250">
+            <Label Text="Multiple Columns" VerticalOptions="Center" />
+            <Switch
+                x:Name="switchControl"
+                Toggled="switchControl_Toggled"
+                VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
     </Grid>
 
-</mct:Popup>
+</toolkit:Popup>
