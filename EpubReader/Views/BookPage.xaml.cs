@@ -317,6 +317,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
+					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
 					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
@@ -342,6 +343,7 @@ public partial class BookPage : ContentPage
 				Dispatcher.Dispatch(async () =>
 				{
 					book.CurrentChapter = index;
+					book.CurrentPage = 0; // Reset current page when changing chapter
 					await db.UpdateBookMark(book);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
