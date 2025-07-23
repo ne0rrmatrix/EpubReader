@@ -29,11 +29,11 @@
 
 The first public beta of the app is available for download:
 
-## ➡️ [**Download EpubReader Beta v0.0.3**](https://github.com/ne0rrmatrix/EpubReader/releases/tag/0.0.4)
+### ➡️ [**Download EpubReader Beta v0.0.3**](https://github.com/ne0rrmatrix/EpubReader/releases/tag/0.0.4)
 
-## ➡️ [**Microsoft store link**](https://apps.microsoft.com/detail/9N3T9QNKK7VX)
+### ➡️ [**Microsoft store link**](https://apps.microsoft.com/detail/9N3T9QNKK7VX)
 
-## Google Play link: Coming Soon!
+### Google Play link: Coming Soon!
 ---
 
 ## 📸 Screenshots
