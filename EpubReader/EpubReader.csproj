@@ -18,7 +18,7 @@
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>7</ApplicationVersion>
+		<ApplicationVersion>8</ApplicationVersion>
 
 		<!--
 		Uncomment the line below if you need to debug the SG code
