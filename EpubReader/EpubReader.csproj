@@ -33,7 +33,7 @@
    
     <!-- Remove this NoWarn once XamlTypeInfo Generator (owned by .NET MAUI Engineering Team) implements a partial class-->
     <NoWarn>CsWinRT1028</NoWarn>
-		
+    
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
 	</PropertyGroup>
@@ -91,13 +91,14 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
     <PackageReference Include="Zeroconf" Version="3.7.16" />
+    <PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
  </ItemGroup>
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.1" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0" />
   </ItemGroup>
-  
+
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	</PropertyGroup>

@@ -93,6 +93,53 @@ public static partial class EbookService
 
 	#region Private Helper Methods - Book Creation
 
+	/// <summary>
+	/// Extracts a list of audio cues from the specified EPUB book reference.
+	/// </summary>
+	/// <remarks>This method processes the media overlays in the EPUB book to identify and extract audio cues. Each
+	/// audio cue is represented by an <see cref="AudioCue"/> object containing details such as the cue's ID, text source,
+	/// and audio clip timings.</remarks>
+	/// <param name="book">The EPUB book reference from which to extract audio cues. Must not be null.</param>
+	/// <returns>A list of <see cref="AudioCue"/> objects representing the audio cues found in the book. Returns an empty list if no
+	/// audio cues are found.</returns>
+	static async Task<List<AudioCue>> GetAudioCues(EpubBookRef book)
+	{
+		var audio = await GetLocalAudio(book);
+		return book.Schema?.MediaOverlays?
+				   .Where(audioQue => audioQue is not null)
+				   .SelectMany(audioQue => audioQue.Body?.Seqs ?? [])
+				   .Where(seq => seq is not null)
+				   .Where(seq => seq.Pars is not null)
+				   .SelectMany(seq => seq.Pars)
+
+				   .Where(par => par?.Audio is not null) // Filter out null pars or pars without audio
+				   .Select(par => new AudioCue
+				   {
+					   Id = par.Id ?? string.Empty,
+					   Text = par.Text?.Src?.Split('#')[0] ?? string.Empty, // Handle null Text or Src
+					   ClipBegin = par.Audio?.ClipBegin ?? string.Empty,
+					   ClipEnd = par.Audio?.ClipEnd ?? string.Empty,
+					   FileName = Path.GetFileName(par.Audio?.Src) ?? string.Empty, // Use Src as FilePath
+					   SpandId = par.Text?.Src?.Split('#')[1] ?? string.Empty, // Handle null Text or Src
+					   AudioData = audio.FirstOrDefault(x => x.FileName.Equals(Path.GetFileName(par.Audio?.Src), StringComparison.OrdinalIgnoreCase))?.Data ?? []
+				   })
+				   .ToList() ?? [];
+	}
+	static async Task<List<Audio>> GetLocalAudio(EpubBookRef book)
+	{
+		var audio = book.Content.Audio;
+		List<Audio> audioList = [];
+		foreach (var item in audio.Local)
+		{
+			var data = await item.ReadContentAsBytesAsync().ConfigureAwait(false);
+			audioList.Add(new Audio
+			{
+				FileName = Path.GetFileName(item.FilePath),
+				Data = data
+			});
+		}
+		return audioList;
+	}
 	static async Task<Book> CreateBookListingAsync(EpubBookRef book, string path)
 	{
 		var Authors = ExtractAuthors(book);
@@ -114,6 +161,12 @@ public static partial class EbookService
 		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		var cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
+		var audioCues = await GetAudioCues(book);
+		chapters.ForEach(chapter =>
+		{
+			chapter.AudioCues = audioCues.FindAll(cue => cue.Text == chapter.FileName);
+		});
+		
 		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
 		
@@ -323,14 +376,14 @@ public static partial class EbookService
 	{
 		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
 		var chaptersRef = readingOrder.ToList();
-
+		
 		return await GetChapters(chaptersRef, book);
 	}
 
 	static async  Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
-
+		
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
@@ -369,8 +422,7 @@ public static partial class EbookService
         {
             var replacementChapter = FindReplacementChapter(chaptersRef, item);
             var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
-
-            if (string.IsNullOrEmpty(htmlContent))
+			if (string.IsNullOrEmpty(htmlContent))
             {
                 continue;
             }

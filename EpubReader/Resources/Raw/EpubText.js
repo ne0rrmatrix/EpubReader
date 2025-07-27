@@ -8,6 +8,12 @@ let isPreviousPage = false;
 let currentPage = 0;
 let frame = null;
 let colCount = 1;
+let next = 'true';
+let lastPageFlipTime = 0;
+let minimumPageFlipDelay = 15000; // 15 seconds in milliseconds
+let lastProcessedSpanId = null;
+let autoPageFlipEnabled = true;
+let pendingPageFlip = false;
 
 document.addEventListener('selectstart', function (e) {
     e.preventDefault();
@@ -136,7 +142,7 @@ const navigationUtils = {
         if (!contentWindow) return;
 
         const scrollAmount = this.calculateScrollAmount(contentWindow);
-
+       
         if (platform.isWindows) {
             contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
         } else {
@@ -818,4 +824,309 @@ function setBackgroundColor(color) {
  */
 function unsetBackgroundColor() {
     styleUtils.unsetBackgroundColor();
+}
+
+/**
+ * Checks if a span element is visible in the current viewport
+ * @param {string} spanId - The ID of the span element to check
+ * @returns {boolean} True if the span is visible, false otherwise
+ */
+function isSpanVisibleOnPage(spanId) {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+
+    if (!doc || !contentWindow) {
+        console.warn("Cannot access iframe document to check span visibility");
+        return false;
+    }
+
+    const spanElement = doc.getElementById(spanId);
+    if (!spanElement) {
+        console.warn(`Span element with ID '${spanId}' not found`);
+        return false;
+    }
+
+    // Get the bounding rectangle of the span
+    const spanRect = spanElement.getBoundingClientRect();
+
+    // Get the viewport dimensions
+    const viewportWidth = contentWindow.innerWidth;
+    const viewportHeight = contentWindow.innerHeight;
+
+    // Check if span is within the viewport
+    const isVisible = (
+        spanRect.left >= 0 &&
+        spanRect.top >= 0 &&
+        spanRect.right <= viewportWidth &&
+        spanRect.bottom <= viewportHeight
+    );
+
+    //console.log(`Span ${spanId} visibility check: ${isVisible ? 'visible' : 'not visible'} (position: left=${spanRect.left}, top=${spanRect.top}, right=${spanRect.right}, bottom=${spanRect.bottom})`);
+
+    // Return the visibility status
+    return isVisible;
+}
+
+let oldHighlightSpanId = null;
+function highlightSpan(spanId) {
+    const doc = domUtils.getIframeDocument();
+
+    
+    const spanElement = doc.getElementById(spanId);
+    removeHighlight(oldHighlightSpanId); // Remove previous highlight if any
+    oldHighlightSpanId = spanId;
+    console.log(`Highlighting span with ID: ${spanId}`);
+    spanElement.style.backgroundColor = 'yellow';
+    spanElement.style.fontWeight = 'bold';
+    
+    // Process the span for visibility and potential page flipping
+    return processSpan(spanId);
+}
+
+
+function removeHighlight(spanId) {
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+       
+        console.warn("Cannot access iframe document for removing highlight");
+        return;
+    }
+    if (oldHighlightSpanId) {
+        console.warn(`removing old highlight ID: ${oldHighlightSpanId}`);
+        const oldSpanElement = doc.getElementById(oldHighlightSpanId);
+        if (oldSpanElement) {
+            oldSpanElement.style.backgroundColor = '';
+            oldSpanElement.style.fontWeight = '';
+        }
+    }
+    const spanElement = doc.getElementById(spanId);
+    if (spanElement) {
+        console.log(`Removing highlight from span with ID: ${spanId}`);
+        spanElement.style.backgroundColor = '';
+        spanElement.style.fontWeight = '';
+    }
+    else {
+        console.warn(`Span with ID '${spanId}' not found for removing highlight in iframe.`);
+    }
+}
+function handleNext() {
+    console.log("Handling next command");
+    navigationUtils.scrollRight(domUtils.detectPlatform());
+}
+
+/**
+ * Checks if a span element is at the bottom of the viewport
+ * @param {string} spanId - The ID of the span element to check
+ * @returns {boolean} True if the span is at the bottom of the viewport
+ */
+function isSpanAtBottomOfPage(spanId) {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+
+    if (!doc || !contentWindow) {
+        console.warn("Cannot access iframe document to check span position");
+        return false;
+    }
+
+    const spanElement = doc.getElementById(spanId);
+    if (!spanElement) {
+        console.warn(`Span element with ID '${spanId}' not found`);
+        return false;
+    }
+
+    // Get the bounding rectangle of the span
+    const spanRect = spanElement.getBoundingClientRect();
+    
+    // Get the viewport dimensions
+    const viewportHeight = contentWindow.innerHeight;
+
+    // Consider the span at the bottom if it's in the bottom 100% of the viewport
+    const bottomThreshold = viewportHeight * 0.95;
+    const isAtBottom = spanRect.bottom > bottomThreshold && spanRect.bottom <= viewportHeight;
+    
+    console.log(`Span ${spanId} bottom check: ${isAtBottom ? 'at bottom' : 'not at bottom'} (position: bottom=${spanRect.bottom}, threshold=${bottomThreshold}, viewportHeight=${viewportHeight})`);
+    
+    return isAtBottom;
+}
+
+/**
+ * Checks if a span element is near the bottom of the viewport
+ * @param {string} spanId - The ID of the span element to check
+ * @returns {boolean} True if the span is near the bottom of the viewport
+ */
+function isSpanNearBottomOfPage(spanId) {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+
+    if (!doc || !contentWindow) {
+        console.warn("Cannot access iframe document to check span position");
+        return false;
+    }
+
+    const spanElement = doc.getElementById(spanId);
+    if (!spanElement) {
+        console.warn(`Span element with ID '${spanId}' not found`);
+        return false;
+    }
+
+    // Get the bounding rectangle of the span
+    const spanRect = spanElement.getBoundingClientRect();
+    
+    // Get the viewport dimensions
+    const viewportHeight = contentWindow.innerHeight;
+
+    // Consider the span "near bottom" if it's in the bottom 20% of the viewport
+    const bottomThreshold = viewportHeight * 0.8;
+    const isNearBottom = spanRect.bottom > bottomThreshold && spanRect.bottom <= viewportHeight;
+    
+    console.log(`Span ${spanId} bottom check: ${isNearBottom ? 'near bottom' : 'not near bottom'} (position: bottom=${spanRect.bottom}, threshold=${bottomThreshold}, viewportHeight=${viewportHeight})`);
+    
+    return isNearBottom;
+}
+
+/**
+ * Checks if a span is the last visible span on the current page
+ * @param {string} spanId - The ID of the span element to check
+ * @returns {boolean} True if the span is the last visible span
+ */
+function isLastVisibleSpan(spanId) {
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+        console.warn("Cannot access iframe document to check for last visible span");
+        return false;
+    }
+
+    // Get all spans in the document
+    const allSpans = doc.querySelectorAll('span[id]');
+    if (!allSpans || allSpans.length === 0) {
+        console.warn("No spans found in document");
+        return false;
+    }
+
+    // Find the index of our current span
+    let currentSpanIndex = -1;
+    for (let i = 0; i < allSpans.length; i++) {
+        if (allSpans[i].id === spanId) {
+            currentSpanIndex = i;
+            break;
+        }
+    }
+
+    if (currentSpanIndex === -1) {
+        console.warn(`Span with ID '${spanId}' not found in document spans collection`);
+        return false;
+    }
+
+    // Check if any spans after the current one are visible
+    for (let i = currentSpanIndex + 1; i < allSpans.length; i++) {
+        if (isSpanVisibleOnPage(allSpans[i].id)) {
+            console.log(`Span ${spanId} is not the last visible span, ${allSpans[i].id} is visible after it`);
+            return false;
+        }
+    }
+
+    console.log(`Span ${spanId} is the last visible span on the page`);
+    return true;
+}
+
+/**
+ * Processes a span, checking visibility and handling page flips if needed
+ * @param {string} spanId - The ID of the span element to process
+ * @returns {boolean} True if the span is visible, false otherwise
+ */
+function processSpan(spanId) {
+    // Skip processing if spanId is null or the same as the last processed span
+    if (!spanId || spanId === lastProcessedSpanId) {
+        return true;
+    }
+    
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+        console.warn("Cannot access iframe document to process span");
+        return false;
+    }
+    
+    const spanElement = doc.getElementById(spanId);
+    if (!spanElement) {
+        console.warn(`Span element with ID '${spanId}' not found for processing`);
+        return false;
+    }
+    
+    // Check if span is visible
+    const isVisible = isSpanVisibleOnPage(spanId);
+    
+    if (isVisible) {
+        // If this span is visible, check if it's near bottom AND the last visible span
+        const isNearBottom = isSpanNearBottomOfPage(spanId);
+        const isLast = isLastVisibleSpan(spanId);
+        
+        if (isNearBottom && isLast && autoPageFlipEnabled) {
+            // Check if enough time has passed since the last page flip
+            const currentTime = Date.now();
+            const timeElapsedSinceLastFlip = currentTime - lastPageFlipTime;
+            
+            if (timeElapsedSinceLastFlip >= minimumPageFlipDelay) {
+                // Flip page if span is near bottom, last visible and enough time has passed
+                console.log(`Flipping page for span ${spanId} (span is near bottom and last visible)`);
+                flipToNextPage();
+            } else {
+                console.log(`Not flipping page yet - only ${(timeElapsedSinceLastFlip/1000).toFixed(1)} seconds since last flip, need ${minimumPageFlipDelay/1000} seconds`);
+            }
+        }
+    } else if (!isVisible && lastProcessedSpanId) {
+        // If this span is not visible, check if the last processed span is near bottom and last visible
+        const wasLastSpanNearBottom = isSpanNearBottomOfPage(lastProcessedSpanId);
+        const wasLastSpanLast = isLastVisibleSpan(lastProcessedSpanId);
+        
+        if (wasLastSpanNearBottom && wasLastSpanLast && autoPageFlipEnabled) {
+            // Check if enough time has passed since the last page flip
+            const currentTime = Date.now();
+            const timeElapsedSinceLastFlip = currentTime - lastPageFlipTime;
+            
+            if (timeElapsedSinceLastFlip >= minimumPageFlipDelay) {
+                // Flip page if conditions are met
+                console.log(`Flipping page for span ${spanId} (last span was near bottom and last visible)`);
+                flipToNextPage();
+            } else {
+                console.log(`Not flipping page yet - only ${(timeElapsedSinceLastFlip/1000).toFixed(1)} seconds since last flip, need ${minimumPageFlipDelay/1000} seconds`);
+            }
+        }
+    }
+    
+    // Update last processed span ID
+    lastProcessedSpanId = spanId;
+    
+    return isVisible;
+}
+
+/**
+ * Flips to the next page and updates the last page flip time
+ */
+function flipToNextPage() {
+    // Record the time of this page flip
+    lastPageFlipTime = Date.now();
+    
+    // Use the existing navigation utility to flip the page
+    let platform = domUtils.detectPlatform();
+    navigationUtils.scrollRight(platform);
+    
+    console.log(`Page flipped at ${new Date(lastPageFlipTime).toISOString()}`);
+}
+
+/**
+ * Enables or disables automatic page flipping
+ * @param {boolean} enabled - Whether auto page flip should be enabled
+ */
+function setAutoPageFlip(enabled) {
+    autoPageFlipEnabled = enabled;
+    console.log(`Auto page flip ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Sets the minimum delay between automatic page flips in seconds
+ * @param {number} seconds - The minimum delay in seconds
+ */
+function setPageFlipDelay(seconds) {
+    minimumPageFlipDelay = Math.max(1, seconds) * 1000; // Convert to milliseconds with minimum of 1 second
+    console.log(`Page flip delay set to ${minimumPageFlipDelay / 1000} seconds`);
 }

@@ -18,10 +18,20 @@ public partial class BookPage : ContentPage
 {
 	const string externalLinkPrefix = "https://runcsharp.jump/?";
 	const uint animationDuration = 200u;
+	bool isPlayingAudio = false;
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
+
+	readonly Service.AudioPlayer? audioPlayer;
+	readonly ToolbarItem audioPlayerItem = new()
+	{
+		Order = ToolbarItemOrder.Primary,
+		Priority = 1,
+		IconImageSource = "play_circle_dark_mode.png",
+
+	};
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -34,6 +44,7 @@ public partial class BookPage : ContentPage
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		this.audioPlayer = new(viewModel.Dispatcher);
 		this.db = db;
 		webViewHelper = new(webView);
 
@@ -100,6 +111,10 @@ public partial class BookPage : ContentPage
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		if (book.Chapters[book.CurrentChapter].AudioCues.Count > 0)
+		{
+			AddAudioBookToolBarItem();
+		}
 	}
 
 	/// <summary>
@@ -295,7 +310,13 @@ public partial class BookPage : ContentPage
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
-	void CreateToolBarItem(int index, Chapter chapter)
+	void AddAudioBookToolBarItem()
+	{
+		Shell.Current.ToolbarItems.Add(audioPlayerItem);
+		audioPlayerItem.Clicked += ToolbarItem_Clicked;
+	}
+
+		void CreateToolBarItem(int index, Chapter chapter)
 	{
 		ArgumentNullException.ThrowIfNull(book);
 		if (string.IsNullOrEmpty(chapter.Title))
@@ -353,5 +374,31 @@ public partial class BookPage : ContentPage
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
+	}
+
+	async void ToolbarItem_Clicked(object? sender, EventArgs e)
+	{
+		System.Diagnostics.Debug.WriteLine("Toolbar item clicked.");
+		if(audioPlayer is null)
+		{
+			System.Diagnostics.Debug.WriteLine("Audio player is null, cannot toggle audio playback.");
+			return;
+		}
+		if (isPlayingAudio)
+		{
+			System.Diagnostics.Debug.WriteLine("Stopping audio playback.");
+			audioPlayer.StopAudio();
+			audioPlayerItem.IconImageSource = "play_circle_dark_mode.png";
+			isPlayingAudio = false;
+			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+		}
+		else
+		{
+			System.Diagnostics.Debug.WriteLine("Starting audio playback.");
+			audioPlayerItem.IconImageSource = "pause_circle_dark_mode.png";
+			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+			isPlayingAudio = true;
+			await audioPlayer.PlayAudio(book, webView).ConfigureAwait(false);
+		}
 	}
 }
