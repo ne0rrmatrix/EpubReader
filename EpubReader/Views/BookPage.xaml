@@ -26,10 +26,11 @@
         <ToolbarItem
             x:Name="audioPlayerItem"
             x:DataType="views:BookPage"
-            Command="{Binding Source={x:Reference CurrentPage}, Path=PlayAudioCommand}"
-            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=play_circle_dark_mode.png,
+            Clicked="audioPlayerItem_Clicked"
+            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=play_circle_light_mode.png,
                                                                 Default=play_circle_light_mode.png},
-                                              Dark=play_circle_light_mode.png}"
+                                              Dark={OnPlatform WinUI=play_circle_dark_mode.png,
+                                                               Default=play_circle_dark_mode.png}}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
     <shimmer:SfShimmer

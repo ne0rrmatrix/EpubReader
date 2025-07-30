@@ -234,7 +234,14 @@ public partial class BookPage : ContentPage
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
 			case "longpress":
-				await PlayAudio(data);
+				isPlayingAudio = true;
+				SetAudioPlayerIcon();
+				if (audioPlayer is null)
+				{
+					System.Diagnostics.Debug.WriteLine("Audio player is null, cannot play audio.");
+					return;
+				}
+				await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
 				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
@@ -244,10 +251,10 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
-				if(isPlayingAudio && audioPlayer is not null)
+				if(isPlayingAudio)
 				{
 					isPlayingAudio = false;
-					await PlayAudio(null);
+					audioPlayerItem_Clicked(this, EventArgs.Empty);
 				}
 				break;
 			case "characterposition":
@@ -371,31 +378,50 @@ public partial class BookPage : ContentPage
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
 	}
+	void SetAudioPlayerIcon()
+	{
+		if (audioPlayerItem is null)
+		{
+			System.Diagnostics.Debug.WriteLine("Audio player item is null, cannot set icon.");
+			return;
+		}
+		if(isPlayingAudio)
+		{
+			System.Diagnostics.Debug.WriteLine("Audio is currently playing, setting pause icon.");
+			audioPlayerItem.IconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+				? "pause_circle_dark_mode.png"
+				: "pause_circle_light_mode.png";
+			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+			return;
+		}
+		var iconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+			? "play_circle_dark_mode.png"
+			: "play_circle_light_mode.png";
+		audioPlayerItem.IconImageSource = iconImageSource;
+		OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+	}
 
-	[RelayCommand]
-	public async Task PlayAudio(string? data)
+	async void audioPlayerItem_Clicked(object? sender, EventArgs e)
 	{
 		System.Diagnostics.Debug.WriteLine("Toolbar item clicked.");
-		if (audioPlayer is null)
+		if (audioPlayer is null || sender is null)
 		{
 			System.Diagnostics.Debug.WriteLine("Audio player is null, cannot toggle audio playback.");
 			return;
 		}
+		
 		if (isPlayingAudio)
 		{
 			System.Diagnostics.Debug.WriteLine("Stopping audio playback.");
+
 			audioPlayer.StopAudio();
-			audioPlayerItem.IconImageSource = "play_circle_dark_mode.png";
 			isPlayingAudio = false;
-			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+			SetAudioPlayerIcon();
+			return;
 		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("Starting audio playback.");
-			audioPlayerItem.IconImageSource = "pause_circle_dark_mode.png";
-			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
-			isPlayingAudio = true;
-			await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
-		}
+
+		isPlayingAudio = true;
+		SetAudioPlayerIcon();
+		await audioPlayer.PlayAudio(book, webView, null).ConfigureAwait(false);
 	}
 }
