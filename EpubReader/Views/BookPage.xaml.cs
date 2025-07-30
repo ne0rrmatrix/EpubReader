@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
@@ -24,14 +25,8 @@ public partial class BookPage : ContentPage
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
 
-	readonly Service.AudioPlayer? audioPlayer;
-	readonly ToolbarItem audioPlayerItem = new()
-	{
-		Order = ToolbarItemOrder.Primary,
-		Priority = 1,
-		IconImageSource = "play_circle_dark_mode.png",
-
-	};
+	readonly Service.AudioPlayer? audioPlayer = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<Service.AudioPlayer>()
+		?? throw new InvalidOperationException("AudioPlayer is not available in the current context.");
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -44,7 +39,6 @@ public partial class BookPage : ContentPage
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
-		this.audioPlayer = new(viewModel.Dispatcher);
 		this.db = db;
 		webViewHelper = new(webView);
 
@@ -111,9 +105,9 @@ public partial class BookPage : ContentPage
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		if (book.Chapters[book.CurrentChapter].AudioCues.Count > 0)
+		if (book.Chapters[book.CurrentChapter].AudioCues.Count == 0)
 		{
-			AddAudioBookToolBarItem();
+			Shell.Current.ToolbarItems.Remove(audioPlayerItem);
 		}
 	}
 
@@ -239,6 +233,9 @@ public partial class BookPage : ContentPage
 			case "menu":
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
+			case "longpress":
+				await PlayAudio(data);
+				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
 				await UpdateUiAppearance();
@@ -247,6 +244,11 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
+				if(isPlayingAudio && audioPlayer is not null)
+				{
+					isPlayingAudio = false;
+					await PlayAudio(null);
+				}
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
@@ -310,12 +312,6 @@ public partial class BookPage : ContentPage
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
-	void AddAudioBookToolBarItem()
-	{
-		Shell.Current.ToolbarItems.Add(audioPlayerItem);
-		audioPlayerItem.Clicked += ToolbarItem_Clicked;
-	}
-
 		void CreateToolBarItem(int index, Chapter chapter)
 	{
 		ArgumentNullException.ThrowIfNull(book);
@@ -376,10 +372,11 @@ public partial class BookPage : ContentPage
 #endif
 	}
 
-	async void ToolbarItem_Clicked(object? sender, EventArgs e)
+	[RelayCommand]
+	public async Task PlayAudio(string? data)
 	{
 		System.Diagnostics.Debug.WriteLine("Toolbar item clicked.");
-		if(audioPlayer is null)
+		if (audioPlayer is null)
 		{
 			System.Diagnostics.Debug.WriteLine("Audio player is null, cannot toggle audio playback.");
 			return;
@@ -398,7 +395,7 @@ public partial class BookPage : ContentPage
 			audioPlayerItem.IconImageSource = "pause_circle_dark_mode.png";
 			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
 			isPlayingAudio = true;
-			await audioPlayer.PlayAudio(book, webView).ConfigureAwait(false);
+			await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
 		}
 	}
 }

@@ -120,6 +120,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
 		builder.Services.AddSingleton<WebViewHelper>();
+		builder.Services.AddSingleton<Service.AudioPlayer>();
 
 		// Register Popup pages and their view models
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
