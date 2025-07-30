@@ -267,7 +267,7 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
-				if(isPlayingAudio)
+				if (isPlayingAudio)
 				{
 					isPlayingAudio = false;
 					audioPlayerItem_Clicked(this, EventArgs.Empty);
@@ -400,7 +400,7 @@ public partial class BookPage : ContentPage
 		{
 			return;
 		}
-		if(isPlayingAudio)
+		if (isPlayingAudio)
 		{
 			audioPlayerItem.IconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
 				? "pause_circle_dark_mode.png"
