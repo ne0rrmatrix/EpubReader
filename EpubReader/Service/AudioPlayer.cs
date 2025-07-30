@@ -44,7 +44,7 @@ public partial class AudioPlayer
 			seekToCueId = string.Empty;
 		}
 		logger.Info($"SeekTo called with cueId: {cueId}");
-		var cue = cues.Find(c => c.SpandId.Equals(cueId, StringComparison.OrdinalIgnoreCase));
+		var cue = cues.Find(c => c.SpanId.Equals(cueId, StringComparison.OrdinalIgnoreCase));
 		if (cue is null)
 		{
 			logger.Warn($"No cue found with ID: {cueId}");
@@ -147,9 +147,9 @@ public partial class AudioPlayer
 			asyncAudioPlayer.CurrentPosition <= end.TotalSeconds);
 		ArgumentNullException.ThrowIfNull(asyncAudioPlayer);
 
-		if (cue is not null && !cue.SpandId.Equals(currentItemId))
+		if (cue is not null && !cue.SpanId.Equals(currentItemId))
 		{
-			currentItemId = cue.SpandId;
+			currentItemId = cue.SpanId;
 			await RunCode(cue, CancellationToken.None);
 			return;
 		}
@@ -167,20 +167,20 @@ public partial class AudioPlayer
 		ArgumentNullException.ThrowIfNull(webView);
 		ArgumentNullException.ThrowIfNull(book);
 		var result = string.Empty;
-		result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpandId}');").WaitAsync(cancellationToken);
+		result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpanId}');").WaitAsync(cancellationToken);
 		
 		if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
 		{
 			dispatcher.Dispatch(async () =>
 			{
 				await webView.EvaluateJavaScriptAsync($"handleNext();").WaitAsync(cancellationToken);
-				await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}')").WaitAsync(cancellationToken);
+				await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpanId}')").WaitAsync(cancellationToken);
 				await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();").WaitAsync(cancellationToken);
 			});
 			return;
 		}
 
-		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}');").WaitAsync(cancellationToken));
+		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpanId}');").WaitAsync(cancellationToken));
 		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();").WaitAsync(cancellationToken));
 	}
 

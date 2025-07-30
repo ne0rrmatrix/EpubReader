@@ -28,7 +28,7 @@ public class AudioCue
 	/// <summary>
 	/// Gets or sets the unique identifier for the span.
 	/// </summary>
-	public string SpandId { get; set; } = string.Empty;
+	public string SpanId { get; set; } = string.Empty;
 
 	/// <summary>
 	/// Gets or sets the audio data as a byte array.

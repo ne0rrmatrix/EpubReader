@@ -120,7 +120,7 @@ public static partial class EbookService
 					   ClipBegin = par.Audio?.ClipBegin ?? string.Empty,
 					   ClipEnd = par.Audio?.ClipEnd ?? string.Empty,
 					   FileName = Path.GetFileName(par.Audio?.Src) ?? string.Empty, // Use Src as FilePath
-					   SpandId = par.Text?.Src?.Split('#')[1] ?? string.Empty, // Handle null Text or Src
+					   SpanId = par.Text?.Src?.Split('#')[1] ?? string.Empty, // Handle null Text or Src
 					   AudioData = audio.FirstOrDefault(x => x.FileName.Equals(Path.GetFileName(par.Audio?.Src), StringComparison.OrdinalIgnoreCase))?.Data ?? []
 				   })
 				   .ToList() ?? [];
