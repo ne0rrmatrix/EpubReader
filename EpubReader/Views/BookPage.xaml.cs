@@ -24,6 +24,7 @@ public partial class BookPage : ContentPage
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
+	ToolbarItem? audioPlayerItem;
 
 	readonly Service.AudioPlayer? audioPlayer = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<Service.AudioPlayer>()
 		?? throw new InvalidOperationException("AudioPlayer is not available in the current context.");
@@ -42,8 +43,10 @@ public partial class BookPage : ContentPage
 		this.db = db;
 		webViewHelper = new(webView);
 
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) 
+			=> await HandleJavascriptAsync(m.Value));
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) 
+			=> { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
 	/// <summary>
@@ -104,10 +107,21 @@ public partial class BookPage : ContentPage
 	/// <param name="e">The event data.</param>
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		if (book.Chapters[book.CurrentChapter].AudioCues.Count == 0)
+		book.Chapters.ForEach(chapter 
+			=> CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		if (book.Chapters[book.CurrentChapter].AudioCues.Count > 0)
 		{
-			Shell.Current.ToolbarItems.Remove(audioPlayerItem);
+			var iconSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+				? "play_circle_dark_mode.png"
+				: "play_circle_light_mode.png";
+			audioPlayerItem = new ToolbarItem
+			{
+				Order = ToolbarItemOrder.Primary,
+				Priority = 0,
+				IconImageSource = iconSource,
+			};
+			audioPlayerItem.Clicked += audioPlayerItem_Clicked;
+			Shell.Current.ToolbarItems.Add(audioPlayerItem);
 		}
 	}
 
@@ -170,7 +184,8 @@ public partial class BookPage : ContentPage
 		var urlParts = url.Split('?')[1].Split('#')[0];
 		if (!string.IsNullOrEmpty(urlParts))
 		{
-			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
+			var chapter = book.Chapters.Find(chapter => 
+				chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 			if (chapter is null)
 			{
 				return;
@@ -182,7 +197,9 @@ public partial class BookPage : ContentPage
 	}
 	static async Task TryHandleExternalLinkAsync(string url)
 	{
-		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) 
+			|| url.Contains("https://demo") 
+			|| url.Contains("app://demo"))
 		{
 			return;
 		}
@@ -234,13 +251,12 @@ public partial class BookPage : ContentPage
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
 			case "longpress":
-				isPlayingAudio = true;
-				SetAudioPlayerIcon();
 				if (audioPlayer is null)
 				{
-					System.Diagnostics.Debug.WriteLine("Audio player is null, cannot play audio.");
 					return;
 				}
+				isPlayingAudio = true;
+				SetAudioPlayerIcon();
 				await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
 				break;
 			case "pageload":
@@ -382,12 +398,10 @@ public partial class BookPage : ContentPage
 	{
 		if (audioPlayerItem is null)
 		{
-			System.Diagnostics.Debug.WriteLine("Audio player item is null, cannot set icon.");
 			return;
 		}
 		if(isPlayingAudio)
 		{
-			System.Diagnostics.Debug.WriteLine("Audio is currently playing, setting pause icon.");
 			audioPlayerItem.IconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
 				? "pause_circle_dark_mode.png"
 				: "pause_circle_light_mode.png";
@@ -403,17 +417,13 @@ public partial class BookPage : ContentPage
 
 	async void audioPlayerItem_Clicked(object? sender, EventArgs e)
 	{
-		System.Diagnostics.Debug.WriteLine("Toolbar item clicked.");
 		if (audioPlayer is null || sender is null)
 		{
-			System.Diagnostics.Debug.WriteLine("Audio player is null, cannot toggle audio playback.");
 			return;
 		}
 		
 		if (isPlayingAudio)
 		{
-			System.Diagnostics.Debug.WriteLine("Stopping audio playback.");
-
 			audioPlayer.StopAudio();
 			isPlayingAudio = false;
 			SetAudioPlayerIcon();

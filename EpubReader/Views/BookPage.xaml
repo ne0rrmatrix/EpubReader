@@ -23,15 +23,7 @@
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
-        <ToolbarItem
-            x:Name="audioPlayerItem"
-            x:DataType="views:BookPage"
-            Clicked="audioPlayerItem_Clicked"
-            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=play_circle_light_mode.png,
-                                                                Default=play_circle_light_mode.png},
-                                              Dark={OnPlatform WinUI=play_circle_dark_mode.png,
-                                                               Default=play_circle_dark_mode.png}}"
-            Order="Primary" />
+
     </ContentPage.ToolbarItems>
     <shimmer:SfShimmer
         x:Name="Shimmer"

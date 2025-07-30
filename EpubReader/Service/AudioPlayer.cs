@@ -150,7 +150,7 @@ public partial class AudioPlayer
 		if (cue is not null && !cue.SpandId.Equals(currentItemId))
 		{
 			currentItemId = cue.SpandId;
-			await RunCode(cue);
+			await RunCode(cue, CancellationToken.None);
 			return;
 		}
 		
@@ -162,26 +162,26 @@ public partial class AudioPlayer
 			return;
 		}
 	}
-	async Task RunCode(AudioCue cue)
+	async Task RunCode(AudioCue cue, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(webView);
 		ArgumentNullException.ThrowIfNull(book);
 		var result = string.Empty;
-		result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpandId}');");
+		result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpandId}');").WaitAsync(cancellationToken);
 		
 		if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
 		{
 			dispatcher.Dispatch(async () =>
 			{
-				await webView.EvaluateJavaScriptAsync($"handleNext();");
-				await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}')");
-				await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();");
+				await webView.EvaluateJavaScriptAsync($"handleNext();").WaitAsync(cancellationToken);
+				await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}')").WaitAsync(cancellationToken);
+				await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();").WaitAsync(cancellationToken);
 			});
 			return;
 		}
-		
-		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}');"));
-		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();"));
+
+		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpandId}');").WaitAsync(cancellationToken));
+		dispatcher.Dispatch(async () => await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();").WaitAsync(cancellationToken));
 	}
 
 

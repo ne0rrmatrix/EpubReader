@@ -102,9 +102,9 @@ public static partial class EbookService
 	/// <param name="book">The EPUB book reference from which to extract audio cues. Must not be null.</param>
 	/// <returns>A list of <see cref="AudioCue"/> objects representing the audio cues found in the book. Returns an empty list if no
 	/// audio cues are found.</returns>
-	static async Task<List<AudioCue>> GetAudioCues(EpubBookRef book)
+	static async Task<List<AudioCue>> GetAudioCues(EpubBookRef book, CancellationToken cancellationToken)
 	{
-		var audio = await GetLocalAudio(book);
+		var audio = await GetLocalAudio(book, cancellationToken);
 		return book.Schema?.MediaOverlays?
 				   .Where(audioQue => audioQue is not null)
 				   .SelectMany(audioQue => audioQue.Body?.Seqs ?? [])
@@ -125,13 +125,13 @@ public static partial class EbookService
 				   })
 				   .ToList() ?? [];
 	}
-	static async Task<List<Audio>> GetLocalAudio(EpubBookRef book)
+	static async Task<List<Audio>> GetLocalAudio(EpubBookRef book, CancellationToken cancellationToken)
 	{
 		var audio = book.Content.Audio;
 		List<Audio> audioList = [];
 		foreach (var item in audio.Local)
 		{
-			var data = await item.ReadContentAsBytesAsync().ConfigureAwait(false);
+			var data = await item.ReadContentAsBytesAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
 			audioList.Add(new Audio
 			{
 				FileName = Path.GetFileName(item.FilePath),
@@ -161,7 +161,7 @@ public static partial class EbookService
 		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		var cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
-		var audioCues = await GetAudioCues(book);
+		var audioCues = await GetAudioCues(book, CancellationToken.None);
 		chapters.ForEach(chapter =>
 		{
 			chapter.AudioCues = audioCues.FindAll(cue => cue.Text == chapter.FileName);
