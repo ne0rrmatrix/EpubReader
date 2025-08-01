@@ -1,4 +1,9 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using EpubReader.Interfaces;
 using EpubReader.Models;
 using MetroLog;
 using Plugin.Maui.Audio;
@@ -9,6 +14,8 @@ public partial class AudioPlayer
 	readonly ILogger logger = LoggerFactory.GetLogger(nameof(AudioPlayer));
 	readonly IDispatcher dispatcher = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDispatcher>()
 		?? throw new InvalidOperationException("Dispatcher is not available in the current context.");
+	readonly IDb db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>()
+		?? throw new InvalidOperationException("Database service is not available in the current context.");
 	List<AudioCue> cues = [];
 	IDispatcherTimer? timer;
 	AsyncAudioPlayer? asyncAudioPlayer;
@@ -74,10 +81,11 @@ public partial class AudioPlayer
 	/// <returns></returns>
 	/// <exception cref="ArgumentNullException">Thrown if <paramref name="book"/> is <see langword="null"/>.</exception>
 	/// <exception cref="InvalidOperationException">Thrown if the audio cues are not available for the current chapter or if the audio player could not be created.</exception>
+	
 	public async Task PlayAudio(Book book, WebView webview, string? cueId)
 	{
 
-		if(asyncAudioPlayer is not null && asyncAudioPlayer.CurrentPosition > 0)
+		if(asyncAudioPlayer is not null && asyncAudioPlayer.CurrentPosition > 0 && !string.IsNullOrEmpty(cueId))
 		{
 			SeekTo(cueId);
 			logger.Info("Audio is already playing, ignoring function call for it again.");
@@ -93,7 +101,7 @@ public partial class AudioPlayer
 		{
 			logger.Info($"End of book reached. Stopping audio and exiting audio player.");
 			dispatcher.Dispatch(async () => await webview.EvaluateJavaScriptAsync("removeHighlight();"));
-			StopAudio();
+			await StopAudio();
 			return;
 		}
 		cues = book.Chapters[book.CurrentChapter].AudioCues 
@@ -108,7 +116,22 @@ public partial class AudioPlayer
 		asyncAudioPlayer.Loop = false;
 		await webview.EvaluateJavaScriptAsync("setAutoPageFlip('true');");
 		InitializeTimer();
+		
+		var currentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage();").WaitAsync(CancellationToken.None);
+		var spans = await webView.EvaluateJavaScriptAsync($"getSpansForPage({currentPage});").WaitAsync(CancellationToken.None);
 
+		var result = JsonSerializer.Deserialize(spans, AudioCueJsonContext.Default.ListAudioCue) ?? [];
+		if(result.Find(item => item.Id.Equals(book.CurrentChapterCue, StringComparison.OrdinalIgnoreCase)) is not null)
+		{
+			seekToCueId = book.CurrentChapterCue;
+			logger.Info($"Current chapter cue '{book.CurrentChapterCue}' is on the current page, setting seekToCueId to it.");
+		}
+		else
+		{
+			seekToCueId = result[0].Id;
+			logger.Info($"Current chapter cue '{book.CurrentChapterCue}' is not on the current page, setting seekToCueId to the first cue on the page: {seekToCueId}.");
+		}
+	
 		await asyncAudioPlayer.PlayAsync(CancellationToken.None).ConfigureAwait(false);
 	}
 
@@ -117,10 +140,17 @@ public partial class AudioPlayer
 	/// </summary>
 	/// <remarks>This method stops the audio player if it is currently playing and ensures that any visual
 	/// highlights in the web view are removed. It also clears any active timers related to the audio playback.</remarks>
-	public void StopAudio()
+	public async Task StopAudio()
 	{
+		if (book is null || asyncAudioPlayer is null)
+		{
+			logger.Warn("StopAudio called but book or asyncAudioPlayer is null.");
+			return;
+		}
+		book.CurrentChapterCue = currentItemId;
+		await db.UpdateBookMark(book).ConfigureAwait(false);
 		logger.Info("StopAudio called.");
-		asyncAudioPlayer?.Stop();
+		asyncAudioPlayer.Stop();
 		ArgumentNullException.ThrowIfNull(webView);
 		ClearTimer();
 		
@@ -150,6 +180,12 @@ public partial class AudioPlayer
 		if (cue is not null && !cue.SpanId.Equals(currentItemId))
 		{
 			currentItemId = cue.SpanId;
+			if(!string.IsNullOrEmpty(currentItemId))
+			{
+				book.CurrentChapterCue = currentItemId;
+				await db.UpdateBookMark(book);
+			}
+			
 			await RunCode(cue, CancellationToken.None);
 			return;
 		}
@@ -157,7 +193,8 @@ public partial class AudioPlayer
 		if (asyncAudioPlayer.CurrentPosition.Equals(0.00))
 		{
 			logger.Info("Last cue reached, stopping audio.");
-			StopAudio();
+			await StopAudio();
+			seekToCueId = string.Empty;
 			await webView.EvaluateJavaScriptAsync("nextChapter()");
 			return;
 		}
@@ -216,4 +253,11 @@ public partial class AudioPlayer
 		timer.Stop();
 		timer = null;
 	}
+}
+
+[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+[JsonSerializable(typeof(List<AudioCue>))]
+[JsonSerializable(typeof(AudioCue))]
+public partial class AudioCueJsonContext : JsonSerializerContext
+{
 }

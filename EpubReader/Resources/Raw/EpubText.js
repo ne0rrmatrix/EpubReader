@@ -530,6 +530,17 @@ function handleMessage(event, platform) {
     } else if (data === "menu") {
         console.log("Received menu command.");
         window.location.href = 'https://runcsharp.menu?true';
+    } else if (data.startsWith("longpress.")) {
+        // Extract coordinates from the message
+        const coords = data.substring(10).split(',');
+        if (coords.length === 2) {
+            const x = parseInt(coords[0], 10);
+            const y = parseInt(coords[1], 10);
+            console.log(`Received long press coordinates from iframe: x=${x}, y=${y}`);
+            
+            // Handle the long press using our utility
+            handleIframeLongPress(x, y);
+        }
     }
 }
 
@@ -562,7 +573,6 @@ function handlePrevCommand() {
     // Make sure to update visible spans when navigating
     updateVisibleSpanElements();
 }
-
 
 /**
  * Calculates the approximate character position based on current scroll position
@@ -651,7 +661,7 @@ const longPressUtils = {
         moveTolerance: 10, // Maximum movement in pixels allowed during press
         preventEventsDuration: 1500 // How long to block events after long press (ms)
     },
-    
+
     /**
      * Current state of touch/mouse tracking
      */
@@ -667,7 +677,7 @@ const longPressUtils = {
         isAudioPlaying: false,    // Flag to track if audio is playing
         movedBeyondTolerance: false // Flag to track if movement exceeded tolerance
     },
-    
+
     /**
      * Initializes long press detection on the given document
      * @param {Document} doc - Document to attach listeners to
@@ -677,27 +687,27 @@ const longPressUtils = {
             console.warn("Cannot initialize long press detection - document not available");
             return;
         }
-        
+
         console.log("Initializing long press detection");
-        
+
         // Touch events - use capture phase to ensure we get events first
         doc.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false, capture: true });
         doc.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false, capture: true });
         doc.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false, capture: true });
         doc.addEventListener('touchcancel', this.handleTouchCancel.bind(this), { passive: false, capture: true });
-        
+
         // Mouse events for desktop - use capture phase
         doc.addEventListener('mousedown', this.handleMouseDown.bind(this), { capture: true });
         doc.addEventListener('mousemove', this.handleMouseMove.bind(this), { capture: true });
         doc.addEventListener('mouseup', this.handleMouseUp.bind(this), { capture: true });
-        
+
         // Add click interceptor with high priority (capture phase)
         doc.addEventListener('click', this.interceptClickEvent.bind(this), { capture: true });
         doc.addEventListener('touchend', this.interceptTouchEndEvent.bind(this), { capture: true });
-        
+
         console.log("Long press detection initialized with click/touch interception");
     },
-    
+
     /**
      * Sets audio playback state
      * @param {boolean} isPlaying - Whether audio is currently playing
@@ -706,7 +716,7 @@ const longPressUtils = {
         this.state.isAudioPlaying = isPlaying;
         console.log(`Audio playback state set to: ${isPlaying}`);
     },
-    
+
     /**
      * Intercepts click events and prevents them if a long press was recently detected
      * @param {MouseEvent} event - The click event
@@ -720,7 +730,7 @@ const longPressUtils = {
         }
         return true;
     },
-    
+
     /**
      * Intercepts touch end events and prevents them if a long press was recently detected
      * @param {TouchEvent} event - The touch end event
@@ -734,7 +744,7 @@ const longPressUtils = {
         }
         return true;
     },
-    
+
     /**
      * Finds the closest span element with an ID to the click/touch position
      * @param {Element} element - Starting element to search from
@@ -744,49 +754,49 @@ const longPressUtils = {
      */
     findClosestSpanWithId(element, x, y) {
         if (!element) return null;
-        
+
         // Get the document to search in
         const doc = element.ownerDocument || document;
-        
+
         // First, check if the element itself is a span with ID
         if (element?.tagName === 'SPAN' && element.id) {
             return element;
         }
-        
+
         // Find all spans with IDs in the document
         const allSpans = doc.querySelectorAll('span[id]');
         if (!allSpans.length) return null;
-        
+
         // If we have only one span, return it
         if (allSpans.length === 1) return allSpans[0];
-        
+
         // Calculate distances and find the closest span
         let closestSpan = null;
         let closestDistance = Number.MAX_VALUE;
-        
+
         allSpans.forEach(span => {
             const rect = span.getBoundingClientRect();
-            
+
             // Find center point of the span
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            
+
             // Calculate Euclidean distance to click/touch position
             const distance = Math.sqrt(
-                Math.pow(centerX - x, 2) + 
+                Math.pow(centerX - x, 2) +
                 Math.pow(centerY - y, 2)
             );
-            
+
             // Update if this span is closer than the current closest
             if (distance < closestDistance) {
                 closestDistance = distance;
                 closestSpan = span;
             }
         });
-        
+
         return closestSpan;
     },
-    
+
     /**
      * Starts the long press timer
      * @param {Element} target - The target element
@@ -795,7 +805,7 @@ const longPressUtils = {
      */
     startLongPressTimer(target, x, y) {
         this.clearLongPressTimer();
-        
+
         this.state.startTime = Date.now();
         this.state.startX = x;
         this.state.startY = y;
@@ -803,12 +813,12 @@ const longPressUtils = {
         this.state.active = true;
         this.state.longPressDetected = false;
         this.state.movedBeyondTolerance = false;
-        
+
         this.state.timeoutId = setTimeout(() => {
             this.handleLongPress();
         }, this.config.pressTimeout);
     },
-    
+
     /**
      * Clears the long press timer
      */
@@ -819,72 +829,72 @@ const longPressUtils = {
         }
         this.state.active = false;
     },
-    
+
     /**
      * Handles long press detection completion
      */
     handleLongPress() {
         if (!this.state.active || this.state.movedBeyondTolerance) return;
-        
+
         const spanElement = this.findClosestSpanWithId(
-            this.state.target, 
-            this.state.startX, 
+            this.state.target,
+            this.state.startX,
             this.state.startY
         );
-        
+
         if (spanElement?.id) {
             console.log(`Long press detected on span with ID: ${spanElement.id}`);
-            
+
             // Set flags to prevent subsequent click/touch events
             this.state.longPressDetected = true;
-            
+
             // Set longer prevention time during audio playback to ensure it works
-            const preventDuration = this.state.isAudioPlaying ? 
+            const preventDuration = this.state.isAudioPlaying ?
                 this.config.preventEventsDuration * 2 : // Double the duration for audio playback
                 this.config.preventEventsDuration;
-                
+
             this.state.preventClickUntil = Date.now() + preventDuration;
-            
+
             // Notify C# code about the long press on a span
             window.location.href = `https://runcsharp.longpress?${spanElement.id}`;
         } else {
             console.log("Long press detected but no span with ID found");
-            
+
             // Still prevent clicks even if no span was found
             this.state.longPressDetected = true;
             this.state.preventClickUntil = Date.now() + this.config.preventEventsDuration;
         }
-        
+
         this.clearLongPressTimer();
     },
-    
+
     /**
      * Handles touch start event
      * @param {TouchEvent} event - The touch start event
      */
     handleTouchStart(event) {
         if (event.touches.length !== 1) return; // Only track single touches
-        
+
         const touch = event.touches[0];
         this.startLongPressTimer(event.target, touch.clientX, touch.clientY);
     },
-    
+
     /**
      * Handles touch move event
      * @param {TouchEvent} event - The touch move event
      */
     handleTouchMove(event) {
         if (!this.state.active || event.touches.length !== 1) return;
-        
+
         const touch = event.touches[0];
-        
+
         // Check if touch has moved beyond tolerance
         const moveX = Math.abs(touch.clientX - this.state.startX);
         const moveY = Math.abs(touch.clientY - this.state.startY);
-        
+
         if (moveX > this.config.moveTolerance || moveY > this.config.moveTolerance) {
             this.state.movedBeyondTolerance = true;
-            
+
             // During audio playback, still block clicks even if moved
             if (this.state.isAudioPlaying) {
                 this.state.longPressDetected = true;
@@ -895,7 +905,7 @@ const longPressUtils = {
             }
         }
     },
-    
+
     /**
      * Handles touch end event
      * @param {TouchEvent} event - The touch end event
@@ -908,14 +918,14 @@ const longPressUtils = {
             event.preventDefault();
             return;
         }
-        
+
         // Only clear timer if it wasn't a long press
         if (!this.state.longPressDetected) {
             this.clearLongPressTimer();
         }
         this.state.longPressDetected = false;
     },
-    
+
     /**
      * Handles touch cancel event
      * @param {TouchEvent} event - The touch cancel event
@@ -924,42 +934,42 @@ const longPressUtils = {
         this.clearLongPressTimer();
         this.state.longPressDetected = false;
     },
-    
+
     /**
      * Handles mouse down event
      * @param {MouseEvent} event - The mouse down event
      */
     handleMouseDown(event) {
         if (event.button !== 0) return; // Only track left mouse button
-        
+
         this.startLongPressTimer(event.target, event.clientX, event.clientY);
     },
-    
+
     /**
      * Handles mouse move event
      * @param {MouseEvent} event - The mouse move event
      */
     handleMouseMove(event) {
         if (!this.state.active) return;
-        
+
         // Check if mouse has moved beyond tolerance
         const moveX = Math.abs(event.clientX - this.state.startX);
         const moveY = Math.abs(event.clientY - this.state.startY);
-        
+
         if (moveX > this.config.moveTolerance || moveY > this.config.moveTolerance) {
             this.state.movedBeyondTolerance = true;
-            
+
             // For mouse movement, still block clicks even if moved beyond tolerance
             // This enables drag operations to still block click events
             this.state.longPressDetected = true;
             this.state.preventClickUntil = Date.now() + this.config.preventEventsDuration;
             console.log("Mouse moved beyond tolerance - blocking short clicks");
-            
+
             // Only clear the timer (to prevent long press), but keep blocking clicks
             this.clearLongPressTimer();
         }
     },
-    
+
     /**
      * Handles mouse up event
      * @param {MouseEvent} event - The mouse up event
@@ -972,14 +982,14 @@ const longPressUtils = {
             event.preventDefault();
             return;
         }
-        
+
         // Only clear timer if it wasn't a long press
         if (!this.state.longPressDetected) {
             this.clearLongPressTimer();
         }
         this.state.longPressDetected = false;
     },
-    
+
     /**
      * Checks if interception is currently active
      * @returns {boolean} True if clicks/touches should be intercepted
@@ -1419,7 +1429,6 @@ function nextChapter() {
 function setAutoPageFlip(enabled) {
     autoPageFlipEnabled = enabled === 'true';
     console.log(`Auto page flip ${autoPageFlipEnabled ? 'enabled' : 'disabled'}`);
-    
     // Update long press utils with audio playback state
     longPressUtils.setAudioPlaybackState(autoPageFlipEnabled);
 }

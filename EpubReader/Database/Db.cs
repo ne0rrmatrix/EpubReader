@@ -176,8 +176,9 @@ public partial class Db : IDb
 		}
 		item.CurrentChapter = book.CurrentChapter;
 		item.CurrentPage = book.CurrentPage;
+		item.CurrentChapterCue = book.CurrentChapterCue;
 		await conn.UpdateAsync(item).WaitAsync(cancellationToken);
-		logger.Info($"Updating bookmark for book: {book.Title}, Chapter: {book.CurrentChapter}, Page: {book.CurrentPage}");
+		logger.Info($"Updating bookmark for book: {book.Title}, Chapter: {book.CurrentChapter}, Page: {book.CurrentPage}, Cue: {book.CurrentChapterCue}");
 	}
 
 	/// <summary>

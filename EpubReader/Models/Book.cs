@@ -43,6 +43,9 @@ public partial class Book : ObservableObject
 	[Column("CurrentPage")]
 	public int CurrentPage { get; set; } = 0;
 
+	[Column("CurrentChapterAudioPosition")]
+	public string CurrentChapterCue { get; set; } = string.Empty;
+
 	/// <summary>
 	/// Gets or sets the file path to the cover image.
 	/// </summary>

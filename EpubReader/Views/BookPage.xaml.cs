@@ -1,4 +1,3 @@
-using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using EpubReader.Interfaces;
 using EpubReader.Messages;
@@ -335,7 +334,7 @@ public partial class BookPage : ContentPage
 		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
-		void CreateToolBarItem(int index, Chapter chapter)
+	void CreateToolBarItem(int index, Chapter chapter)
 	{
 		ArgumentNullException.ThrowIfNull(book);
 		if (string.IsNullOrEmpty(chapter.Title))
@@ -424,7 +423,7 @@ public partial class BookPage : ContentPage
 		
 		if (isPlayingAudio)
 		{
-			audioPlayer.StopAudio();
+			await audioPlayer.StopAudio();
 			isPlayingAudio = false;
 			SetAudioPlayerIcon();
 			return;

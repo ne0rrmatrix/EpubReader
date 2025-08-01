@@ -109,6 +109,7 @@ public partial class LibraryViewModel : BaseViewModel
 			// Restore reading position
 			Book.CurrentChapter = existingBook.CurrentChapter;
 			Book.CurrentPage = existingBook.CurrentPage;
+			Book.CurrentChapterCue = existingBook.CurrentChapterCue;
 			Book.Id = existingBook.Id;
 
 			StreamExtensions.Instance?.SetBook(Book);
