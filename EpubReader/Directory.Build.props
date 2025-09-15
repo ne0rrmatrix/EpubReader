@@ -16,11 +16,12 @@
     <NuGetAuditMode>all</NuGetAuditMode>
 
     <!-- MAUI Specific -->
-    <MauiPackageVersion>9.0.90</MauiPackageVersion>
+    <MauiPackageVersion>9.0.110</MauiPackageVersion>
     <NextMauiPackageVersion>10.0.0</NextMauiPackageVersion>
     <MauiStrictXamlCompilation>true</MauiStrictXamlCompilation>
     <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
     <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
 
     <!-- https://learn.microsoft.com/dotnet/core/deploying/native-aot/?tabs=net8plus%2Cwindows -->
     <StripSymbols>false</StripSymbols>
@@ -224,12 +225,6 @@
     <!-- Embed symbols containing Source Link in the main file (exe/dll) -->
     <DebugType>embedded</DebugType>
   </PropertyGroup>
-
-  <ItemGroup>
-    <SupportedPlatform Include="Tizen" />
-    <InternalsVisibleTo Include="CommunityToolkit.Maui.UnitTests"/>
-    <InternalsVisibleTo Include="CommunityToolkit.Maui.Analyzers.UnitTests"/>
-  </ItemGroup>
 
   <PropertyGroup Condition="('$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true') and $([MSBuild]::IsOSPlatform('windows')) == 'true'">
     <IncludeTizenTargetFrameworks>true</IncludeTizenTargetFrameworks>
