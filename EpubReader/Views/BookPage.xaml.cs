@@ -18,10 +18,15 @@ public partial class BookPage : ContentPage
 {
 	const string externalLinkPrefix = "https://runcsharp.jump/?";
 	const uint animationDuration = 200u;
+	bool isPlayingAudio = false;
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly WebViewHelper webViewHelper;
+	ToolbarItem? audioPlayerItem;
+
+	readonly Service.AudioPlayer? audioPlayer = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<Service.AudioPlayer>()
+		?? throw new InvalidOperationException("AudioPlayer is not available in the current context.");
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -37,8 +42,10 @@ public partial class BookPage : ContentPage
 		this.db = db;
 		webViewHelper = new(webView);
 
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
+		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) 
+			=> await HandleJavascriptAsync(m.Value));
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) 
+			=> { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
 	/// <summary>
@@ -99,7 +106,22 @@ public partial class BookPage : ContentPage
 	/// <param name="e">The event data.</param>
 	void CurrentPage_Loaded(object sender, EventArgs e)
 	{
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		book.Chapters.ForEach(chapter 
+			=> CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		if (book.Chapters[book.CurrentChapter].AudioCues.Count > 0)
+		{
+			var iconSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+				? "play_circle_dark_mode.png"
+				: "play_circle_light_mode.png";
+			audioPlayerItem = new ToolbarItem
+			{
+				Order = ToolbarItemOrder.Primary,
+				Priority = 0,
+				IconImageSource = iconSource,
+			};
+			audioPlayerItem.Clicked += audioPlayerItem_Clicked;
+			Shell.Current.ToolbarItems.Add(audioPlayerItem);
+		}
 	}
 
 	/// <summary>
@@ -161,7 +183,8 @@ public partial class BookPage : ContentPage
 		var urlParts = url.Split('?')[1].Split('#')[0];
 		if (!string.IsNullOrEmpty(urlParts))
 		{
-			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
+			var chapter = book.Chapters.Find(chapter => 
+				chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 			if (chapter is null)
 			{
 				return;
@@ -173,7 +196,9 @@ public partial class BookPage : ContentPage
 	}
 	static async Task TryHandleExternalLinkAsync(string url)
 	{
-		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
+		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) 
+			|| url.Contains("https://demo") 
+			|| url.Contains("app://demo"))
 		{
 			return;
 		}
@@ -224,6 +249,15 @@ public partial class BookPage : ContentPage
 			case "menu":
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
+			case "longpress":
+				if (audioPlayer is null)
+				{
+					return;
+				}
+				isPlayingAudio = true;
+				SetAudioPlayerIcon();
+				await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
+				break;
 			case "pageload":
 				await webViewHelper.OnSettingsClickedAsync();
 				await UpdateUiAppearance();
@@ -232,6 +266,11 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
+				if (isPlayingAudio)
+				{
+					isPlayingAudio = false;
+					audioPlayerItem_Clicked(this, EventArgs.Empty);
+				}
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
@@ -353,5 +392,45 @@ public partial class BookPage : ContentPage
 		};
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
+	}
+	void SetAudioPlayerIcon()
+	{
+		if (audioPlayerItem is null)
+		{
+			return;
+		}
+		if (isPlayingAudio)
+		{
+			audioPlayerItem.IconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+				? "pause_circle_dark_mode.png"
+				: "pause_circle_light_mode.png";
+			OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+			return;
+		}
+		var iconImageSource = Application.Current?.PlatformAppTheme == AppTheme.Dark
+			? "play_circle_dark_mode.png"
+			: "play_circle_light_mode.png";
+		audioPlayerItem.IconImageSource = iconImageSource;
+		OnPropertyChanged(nameof(audioPlayerItem.IconImageSource));
+	}
+
+	async void audioPlayerItem_Clicked(object? sender, EventArgs e)
+	{
+		if (audioPlayer is null || sender is null)
+		{
+			return;
+		}
+		
+		if (isPlayingAudio)
+		{
+			await audioPlayer.StopAudio();
+			isPlayingAudio = false;
+			SetAudioPlayerIcon();
+			return;
+		}
+
+		isPlayingAudio = true;
+		SetAudioPlayerIcon();
+		await audioPlayer.PlayAudio(book, webView, null).ConfigureAwait(false);
 	}
 }

@@ -45,6 +45,11 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.TextZoom = 100;
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
+		handler.PlatformView.LongClickable = true;
+		handler.PlatformView.SetOnLongClickListener(new LongClickListener());
+#if DEBUG
+		Android.Webkit.WebView.SetWebContentsDebuggingEnabled(true);
+#endif
 	}
 
 	/// <summary>

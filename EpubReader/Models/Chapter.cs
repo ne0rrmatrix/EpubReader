@@ -21,4 +21,9 @@ public class Chapter
 	/// Gets or sets the name of the file.
 	/// </summary>
     public string FileName { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the collection of audio cues.
+	/// </summary>
+	public List<AudioCue> AudioCues { get; set; } = [];
 }

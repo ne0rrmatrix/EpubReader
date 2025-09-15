@@ -12,6 +12,7 @@ using MetroLog.Operators;
 using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
+using Plugin.Maui.Audio;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
@@ -119,6 +120,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
 		builder.Services.AddSingleton<WebViewHelper>();
+		builder.Services.AddSingleton<Service.AudioPlayer>();
 
 		// Register Popup pages and their view models
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
@@ -128,6 +130,7 @@ public static class MauiProgram
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
 		builder.Services.AddTransientWithShellRoute<CalibrePage, CalibrePageViewModel>("CalibrePage");
+		builder.Services.AddSingleton(AudioManager.Current);
 		return builder.Build();
     }
 }

@@ -8,6 +8,14 @@ let isPreviousPage = false;
 let currentPage = 0;
 let frame = null;
 let colCount = 1;
+let next = 'true';
+let lastPageFlipTime = 0;
+let minimumPageFlipDelay = 15000; // 15 seconds in milliseconds
+let lastProcessedSpanId = null;
+let autoPageFlipEnabled = true;
+let pendingPageFlip = false;
+let visibleSpanElements = [];
+let oldHighlightSpanId = null;
 
 // New: navigation state to prevent interrupted smooth scrolling
 const navigationState = {
@@ -591,6 +599,12 @@ const styleUtils = {
  * @param {Object} platform - Platform flags
  */
 function handleMessage(event, platform) {
+    // Check if we should ignore this message due to a recent long press
+    if (longPressUtils.shouldInterceptEvents()) {
+        console.log("Ignoring message event due to recent long press");
+        return;
+    }
+    
     // Origin validation for security
     if (!securityUtils.validateOrigin(event.origin, platform)) {
         return;
@@ -609,6 +623,17 @@ function handleMessage(event, platform) {
     } else if (data === "menu") {
         console.log("Received menu command.");
         window.location.href = 'https://runcsharp.menu?true';
+    } else if (data.startsWith("longpress.")) {
+        // Extract coordinates from the message
+        const coords = data.substring(10).split(',');
+        if (coords.length === 2) {
+            const x = parseInt(coords[0], 10);
+            const y = parseInt(coords[1], 10);
+            console.log(`Received long press coordinates from iframe: x=${x}, y=${y}`);
+            
+            // Handle the long press using our utility
+            handleIframeLongPress(x, y);
+        }
     }
 }
 
@@ -630,6 +655,8 @@ function handleNextCommand() {
     } else {
         navigationUtils.scrollRight(platform);
     }
+    // Make sure to update visible spans when navigating
+    updateVisibleSpanElements();
 }
 
 /**
@@ -650,8 +677,9 @@ function handlePrevCommand() {
     } else {
         navigationUtils.scrollLeft(platform);
     }
+    // Make sure to update visible spans when navigating
+    updateVisibleSpanElements();
 }
-
 
 /**
  * Calculates the approximate character position based on current scroll position
@@ -728,6 +756,359 @@ function updateCharacterPosition() {
     window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
 }
 
+/**
+ * Long press detection utilities
+ */
+const longPressUtils = {
+    /**
+     * Long press configuration
+     */
+    config: {
+        pressTimeout: 800, // Time in ms to consider a press as "long"
+        moveTolerance: 10, // Maximum movement in pixels allowed during press
+        preventEventsDuration: 1500 // How long to block events after long press (ms)
+    },
+
+    /**
+     * Current state of touch/mouse tracking
+     */
+    state: {
+        startTime: 0,
+        startX: 0,
+        startY: 0,
+        target: null,
+        timeoutId: null,
+        active: false,
+        longPressDetected: false, // Flag to track if a long press was detected
+        preventClickUntil: 0,     // Timestamp until which to prevent click/touch events
+        isAudioPlaying: false,    // Flag to track if audio is playing
+        movedBeyondTolerance: false // Flag to track if movement exceeded tolerance
+    },
+
+    /**
+     * Initializes long press detection on the given document
+     * @param {Document} doc - Document to attach listeners to
+     */
+    initialize(doc) {
+        if (!doc) {
+            console.warn("Cannot initialize long press detection - document not available");
+            return;
+        }
+
+        console.log("Initializing long press detection");
+
+        // Touch events - use capture phase to ensure we get events first
+        doc.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false, capture: true });
+        doc.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false, capture: true });
+        doc.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false, capture: true });
+        doc.addEventListener('touchcancel', this.handleTouchCancel.bind(this), { passive: false, capture: true });
+
+        // Mouse events for desktop - use capture phase
+        doc.addEventListener('mousedown', this.handleMouseDown.bind(this), { capture: true });
+        doc.addEventListener('mousemove', this.handleMouseMove.bind(this), { capture: true });
+        doc.addEventListener('mouseup', this.handleMouseUp.bind(this), { capture: true });
+
+        // Add click interceptor with high priority (capture phase)
+        doc.addEventListener('click', this.interceptClickEvent.bind(this), { capture: true });
+        doc.addEventListener('touchend', this.interceptTouchEndEvent.bind(this), { capture: true });
+
+        console.log("Long press detection initialized with click/touch interception");
+    },
+
+    /**
+     * Sets audio playback state
+     * @param {boolean} isPlaying - Whether audio is currently playing
+     */
+    setAudioPlaybackState(isPlaying) {
+        this.state.isAudioPlaying = isPlaying;
+        console.log(`Audio playback state set to: ${isPlaying}`);
+    },
+
+    /**
+     * Intercepts click events and prevents them if a long press was recently detected
+     * @param {MouseEvent} event - The click event
+     */
+    interceptClickEvent(event) {
+        if (this.shouldInterceptEvents()) {
+            console.log("Intercepted and prevented click event after long press");
+            event.stopPropagation();
+            event.preventDefault();
+            return false;
+        }
+        return true;
+    },
+
+    /**
+     * Intercepts touch end events and prevents them if a long press was recently detected
+     * @param {TouchEvent} event - The touch end event
+     */
+    interceptTouchEndEvent(event) {
+        if (this.shouldInterceptEvents()) {
+            console.log("Intercepted and prevented touch end event after long press");
+            event.stopPropagation();
+            event.preventDefault();
+            return false;
+        }
+        return true;
+    },
+
+    /**
+     * Finds the closest span element with an ID to the click/touch position
+     * @param {Element} element - Starting element to search from
+     * @param {number} x - Click/touch X coordinate
+     * @param {number} y - Click/touch Y coordinate
+     * @returns {Element|null} The closest span with ID or null
+     */
+    findClosestSpanWithId(element, x, y) {
+        if (!element) return null;
+
+        // Get the document to search in
+        const doc = element.ownerDocument || document;
+
+        // First, check if the element itself is a span with ID
+        if (element?.tagName === 'SPAN' && element.id) {
+            return element;
+        }
+
+        // Find all spans with IDs in the document
+        const allSpans = doc.querySelectorAll('span[id]');
+        if (!allSpans.length) return null;
+
+        // If we have only one span, return it
+        if (allSpans.length === 1) return allSpans[0];
+
+        // Calculate distances and find the closest span
+        let closestSpan = null;
+        let closestDistance = Number.MAX_VALUE;
+
+        allSpans.forEach(span => {
+            const rect = span.getBoundingClientRect();
+
+            // Find center point of the span
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            // Calculate Euclidean distance to click/touch position
+            const distance = Math.sqrt(
+                Math.pow(centerX - x, 2) +
+                Math.pow(centerY - y, 2)
+            );
+
+            // Update if this span is closer than the current closest
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestSpan = span;
+            }
+        });
+
+        return closestSpan;
+    },
+
+    /**
+     * Starts the long press timer
+     * @param {Element} target - The target element
+     * @param {number} x - Starting X coordinate
+     * @param {number} y - Starting Y coordinate
+     */
+    startLongPressTimer(target, x, y) {
+        this.clearLongPressTimer();
+
+        this.state.startTime = Date.now();
+        this.state.startX = x;
+        this.state.startY = y;
+        this.state.target = target;
+        this.state.active = true;
+        this.state.longPressDetected = false;
+        this.state.movedBeyondTolerance = false;
+
+        this.state.timeoutId = setTimeout(() => {
+            this.handleLongPress();
+        }, this.config.pressTimeout);
+    },
+
+    /**
+     * Clears the long press timer
+     */
+    clearLongPressTimer() {
+        if (this.state.timeoutId) {
+            clearTimeout(this.state.timeoutId);
+            this.state.timeoutId = null;
+        }
+        this.state.active = false;
+    },
+
+    /**
+     * Handles long press detection completion
+     */
+    handleLongPress() {
+        if (!this.state.active || this.state.movedBeyondTolerance) return;
+
+        const spanElement = this.findClosestSpanWithId(
+            this.state.target,
+            this.state.startX,
+            this.state.startY
+        );
+
+        if (spanElement?.id) {
+            console.log(`Long press detected on span with ID: ${spanElement.id}`);
+
+            // Set flags to prevent subsequent click/touch events
+            this.state.longPressDetected = true;
+
+            // Set longer prevention time during audio playback to ensure it works
+            const preventDuration = this.state.isAudioPlaying ?
+                this.config.preventEventsDuration * 2 : // Double the duration for audio playback
+                this.config.preventEventsDuration;
+
+            this.state.preventClickUntil = Date.now() + preventDuration;
+
+            // Notify C# code about the long press on a span
+            window.location.href = `https://runcsharp.longpress?${spanElement.id}`;
+        } else {
+            console.log("Long press detected but no span with ID found");
+
+            // Still prevent clicks even if no span was found
+            this.state.longPressDetected = true;
+            this.state.preventClickUntil = Date.now() + this.config.preventEventsDuration;
+        }
+
+        this.clearLongPressTimer();
+    },
+
+    /**
+     * Handles touch start event
+     * @param {TouchEvent} event - The touch start event
+     */
+    handleTouchStart(event) {
+        if (event.touches.length !== 1) return; // Only track single touches
+
+        const touch = event.touches[0];
+        this.startLongPressTimer(event.target, touch.clientX, touch.clientY);
+    },
+
+    /**
+     * Handles touch move event
+     * @param {TouchEvent} event - The touch move event
+     */
+    handleTouchMove(event) {
+        if (!this.state.active || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+
+        // Check if touch has moved beyond tolerance
+        const moveX = Math.abs(touch.clientX - this.state.startX);
+        const moveY = Math.abs(touch.clientY - this.state.startY);
+
+        if (moveX > this.config.moveTolerance || moveY > this.config.moveTolerance) {
+            this.state.movedBeyondTolerance = true;
+
+            // During audio playback, still block clicks even if moved
+            if (this.state.isAudioPlaying) {
+                this.state.longPressDetected = true;
+                this.state.preventClickUntil = Date.now() + this.config.preventEventsDuration;
+                console.log("Movement detected during audio playback - still blocking short touches");
+            } else {
+                this.clearLongPressTimer();
+            }
+        }
+    },
+
+    /**
+     * Handles touch end event
+     * @param {TouchEvent} event - The touch end event
+     */
+    handleTouchEnd(event) {
+        // Check if we're in a long press state and should prevent default behavior
+        if (this.shouldInterceptEvents()) {
+            console.log("Preventing default touch end action due to recent long press");
+            event.stopPropagation();
+            event.preventDefault();
+            return;
+        }
+
+        // Only clear timer if it wasn't a long press
+        if (!this.state.longPressDetected) {
+            this.clearLongPressTimer();
+        }
+        this.state.longPressDetected = false;
+    },
+
+    /**
+     * Handles touch cancel event
+     * @param {TouchEvent} event - The touch cancel event
+     */
+    handleTouchCancel(event) {
+        this.clearLongPressTimer();
+        this.state.longPressDetected = false;
+    },
+
+    /**
+     * Handles mouse down event
+     * @param {MouseEvent} event - The mouse down event
+     */
+    handleMouseDown(event) {
+        if (event.button !== 0) return; // Only track left mouse button
+
+        this.startLongPressTimer(event.target, event.clientX, event.clientY);
+    },
+
+    /**
+     * Handles mouse move event
+     * @param {MouseEvent} event - The mouse move event
+     */
+    handleMouseMove(event) {
+        if (!this.state.active) return;
+
+        // Check if mouse has moved beyond tolerance
+        const moveX = Math.abs(event.clientX - this.state.startX);
+        const moveY = Math.abs(event.clientY - this.state.startY);
+
+        if (moveX > this.config.moveTolerance || moveY > this.config.moveTolerance) {
+            this.state.movedBeyondTolerance = true;
+
+            // For mouse movement, still block clicks even if moved beyond tolerance
+            // This enables drag operations to still block click events
+            this.state.longPressDetected = true;
+            this.state.preventClickUntil = Date.now() + this.config.preventEventsDuration;
+            console.log("Mouse moved beyond tolerance - blocking short clicks");
+
+            // Only clear the timer (to prevent long press), but keep blocking clicks
+            this.clearLongPressTimer();
+        }
+    },
+
+    /**
+     * Handles mouse up event
+     * @param {MouseEvent} event - The mouse up event
+     */
+    handleMouseUp(event) {
+        // Check if we're in a long press state and should prevent default behavior
+        if (this.shouldInterceptEvents()) {
+            console.log("Preventing default mouse up action due to recent long press");
+            event.stopPropagation();
+            event.preventDefault();
+            return;
+        }
+
+        // Only clear timer if it wasn't a long press
+        if (!this.state.longPressDetected) {
+            this.clearLongPressTimer();
+        }
+        this.state.longPressDetected = false;
+    },
+
+    /**
+     * Checks if interception is currently active
+     * @returns {boolean} True if clicks/touches should be intercepted
+     */
+    shouldInterceptEvents() {
+        const shouldIntercept = Date.now() < this.state.preventClickUntil;
+        if (shouldIntercept) {
+            console.log("Blocking events due to recent long press or movement");
+        }
+        return shouldIntercept;
+    }
+};
 
 /**
  * Initialize the reader when the DOM is fully loaded
@@ -773,9 +1154,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 100); // Small delay to ensure content is fully rendered
             }
 
+            // Initialize long press detection on the iframe document
+            longPressUtils.initialize(contentWindow.document);
+
             window.location.href = 'https://runcsharp.pageLoad?true';
         } catch (error) {
             console.error("Error during iframe onload:", error);
+        }
+        finally {
+            // Inside frame.onload function, before the last line
+            setTimeout(() => {
+                updateVisibleSpanElements();
+            }, 200);
         }
     };
 
@@ -784,6 +1174,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (platform.isIOS) {
         window.addEventListener('touchstart', {});
     }
+    
+    // Initialize long press detection on the main document as well
+    longPressUtils.initialize(document);
 });
 
 // Public API functions
@@ -929,4 +1322,220 @@ function setBackgroundColor(color) {
  */
 function unsetBackgroundColor() {
     styleUtils.unsetBackgroundColor();
+}
+
+function highlightSpan(spanId) {
+    const doc = domUtils.getIframeDocument();
+    const spanElement = doc.getElementById(spanId);
+    removeHighlight(oldHighlightSpanId); // Remove previous highlight if any
+    oldHighlightSpanId = spanId;
+    console.log(`Highlighting span with ID: ${spanId}`);
+    spanElement.style.backgroundColor = 'yellow';
+    spanElement.style.fontWeight = 'bold';
+}
+
+function removeHighlight(spanId) {
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+       
+        console.warn("Cannot access iframe document for removing highlight");
+        return;
+    }
+    if (oldHighlightSpanId) {
+        console.warn(`removing old highlight ID: ${oldHighlightSpanId}`);
+        const oldSpanElement = doc.getElementById(oldHighlightSpanId);
+        if (oldSpanElement) {
+            oldSpanElement.style.backgroundColor = '';
+            oldSpanElement.style.fontWeight = '';
+        }
+    }
+    const spanElement = doc.getElementById(spanId);
+    if (spanElement) {
+        console.log(`Removing highlight from span with ID: ${spanId}`);
+        spanElement.style.backgroundColor = '';
+        spanElement.style.fontWeight = '';
+    }
+    else {
+        console.warn(`Span with ID '${spanId}' not found for removing highlight in iframe.`);
+    }
+}
+function handleNext() {
+    console.log("Handling next command");
+    navigationUtils.scrollRight(domUtils.detectPlatform());
+}
+
+/**
+* Collects all span elements with IDs on all pages and organizes them by page number
+* @returns {Object} Object with page numbers as keys and arrays of span elements as values
+*/
+function collectSpansByPage() {
+    const contentWindow = domUtils.getContentWindow();
+    const doc = domUtils.getIframeDocument();
+
+    if (!contentWindow || !doc) {
+        console.warn("Cannot access iframe document to collect spans by page");
+        return {};
+    }
+
+    // Calculate page dimensions
+    const pageWidth = contentWindow.innerWidth;
+    const totalWidth = doc.documentElement.scrollWidth;
+    const totalPages = Math.ceil(totalWidth / pageWidth);
+
+    // Initialize result object with empty arrays for each page
+    const spansByPage = {};
+    for (let i = 0; i < totalPages; i++) {
+        spansByPage[i] = [];
+    }
+
+    // Get all spans with IDs in the document
+    const allSpans = doc.querySelectorAll('span[id]');
+
+    // For each span, determine which page it belongs to
+    allSpans.forEach(span => {
+        const rect = span.getBoundingClientRect();
+
+        // Calculate horizontal position relative to the document
+        // Need to add scroll position to get absolute position
+        const absoluteLeft = rect.left + contentWindow.scrollX;
+
+        // Determine page number based on position
+        const pageNumber = Math.floor(absoluteLeft / pageWidth);
+
+        // Only include if page number is valid
+        if (pageNumber >= 0 && pageNumber < totalPages) {
+            spansByPage[pageNumber].push({
+                id: span.id,
+                text: span.textContent,
+                rect: {
+                    left: rect.left,
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                    width: rect.width,
+                    height: rect.height
+                },
+                absolutePosition: {
+                    left: absoluteLeft,
+                    top: rect.top + contentWindow.scrollY
+                }
+            });
+        }
+    });
+
+    return spansByPage;
+}
+
+/**
+ * Updates the global visibleSpanElements array with spans on the current page
+ * @returns {Array} Array of span elements visible on current page
+ */
+function updateVisibleSpanElements() {
+    const contentWindow = domUtils.getContentWindow();
+
+    if (!contentWindow) {
+        console.warn("Cannot access iframe content window to update visible spans");
+        visibleSpanElements = [];
+        return visibleSpanElements;
+    }
+
+    // Get all spans organized by page
+    const spansByPage = collectSpansByPage();
+
+    // Determine current page based on scroll position
+    const pageWidth = contentWindow.innerWidth;
+    const currentPageNumber = Math.floor(contentWindow.scrollX / pageWidth);
+
+    // Get spans for current page
+    visibleSpanElements = spansByPage[currentPageNumber] || [];
+
+    return visibleSpanElements;
+}
+
+/**
+ * Gets all spans organized by page
+ * @returns {Object} Object with page numbers as keys and arrays of span elements as values
+ */
+function getAllSpansByPage() {
+    return collectSpansByPage();
+}
+
+/**
+ * Gets spans for a specific page number
+ * @param {number} pageNumber - The page number to get spans for
+ * @returns {Array} Array of span elements on the specified page
+ */
+function getSpansForPage(pageNumber) {
+    const spansByPage = collectSpansByPage();
+    return spansByPage[pageNumber] || [];
+}
+
+/**
+* Checks if a span ID exists on the current page or the next page
+* @param {string} spanId - The ID of the span to check
+* @returns {boolean|null} - false if on current page, true if on next page, null if error or not found
+*/
+function isSpanOnNextPage(spanId) {
+    try {
+        // Make sure we have the most up-to-date span information
+        const spansByPage = collectSpansByPage();
+        const contentWindow = domUtils.getContentWindow();
+
+        if (!contentWindow || !spansByPage) {
+            console.warn("Cannot check span location - iframe content not accessible");
+            return null;
+        }
+        console.log(`Checking span location for ID: ${spanId}`);
+        // Determine current page based on scroll position
+        const pageWidth = contentWindow.innerWidth;
+        const currentPageNumber = Math.floor(contentWindow.scrollX / pageWidth);
+        const nextPageNumber = currentPageNumber + 1;
+
+        // Get spans for current and next pages
+        const currentPageSpans = spansByPage[currentPageNumber] || [];
+        const nextPageSpans = spansByPage[nextPageNumber] || [];
+
+        // Check if spanId exists on current page
+        const isOnCurrentPage = currentPageSpans.some(span => span.id === spanId);
+        if (isOnCurrentPage) {
+            return "false";
+        }
+
+        // Check if spanId exists on next page
+        const isOnNextPage = nextPageSpans.some(span => span.id === spanId);
+        if (isOnNextPage) {
+            return "true";
+        }
+
+        // If not found on either page, check if it exists at all
+        for (let pageNum in spansByPage) {
+            if (spansByPage[pageNum].some(span => span.id === spanId)) {
+                console.log(`Span ID '${spanId}' found on page ${pageNum} (not current or next)`);
+                return "";
+            }
+        }
+
+        // If we got here, the span doesn't exist
+        console.warn(`Span ID '${spanId}' not found on any page`);
+        return null;
+    } catch (error) {
+        console.error(`Error checking span location for ID '${spanId}':`, error);
+        return null;
+    }
+}
+
+function nextChapter() {
+    console.log("Next chapter command received, navigating to next page.");
+    window.location.href = 'https://runcsharp.next?true';
+}
+
+/**
+ * Set whether automatic page flipping should be enabled
+ * @param {string} enabled - Whether auto page flip is enabled ('true' or 'false')
+ */
+function setAutoPageFlip(enabled) {
+    autoPageFlipEnabled = enabled === 'true';
+    console.log(`Auto page flip ${autoPageFlipEnabled ? 'enabled' : 'disabled'}`);
+    // Update long press utils with audio playback state
+    longPressUtils.setAudioPlaybackState(autoPageFlipEnabled);
 }

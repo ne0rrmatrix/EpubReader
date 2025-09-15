@@ -88,7 +88,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
 		}
 	}
-
+	
 	/// <summary>
 	/// Displays a popup using the specified view model.
 	/// </summary>

@@ -8,6 +8,22 @@
 const TARGET_ORIGIN = "https://demo";
 const TARGET_ORIGIN_MACIOS = "app://demo";
 
+// Long press detection configuration
+const longPressConfig = {
+    pressTimeout: 800,     // Time in ms to consider a press as "long"
+    moveTolerance: 10,     // Maximum movement in pixels allowed during press
+};
+
+// Long press state tracking
+const longPressState = {
+    startTime: 0,
+    startX: 0,
+    startY: 0,
+    target: null,
+    timeoutId: null,
+    active: false,
+};
+
 /**
  * Detects the user's operating system platform
  * @returns {Object} Platform flags
@@ -35,6 +51,54 @@ function sendMessageToParent(message) {
     }
 }
 
+/**
+ * Starts the long press timer
+ * @param {Element} target - The target element
+ * @param {number} x - Starting X coordinate
+ * @param {number} y - Starting Y coordinate
+ */
+function startLongPressTimer(target, x, y) {
+    clearLongPressTimer();
+
+    longPressState.startTime = Date.now();
+    longPressState.startX = x;
+    longPressState.startY = y;
+    longPressState.target = target;
+    longPressState.active = true;
+
+    longPressState.timeoutId = setTimeout(() => {
+        handleLongPress(x, y);
+    }, longPressConfig.pressTimeout);
+}
+
+/**
+ * Clears the long press timer
+ */
+function clearLongPressTimer() {
+    if (longPressState.timeoutId) {
+        clearTimeout(longPressState.timeoutId);
+        longPressState.timeoutId = null;
+    }
+    longPressState.active = false;
+}
+
+/**
+ * Handles when a long press is detected
+ * @param {number} x - X coordinate of the long press
+ * @param {number} y - Y coordinate of the long press
+ */
+function handleLongPress(x, y) {
+    if (!longPressState.active) return;
+    
+    console.log(`Long press detected at: ${x}, ${y}`);
+    
+    // Send the long press coordinates to parent (EpubText.js)
+    sendMessageToParent(`longpress.${x},${y}`);
+    
+    // Clear the timer and state
+    clearLongPressTimer();
+}
+
 // Handle link navigation
 function handleLinkClick(href) {
     sendMessageToParent(`jump.${href}`);
@@ -43,8 +107,6 @@ function handleLinkClick(href) {
 
 // Handle navigation regions - updated to work with both touch and click events
 function handleNavigationClick(event) {
-   
-
     // Get coordinates from either touch or click event
     let clickX;
     if (event.type === 'touchstart' || event.type === 'touchend') {
@@ -71,11 +133,17 @@ function handleNavigationClick(event) {
     }
 }
 
-// Touch event handler
+// Touch event handler with long press detection
 document.addEventListener('touchstart', function (event) {
     console.log('touchstart', event.touches.length);
 
+    if (event.touches.length !== 1) return; // Only handle single touches
+
+    const touch = event.touches[0];
     const target = event.target;
+
+    // Start long press detection
+    startLongPressTimer(target, touch.clientX, touch.clientY);
 
     // Handle direct link click
     if (target.tagName === 'A') {
@@ -88,16 +156,43 @@ document.addEventListener('touchstart', function (event) {
         return handleLinkClick(parentLink.href);
     }
 
-    // Handle navigation click
-    handleNavigationClick(event);
+    // Don't handle navigation click yet - wait to see if it's a long press
 });
 
-// Optional: Add touchend handler for better touch experience
+// Track touch movement to cancel long press if moved too much
+document.addEventListener('touchmove', function (event) {
+    if (!longPressState.active || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+
+    // Check if touch has moved beyond tolerance
+    const moveX = Math.abs(touch.clientX - longPressState.startX);
+    const moveY = Math.abs(touch.clientY - longPressState.startY);
+
+    if (moveX > longPressConfig.moveTolerance || moveY > longPressConfig.moveTolerance) {
+        // Cancel long press if moved beyond tolerance
+        clearLongPressTimer();
+    }
+});
+
+// Touch end handler - if not a long press, handle as navigation
 document.addEventListener('touchend', function (event) {
+    // If long press wasn't triggered and timer was active, it was a short press
+    if (longPressState.active) {
+        clearLongPressTimer();
+        // Only handle navigation if it wasn't a long press
+        handleNavigationClick(event);
+    }
+    
     // Prevent the delayed click event on mobile
     if (event.target.tagName !== 'A' && !event.target.closest('a')) {
         event.preventDefault();
     }
+});
+
+// Cancel long press on touch cancel
+document.addEventListener('touchcancel', function () {
+    clearLongPressTimer();
 });
 
 // Click event handler for non-touch devices

@@ -17,6 +17,7 @@ This document provides guidelines for using GitHub Copilot to contribute to the 
 ### Specific to .NET MAUI
 * Ensure that any UI components or controls are compatible with .NET MAUI.
 * Avoid using Xamarin.Forms-specific code unless there is a direct .NET MAUI equivalent.
+* Follow the project's coding style and best practices as outlined in the [contributing](https://github.com/CommunityToolkit/Maui/blob/main/CONTRIBUTING.md) document.
 
 ## Best Practices
 * Use **Trace.WriteLine()** for debug logging instead of **Debug.WriteLine()**.
@@ -123,7 +124,7 @@ if (something is not null)
 In other words, `NotImplementedException` implies that a feature is still in development, indicating that the Pull Request is incomplete.
 
 ### Bug Fixes
-If you're looking for something to fix, please browse [open issues](https://github.com/ne0rrmatrix/EpubReader/issues).
+If you're looking for something to fix, please browse [open issues](https://github.com/CommunityToolkit/Maui/issues).
 
 Follow the style used by the [.NET Foundation](https://github.com/dotnet/runtime/blob/master/docs/coding-guidelines/coding-style.md), with two primary exceptions:
 
@@ -131,10 +132,13 @@ Follow the style used by the [.NET Foundation](https://github.com/dotnet/runtime
 * We will **not** use `_` or `s_` as a prefix for internal or private field names
 * We will use `camelCaseFieldName` for naming internal or private fields in both instance and static implementations
 
+Read and follow our [Pull Request template](https://github.com/CommunityToolkit/Maui/blob/main/.github/PULL_REQUEST_TEMPLATE.md)
+
 ## Submitting Contributions
 1.	Fork the repository and create a new branch for your changes.
 2.	Implement your changes using GitHub Copilot as needed.
 3.	Ensure your changes include tests, samples, and documentation.
+4.	Open a pull request and follow the [Pull Request template](https://github.com/CommunityToolkit/Maui/blob/main/.github/PULL_REQUEST_TEMPLATE.md).
 
 ## Additional Resources
 * [GitHub Copilot Documentation](https://docs.github.com/en/copilot)

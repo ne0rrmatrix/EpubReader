@@ -23,6 +23,7 @@
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
+
     </ContentPage.ToolbarItems>
     <shimmer:SfShimmer
         x:Name="Shimmer"
