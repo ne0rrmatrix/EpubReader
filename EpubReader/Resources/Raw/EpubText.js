@@ -9,6 +9,12 @@ let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
+// New: navigation state to prevent interrupted smooth scrolling
+const navigationState = {
+    isAnimating: false,
+    pending: null // 'next' | 'prev' | null
+};
+
 document.addEventListener('selectstart', function (e) {
     e.preventDefault();
 });
@@ -69,6 +75,16 @@ const domUtils = {
 };
 
 /**
+ * Sets whether user interaction (scrolling, clicking) is enabled on the iframe
+ * @param {any} enabled
+ */
+function setInteractionEnabled(enabled) {
+    if (frame) {
+        frame.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+}
+
+/**
  * Scrolling and navigation utilities
  */
 const navigationUtils = {
@@ -100,55 +116,136 @@ const navigationUtils = {
     },
 
     /**
+     * Smoothly (or instantly) scroll to targetLeft; resolves when movement is done.
+     * Uses 'scrollend' if available, falls back to proximity + timeout.
+     * @param {Window} contentWindow
+     * @param {number} targetLeft
+     * @param {Object} platform - Platform flags
+     * @returns {Promise<void>}
+     */
+    animateTo(contentWindow, targetLeft, platform) {
+        const target = Math.round(targetLeft);
+     
+        return new Promise((resolve) => {
+            let done = false;
+            const epsilon = 2; // px tolerance
+            const cleanup = () => {
+                if (done) return;
+                done = true;
+                contentWindow.removeEventListener('scroll', onScroll, { passive: true });
+                // scrollend may not exist everywhere; remove won't hurt if not added
+                contentWindow.removeEventListener('scrollend', onScrollEnd);
+                clearTimeout(timerId);
+                resolve();
+            };
+            const onScroll = () => {
+                if (Math.abs(contentWindow.scrollX - target) <= epsilon) {
+                    cleanup();
+                }
+            };
+            const onScrollEnd = () => cleanup();
+
+            contentWindow.addEventListener('scroll', onScroll, { passive: true });
+            // Optional; supported in modern engines. If not supported, listener will be inert.
+            contentWindow.addEventListener('scrollend', onScrollEnd);
+
+            // Safety timeout in case neither 'scrollend' nor proximity triggers (UA dependent)
+            const timerId = setTimeout(() => {
+                // Snap to target to guarantee we finish aligned to a page
+                contentWindow.scrollTo(target, 0);
+                cleanup();
+            }, 800);
+
+            contentWindow.scrollTo({
+                left: target,
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    },
+
+    /**
      * Scrolls the content left by one page
      * @param {Object} platform - Platform flags
      */
-    scrollLeft(platform) {
+    async scrollLeft(platform) {
         const contentWindow = domUtils.getContentWindow();
         if (!contentWindow) return;
 
-        const scrollAmount = this.calculateScrollAmount(contentWindow);
+        // Coalesce interactions while animating
+        if (navigationState.isAnimating) {
+            navigationState.pending = 'prev';
+            return;
+        }
 
-        if (platform.isWindows) {
-            contentWindow.scrollTo(contentWindow.scrollX - scrollAmount, 0);
-        } else {
-            contentWindow.scrollTo({
-                left: contentWindow.scrollX - scrollAmount,
-                top: 0,
-                behavior: "smooth"
-            });
+        const scrollAmount = this.calculateScrollAmount(contentWindow);
+        const targetLeft = contentWindow.scrollX - scrollAmount;
+
+        navigationState.isAnimating = true;
+        setInteractionEnabled(false);
+        try {
+            await this.animateTo(contentWindow, targetLeft, platform);
+            if (currentPage > 0) {
+                currentPage--;
+            } else {
+                console.warn("Already at the first page, cannot scroll left.");
+            }
+            console.log("Scrolled left to page:", currentPage);
+            updateCharacterPosition();
+        } finally {
+            navigationState.isAnimating = false;
+            setInteractionEnabled(true);
+            this._drainPending();
         }
-        if (currentPage > 0) {
-            currentPage--;
-        } else {
-            console.warn("Already at the first page, cannot scroll left.");
-        }
-        console.log("Scrolled left to page:", currentPage);
-        updateCharacterPosition();
     },
 
     /**
      * Scrolls the content right by one page
      * @param {Object} platform - Platform flags
      */
-    scrollRight(platform) {
+    async scrollRight(platform) {
         const contentWindow = domUtils.getContentWindow();
         if (!contentWindow) return;
 
-        const scrollAmount = this.calculateScrollAmount(contentWindow);
-
-        if (platform.isWindows) {
-            contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
-        } else {
-            contentWindow.scrollTo({
-                left: contentWindow.scrollX + scrollAmount,
-                top: 0,
-                behavior: "smooth"
-            });
+        // Coalesce interactions while animating
+        if (navigationState.isAnimating) {
+            navigationState.pending = 'next';
+            return;
         }
-        currentPage++;
-        console.log("Scrolled right to page:", currentPage);
-        updateCharacterPosition();
+
+        const scrollAmount = this.calculateScrollAmount(contentWindow);
+        const targetLeft = contentWindow.scrollX + scrollAmount;
+
+        navigationState.isAnimating = true;
+        setInteractionEnabled(false);
+        try {
+            await this.animateTo(contentWindow, targetLeft, platform);
+            currentPage++;
+            console.log("Scrolled right to page:", currentPage);
+            updateCharacterPosition();
+        } finally {
+            navigationState.isAnimating = false;
+            setInteractionEnabled(true);
+            this._drainPending();
+        }
+    },
+
+    /**
+     * Drain one pending navigation request (if any) after animation completes.
+     * Ensures we don't spam multiple additional navigations.
+     * @private
+     */
+    _drainPending() {
+        const pending = navigationState.pending;
+        navigationState.pending = null;
+        if (!pending) return;
+
+        // Re-evaluate edges at the time we execute the pending nav
+        if (pending === 'next') {
+            handleNextCommand();
+        } else if (pending === 'prev') {
+            handlePrevCommand();
+        }
     },
 
     /**
@@ -519,7 +616,14 @@ function handleMessage(event, platform) {
  * Handles the "next" command
  */
 function handleNextCommand() {
-    let platform = domUtils.detectPlatform();
+    const platform = domUtils.detectPlatform();
+
+    // If animation in progress, coalesce to a single pending "next"
+    if (navigationState.isAnimating) {
+        navigationState.pending = 'next';
+        return;
+    }
+
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
         window.location.href = 'https://runcsharp.next?true';
@@ -532,7 +636,14 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
-    let platform = domUtils.detectPlatform();
+    const platform = domUtils.detectPlatform();
+
+    // If animation in progress, coalesce to a single pending "prev"
+    if (navigationState.isAnimating) {
+        navigationState.pending = 'prev';
+        return;
+    }
+
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
         window.location.href = 'https://runcsharp.prev?true';
@@ -644,7 +755,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("Root dimensions already set, skipping initial resize.");
         layoutUtils.setDimensions(body, root);
     }
-    
+
     frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
 
     // Handle iframe load events

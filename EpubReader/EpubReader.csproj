@@ -18,7 +18,7 @@
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>6</ApplicationVersion>
+		<ApplicationVersion>7</ApplicationVersion>
 
 		<!--
 		Uncomment the line below if you need to debug the SG code
@@ -38,7 +38,10 @@
 		<WindowsPackageType>None</WindowsPackageType>
 	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Release' &#xD;&#xA;                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'&#xD;&#xA;                 AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'
+                              AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'tizen'
+                              AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'
+                              AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
     <!-- Ahead-of-time compilation is not yet supported net8.0-tizen -->
     <!-- Cross-OS native compilation is not supported net8.0-android -->
     <!-- Only iOS + MacCatalyst support AOT in .NET 9 -->
@@ -71,22 +74,22 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</TargetPlatformMinVersion>
   </PropertyGroup>
-
+  
   <ItemGroup>
-    <PackageReference Include="FFImageLoading.Maui" Version="1.1.6" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
     <PackageReference Include="VersOne.Epub" Version="3.3.4" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="*" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.7" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="12.1.0" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="12.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="12.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-    <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.5" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="9.0.7" />
+    <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.6" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="9.0.8" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
@@ -95,7 +98,7 @@
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.1" />
-    <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0" />
+    <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.1" />
   </ItemGroup>
   
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
