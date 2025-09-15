@@ -146,7 +146,7 @@ This project is built with:
 
 ### Prerequisites
 - Visual Studio 2022 with .NET MAUI workload
-- .NET 8.0 or later
+- .NET 9.0 or later
 - Platform-specific SDKs (Android SDK, Xcode for iOS/macOS)
 
 ---
