@@ -42,8 +42,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$SONAR_TOKEN"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SONAR_TOKEN"
           dotnet workload install maui --source https://api.nuget.org/v3/index.json
           dotnet restore EpubReader/EpubReader.csproj
           dotnet build EpubReader/EpubReader.csproj -c:Debug
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
