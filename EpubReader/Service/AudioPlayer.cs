@@ -1,8 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using EpubReader.Interfaces;
 using EpubReader.Models;
 using MetroLog;
@@ -19,6 +17,8 @@ public partial class AudioPlayer
 	List<AudioCue> cues = [];
 	IDispatcherTimer? timer;
 	AsyncAudioPlayer? asyncAudioPlayer;
+	int currentPage;
+	int newPage = 0;
 	public AsyncAudioPlayer? AsyncAudioPlayer => asyncAudioPlayer;
 	WebView? webView;
 	Book? book;
@@ -46,10 +46,12 @@ public partial class AudioPlayer
 			logger.Warn("SeekTo called with null or empty cueId.");
 			return;
 		}
-		if(!string.IsNullOrEmpty(seekToCueId))
+		if(asyncAudioPlayer is null)
 		{
-			seekToCueId = string.Empty;
+			logger.Warn("SeekTo called but asyncAudioPlayer is null.");
+			return;
 		}
+		
 		logger.Info($"SeekTo called with cueId: {cueId}");
 		var cue = cues.Find(c => c.SpanId.Equals(cueId, StringComparison.OrdinalIgnoreCase));
 		if (cue is null)
@@ -62,7 +64,8 @@ public partial class AudioPlayer
 			var position = begin.TotalSeconds;
 			logger.Info($"Seeking audio player to position: {position}");
 			
-			asyncAudioPlayer?.Seek(position);
+			asyncAudioPlayer.Seek(position);
+			seekToCueId = string.Empty;
 		}
 		else
 		{
@@ -84,54 +87,82 @@ public partial class AudioPlayer
 	
 	public async Task PlayAudio(Book book, WebView webview, string? cueId)
 	{
-
-		if(asyncAudioPlayer is not null && asyncAudioPlayer.CurrentPosition > 0 && !string.IsNullOrEmpty(cueId))
-		{
-			SeekTo(cueId);
-			logger.Info("Audio is already playing, ignoring function call for it again.");
-			return;
-		}
+		await webview.EvaluateJavaScriptAsync("setAutoPageFlip('true');");
 		seekToCueId = cueId ?? string.Empty;
 		logger.Info("PlayAudio called.");
 		webView = webview;
 		this.book = book ?? throw new ArgumentNullException(nameof(book));
+		cues = book.Chapters[book.CurrentChapter].AudioCues ?? [];
+
 		var audioData = book.Chapters[book.CurrentChapter].AudioCues.Find(cue => cue.Text == book.Chapters[book.CurrentChapter].FileName)?.AudioData
 			?? [];
-		if (audioData.Length == 0)
+		if (asyncAudioPlayer is not null && asyncAudioPlayer.IsPlaying)
 		{
-			logger.Info($"End of book reached. Stopping audio and exiting audio player.");
-			dispatcher.Dispatch(async () => await webview.EvaluateJavaScriptAsync("removeHighlight();"));
-			await StopAudio();
+			logger.Info("Audio is already playing, ignoring function call for it again.");
 			return;
 		}
-		cues = book.Chapters[book.CurrentChapter].AudioCues 
-		?? throw new InvalidOperationException("AudioCues are not available for the current chapter.");
-		
+
 		var memoryStream = new MemoryStream();
 		await memoryStream.WriteAsync(audioData).ConfigureAwait(false);
 		memoryStream.Seek(0, SeekOrigin.Begin);
-		
+
 		asyncAudioPlayer = audioManager.CreateAsyncPlayer(memoryStream)
 			?? throw new InvalidOperationException($"Audio player could not be created for chapter '{book.Chapters[book.CurrentChapter].Title}'.");
 		asyncAudioPlayer.Loop = false;
-		await webview.EvaluateJavaScriptAsync("setAutoPageFlip('true');");
-		InitializeTimer();
-		
-		var currentPage = await webView.EvaluateJavaScriptAsync("getCurrentPage();").WaitAsync(CancellationToken.None);
-		var spans = await webView.EvaluateJavaScriptAsync($"getSpansForPage({currentPage});").WaitAsync(CancellationToken.None);
 
-		var result = JsonSerializer.Deserialize(spans, AudioCueJsonContext.Default.ListAudioCue) ?? [];
-		if(result.Find(item => item.Id.Equals(book.CurrentChapterCue, StringComparison.OrdinalIgnoreCase)) is not null)
+		if (cues.Count == 0 || audioData.Length == 0)
 		{
-			seekToCueId = book.CurrentChapterCue;
-			logger.Info($"Current chapter cue '{book.CurrentChapterCue}' is on the current page, setting seekToCueId to it.");
+			logger.Warn($"No audio cues or audio data found for chapter '{book.Chapters[book.CurrentChapter].Title}', cannot play audio.");
+			return;
 		}
-		else
+		
+		if (!string.IsNullOrEmpty(cueId))
 		{
-			seekToCueId = result[0].Id;
-			logger.Info($"Current chapter cue '{book.CurrentChapterCue}' is not on the current page, setting seekToCueId to the first cue on the page: {seekToCueId}.");
+			logger.Info($"cueId '{cueId}' was passed to PlayAudio, will seek to it if it exists on the current page.");
+			InitializeTimer();
+			await asyncAudioPlayer.PlayAsync(CancellationToken.None).ConfigureAwait(false);
+			return;
 		}
-	
+
+		var page = await webView.EvaluateJavaScriptAsync("getCurrentPage();").WaitAsync(CancellationToken.None) ?? throw new InvalidOperationException("Could not retrieve current page from web view.");
+		if(!int.TryParse(page, out currentPage))
+		{
+			logger.Warn($"Could not parse current page '{page}' to an integer, defaulting to 0.");
+			currentPage = 0;
+		}
+
+		var spans = await webView.EvaluateJavaScriptAsync($"getSpansForPage({currentPage});").WaitAsync(CancellationToken.None) ?? string.Empty;
+		if (string.IsNullOrEmpty(spans))
+		{
+			logger.Warn($"No spans found on the current page: {currentPage}. Cannot set initial highlight or seek position.");
+			return;
+		}
+		
+		try
+		{
+			var result = JsonSerializer.Deserialize(spans, AudioCueJsonContext.Default.ListAudioCue);
+			if (result is null || result.Count == 0)
+			{
+				logger.Warn($"No spans found on the current page: {currentPage}. Cannot set initial highlight or seek position.");
+				return;
+			}
+			if (result.Find(item => item.Id.Equals(book.CurrentChapterCue, StringComparison.OrdinalIgnoreCase)) is not null)
+			{
+				seekToCueId = book.CurrentChapterCue;
+				logger.Info($"Current chapter cue: '{book.CurrentChapterCue}' setting seekToCueId to it.");
+			}
+			else
+			{
+				seekToCueId = result[0].Id;
+				logger.Info($"Current chapter cue '{book.CurrentChapterCue}' is not on the current page, setting seekToCueId to the first cue on the page: {seekToCueId}.");
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error deserializing spans for page {currentPage}: {ex.Message}");
+		}
+
+		InitializeTimer();
 		await asyncAudioPlayer.PlayAsync(CancellationToken.None).ConfigureAwait(false);
 	}
 
@@ -151,23 +182,28 @@ public partial class AudioPlayer
 		await db.UpdateBookMark(book).ConfigureAwait(false);
 		logger.Info("StopAudio called.");
 		asyncAudioPlayer.Stop();
-		ArgumentNullException.ThrowIfNull(webView);
 		ClearTimer();
-		
+		if(webView is null)
+		{
+			logger.Warn("webView is null, cannot remove highlight.");
+			return;
+		}
 		dispatcher.Dispatch(async () 
 			=> { await webView.EvaluateJavaScriptAsync($"removeHighlight();");});
 	}
 
 	async Task UpdatePlaybackHighlight()
 	{
-		ArgumentNullException.ThrowIfNull(webView);
-		ArgumentNullException.ThrowIfNull(book);
-		ArgumentNullException.ThrowIfNull(asyncAudioPlayer);
-		if(!string.IsNullOrEmpty(seekToCueId))
+		if (asyncAudioPlayer is null || book is null || webView is null)
 		{
-			logger.Info($"Seeking to cue with ID: {seekToCueId}");
+			logger.Warn("UpdatePlaybackHighlight called but asyncAudioPlayer, book or webview is null.");
+			return;
+		}
+		
+		if (!string.IsNullOrEmpty(seekToCueId))
+		{
+			System.Diagnostics.Debug.WriteLine($"Seeking to cue ID: {seekToCueId}");
 			SeekTo(seekToCueId);
-			seekToCueId = string.Empty;
 			return;
 		}
 		var cue = cues.Find(cue => 
@@ -175,11 +211,16 @@ public partial class AudioPlayer
 			TimeSpan.TryParse(cue.ClipEnd, new CultureInfo("en-US"), out var end) &&
 			asyncAudioPlayer.CurrentPosition >= begin.TotalSeconds && 
 			asyncAudioPlayer.CurrentPosition <= end.TotalSeconds);
-		ArgumentNullException.ThrowIfNull(asyncAudioPlayer);
 
-		if (cue is not null && !cue.SpanId.Equals(currentItemId))
+		if (cue is null)
+		{
+			logger.Warn("No matching cue found for current audio position.");
+			return;
+		}
+		if (!cue.SpanId.Equals(currentItemId))
 		{
 			currentItemId = cue.SpanId;
+			
 			if(!string.IsNullOrEmpty(currentItemId))
 			{
 				book.CurrentChapterCue = currentItemId;
@@ -196,23 +237,30 @@ public partial class AudioPlayer
 			await StopAudio();
 			seekToCueId = string.Empty;
 			await webView.EvaluateJavaScriptAsync("nextChapter()");
-			return;
 		}
 	}
 	async Task RunCode(AudioCue cue, CancellationToken cancellationToken)
 	{
-		ArgumentNullException.ThrowIfNull(webView);
-		ArgumentNullException.ThrowIfNull(book);
-		var result = string.Empty;
-		result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpanId}');").WaitAsync(cancellationToken);
-		
-		if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
+		if(webView is null || book is null)
 		{
+			logger.Warn("RunCode called but webView or book is null.");
+			return;
+		}
+		
+		var result = await webView.EvaluateJavaScriptAsync($"isSpanOnNextPage('{cue.SpanId}');").WaitAsync(cancellationToken);
+		
+		if (result is not null && result.Equals("true", StringComparison.OrdinalIgnoreCase))
+		{
+			var page = await webView.EvaluateJavaScriptAsync("getCurrentPage();").WaitAsync(CancellationToken.None) ?? throw new InvalidOperationException("Could not retrieve current page from web view.");
+			if (!int.TryParse(page, out currentPage))
+			{
+				logger.Warn($"Could not parse current page '{page}' to an integer, defaulting to 0.");
+				return;
+			}
+			
 			dispatcher.Dispatch(async () =>
 			{
 				await webView.EvaluateJavaScriptAsync($"handleNext();").WaitAsync(cancellationToken);
-				await webView.EvaluateJavaScriptAsync($"highlightSpan('{cue.SpanId}')").WaitAsync(cancellationToken);
-				await webView.EvaluateJavaScriptAsync($"updateVisibleSpanElements();").WaitAsync(cancellationToken);
 			});
 			return;
 		}

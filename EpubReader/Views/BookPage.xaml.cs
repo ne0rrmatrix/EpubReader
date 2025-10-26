@@ -242,6 +242,11 @@ public partial class BookPage : ContentPage
 		{
 			case "next":
 				await webViewHelper.Next(pageLabel, book);
+				if(isPlayingAudio && audioPlayer is not null)
+				{
+					System.Diagnostics.Debug.WriteLine("Playing next audio cue.");
+					await audioPlayer.PlayAudio(book, webView, data).ConfigureAwait(false);
+				}
 				break;
 			case "prev":
 				await webViewHelper.Prev(pageLabel, book);
@@ -250,8 +255,9 @@ public partial class BookPage : ContentPage
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
 			case "longpress":
-				if (audioPlayer is null)
+				if(audioPlayer is null || book.Chapters[book.CurrentChapter].AudioCues.Count == 0)
 				{
+					System.Diagnostics.Debug.WriteLine("AudioPlayer is null or no audio cues available.");
 					return;
 				}
 				isPlayingAudio = true;
@@ -420,7 +426,11 @@ public partial class BookPage : ContentPage
 		{
 			return;
 		}
-		
+		if(book.CurrentChapter >= book.Chapters.Count)
+		{
+			System.Diagnostics.Debug.WriteLine("CurrentChapter index is out of range.");
+			return;
+		}
 		if (isPlayingAudio)
 		{
 			await audioPlayer.StopAudio();
