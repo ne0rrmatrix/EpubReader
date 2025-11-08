@@ -16,8 +16,7 @@
     <NuGetAuditMode>all</NuGetAuditMode>
 
     <!-- MAUI Specific -->
-    <MauiPackageVersion>9.0.110</MauiPackageVersion>
-    <NextMauiPackageVersion>10.0.0</NextMauiPackageVersion>
+    <MauiPackageVersion>9.0.120</MauiPackageVersion>
     <MauiStrictXamlCompilation>true</MauiStrictXamlCompilation>
     <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
     <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
@@ -226,7 +225,4 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
-  <PropertyGroup Condition="('$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true') and $([MSBuild]::IsOSPlatform('windows')) == 'true'">
-    <IncludeTizenTargetFrameworks>true</IncludeTizenTargetFrameworks>
-  </PropertyGroup>
 </Project>
