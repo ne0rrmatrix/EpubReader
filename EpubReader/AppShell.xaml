@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Shell
     x:Class="EpubReader.AppShell"
-    xmlns:local="clr-namespace:EpubReader.Views"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Name="Page"
     Title=""
     Shell.FlyoutBehavior="Disabled">
     <ShellContent
         Title="Library"
-        ContentTemplate="{DataTemplate local:LibraryPage}"
+        ContentTemplate="{DataTemplate LibraryPage}"
         Route="MainPage" />
 
 </Shell>
