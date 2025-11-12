@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Messaging.Messages;
-using EpubReader.Models;
 
 namespace EpubReader.Messages;
 

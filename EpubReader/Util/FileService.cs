@@ -1,6 +1,4 @@
-﻿using MetroLog;
-
-namespace EpubReader.Util;
+﻿namespace EpubReader.Util;
 
 /// <summary>
 /// Provides static methods for file and directory operations, including deletion and saving of files and images.

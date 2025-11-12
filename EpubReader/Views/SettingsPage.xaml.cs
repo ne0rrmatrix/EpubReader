@@ -1,11 +1,3 @@
-using CommunityToolkit.Maui.Views;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.ViewModels;
-using MetroLog;
-
 namespace EpubReader.Views;
 
 /// <summary>

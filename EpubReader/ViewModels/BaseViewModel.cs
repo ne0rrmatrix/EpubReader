@@ -1,9 +1,5 @@
 ﻿using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Mvvm.ComponentModel;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using MetroLog;
 
 #if ANDROID
 using CommunityToolkit.Maui.Core.Platform;

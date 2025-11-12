@@ -1,7 +1,3 @@
-using EpubReader.Interfaces;
-using EpubReader.ViewModels;
-using MetroLog;
-
 namespace EpubReader.Views;
 
 public partial class CalibrePage : ContentPage

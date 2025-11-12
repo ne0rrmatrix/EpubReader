@@ -1,6 +1,4 @@
-﻿using EpubReader.Views;
-
-namespace EpubReader;
+﻿namespace EpubReader;
 
 public partial class AppShell : Shell
 {

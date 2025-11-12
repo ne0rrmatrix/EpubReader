@@ -1,8 +1,5 @@
 ﻿using Android.Graphics;
 using Android.Webkit;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
 namespace EpubReader.Controls;

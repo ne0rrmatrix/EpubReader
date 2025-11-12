@@ -1,6 +1,4 @@
-﻿using EpubReader.Models;
-
-namespace EpubReader.ViewModels;
+﻿namespace EpubReader.ViewModels;
 
 /// <summary>
 /// Represents the view model for the settings page, providing access to available fonts and color schemes.

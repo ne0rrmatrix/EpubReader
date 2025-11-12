@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using System.Runtime.Versioning;
-using EpubReader.Util;
 using Foundation;
 using WebKit;
 

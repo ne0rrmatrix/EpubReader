@@ -1,7 +1,4 @@
 using System.Text;
-using EpubReader.Models;
-using EpubReader.Util;
-using MetroLog;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using VersOne.Epub;

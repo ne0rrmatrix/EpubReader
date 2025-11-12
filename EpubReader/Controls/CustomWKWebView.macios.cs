@@ -1,5 +1,4 @@
 ﻿using CoreGraphics;
-using EpubReader.Util;
 using Foundation;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;

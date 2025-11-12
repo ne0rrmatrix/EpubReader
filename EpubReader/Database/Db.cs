@@ -1,8 +1,4 @@
-﻿using System.Threading.Tasks;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using MetroLog;
-using SQLite;
+﻿using SQLite;
 
 namespace EpubReader.Database;
 

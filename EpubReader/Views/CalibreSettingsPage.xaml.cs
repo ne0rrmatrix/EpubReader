@@ -1,7 +1,3 @@
-using CommunityToolkit.Maui.Views;
-using EpubReader.Interfaces;
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 public partial class CalibreSettingsPage : Popup

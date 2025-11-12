@@ -5,8 +5,6 @@ using Android.OS;
 using Android.Views;
 using Android.Views.InputMethods;
 using Android.Widget;
-using EpubReader.Interfaces;
-using EpubReader.Service;
 
 namespace EpubReader;
 

@@ -1,7 +1,4 @@
 ﻿using EpubReader.Extensions;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using MetroLog;
 
 namespace EpubReader.Util;
 

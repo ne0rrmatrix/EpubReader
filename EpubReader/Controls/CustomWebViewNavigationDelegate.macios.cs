@@ -1,6 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using Microsoft.Maui.Handlers;
+﻿using Microsoft.Maui.Handlers;
 using WebKit;
 
 namespace EpubReader.Controls;

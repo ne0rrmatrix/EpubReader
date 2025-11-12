@@ -1,5 +1,4 @@
-﻿using EpubReader.Interfaces;
-using Windows.Storage;
+﻿using Windows.Storage;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 using WindowsFolderPicker = Windows.Storage.Pickers.FolderPicker;

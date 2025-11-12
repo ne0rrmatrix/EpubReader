@@ -1,11 +1,5 @@
-﻿using CommunityToolkit.Maui;
-using CommunityToolkit.Maui.Core;
+﻿using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using EpubReader.Models;
-using EpubReader.Util;
-using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 

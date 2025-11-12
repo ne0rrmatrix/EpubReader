@@ -1,10 +1,3 @@
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.Util;
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 /// <summary>

@@ -1,12 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.Service;
-using EpubReader.ViewModels;
-using MetroLog;
-
-namespace EpubReader.Util;
+﻿namespace EpubReader.Util;
 
 /// <summary>
 /// Provides functionality to process EPUB files, including selecting, validating, and saving them to a library.

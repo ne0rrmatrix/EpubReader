@@ -1,10 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using EpubReader.Util;
-
-namespace EpubReader.ViewModels;
+﻿namespace EpubReader.ViewModels;
 public partial class FolderDialogPageViewModel : BaseViewModel
 {
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();

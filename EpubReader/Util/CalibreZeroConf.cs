@@ -1,5 +1,4 @@
-﻿using MetroLog;
-using Zeroconf;
+﻿using Zeroconf;
 
 namespace EpubReader.Util;
 

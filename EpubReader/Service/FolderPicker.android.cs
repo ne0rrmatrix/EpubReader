@@ -1,7 +1,6 @@
 ﻿using Android.App;
 using Android.Content;
 using AndroidX.DocumentFile.Provider;
-using EpubReader.Interfaces;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 using Uri = Android.Net.Uri;

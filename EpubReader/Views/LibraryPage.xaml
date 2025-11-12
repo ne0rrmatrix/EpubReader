@@ -1,28 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.LibraryPage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:Models="clr-namespace:EpubReader.Models"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    x:DataType="viewModels:LibraryViewModel"
+    x:DataType="LibraryViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=CalibreCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=CalibreCommand}"
             IconImageSource="globe_book_24dp.png"
             Order="Primary" />
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=AddCommand}"
             IconImageSource="add.png"
             Order="Primary" />
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AddFolderCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=AddFolderCommand}"
             IconImageSource="folder_24dp.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
@@ -38,7 +34,7 @@
             </Grid.ColumnDefinitions>
             <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
                 <ImageButton
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AlphabeticalAuthorSortCommand}"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=AlphabeticalAuthorSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -57,7 +53,7 @@
 
                 <ImageButton
                     Margin="10,10,0,0"
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}, Path=AlphabeticalTitleSortCommand}"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=AlphabeticalTitleSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -100,7 +96,7 @@
             </CollectionView.ItemsLayout>
 
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="Models:Book">
+                <DataTemplate x:DataType="Book">
                     <Grid Margin="4" Padding="4">
                         <SwipeView>
                             <SwipeView.RightItems>
@@ -108,7 +104,7 @@
 
                                     <SwipeItem
                                         BackgroundColor="LightGray"
-                                        Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                        Command="{Binding RemoveBookCommand, x:DataType=LibraryViewModel, Source={RelativeSource AncestorType={x:Type LibraryViewModel}}}"
                                         CommandParameter="{Binding .}"
                                         IconImageSource="delete.png"
                                         Text="Delete" />
@@ -131,7 +127,7 @@
                                         <FlyoutBase.ContextFlyout>
                                             <MenuFlyout>
                                                 <MenuFlyoutItem
-                                                    Command="{Binding RemoveBookCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}"
+                                                    Command="{Binding RemoveBookCommand, x:DataType=LibraryViewModel, Source={RelativeSource AncestorType={x:Type LibraryViewModel}}}"
                                                     CommandParameter="{Binding .}"
                                                     IconImageSource="delete.png"
                                                     Text="Delete" />
@@ -139,7 +135,7 @@
                                         </FlyoutBase.ContextFlyout>
 
                                         <ffimageloading:CachedImage.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=viewModels:LibraryViewModel, Source={RelativeSource AncestorType={x:Type viewModels:LibraryViewModel}}}" CommandParameter="{Binding .}" />
+                                            <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=LibraryViewModel, Source={RelativeSource AncestorType={x:Type LibraryViewModel}}}" CommandParameter="{Binding .}" />
                                         </ffimageloading:CachedImage.GestureRecognizers>
                                     </ffimageloading:CachedImage>
 

@@ -1,17 +1,7 @@
 ﻿using System.Collections.ObjectModel;
-using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Extensions;
-using CommunityToolkit.Maui.Views;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Messages;
-using EpubReader.Models;
 using EpubReader.ODPS;
-using EpubReader.Util;
-using EpubReader.Views;
-using FileInfo = EpubReader.Models.FileInfo;
+
 namespace EpubReader.ViewModels;
 public partial class CalibrePageViewModel : BaseViewModel
 {

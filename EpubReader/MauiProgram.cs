@@ -1,20 +1,12 @@
-﻿using CommunityToolkit.Maui;
-using EpubReader.Controls;
-using EpubReader.Database;
-using EpubReader.Interfaces;
-using EpubReader.Service;
-using EpubReader.Util;
-using EpubReader.ViewModels;
-using EpubReader.Views;
-using FFImageLoading.Maui;
-using MetroLog;
+﻿using FFImageLoading.Maui;
 using MetroLog.Operators;
 using MetroLog.Targets;
-using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
+using Microsoft.Extensions.Logging;
+
 
 #if IOS || MACCATALYST
 using CoreGraphics;

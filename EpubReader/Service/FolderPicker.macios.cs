@@ -1,5 +1,4 @@
-﻿using EpubReader.Interfaces;
-using Foundation;
+﻿using Foundation;
 using UIKit;
 using UniformTypeIdentifiers;
 using ILogger = MetroLog.ILogger;

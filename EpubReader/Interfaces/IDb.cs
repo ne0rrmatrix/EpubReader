@@ -1,6 +1,4 @@
-﻿using EpubReader.Models;
-
-namespace EpubReader.Interfaces;
+﻿namespace EpubReader.Interfaces;
 
 /// <summary>
 /// Defines methods for managing books and settings in a database.
