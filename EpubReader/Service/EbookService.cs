@@ -522,6 +522,7 @@ public static partial class EbookService
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.EnsureXmlLang(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.EnsureXhtml1TransitionalDoctype(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.RemoveKoboScriptLinks(htmlFile);
 		return htmlFile;
 	}
 

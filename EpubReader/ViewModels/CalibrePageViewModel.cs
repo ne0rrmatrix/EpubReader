@@ -249,10 +249,16 @@ public partial class CalibrePageViewModel : BaseViewModel
 				Logger.Info("Loading books cancelled by user.");
 				break;
 			}
-	
+
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
-			var downloadUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/acquisition")?.Href ?? string.Empty;
+			var DownloadList = entry.Links.FindAll(l => l.Rel == "http://opds-spec.org/acquisition") ?? [];
+			var downloadUrl = DownloadList.FirstOrDefault(l => l.Type == "application/epub+zip")?.Href ?? string.Empty;
+			if (string.IsNullOrEmpty(downloadUrl))
+			{
+				Logger.Warn($"Entry '{entry.Title}' is missing image or download URL. Skipping...");
+				continue;
+			}
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var book = new Book
 			{

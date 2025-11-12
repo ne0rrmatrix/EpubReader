@@ -66,7 +66,7 @@ public partial class BookPage : ContentPage
 	/// operating system, with a larger translation on iOS and Android platforms.</remarks>
 	/// <param name="sender">The source of the event, typically the grid area that was tapped.</param>
 	/// <param name="e">The event data associated with the tap event.</param>
-	async void GridArea_Tapped(object sender, EventArgs e)
+	async void GridArea_Tapped(object? sender, EventArgs? e)
 	{
 		ViewModel.Press();
 		var width = this.Width * 0.4;
@@ -74,9 +74,9 @@ public partial class BookPage : ContentPage
 		{
 			width = this.Width * 0.8;
 		}
-		await grid.TranslateTo(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
-		await grid.ScaleTo(0.8, animationDuration).ConfigureAwait(false);
-		await grid.FadeTo(0.8, animationDuration).ConfigureAwait(false);
+		await grid.TranslateToAsync(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.ScaleToAsync(0.8, animationDuration).ConfigureAwait(false);
+		await grid.FadeToAsync(0.8, animationDuration).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -86,7 +86,7 @@ public partial class BookPage : ContentPage
 	/// UI to reflect the navigation state.</remarks>
 	/// <param name="sender">The source of the event, typically the web view control.</param>
 	/// <param name="e">The event data containing information about the navigation event.</param>
-	async void webView_Navigated(object? sender, WebNavigatedEventArgs e)
+	async void webView_Navigated(object? sender, WebNavigatedEventArgs? e)
 	{
 		await webViewHelper.LoadPageAsync(pageLabel, book);
 		Shimmer.IsActive = false;
@@ -97,7 +97,7 @@ public partial class BookPage : ContentPage
 	/// </summary>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">The event data.</param>
-	void CurrentPage_Loaded(object sender, EventArgs e)
+	void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
 	}
@@ -127,8 +127,12 @@ public partial class BookPage : ContentPage
 	/// processes the URL asynchronously.</remarks>
 	/// <param name="sender">The source of the event, typically the web view control.</param>
 	/// <param name="e">The <see cref="WebNavigatingEventArgs"/> containing event data, including the URL being navigated to.</param>
-	async void webView_Navigating(object? sender, WebNavigatingEventArgs e)
+	async void webView_Navigating(object? sender, WebNavigatingEventArgs? e)
 	{
+		if (e is null)
+		{
+			return;
+		}
 		var url = e.Url;
 
 		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
@@ -287,12 +291,12 @@ public partial class BookPage : ContentPage
 	/// duration.</remarks>
 	/// <param name="sender">The source of the event that triggered the method.</param>
 	/// <param name="e">The event data associated with the event.</param>
-	async void CloseMenuAsync(object sender, EventArgs e)
+	async void CloseMenuAsync(object? sender, EventArgs? e)
 	{
 		ViewModel.Press();
-		await grid.FadeTo(1, animationDuration).ConfigureAwait(false);
-		await grid.ScaleTo(1, animationDuration).ConfigureAwait(false);
-		await grid.TranslateTo(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
+		await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
+		await grid.TranslateToAsync(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)

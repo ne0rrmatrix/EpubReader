@@ -15,7 +15,7 @@ public partial class CalibreSettingsPage : Popup
 		BindingContext = viewModel;
 	}
 
-	async void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		if (viewModel.db is null)
 		{
@@ -38,7 +38,7 @@ public partial class CalibreSettingsPage : Popup
 		logger.Info("CalibreSettingsPage loaded.");
 	}
 
-	async void Switch_Toggled(object? sender, ToggledEventArgs e)
+	async void Switch_Toggled(object? sender, ToggledEventArgs? e)
 	{
 		if (sender is null)
 		{
@@ -58,7 +58,7 @@ public partial class CalibreSettingsPage : Popup
 		logger.Info("Settings saved successfully.");
 	}
 
-	void CurrentPage_Unloaded(object sender, EventArgs e)
+	void CurrentPage_Unloaded(object? sender, EventArgs? e)
 	{
 		horizontalStacklayout.Remove(switchController);
 		switchController.Toggled -= Switch_Toggled;
@@ -66,7 +66,7 @@ public partial class CalibreSettingsPage : Popup
 		EntryText.Completed -= Entry_Completed;
 	}
 
-	async void Entry_Completed(object? sender, EventArgs e)
+	async void Entry_Completed(object? sender, EventArgs? e)
 	{
 		if(sender is null)
 		{

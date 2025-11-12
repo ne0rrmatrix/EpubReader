@@ -300,6 +300,22 @@ public static partial class HtmlAgilityPackExtensions
 		return Regex.Replace(cssString, pattern, "", RegexOptions.Singleline, TimeSpan.FromSeconds(10));
 	}
 
+	/// <summary>
+	/// Removes Kobo JavaScript script tags from the specified HTML content.
+	/// </summary>
+	/// <remarks>This method uses a regular expression to identify and remove <c>&lt;script&gt;</c> tags with
+	/// <c>src</c> attributes containing "kobo.js" from the provided HTML content. It also removes any resulting empty lines.</remarks>
+	/// <param name="htmlContent">The HTML content from which Kobo script tags should be removed.</param>
+	/// <returns>The HTML content with all Kobo script tags removed.</returns>
+	public static string RemoveKoboScriptLinks(string htmlContent)
+	{
+		// Regular expression to match <script> tags with src containing "kobo.js"
+		string koboScriptPattern = @"<script\s+[^>]*src=[""'][^""']*kobo\.js[""'][^>]*/?>|<script\s+[^>]*src=[""'][^""']*kobo\.js[""'][^>]*></script>";
+		// Remove all matches from the HTML content
+		string cleanedHtml = Regex.Replace(htmlContent, koboScriptPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
+		return RemoveEmptyLines(cleanedHtml);
+	}
+
 	static bool IsHtmlPage(string htmlContent)
 	{
 		try

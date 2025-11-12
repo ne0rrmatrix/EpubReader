@@ -125,7 +125,7 @@ const navigationUtils = {
      */
     animateTo(contentWindow, targetLeft, platform) {
         const target = Math.round(targetLeft);
-     
+
         return new Promise((resolve) => {
             let done = false;
             const epsilon = 2; // px tolerance
@@ -155,12 +155,17 @@ const navigationUtils = {
                 contentWindow.scrollTo(target, 0);
                 cleanup();
             }, 800);
+            if (platform.isWindows) {
+                // Windows Edge has issues with smooth scrolling; use instant
+                contentWindow.scrollTo(target, 0);
 
-            contentWindow.scrollTo({
-                left: target,
-                top: 0,
-                behavior: 'smooth'
-            });
+            } else {
+                contentWindow.scrollTo({
+                    left: target,
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
         });
     },
 
@@ -272,8 +277,8 @@ const navigationUtils = {
      * @returns {number} The scroll amount in pixels
      */
     calculateScrollAmount(contentWindow) {
-        const gap = parseInt(
-            window.getComputedStyle(contentWindow.document.documentElement)
+        const gap = Number.parseInt(
+            globalThis.getComputedStyle(contentWindow.document.documentElement)
                 .getPropertyValue("column-gap")
         ) || 0;
 
@@ -290,7 +295,7 @@ const navigationUtils = {
         }
 
         // Check if contentWindow and document are ready
-        if (frame.contentWindow && frame.contentWindow.document.readyState === 'complete') {
+        if (frame.contentWindow?.document.readyState === 'complete') {
             const contentDoc = frame.contentDocument || frame.contentWindow.document;
             const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
             console.log("Scrolling to end of container.");
@@ -380,13 +385,13 @@ const columnUtils = {
         const columnWidth = computedStyle.getPropertyValue('column-width');
 
         if (columnCount && columnCount !== 'auto') {
-            return parseInt(columnCount, 10);
+            return Number.parseInt(columnCount, 10);
         }
 
         if (columnWidth && columnWidth !== 'auto') {
-            const width = parseFloat(columnWidth);
+            const width = Number.parseFloat(columnWidth);
             const containerWidth = contentWindow.innerWidth;
-            const gap = parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
+            const gap = Number.parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
             return Math.floor((containerWidth + gap) / (width + gap));
         }
 
@@ -406,10 +411,10 @@ const columnUtils = {
         }
 
         // Get the computed style height or use scrollHeight as fallback
-        const computedStyle = window.getComputedStyle(documentElement);
-        const height = parseFloat(computedStyle.height);
+        const computedStyle = globalThis.getComputedStyle(documentElement);
+        const height = Number.parseFloat(computedStyle.height);
 
-        return isNaN(height) ? documentElement.scrollHeight : height;
+        return Number.isNaN(height) ? documentElement.scrollHeight : height;
     },
 
     /**
@@ -601,14 +606,14 @@ function handleMessage(event, platform) {
     if (data.startsWith("jump.")) {
         const href = data.substring(5);
         console.log("Jumping to:", href);
-        window.location.href = `https://runcsharp.jump?${href}`;
+        globalThis.location.href = `https://runcsharp.jump?${href}`;
     } else if (data === "next") {
         handleNextCommand();
     } else if (data === "prev") {
         handlePrevCommand();
     } else if (data === "menu") {
         console.log("Received menu command.");
-        window.location.href = 'https://runcsharp.menu?true';
+        globalThis.location.href = 'https://runcsharp.menu?true';
     }
 }
 
@@ -626,7 +631,7 @@ function handleNextCommand() {
 
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
-        window.location.href = 'https://runcsharp.next?true';
+        globalThis.location.href = 'https://runcsharp.next?true';
     } else {
         navigationUtils.scrollRight(platform);
     }
@@ -646,7 +651,7 @@ function handlePrevCommand() {
 
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
-        window.location.href = 'https://runcsharp.prev?true';
+        globalThis.location.href = 'https://runcsharp.prev?true';
     } else {
         navigationUtils.scrollLeft(platform);
     }
@@ -708,7 +713,7 @@ function extractTextFromDocument(doc) {
         let textContent = doc.body.textContent || doc.body.innerText || "";
 
         // Normalize whitespace while preserving paragraph breaks
-        textContent = textContent.replace(/\s+/g, " ").trim();
+        textContent = textContent.replaceAll(/\s+/g, " ").trim();
 
         return textContent;
     } catch (error) {
@@ -725,7 +730,7 @@ function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
     console.log(`Updating character position: ${characterPosition}`);
     // Notify C# code about the character position change
-    window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
+    globalThis.location.href = `https://runcsharp.characterposition?${characterPosition}`;
 }
 
 
@@ -773,7 +778,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 100); // Small delay to ensure content is fully rendered
             }
 
-            window.location.href = 'https://runcsharp.pageLoad?true';
+            globalThis.location.href = 'https://runcsharp.pageLoad?true';
         } catch (error) {
             console.error("Error during iframe onload:", error);
         }
@@ -782,7 +787,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Listen for messages from the parent window
     window.addEventListener("message", event => handleMessage(event, platform));
     if (platform.isIOS) {
-        window.addEventListener('touchstart', {});
+        globalThis.addEventListener('touchstart', {});
     }
 });
 

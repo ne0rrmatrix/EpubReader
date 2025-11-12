@@ -274,7 +274,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	public async Task<bool> ProcessFileAsync(Book book, CancellationToken cancellationToken)
 	{
 		using var httpClient = new HttpClient();
-		var memoryStream = new MemoryStream();
+		using var memoryStream = new MemoryStream();
 		try
 		{
 			using var stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
@@ -283,16 +283,20 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 			var cacheDirectory = FileSystem.Current.CacheDirectory;
 			var invalidPathChars = Path.GetInvalidFileNameChars();
+			var extraInvalidChars = new char[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+'};
+			var emptySpaces = " ";
+			invalidPathChars = [.. invalidPathChars, .. emptySpaces];
+			invalidPathChars = [.. invalidPathChars, .. extraInvalidChars];
 			book.Title = string.Concat(book.Title.Split(invalidPathChars, StringSplitOptions.RemoveEmptyEntries));
 			book.FilePath = Path.Combine(cacheDirectory, $"{book.Title}.epub");
-
 			var fileBytes = memoryStream.ToArray();
-			await File.WriteAllBytesAsync(book.FilePath, fileBytes, cancellationToken).ConfigureAwait(false);
+			await File.WriteAllBytesAsync(book.FilePath, fileBytes, cancellationToken);
 			logger.Info($"File saved: {book.FilePath}");
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file: {ex.Message}");
+			if(ex.StackTrace is not null) { logger.Error(ex.StackTrace); }
 			return false;
 		}
 	
@@ -300,22 +304,27 @@ public partial class ProcessEpubFiles : BaseViewModel
 		try
 		{
 
-			var ebook = await EbookService.GetListingAsync(book.FilePath).ConfigureAwait(false);
+			var ebook = await EbookService.GetListingAsync(book.FilePath);
 			if (ebook is null)
 			{
+				logger.Error("Error opening book after download.");
 				return false;
 			}
 
 			if (await IsBookAlreadyInLibrary(ebook))
 			{
+				logger.Info("Book already exists in library.");
 				return false;
 			}
 			memoryStream.Seek(0, SeekOrigin.Begin);
-			await SaveBookToLibraryAsync(ebook, memoryStream, book.FilePath, cancellationToken).ConfigureAwait(false);
+			await SaveBookToLibraryAsync(ebook, memoryStream, book.FilePath, cancellationToken);
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error adding book: {ex.Message}");
+			if(ex.StackTrace is not null) {
+				logger.Error(ex.StackTrace);
+			}
 			return false;
 		}
 		return true;

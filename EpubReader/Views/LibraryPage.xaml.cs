@@ -54,8 +54,13 @@ public partial class LibraryPage : ContentPage
 	/// results are logged for informational purposes.</remarks>
 	/// <param name="sender">The source of the event, typically the search bar control.</param>
 	/// <param name="e">The <see cref="TextChangedEventArgs"/> containing the event data, including the new text value.</param>
-	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs e)
+	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
+		if (e is null)
+		{
+			logger.Warn("TextChangedEventArgs is null, cannot process search.");
+			return;
+		}
 		var books = viewModel.Books;
 		var results = e.NewTextValue;
 		var allBooks = await db.GetAllBooks();

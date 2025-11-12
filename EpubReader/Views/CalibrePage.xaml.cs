@@ -14,8 +14,13 @@ public partial class CalibrePage : ContentPage
 		InitializeComponent();
 		BindingContext = viewModel;
 	}
-	void OnSearchBarTextChanged(object? sender, TextChangedEventArgs e)
+	void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
+		if (e is null)
+		{
+			logger.Warn("TextChangedEventArgs is null, cannot process search.");
+			return;
+		}
 		var books = viewModel.Books.ToList();
 		var results = e.NewTextValue;
 		var allBooks = viewModel.BookList.ToList();

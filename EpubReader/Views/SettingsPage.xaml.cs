@@ -41,8 +41,13 @@ public partial class SettingsPage : Popup<bool>
 	/// of the update.</remarks>
 	/// <param name="sender">The source of the event, typically the slider control.</param>
 	/// <param name="e">The <see cref="ValueChangedEventArgs"/> containing the old and new values of the slider.</param>
-	async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
+	async void OnFontSizeSliderChanged(object? sender, ValueChangedEventArgs? e)
 	{
+		if (e is null)
+		{
+			logger.Warn("ValueChangedEventArgs is null, cannot change font size.");
+			return;
+		}
 		if((int)e.NewValue == 0 || settings is null)
 		{
 			return;
@@ -60,7 +65,7 @@ public partial class SettingsPage : Popup<bool>
 	/// have been reset.</remarks>
 	/// <param name="sender">The source of the event that triggered the method.</param>
 	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
-	async void RemoveAllSettings(object sender, EventArgs e)
+	async void RemoveAllSettings(object? sender, EventArgs? e)
 	{
 		await db.RemoveAllSettings();
 		settings = new Settings();
@@ -81,7 +86,7 @@ public partial class SettingsPage : Popup<bool>
 	/// to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">The event data.</param>
-	async void ThemePicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void ThemePicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
 		if(settings is null)
 		{
@@ -109,7 +114,7 @@ public partial class SettingsPage : Popup<bool>
 	/// updated settings to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event, typically the font picker control.</param>
 	/// <param name="e">The event data associated with the selection change.</param>
-	async void FontPicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void FontPicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
 		if(settings is null)
 		{
@@ -128,7 +133,7 @@ public partial class SettingsPage : Popup<bool>
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	void CurrentPage_Unloaded(object sender, EventArgs e)
+	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
 		System.Diagnostics.Debug.WriteLine("Unloaded event fired");
 		stackLayout.Remove(switchControl);
@@ -142,7 +147,7 @@ public partial class SettingsPage : Popup<bool>
 	/// updating the settings, it saves the changes to the database and sends a message indicating the update.</remarks>
 	/// <param name="sender">The source of the event, typically the switch control.</param>
 	/// <param name="e">The event data containing the toggle state.</param>
-	async void switchControl_Toggled(object? sender, ToggledEventArgs e)
+	async void switchControl_Toggled(object? sender, ToggledEventArgs? e)
 	{
 		if(sender is null)
 		{
@@ -164,7 +169,7 @@ public partial class SettingsPage : Popup<bool>
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	async void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		settings = await db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;

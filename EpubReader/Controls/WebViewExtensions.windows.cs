@@ -57,6 +57,7 @@ public static partial class WebViewExtensions
 		var coreWebView = webViewHandler.PlatformView.CoreWebView2;
 #if DEBUG
 		settings.AreDevToolsEnabled = true;
+		coreWebView.OpenDevToolsWindow();
 #endif
 #if RELEASE
 		settings.AreDevToolsEnabled = false;
