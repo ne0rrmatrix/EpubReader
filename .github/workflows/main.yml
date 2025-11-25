@@ -10,12 +10,21 @@ jobs:
     name: Build and analyze
     runs-on: windows-latest
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-dotnet@v5
         with:
-          java-version: 17
-          distribution: 'zulu' # Alternative distribution options are available.
-      - uses: actions/checkout@v4
+                    dotnet-version: '10.0.x'
+                    dotnet-quality: 'ga'
+
+      -   uses: actions/setup-java@v5
+          with:
+                    distribution: 'microsoft'
+                    java-version: '21'
+
+      -   name: Install .NET MAUI Workload
+          run: |
+                    dotnet workload install maui
+                    dotnet workload update
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       - name: Cache SonarQube Cloud packages
@@ -43,7 +52,6 @@ jobs:
         shell: powershell
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-           dotnet workload install maui --source https://api.nuget.org/v3/index.json
            dotnet restore EpubReader/EpubReader.csproj
            dotnet build EpubReader/EpubReader.csproj -c:Debug
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
