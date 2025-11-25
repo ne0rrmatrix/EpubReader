@@ -1,6 +1,4 @@
 name: SonarQube
-env:
- SECRET: ${{ secrets.SONAR_TOKEN }}
 on:
   push:
     branches:
@@ -10,6 +8,8 @@ on:
 jobs:
   build:
     name: Build and analyze
+    env:
+     SECRET: ${{ secrets.SONAR_TOKEN }}
     runs-on: windows-latest
     steps:
       - uses: actions/setup-dotnet@v5
