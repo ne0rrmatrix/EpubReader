@@ -12,7 +12,7 @@ namespace EpubReader;
 /// </summary>
 [Activity(NoHistory = true, LaunchMode = LaunchMode.SingleTop, Exported = true)]
 [IntentFilter(
-	new[] { Intent.ActionView },
+	[Intent.ActionView],
 	Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
 	DataScheme = "com.googleusercontent.apps.507277680982-hejogn5jq19j8kvmmr8teei2odg3rlda",
 	DataHost = "oauth2redirect",

@@ -5,15 +5,13 @@ using Android.OS;
 using Android.Views;
 using Android.Views.InputMethods;
 using Android.Widget;
-using EpubReader.Platforms.Android;
-using Plugin.Firebase.Auth;
 using Plugin.Firebase.Auth.Google;
 
 namespace EpubReader;
 
 [Activity(Theme = "@style/Maui.SplashTheme", ResizeableActivity = true, MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density )]
 [IntentFilter(
-	new[] { Intent.ActionView },
+	[Intent.ActionView],
 	Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
 	DataScheme = "https",
 	DataHost = "epubreader-a03f6.firebaseapp.com",
@@ -48,13 +46,13 @@ public class MainActivity : MauiAppCompatActivity
 			catch (Exception ex)
 			{
 				// Prevent plugin null-ref or config errors from crashing the app; log for diagnostics.
-				System.Diagnostics.Trace.WriteLine($"Firebase Google HandleActivityResultAsync ignored: {ex.GetType().Name}: {ex.Message}");
+				System.Diagnostics.Trace.TraceWarning($"Firebase Google HandleActivityResultAsync ignored: {ex.GetType().Name}: {ex.Message}");
 			}
 		}
 		else
 		{
 			// Optional: helpful telemetry during debugging
-			System.Diagnostics.Trace.WriteLine($"OnActivityResult: Ignored by Google plugin. requestCode={requestCode}, resultCode={resultCode}");
+			System.Diagnostics.Trace.TraceWarning($"OnActivityResult: Ignored by Google plugin. requestCode={requestCode}, resultCode={resultCode}");
 		}
 
 		ActivityResult?.Invoke(requestCode, resultCode, data);

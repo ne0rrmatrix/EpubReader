@@ -52,7 +52,7 @@ public partial class App : Application, IDisposable
 
 	async Task InitializeAppAsync(CancellationToken token)
 	{
-		bool needsAuth = await authenticationService.NeedsAuthenticationAsync(token);
+		bool needsAuth = await AuthenticationService.NeedsAuthenticationAsync(token);
 		if (needsAuth)
 		{
 			await Shell.Current.GoToAsync("LoginPage");

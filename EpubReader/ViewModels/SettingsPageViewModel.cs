@@ -72,6 +72,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 	protected override void Dispose(bool disposing)
 	{
 		authenticationService.AuthStateChanged -= OnAuthStateChanged;
+		base.Dispose(disposing);
 	}
 
 	/// <summary>

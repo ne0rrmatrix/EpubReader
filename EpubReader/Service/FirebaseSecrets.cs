@@ -63,7 +63,7 @@ static class FirebaseSecrets
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"Firebase secrets: failed to read embedded props - {ex.Message}");
+            Trace.TraceWarning($"Firebase secrets: failed to read embedded props - {ex.Message}");
             return (string.Empty, string.Empty, string.Empty);
         }
     }

@@ -28,13 +28,11 @@ public partial class LoginPageViewModel(AuthenticationService authenticationServ
 			IsBusy = true;
 			IsNotBusy = false;
 			StatusMessage = "Signing in with Google...";
-
 			var userId = await authenticationService.SignInWithGoogleAsync(cancellationToken);
 
 			if (!string.IsNullOrWhiteSpace(userId))
 			{
 				StatusMessage = "Sign in successful!";
-				//await Shell.Current.GoToAsync("..");
 				await Shell.Current.Navigation.PopModalAsync();
 			}
 			else
@@ -72,13 +70,10 @@ public partial class LoginPageViewModel(AuthenticationService authenticationServ
 			IsBusy = true;
 			IsNotBusy = false;
 			StatusMessage = "Setting up local mode...";
-
+#if WINDOWS
 			await AuthenticationService.SetLocalOnlyModeAsync(cancellationToken);
-
+#endif
 			StatusMessage = "Local mode enabled!";
-
-			// Navigate back or close the login page
-			//await Shell.Current.GoToAsync("..");
 			await Shell.Current.Navigation.PopModalAsync();
 		}
 		catch (Exception ex)

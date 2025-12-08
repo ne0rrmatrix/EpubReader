@@ -23,7 +23,7 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 	readonly string deviceId;
 	readonly string deviceName;
 	readonly Subject<ReadingProgress> saveSubject = new();
-	readonly CompositeDisposable subscriptions = new();
+	readonly CompositeDisposable subscriptions = [];
 	readonly AuthenticationService authenticationService;
 	string databaseUrl = string.Empty;
 	string? userId;

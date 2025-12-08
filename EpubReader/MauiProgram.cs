@@ -1,12 +1,12 @@
 ﻿using FFImageLoading.Maui;
 using MetroLog.Operators;
 using MetroLog.Targets;
+using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
+using Microsoft.Maui.LifecycleEvents;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
-using Microsoft.Extensions.Logging;
-using Microsoft.Maui.LifecycleEvents;
 
 #if ANDROID
 using Plugin.Firebase.Core.Platforms.Android;
@@ -56,7 +56,7 @@ public static class MauiProgram
 		// Validate configuration and log helpful diagnostic if invalid
 		if (!FirebaseConfigLoader.IsConfigValid())
 		{
-			System.Diagnostics.Trace.WriteLine("WARNING: Firebase configuration not found via env vars or assets. Android resources may still contain placeholders.");
+			System.Diagnostics.Trace.TraceWarning("WARNING: Firebase configuration not found via env vars or assets. Android resources may still contain placeholders.");
 		}
 
 		WebViewHandler.Mapper.ModifyMapping(
@@ -148,46 +148,52 @@ public static class MauiProgram
 #if ANDROID
 			events.AddAndroid(android => android.OnCreate((activity, _) =>
 			{
-				// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
-				try
-				{
-					FirebaseConfigLoader.InjectFirebaseSecrets();
-
-					// Build FirebaseOptions from loaded configuration
-					var appId = FirebaseConfigLoader.GetConfigValue("google_app_id");
-					var apiKey = FirebaseConfigLoader.GetConfigValue("google_api_key");
-					var databaseUrl = FirebaseConfigLoader.GetConfigValue("firebase_database_url");
-
-					if (!string.IsNullOrWhiteSpace(appId))
-					{
-						var optionsBuilder = new Firebase.FirebaseOptions.Builder()
-								.SetApplicationId(appId);
-						if (!string.IsNullOrWhiteSpace(apiKey))
-						{
-							optionsBuilder.SetApiKey(apiKey);
-						}
-
-						if (!string.IsNullOrWhiteSpace(databaseUrl))
-						{
-							optionsBuilder.SetDatabaseUrl(databaseUrl);
-						}
-
-						var options = optionsBuilder.Build();
-						Firebase.FirebaseApp.InitializeApp(activity, options);
-					}
-
-					CrossFirebase.Initialize(activity);
-					var clientId = FirebaseConfigLoader.GetConfigValue("default_web_client_id");
-						
-				}
-				catch (Exception ex)
-				{
-					System.Diagnostics.Trace.WriteLine($"DEBUG: Firebase startup error: {ex.Message}");
-				}
+				InitializeFirebaseOnAndroid(activity);
 			}));
 #endif
 		});
 
 		return builder;
 	}
+
+#if ANDROID
+	static void InitializeFirebaseOnAndroid(Android.App.Activity activity)
+	{
+		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
+		try
+		{
+			FirebaseConfigLoader.InjectFirebaseSecrets();
+
+			// Build FirebaseOptions from loaded configuration
+			var appId = FirebaseConfigLoader.GetConfigValue("google_app_id");
+			var apiKey = FirebaseConfigLoader.GetConfigValue("google_api_key");
+			var databaseUrl = FirebaseConfigLoader.GetConfigValue("firebase_database_url");
+
+			if (!string.IsNullOrWhiteSpace(appId))
+			{
+				var optionsBuilder = new Firebase.FirebaseOptions.Builder()
+					.SetApplicationId(appId);
+
+				if (!string.IsNullOrWhiteSpace(apiKey))
+				{
+					optionsBuilder.SetApiKey(apiKey);
+				}
+
+				if (!string.IsNullOrWhiteSpace(databaseUrl))
+				{
+					optionsBuilder.SetDatabaseUrl(databaseUrl);
+				}
+
+				var options = optionsBuilder.Build();
+				Firebase.FirebaseApp.InitializeApp(activity, options);
+			}
+
+			CrossFirebase.Initialize(activity);
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Trace.TraceWarning($"DEBUG: Firebase startup error: {ex.Message}");
+		}
+	}
+#endif
 }
