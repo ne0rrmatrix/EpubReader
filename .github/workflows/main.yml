@@ -9,7 +9,8 @@ jobs:
   build:
     name: Build and analyze
     env:
-     SECRET: ${{ secrets.SONAR_TOKEN }}
+      SECRET: ${{ secrets.SONAR_TOKEN }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
     runs-on: windows-latest
     steps:
       - uses: actions/setup-dotnet@v5
@@ -29,6 +30,25 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Expose Google JSON to environment (no file)
+        if: ${{ secrets.GOOGLE_SECRET != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) {
+            Write-Error 'Environment variable GOOGLE_SECRET_B64 is empty'
+            exit 1
+          }
+          try {
+            $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          } catch {
+            Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
+            exit 1
+          }
+          $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+          Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
+
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v4
         with:
@@ -49,8 +69,6 @@ jobs:
           New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
       - name: Build and analyze
-        env:
-          SECRET: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$SECRET"
