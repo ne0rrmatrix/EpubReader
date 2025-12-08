@@ -50,7 +50,7 @@ jobs:
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
       - name: Build and analyze
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SECRET: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$SECRET"
