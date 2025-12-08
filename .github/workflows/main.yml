@@ -46,9 +46,66 @@ jobs:
             Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
             exit 1
           }
+
           $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
           Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
           Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
+
+          try {
+            $json = $decoded | ConvertFrom-Json -ErrorAction Stop
+          } catch {
+            Write-Warning 'Decoded content is not valid JSON; skipping FIREBASE_* exports'
+            exit 0
+          }
+
+          $firebaseAppId = $null
+          $firebaseApiKey = $null
+          $firebaseDatabaseUrl = $null
+          $firebaseAuthDomain = $null
+          $firebaseWebClientId = $null
+
+          if ($json.client -and $json.client.Count -ge 1) {
+            $client0 = $json.client[0]
+            if ($client0.client_info -and $client0.client_info.mobilesdk_app_id) {
+              $firebaseAppId = $client0.client_info.mobilesdk_app_id
+            }
+            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and $client0.api_key[0].current_key) {
+              $firebaseApiKey = $client0.api_key[0].current_key
+            }
+            if ($client0.oauth_client) {
+              foreach ($oc in $client0.oauth_client) {
+                if (-not $firebaseWebClientId -and $oc.client_id) {
+                  $firebaseWebClientId = $oc.client_id
+                  break
+                }
+              }
+            }
+          }
+
+          if ($json.project_info) {
+            if ($json.project_info.firebase_url) {
+              $firebaseDatabaseUrl = $json.project_info.firebase_url
+            }
+            if ($json.project_info.project_id) {
+              $firebaseAuthDomain = "$($json.project_info.project_id).firebaseapp.com"
+            }
+          }
+
+          $envEntries = @()
+          if ($firebaseAppId)    { $envEntries += "FIREBASE_APP_ID=$firebaseAppId" }
+          if ($firebaseApiKey)   { $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" }
+          if ($firebaseDatabaseUrl) { $envEntries += "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" }
+          if ($firebaseAuthDomain)  { $envEntries += "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" }
+          if ($firebaseWebClientId) { $envEntries += "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" }
+
+          if ($envEntries.Count -gt 0) {
+            foreach ($e in $envEntries) {
+              Add-Content -Path $env:GITHUB_ENV -Value $e -Encoding utf8
+            }
+            Write-Host 'FIREBASE_* environment variables exported'
+          } else {
+            Write-Host 'No FIREBASE_* values were found in google-services.json'
+          }
 
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v4
@@ -75,7 +132,7 @@ jobs:
       - name: Build and analyze
         shell: powershell
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$SECRET"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET"
           dotnet restore EpubReader/EpubReader.csproj
           dotnet build EpubReader/EpubReader.csproj -c:Debug
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$SECRET"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SECRET"
