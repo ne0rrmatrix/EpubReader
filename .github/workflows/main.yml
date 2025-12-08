@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Expose Google JSON to environment (no file)
-        if: ${{ secrets.GOOGLE_SECRET != '' }}
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
         shell: powershell
         run: |
           if (-not $env:GOOGLE_SECRET_B64) {
