@@ -3,6 +3,7 @@ using CommunityToolkit.Maui.Extensions;
 using EpubReader.ODPS;
 
 namespace EpubReader.ViewModels;
+
 public partial class CalibrePageViewModel : BaseViewModel
 {
 	bool isAlphabeticalSorted = false;
@@ -23,7 +24,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public List<Book> BookList { get; set; } = [];
 
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	
+
 	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
 
 	public CalibrePageViewModel()
@@ -46,7 +47,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			CancellationTokenSource = new CancellationTokenSource();
 		}
 		book.IsInLibrary = await processEpubFiles.ProcessFileAsync(book, CancellationTokenSource.Token);
-		if(book.IsInLibrary)
+		if (book.IsInLibrary)
 		{
 			await ShowInfoToastAsync($"Book '{book.Title}' has been added to your library.");
 		}
@@ -91,7 +92,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		isAlphabeticalSorted = !isAlphabeticalSorted;
 		Books = [.. SortByAuthor([.. Books], isAlphabeticalSorted)];
 	}
-	
+
 
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by their titles.
@@ -115,7 +116,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		if (isAlphabeticalSorted)
 		{
 			Logger.Info("Sorting books by date (Most Recent - Oldest)");
-			Books =  [.. Books.OrderBy(b => b.PublishedDate)];
+			Books = [.. Books.OrderBy(b => b.PublishedDate)];
 			return;
 		}
 		Logger.Info("Sorting books by date (Oldest - Most Recent)");
@@ -289,15 +290,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
 			return false;
 		}
-		
+
 		if (!await NetworkChecker.ValidateNetworkConnection(url))
 		{
 			Logger.Warn($"Network connection failed for {url}");
 			EmptyLabelText = "Network connection failed. Please check your settings.";
 			return false;
 		}
-	
-	
+
+
 		if (prefix.Equals("https") && !await NetworkChecker.ValidateSSLCertificate(url))
 		{
 			Logger.Error($"SSL certificate validation failed for {url}");
@@ -321,18 +322,18 @@ public partial class CalibrePageViewModel : BaseViewModel
 		var settings = await db.GetSettings() ?? new Settings();
 		var urlPrefix = settings.UrlPrefix;
 		var baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
-		
+
 		List<(string IpAddress, int Port)> servers = [];
-		if(settings.CalibreAutoDiscovery)
+		if (settings.CalibreAutoDiscovery)
 		{
 			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
-			if(servers.Count == 0)
+			if (servers.Count == 0)
 			{
 				return (string.Empty, 0);
 			}
 			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
 		}
-		
+
 		if (servers.Count > 1)
 		{
 			Logger.Info($"Using discovered Calibre server at {baseUrl}");

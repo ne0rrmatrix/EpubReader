@@ -1,4 +1,5 @@
 ﻿namespace EpubReader.ViewModels;
+
 public partial class FolderDialogPageViewModel : BaseViewModel
 {
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();

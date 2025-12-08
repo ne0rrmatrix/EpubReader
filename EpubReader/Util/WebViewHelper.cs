@@ -1,4 +1,7 @@
 ﻿using EpubReader.Extensions;
+using EpubReader.Interfaces;
+using EpubReader.Models;
+using EpubReader.Service;
 
 namespace EpubReader.Util;
 
@@ -6,9 +9,12 @@ namespace EpubReader.Util;
 /// A utility class that provides methods to interact with a <see cref="WebView"/> handler.
 /// </summary>
 /// <param name="handler"></param>
-public partial class WebViewHelper(WebView handler)
+/// <param name="db"></param>
+/// <param name="syncService"></param>
+public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncService)
 {
-	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly IDb database = db;
+	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(WebViewHelper));
 
@@ -18,7 +24,7 @@ public partial class WebViewHelper(WebView handler)
 	/// <returns></returns>
 	public async Task OnSettingsClickedAsync()
 	{
-		var settings = await db.GetSettings() ?? new();
+		var settings = await database.GetSettings() ?? new();
 		await SetColorSchemeAsync(settings);
 		await SetFontDataAsync(settings);
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
@@ -43,7 +49,7 @@ public partial class WebViewHelper(WebView handler)
 	public async Task LoadPageAsync(Label label, Book book)
 	{
 #if ANDROID || WINDOWS
-		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+        var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #elif IOS || MACCATALYST
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
@@ -63,7 +69,7 @@ public partial class WebViewHelper(WebView handler)
 		{
 			book.CurrentChapter++;
 			book.CurrentPage = 0;
-			await db.UpdateBookMark(book);
+			await SaveProgressAsync(book);
 			await LoadPageAsync(label, book);
 		}
 	}
@@ -80,7 +86,7 @@ public partial class WebViewHelper(WebView handler)
 		{
 			book.CurrentChapter--;
 			book.CurrentPage = 0;
-			await db.UpdateBookMark(book);
+			await SaveProgressAsync(book);
 			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
 			await LoadPageAsync(label, book);
 		}
@@ -208,5 +214,23 @@ public partial class WebViewHelper(WebView handler)
 			return (Convert.ToInt32(result) / 3 - fontSize);
 		}
 		return (Convert.ToInt32(result) - fontSize);
+	}
+
+	async Task SaveProgressAsync(Book book)
+	{
+		var syncId = await BookIdentityService.ComputeSyncIdAsync(book, CancellationToken.None);
+		var progress = new ReadingProgress
+		{
+			BookId = syncId,
+			CurrentChapter = book.CurrentChapter,
+			CurrentPage = book.CurrentPage,
+			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+			DeviceId = string.Empty,
+			DeviceName = string.Empty,
+			IsSynced = false
+		};
+
+		// SaveProgressAsync now handles local storage and debouncing internally via Rx
+		await syncServiceInstance.SaveProgressAsync(progress, CancellationToken.None);
 	}
 }

@@ -124,7 +124,7 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
-		
+
 		// Create <link> tags for each CSS file
 		StringBuilder cssLinks = new();
 		cssLinks.Append($"<link rel=\"stylesheet\" href=\"{cssFile}\"/>\n");
@@ -143,7 +143,7 @@ public static partial class HtmlAgilityPackExtensions
 	/// <returns>The updated HTML content with the CSS links inserted before the closing <c>&lt;/head&gt;</c> tag.</returns>
 	/// <exception cref="InvalidOperationException">Thrown if the <paramref name="htmlContent"/> does not contain a closing <c>&lt;/head&gt;</c> tag.</exception>
 	public static string AddCssLinks(string htmlContent, List<string> cssFiles)
-	{	
+	{
 		// Find the closing </head> tag
 		int headCloseTagIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
 
@@ -152,9 +152,9 @@ public static partial class HtmlAgilityPackExtensions
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
 
-			// Create <link> tags for each CSS file
-			StringBuilder cssLinks = new();
-		
+		// Create <link> tags for each CSS file
+		StringBuilder cssLinks = new();
+
 		foreach (string cssFile in cssFiles)
 		{
 			if (cssFile.Contains("kobo") || cssFile.Contains("calibre"))
@@ -186,7 +186,7 @@ public static partial class HtmlAgilityPackExtensions
 		{
 			throw new InvalidOperationException("The HTML content does not contain a closing </head> tag.");
 		}
-		if(jsFiles.Contains("kobo"))
+		if (jsFiles.Contains("kobo"))
 		{
 			return htmlContent;
 		}
@@ -263,7 +263,7 @@ public static partial class HtmlAgilityPackExtensions
 			System.Diagnostics.Trace.TraceInformation(ex.Message);
 			return html;
 		}
-		
+
 	}
 
 	/// <summary>

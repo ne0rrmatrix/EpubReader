@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="com.google.firebase.crashlytics.mapping_file_id">none</string>
+
+    <!-- Firebase configuration is intentionally not stored in Android resource strings.
+         Configuration is loaded at runtime from environment variables or
+         Platforms/Android/Assets/google-services.json by the app.
+    -->
+</resources>

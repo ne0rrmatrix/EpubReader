@@ -30,7 +30,7 @@ public partial class LibraryPage : ContentPage
 	{
 		base.OnNavigatedTo(args);
 		Shell.SetNavBarIsVisible(this, true);
-		
+
 		if (viewModel.Books is not null && viewModel.Books.Count > 0)
 		{
 			logger.Info("Books already loaded, skipping database fetch");
@@ -41,7 +41,7 @@ public partial class LibraryPage : ContentPage
 		viewModel.Books = [.. temp];
 		viewModel.AlphabeticalTitleSort();
 	}
-	
+
 	/// <summary>
 	/// Handles the text changed event for the search bar, updating the displayed list of books based on the search query.
 	/// </summary>
@@ -64,7 +64,7 @@ public partial class LibraryPage : ContentPage
 		if (string.IsNullOrWhiteSpace(results))
 		{
 			books.Clear();
-			if(allBooks.Count == books.Count)
+			if (allBooks.Count == books.Count)
 			{
 				logger.Info("Search text is empty, showing all books");
 				return; // No need to update if already showing all books

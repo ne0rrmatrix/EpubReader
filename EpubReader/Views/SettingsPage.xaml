@@ -1,34 +1,43 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <toolkit:Popup
     x:Class="EpubReader.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:EpubReader.Models"
     xmlns:system="clr-namespace:System;assembly=mscorlib"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    x:DataType="SettingsPageViewModel"
+    x:DataType="viewModels:SettingsPageViewModel"
     x:TypeArguments="system:Boolean"
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
-    HeightRequest="{OnPlatform WinUI=450,
-                               Default=350}"
+    CanBeDismissedByTappingOutsideOfPopup="True"
+    HeightRequest="{OnPlatform WinUI=550,
+                               Default=450}"
     Loaded="CurrentPage_Loaded"
     Unloaded="CurrentPage_Unloaded"
     WidthRequest="300">
 
-    <Grid
-        x:Name="grid"
-        Padding="3"
-        ColumnSpacing="2"
-        RowSpacing="20">
+    <ScrollView x:Name="ScrollView" VerticalScrollBarVisibility="Never" HorizontalScrollBarVisibility="Never">
+        <Grid
+            x:Name="grid"
+            Padding="0"
+            ColumnSpacing="2"
+            RowSpacing="20">
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -61,8 +70,8 @@
             x:Name="FontPicker"
             Title="Select Font"
             Grid.Row="3"
-            ItemDisplayBinding="{Binding FontFamily, x:DataType=EpubFonts}"
-            ItemsSource="{Binding Fonts, x:DataType=SettingsPageViewModel}"
+            ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
+            ItemsSource="{Binding Fonts}"
             SelectedIndexChanged="FontPicker_SelectedIndexChanged"
             WidthRequest="250" />
 
@@ -70,8 +79,8 @@
             x:Name="ThemePicker"
             Title="Theme"
             Grid.Row="4"
-            ItemDisplayBinding="{Binding Name, x:DataType=ColorScheme}"
-            ItemsSource="{Binding ColorSchemes, x:DataType=SettingsPageViewModel}"
+            ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
+            ItemsSource="{Binding ColorSchemes}"
             SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
             WidthRequest="250" />
 
@@ -97,6 +106,65 @@
                 VerticalOptions="Center" />
         </HorizontalStackLayout>
 
-    </Grid>
+        <!--  Authentication Section  -->
+        <Label
+            Grid.Row="7"
+            FontAttributes="Bold"
+            HorizontalOptions="Center"
+            Text="Account &amp; Sync" />
+
+        <VerticalStackLayout
+            Grid.Row="8"
+            Spacing="10">
+            
+            <!--  Auth Status Display  -->
+            <Label
+                FontSize="13"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                IsVisible="{Binding IsAuthenticated}"
+                LineBreakMode="WordWrap"
+                Text="{Binding AuthStatusText}"
+                TextColor="{AppThemeBinding Dark={StaticResource Gray300},
+                                            Light={StaticResource Gray600}}" />
+
+            <Label
+                FontSize="13"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                IsVisible="{Binding IsLocalOnly}"
+                Text="Local mode - No cloud sync"
+                TextColor="{AppThemeBinding Dark={StaticResource Gray400},
+                                            Light={StaticResource Gray600}}" />
+
+            <!--  Sign In Button (visible when not authenticated)  -->
+            <Button
+                Command="{Binding SignInCommand}"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                IsVisible="{Binding IsNotAuthenticated}"
+                Text="Sign In"
+                WidthRequest="200" />
+
+            <!--  Sign Out Button (visible when authenticated)  -->
+            <Button
+                Command="{Binding SignOutCommand}"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                IsVisible="{Binding IsAuthenticated}"
+                Text="Sign Out"
+                WidthRequest="200" />
+
+            <Button
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                Text="Close"
+                Clicked="OnCloseClicked"
+                WidthRequest="200" />
+
+        </VerticalStackLayout>
+
+        </Grid>
+    </ScrollView>
 
 </toolkit:Popup>

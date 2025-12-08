@@ -63,9 +63,4 @@ public interface IDb
 	/// <param name="book">The book to be removed. Cannot be null.</param>
 	Task RemoveBook(Book book, CancellationToken cancellationToken = default);
 
-	/// <summary>
-	/// Updates the bookmark for the specified book.
-	/// </summary>
-	/// <param name="book">The book for which the bookmark is to be updated. Cannot be null.</param>
-	Task UpdateBookMark(Book book, CancellationToken cancellationToken = default);
 }

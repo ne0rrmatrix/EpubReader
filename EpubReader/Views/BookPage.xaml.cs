@@ -1,5 +1,10 @@
 namespace EpubReader.Views;
 
+using System.Diagnostics;
+using System.Globalization;
+using EpubReader.Service;
+using EpubReader.Util;
+
 /// <summary>
 /// Represents a page in a book application, providing functionality for displaying and interacting with book content.
 /// </summary>
@@ -14,7 +19,9 @@ public partial class BookPage : ContentPage
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
 	readonly IDb db;
+	readonly ISyncService syncService;
 	readonly WebViewHelper webViewHelper;
+	ToolbarItem? syncToolbarItem;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -23,15 +30,54 @@ public partial class BookPage : ContentPage
 	/// also registers message handlers for JavaScript and settings messages using a weak reference messenger.</remarks>
 	/// <param name="viewModel">The view model that provides data binding for the page.</param>
 	/// <param name="db">The database interface used for data operations within the page.</param>
-	public BookPage(BookViewModel viewModel, IDb db)
+	/// <param name="syncService">The sync service for managing reading progress synchronization.</param>
+	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
-		webViewHelper = new(webView);
+		this.syncService = syncService;
+		webViewHelper = new(webView, db, syncService);
+
+		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
+	}
+
+	protected override void OnAppearing()
+	{
+		base.OnAppearing();
+		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
+	}
+
+	async Task UpdateSyncToolbarAsync()
+	{
+		RemoveSyncToolbarItem();
+
+		var isLocalAuth = await AuthenticationService.IsLocalOnlyModeAsync();
+		if (syncService.IsLocalOnly || isLocalAuth)
+		{
+			return;
+		}
+
+		syncToolbarItem = new ToolbarItem
+		{
+			Text = "Sync",
+			Priority = 0,
+			Order = ToolbarItemOrder.Primary,
+			Command = new Command(() => Dispatcher.Dispatch(async () => await SyncProgressNowAsync(ViewModel.CancellationTokenSource.Token)))
+		};
+		Shell.Current.ToolbarItems.Add(syncToolbarItem);
+	}
+
+	void RemoveSyncToolbarItem()
+	{
+		if (syncToolbarItem is not null && Shell.Current.ToolbarItems.Contains(syncToolbarItem))
+		{
+			Shell.Current.ToolbarItems.Remove(syncToolbarItem);
+		}
+		syncToolbarItem = null;
 	}
 
 	/// <summary>
@@ -81,6 +127,7 @@ public partial class BookPage : ContentPage
 	/// <param name="e">The event data containing information about the navigation event.</param>
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs? e)
 	{
+		await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
 		await webViewHelper.LoadPageAsync(pageLabel, book);
 		Shimmer.IsActive = false;
 	}
@@ -165,9 +212,10 @@ public partial class BookPage : ContentPage
 			}
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
-			await db.UpdateBookMark(book);
+			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 		}
 	}
+
 	static async Task TryHandleExternalLinkAsync(string url)
 	{
 		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
@@ -207,7 +255,7 @@ public partial class BookPage : ContentPage
 
 	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
-		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), 
+		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"),
 			out int parsedPage) ? parsedPage : 0;
 
 		switch (methodName.ToLowerInvariant())
@@ -232,7 +280,7 @@ public partial class BookPage : ContentPage
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
-				await db.UpdateBookMark(book);
+				await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 
 				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
 				{
@@ -315,7 +363,7 @@ public partial class BookPage : ContentPage
 				{
 					book.CurrentChapter = index;
 					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
-					await db.UpdateBookMark(book);
+					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
 					CloseMenuAsync(this, EventArgs.Empty);
@@ -330,25 +378,165 @@ public partial class BookPage : ContentPage
 			Height = new GridLength(1, GridUnitType.Auto)
 		});
 #else
-		var toolbarItem = new ToolbarItem
-		{
-			Text = chapter.Title,
-			Order = ToolbarItemOrder.Secondary,
-			Priority = index,
-			Command = new Command(() =>
-			{
-				Dispatcher.Dispatch(async () =>
-				{
-					book.CurrentChapter = index;
-					book.CurrentPage = 0; // Reset current page when changing chapter
-					await db.UpdateBookMark(book);
-					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
-					CloseMenuAsync(this, EventArgs.Empty);
-				});
-			})
-		};
-		Shell.Current.ToolbarItems.Add(toolbarItem);
+        var toolbarItem = new ToolbarItem
+        {
+            Text = chapter.Title,
+            Order = ToolbarItemOrder.Secondary,
+            Priority = index,
+            Command = new Command(() =>
+            {
+                Dispatcher.Dispatch(async () =>
+                {
+                    book.CurrentChapter = index;
+                    book.CurrentPage = 0; // Reset current page when changing chapter
+                    await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+                    var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+                    await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
+                    CloseMenuAsync(this, EventArgs.Empty);
+                });
+            })
+        };
+        Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
+	}
+
+	async Task LoadAndMergeProgressAsync(CancellationToken token)
+	{
+		try
+		{
+			var bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
+
+			// Get cloud progress (which checks local cache first)
+			var cloud = await syncService.GetProgressAsync(bookId, token);
+
+			// Backfill from legacy Book fields if no progress record yet
+			if (cloud is null && (book.CurrentChapter > 0 || book.CurrentPage > 0))
+			{
+				var progress = new ReadingProgress
+				{
+					BookId = bookId,
+					CurrentChapter = book.CurrentChapter,
+					CurrentPage = book.CurrentPage,
+					LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+					DeviceId = string.Empty,
+					DeviceName = string.Empty,
+					IsSynced = false
+				};
+				await syncService.SaveProgressAsync(progress, token);
+			}
+			else if (cloud is not null)
+			{
+				await ApplyProgressToUiAsync(cloud);
+			}
+
+			pageLabel.Text = await GetCurrentPageInfoAsync();
+		}
+		catch (OperationCanceledException)
+		{
+			// ignore
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Trace.TraceError($"Failed to load progress: {ex.Message}");
+		}
+	}
+
+	async Task SaveProgressAsync(CancellationToken token)
+	{
+		var syncId = await BookIdentityService.ComputeSyncIdAsync(book, token);
+		var progress = new ReadingProgress
+		{
+			BookId = syncId,
+			CurrentChapter = book.CurrentChapter,
+			CurrentPage = book.CurrentPage,
+			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+			DeviceId = string.Empty,
+			DeviceName = string.Empty,
+			IsSynced = false,
+		};
+		await syncService.SaveProgressAsync(progress, token);
+	}
+
+	async Task ApplyProgressToUiAsync(ReadingProgress progress)
+	{
+		book.CurrentChapter = progress.CurrentChapter;
+		book.CurrentPage = progress.CurrentPage;
+
+		if (book.Chapters.Count > book.CurrentChapter && book.CurrentChapter >= 0)
+		{
+			await webViewHelper.LoadPageAsync(pageLabel, book);
+			if (book.CurrentPage > 0)
+			{
+				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+			}
+		}
+
+		pageLabel.Text = await GetCurrentPageInfoAsync();
+	}
+
+	async Task SyncProgressNowAsync(CancellationToken token)
+	{
+		try
+		{
+			if (syncService.IsLocalOnly)
+			{
+				await ViewModel.ShowInfoToastAsync("Sync unavailable in local-only mode");
+				return;
+			}
+
+			var syncId = await BookIdentityService.ComputeSyncIdAsync(book, token);
+			var cloud = await syncService.GetCloudProgressAsync(syncId, token);
+			var local = await syncService.GetLocalProgressAsync(syncId, token);
+
+			var remoteTime = TryParseTimestamp(cloud?.LastUpdated);
+			var localTime = TryParseTimestamp(local?.LastUpdated);
+
+			if (cloud is not null && remoteTime > localTime)
+			{
+				if (cloud.CurrentChapter != book.CurrentChapter || cloud.CurrentPage != book.CurrentPage)
+				{
+					await ApplyProgressToUiAsync(cloud);
+					await syncService.SaveProgressAsync(cloud, token);
+				}
+				pageLabel.Text = await GetCurrentPageInfoAsync();
+				await ViewModel.ShowInfoToastAsync("Progress updated from cloud");
+				return;
+			}
+
+			var currentProgress = new ReadingProgress
+			{
+				BookId = syncId,
+				CurrentChapter = book.CurrentChapter,
+				CurrentPage = book.CurrentPage,
+				LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+				DeviceId = string.Empty,
+				DeviceName = string.Empty,
+				IsSynced = false
+			};
+
+			if (local is null || local.CurrentChapter != book.CurrentChapter || local.CurrentPage != book.CurrentPage)
+			{
+				await syncService.SaveProgressAsync(currentProgress, token);
+				await ViewModel.ShowInfoToastAsync("Progress synced to cloud");
+			}
+			else
+			{
+				await ViewModel.ShowInfoToastAsync("Progress already up to date");
+			}
+
+			pageLabel.Text = await GetCurrentPageInfoAsync();
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Manual sync failed: {ex.Message}");
+			await ViewModel.ShowErrorToastAsync("Sync failed. Please try again.");
+		}
+	}
+
+	static DateTimeOffset TryParseTimestamp(string? timestamp)
+	{
+		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+			? parsed
+			: DateTimeOffset.MinValue;
 	}
 }

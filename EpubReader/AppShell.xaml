@@ -9,5 +9,4 @@
         Title="Library"
         ContentTemplate="{DataTemplate LibraryPage}"
         Route="MainPage" />
-
 </Shell>

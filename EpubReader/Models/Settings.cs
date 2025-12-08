@@ -15,7 +15,7 @@ public class Settings
 	/// </summary>
 	[PrimaryKey]
 	[Column("Id")]
-	public Guid Id { get; set; } 
+	public Guid Id { get; set; }
 
 	/// <summary>
 	/// Gets or sets the font family name used for text rendering.

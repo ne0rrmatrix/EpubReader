@@ -113,7 +113,7 @@ public static partial class EbookService
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
 		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
-		
+
 		return new Book
 		{
 			Title = book.Title.Trim(),
@@ -289,21 +289,21 @@ public static partial class EbookService
 	}
 
 	static async Task<List<Models.Image>> ExtractImages(EpubBookRef book)
-    {
-        var images = new List<Models.Image>();
+	{
+		var images = new List<Models.Image>();
 
-        foreach (var image in book.Content.Images.Local)
-        {
-            var img = new Models.Image
-            {
-                FileName = Path.GetFileName(image.FilePath),
-                Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
-            };
-            images.Add(img);
-        }
+		foreach (var image in book.Content.Images.Local)
+		{
+			var img = new Models.Image
+			{
+				FileName = Path.GetFileName(image.FilePath),
+				Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
+			};
+			images.Add(img);
+		}
 
-        return images;
-    }
+		return images;
+	}
 
 	static List<string> ExtractAuthors(EpubBookRef book)
 	{
@@ -324,7 +324,7 @@ public static partial class EbookService
 		return await GetChapters(chaptersRef, book);
 	}
 
-	static async  Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	static async Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
 
@@ -357,31 +357,31 @@ public static partial class EbookService
 		return chaptersRef.Count(item => !item.FilePath.Contains("_split_")) < 3;
 	}
 
-    static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
-    {
-        var split000Chapters = chaptersRef
-            .Where(x => x is not null && x.FilePath.Contains("_split_000"));
+	static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
+	{
+		var split000Chapters = chaptersRef
+			.Where(x => x is not null && x.FilePath.Contains("_split_000"));
 
-        foreach (var item in split000Chapters)
-        {
-            var replacementChapter = FindReplacementChapter(chaptersRef, item);
-            var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
+		foreach (var item in split000Chapters)
+		{
+			var replacementChapter = FindReplacementChapter(chaptersRef, item);
+			var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
 
-            if (string.IsNullOrEmpty(htmlContent))
-            {
-                continue;
-            }
+			if (string.IsNullOrEmpty(htmlContent))
+			{
+				continue;
+			}
 
-            var chapter = CreateChapter(book, htmlContent, item);
-            if (string.IsNullOrEmpty(chapter.Title))
-            {
-                chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
-            }
-            chapters.Add(chapter);
-        }
-    }
+			var chapter = CreateChapter(book, htmlContent, item);
+			if (string.IsNullOrEmpty(chapter.Title))
+			{
+				chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
+			}
+			chapters.Add(chapter);
+		}
+	}
 
- 
+
 	static async Task ProcessAllChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		foreach (var item in chaptersRef)

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.LoginPage"
+    x:DataType="LoginPageViewModel"
+      xmlns:converters="clr-namespace:EpubReader.Converter;assembly=EpubReader"
+    BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                      Light=White}"
+    Shell.NavBarIsVisible="False">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringIsNotNullOrEmptyConverter x:Key="StringIsNotNullOrEmptyConverter" />
+            <!-- other resources -->
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30"
+            Spacing="30"
+            VerticalOptions="Center">
+
+            <!--  App Logo/Title  -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="10">
+                <Image
+                    HeightRequest="120"
+                    HorizontalOptions="Center"
+                    Source="appicon.png"
+                    WidthRequest="120" />
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="32"
+                    HorizontalOptions="Center"
+                    Text="EpubReader" />
+            </VerticalStackLayout>
+
+            <!--  Welcome Message  -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="15">
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="22"
+                    HorizontalOptions="Center"
+                    Text="Welcome!" />
+                <Label
+                    FontSize="16"
+                    HorizontalOptions="Center"
+                    HorizontalTextAlignment="Center"
+                    LineBreakMode="WordWrap"
+                    Text="Sign in to sync your reading progress across all your devices."
+                    TextColor="{AppThemeBinding Dark={StaticResource Gray300},
+                                                Light={StaticResource Gray600}}" />
+            </VerticalStackLayout>
+
+            <!--  Sign In with Google Button  -->
+            <Button
+                BackgroundColor="#4285F4"
+                Command="{Binding SignInWithGoogleCommand}"
+                CornerRadius="8"
+                FontAttributes="Bold"
+                FontSize="16"
+                HeightRequest="50"
+                HorizontalOptions="Fill"
+                IsEnabled="{Binding IsNotBusy}"
+                Text="Sign in with Google"
+                TextColor="White" />
+
+            <!--  Or Divider  -->
+            <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="10">
+                <BoxView
+                    Grid.Column="0"
+                    BackgroundColor="{AppThemeBinding Dark={StaticResource Gray600},
+                                                      Light={StaticResource Gray300}}"
+                    HeightRequest="1"
+                    VerticalOptions="Center" />
+                <Label
+                    Grid.Column="1"
+                    FontSize="14"
+                    Text="or"
+                    TextColor="{AppThemeBinding Dark={StaticResource Gray400},
+                                                Light={StaticResource Gray600}}"
+                    VerticalOptions="Center" />
+                <BoxView
+                    Grid.Column="2"
+                    BackgroundColor="{AppThemeBinding Dark={StaticResource Gray600},
+                                                      Light={StaticResource Gray300}}"
+                    HeightRequest="1"
+                    VerticalOptions="Center" />
+            </Grid>
+
+            <!--  Skip and Use Locally Button  -->
+            <Button
+                BackgroundColor="Transparent"
+                BorderColor="{AppThemeBinding Dark={StaticResource Gray600},
+                                              Light={StaticResource Gray400}}"
+                BorderWidth="2"
+                Command="{Binding SkipAndUseLocallyCommand}"
+                CornerRadius="8"
+                FontSize="16"
+                HeightRequest="50"
+                HorizontalOptions="Fill"
+                IsEnabled="{Binding IsNotBusy}"
+                Text="Skip &amp; Use Locally"
+                TextColor="{AppThemeBinding Dark={StaticResource Gray200},
+                                            Light={StaticResource Gray900}}" />
+
+            <!--  Local Mode Explanation  -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="8">
+                <Label
+                    FontSize="14"
+                    HorizontalOptions="Center"
+                    HorizontalTextAlignment="Center"
+                    LineBreakMode="WordWrap"
+                    Text="Using local mode means:"
+                    TextColor="{AppThemeBinding Dark={StaticResource Gray400},
+                                                Light={StaticResource Gray600}}" />
+                <Label
+                    FontSize="13"
+                    HorizontalOptions="Start"
+                    HorizontalTextAlignment="Start"
+                    LineBreakMode="WordWrap"
+                    Text="• Your books stay only on this device&#x0a;• No cloud sync across devices&#x0a;• You can sign in later from Settings"
+                    TextColor="{AppThemeBinding Dark={StaticResource Gray500},
+                                                Light={StaticResource Gray700}}" />
+            </VerticalStackLayout>
+
+            <!--  Activity Indicator  -->
+            <ActivityIndicator
+                HeightRequest="30"
+                HorizontalOptions="Center"
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                VerticalOptions="Center"
+                WidthRequest="30"
+                Color="{AppThemeBinding Dark={StaticResource Primary},
+                                        Light={StaticResource Primary}}" />
+
+            <!--  Status Message  -->
+            <Label
+                FontSize="14"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                IsVisible="{Binding StatusMessage, Converter={StaticResource StringIsNotNullOrEmptyConverter}}"
+                LineBreakMode="WordWrap"
+                Text="{Binding StatusMessage}"
+                TextColor="{AppThemeBinding Dark={StaticResource Gray300},
+                                            Light={StaticResource Gray700}}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

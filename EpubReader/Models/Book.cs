@@ -49,6 +49,12 @@ public partial class Book : ObservableObject
 	public string CoverImagePath { get; set; } = string.Empty;
 
 	/// <summary>
+	/// Gets or sets the deterministic identifier used for cross-device sync.
+	/// </summary>
+	[Column("SyncId")]
+	public string SyncId { get; set; } = string.Empty;
+
+	/// <summary>
 	/// Gets or sets the list of shared EPUB files.
 	/// </summary>
 	[Ignore]

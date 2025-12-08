@@ -1,3 +1,9 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
+using CommunityToolkit.Maui.Extensions;
+using Syncfusion.Maui.Toolkit.Internals;
+
 namespace EpubReader.Views;
 
 /// <summary>
@@ -40,7 +46,7 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("ValueChangedEventArgs is null, cannot change font size.");
 			return;
 		}
-		if((int)e.NewValue == 0 || settings is null)
+		if ((int)e.NewValue == 0 || settings is null)
 		{
 			return;
 		}
@@ -80,7 +86,7 @@ public partial class SettingsPage : Popup<bool>
 	/// <param name="e">The event data.</param>
 	async void ThemePicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
-		if(settings is null)
+		if (settings is null)
 		{
 			logger.Warn("Settings are null, cannot change theme.");
 			return;
@@ -90,7 +96,7 @@ public partial class SettingsPage : Popup<bool>
 		{
 			return;
 		}
-		
+
 		settings.BackgroundColor = scheme.BackgroundColor;
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
@@ -108,7 +114,7 @@ public partial class SettingsPage : Popup<bool>
 	/// <param name="e">The event data associated with the selection change.</param>
 	async void FontPicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
-		if(settings is null)
+		if (settings is null)
 		{
 			logger.Warn("Settings are null, cannot change font.");
 			return;
@@ -125,9 +131,9 @@ public partial class SettingsPage : Popup<bool>
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
+	[SuppressMessage("Performance", "CA1822:MarkMembersAsStatic", Justification = "Event handler must be instance scoped")]
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
-		System.Diagnostics.Debug.WriteLine("Unloaded event fired");
 		stackLayout.Remove(switchControl);
 	}
 
@@ -141,7 +147,7 @@ public partial class SettingsPage : Popup<bool>
 	/// <param name="e">The event data containing the toggle state.</param>
 	async void switchControl_Toggled(object? sender, ToggledEventArgs? e)
 	{
-		if(sender is null)
+		if (sender is null)
 		{
 			logger.Warn("Sender is null, cannot toggle multiple columns.");
 			return;
@@ -168,5 +174,15 @@ public partial class SettingsPage : Popup<bool>
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		if (BindingContext is SettingsPageViewModel viewModel)
+		{
+			await viewModel.LoadAuthStatusAsync();
+		}
+	}
+
+	async void OnCloseClicked(object? sender, EventArgs? e)
+	{
+		Trace.TraceInformation("SettingsPage.OnCloseClicked: Close button pressed");
+		await this.CloseAsync();
 	}
 }

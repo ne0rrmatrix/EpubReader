@@ -42,10 +42,10 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// cref="WKWebpagePreferences"/> as parameters, used to specify the navigation policy.</param>
 	/// <exception cref="InvalidOperationException">Thrown if the URL of the navigation request is null.</exception>
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
-	{	
+	{
 		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
 		var url = path.Split('?');
-		
+
 		if (url.Length > 1 || path.Contains("https://runcsharp"))
 		{
 			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));

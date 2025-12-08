@@ -260,15 +260,17 @@ const navigationUtils = {
      */
     scrollToPage(page) {
         const contentWindow = domUtils.getContentWindow();
-        if (!contentWindow) return;
-        for (let i = 0; i < page; i++) {
-            if (this.isHorizontallyScrolledToEnd()) {
-                console.warn("Already at the last page, cannot scroll further.");
-                return;
-            }
-            const scrollAmount = this.calculateScrollAmount(contentWindow);
-            contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
+        const contentDoc = domUtils.getIframeDocument();
+        if (!contentWindow || !contentDoc) {
+            console.warn("Cannot scroll to page - iframe not ready.");
+            return;
         }
+
+        const scrollAmount = this.calculateScrollAmount(contentWindow);
+        const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
+        const target = Math.min(maxScrollLeft, Math.max(0, Math.round(page * scrollAmount)));
+
+        contentWindow.scrollTo(target, 0);
     },
 
     /**
@@ -892,7 +894,10 @@ function gotoPage(page) {
     setTimeout(() => {
         navigationUtils.scrollToPage(page);
         isPreviousPage = false;
-        currentPage = getPageCount();
+        // Track the page we navigated to so persistence matches navigation
+        const maxPage = getPageCount();
+        const clampedPage = Math.min(page, maxPage);
+        currentPage = clampedPage;
         updateCharacterPosition();
     }, 200);
 }

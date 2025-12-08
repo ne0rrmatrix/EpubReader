@@ -19,7 +19,7 @@ public partial class CalibreSettingsPage : Popup
 			return;
 		}
 		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
-		if(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+		if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
 		{
 			logger.Info("CalibreSettingsPage loaded on Windows or macOS, setting EntryText to visible.");
 			switchController.IsToggled = settings.CalibreAutoDiscovery;
@@ -29,7 +29,7 @@ public partial class CalibreSettingsPage : Popup
 			logger.Info("CalibreSettingsPage loaded on Android or iOS, setting EntryText to not visible.");
 			switchController.IsToggled = false;
 		}
-		
+
 		EntryText.Text = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
 		logger.Info("CalibreSettingsPage loaded.");
 	}
@@ -64,7 +64,7 @@ public partial class CalibreSettingsPage : Popup
 
 	async void Entry_Completed(object? sender, EventArgs? e)
 	{
-		if(sender is null)
+		if (sender is null)
 		{
 			logger.Warn("Sender is null, cannot process completed event.");
 			return;
@@ -76,7 +76,7 @@ public partial class CalibreSettingsPage : Popup
 		}
 		logger.Info("Entry completed event triggered.");
 		var text = entry.Text;
-		
+
 		if (string.IsNullOrWhiteSpace(text))
 		{
 			logger.Warn("URL is empty or whitespace. Please enter a valid URL.");

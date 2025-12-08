@@ -15,7 +15,7 @@ namespace EpubReader.Service;
 public partial class FolderPicker : IFolderPicker
 {
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
-	
+
 	/// <summary>
 	/// Asynchronously presents a folder picker dialog to the user and returns the path of the selected folder.
 	/// </summary>
@@ -47,7 +47,7 @@ public partial class FolderPicker : IFolderPicker
 
 		var dismissHandler = new Action(() => GetFileResults(null!, tcs));
 		var delegateController = new UIPresentationControllerDelegate(dismissHandler);
-		if(picker.PresentationController is null)
+		if (picker.PresentationController is null)
 		{
 			throw new InvalidOperationException("Picker's PresentationController is null. Ensure the picker is presented from a valid UIViewController.");
 		}
@@ -69,64 +69,64 @@ public partial class FolderPicker : IFolderPicker
 	/// <returns>A task representing the asynchronous operation. The task result contains a list of file paths to EPUB files found
 	/// in the specified folder. The list will be empty if no EPUB files are found or if the folder cannot be accessed.</returns>
 	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default)
-    {
-        List<string> epubFiles = [];
+	{
+		List<string> epubFiles = [];
 
-        if (string.IsNullOrEmpty(folderUri))
-        {
+		if (string.IsNullOrEmpty(folderUri))
+		{
 			logger.Info("No folder URI provided.");
 			return Task.FromResult(epubFiles);
-        }
+		}
 
-        try
-        {
-            // Convert the string URL to NSUrl
-            NSUrl folderUrl = new(folderUri);
-            if (!folderUrl.IsFileUrl)
-            {
-                return Task.FromResult(epubFiles);
-            }
+		try
+		{
+			// Convert the string URL to NSUrl
+			NSUrl folderUrl = new(folderUri);
+			if (!folderUrl.IsFileUrl)
+			{
+				return Task.FromResult(epubFiles);
+			}
 
-            // Get access to file system
-            NSFileManager fileManager = NSFileManager.DefaultManager;
+			// Get access to file system
+			NSFileManager fileManager = NSFileManager.DefaultManager;
 
 			// Check if folder exists and is accessible
 			string folderPath = folderUrl.Path ?? string.Empty; // Convert NSUrl to string path
 			string[]? contents = fileManager.GetDirectoryContent(folderPath, out NSError? error);
 
-            if (error is not null || contents is null)
-            {
+			if (error is not null || contents is null)
+			{
 				logger.Info($"Error accessing folder contents: {error?.LocalizedDescription}");
 				return Task.FromResult(epubFiles);
-            }
-			
-            // Enumerate through directory contents
-            foreach (var filePath in contents)
-            {
-                NSUrl fileUrl = NSUrl.FromFilename(filePath);
+			}
 
-                // Check if it's a file
-                bool isDirectory = true;
-                if (fileUrl.Path is null)
-                {
-                    logger.Info("File URL is null.");
-                    continue;
-                }
-                if (fileManager.FileExists(fileUrl.Path, ref isDirectory) && 
-					!isDirectory && 
+			// Enumerate through directory contents
+			foreach (var filePath in contents)
+			{
+				NSUrl fileUrl = NSUrl.FromFilename(filePath);
+
+				// Check if it's a file
+				bool isDirectory = true;
+				if (fileUrl.Path is null)
+				{
+					logger.Info("File URL is null.");
+					continue;
+				}
+				if (fileManager.FileExists(fileUrl.Path, ref isDirectory) &&
+					!isDirectory &&
 					fileUrl.LastPathComponent?.EndsWith(".epub", StringComparison.OrdinalIgnoreCase) == true)
-					{
-						epubFiles.Add(fileUrl.Path);
-					}
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Info($"Error enumerating EPUB files: {ex.Message}");
-        }
+				{
+					epubFiles.Add(fileUrl.Path);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Info($"Error enumerating EPUB files: {ex.Message}");
+		}
 
-        return Task.FromResult(epubFiles);
-    }
+		return Task.FromResult(epubFiles);
+	}
 
 	/// <summary>
 	/// Asynchronously performs a file operation on the specified EPUB file.

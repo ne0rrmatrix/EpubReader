@@ -14,5 +14,5 @@ public class Css
 	/// <summary>
 	/// Gets or sets the content as a string.
 	/// </summary>
-    public string Content { get; set; } = string.Empty;
+	public string Content { get; set; } = string.Empty;
 }

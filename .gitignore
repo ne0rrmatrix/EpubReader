@@ -174,7 +174,6 @@ DocProject/Help/*.HxT
 DocProject/Help/*.HxC
 DocProject/Help/*.hhc
 DocProject/Help/*.hhk
-DocProject/Help/*.hhp
 DocProject/Help/Html2
 DocProject/Help/html
 
@@ -198,6 +197,15 @@ PublishScripts/
 *.nupkg
 # NuGet Symbol Packages
 *.snupkg
+
+# Firebase generated secrets
+**/FirebaseSecrets.g.cs
+
+# Environment secrets (never commit)
+.env
+.env.local
+.env.*.local
+
 # The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
@@ -299,71 +307,20 @@ node_modules/
 # Visual Studio LightSwitch build output
 **/*.HTMLClient/GeneratedArtifacts
 **/*.DesktopClient/GeneratedArtifacts
-**/*.DesktopClient/ModelManifest.xml
 **/*.Server/GeneratedArtifacts
-**/*.Server/ModelManifest.xml
 _Pvt_Extensions
 
-# Paket dependency manager
-.paket/paket.exe
-paket-files/
+# Keystore files (ignore user-specific keystores)
+**/epubreader.keystore
+**/*.pem
 
-# FAKE - F# Make
-.fake/
+# Ignore local platform google json produced by build or dev
+EpubReader/Resources/Raw/google-services.json
+Platforms/Android/google-services.json
 
-# CodeRush personal settings
-.cr/personal
-
-# Python Tools for Visual Studio (PTVS)
-__pycache__/
-*.pyc
-
-# Cake - Uncomment if you are using it
-# tools/**
-# !tools/packages.config
-
-# Tabs Studio
-*.tss
-
-# Telerik's JustMock configuration file
-*.jmconfig
-
-# BizTalk build output
-*.btp.cs
-*.btm.cs
-*.odx.cs
-*.xsd.cs
-
-# OpenCover UI analysis results
-OpenCover/
-
-# Azure Stream Analytics local run output
-ASALocalRun/
-
-# MSBuild Binary and Structured Log
-*.binlog
-
-# NVidia Nsight GPU debugger configuration file
-*.nvuser
-
-# MFractors (Xamarin productivity tool) working folder
-.mfractor/
-
-# Local History for Visual Studio
-.localhistory/
-
-# BeatPulse healthcheck temp database
-healthchecksdb
-
-# Backup folder for Package Reference Convert tool in Visual Studio 2017
-MigrationBackup/
-
-# Ionide (cross platform F# VS Code tools) working folder
-.ionide/
-
-# Fody - auto-generated XML schema
-FodyWeavers.xsd
-
-# Keystore files
-/EpubReader/epubreader.keystore
-/EpubReader/epubreader.pem
+# Ignore firebase secrets files and props
+EpubReader/firebase.secrets.props
+FIREBASE_SETUP.md
+/build-secrets/google-services.json
+/build-secrets/android/strings.secrets.xml
+/EpubReader/Resources/google-services.json

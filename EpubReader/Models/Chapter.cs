@@ -20,5 +20,5 @@ public class Chapter
 	/// <summary>
 	/// Gets or sets the name of the file.
 	/// </summary>
-    public string FileName { get; set; } = string.Empty;
+	public string FileName { get; set; } = string.Empty;
 }

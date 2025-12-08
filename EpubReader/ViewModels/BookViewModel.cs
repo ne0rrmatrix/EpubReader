@@ -1,5 +1,4 @@
-﻿using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Maui.Extensions;
+﻿using CommunityToolkit.Maui.Extensions;
 
 namespace EpubReader.ViewModels;
 
@@ -18,7 +17,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	const string url = "app://demo/index.html";
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
-
+	readonly AuthenticationService authenticationService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	/// <summary>
@@ -58,8 +57,9 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel()
+	public BookViewModel(AuthenticationService authenticationService)
 	{
+		this.authenticationService = authenticationService;
 		Press();
 	}
 
@@ -93,23 +93,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var popup = new SettingsPage(new SettingsPageViewModel());
+		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService));
 		PopupOptions options = new()
 		{
-			CanBeDismissedByTappingOutsideOfPopup = true,
+			CanBeDismissedByTappingOutsideOfPopup = true
 		};
-		
-		IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(popup, options, cancellation);
-		if (result.WasDismissedByTappingOutsideOfPopup)
-		{
-			System.Diagnostics.Debug.WriteLine("Popup was dismissed by tapping outside of it.");
-			isPopupActive = false;
-		}
-		else
-		{
-			System.Diagnostics.Debug.WriteLine("Popup was closed by other means.");
-			isPopupActive = false;
-		}
+		await Shell.Current.ShowPopupAsync(popup, options, cancellation);
 	}
 
 	/// <summary>

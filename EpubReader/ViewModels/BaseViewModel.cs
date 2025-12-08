@@ -111,7 +111,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 		return [.. books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 
-	
+
 
 	#region Toast Helper Methods
 

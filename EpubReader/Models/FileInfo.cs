@@ -1,4 +1,5 @@
 ﻿namespace EpubReader.Models;
+
 public class FileInfo
 {
 	public int Count { get; set; } = 0;

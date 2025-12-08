@@ -1,4 +1,7 @@
-﻿namespace EpubReader.ViewModels;
+﻿using System.Diagnostics;
+using AsyncAwaitBestPractices;
+
+namespace EpubReader.ViewModels;
 
 /// <summary>
 /// Represents the view model for the settings page, providing access to available fonts and color schemes.
@@ -8,6 +11,7 @@
 /// options.</remarks>
 public partial class SettingsPageViewModel : BaseViewModel
 {
+	readonly AuthenticationService authenticationService;
 	readonly List<EpubFonts> fonts = [
 		new EpubFonts { FontFamily = "Arial" },
 		new EpubFonts { FontFamily = "Times New Roman" },
@@ -30,6 +34,18 @@ public partial class SettingsPageViewModel : BaseViewModel
 			new ColorScheme() { Name = "Vintage", BackgroundColor = "#f5f5dc", TextColor = "#000000" }
 		];
 
+	[ObservableProperty]
+	public partial bool IsAuthenticated { get; set; }
+
+	[ObservableProperty]
+	public partial bool IsNotAuthenticated { get; set; } = true;
+
+	[ObservableProperty]
+	public partial bool IsLocalOnly { get; set; }
+
+	[ObservableProperty]
+	public partial string AuthStatusText { get; set; } = string.Empty;
+
 	/// <summary>
 	/// Gets the collection of available color schemes.
 	/// </summary>
@@ -42,8 +58,83 @@ public partial class SettingsPageViewModel : BaseViewModel
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="SettingsPageViewModel"/> class.
+	/// Note: long-running async work is NOT started here. Call <see cref="InitializeAsync"/> from the view (OnAppearing/Loaded).
 	/// </summary>
-	public SettingsPageViewModel()
+	public SettingsPageViewModel(AuthenticationService authenticationService)
 	{
+		this.authenticationService = authenticationService;
+		this.authenticationService.AuthStateChanged += OnAuthStateChanged;
+		InitializeAsync().SafeFireAndForget(onException: ex =>
+		{
+			Debug.WriteLine($"Error during SettingsPageViewModel initialization: {ex}");
+		});
+	}
+	protected override void Dispose(bool disposing)
+	{
+		authenticationService.AuthStateChanged -= OnAuthStateChanged;
+	}
+
+	/// <summary>
+	/// Performs async initialization for the view model. Call this from a UI lifecycle event (Page.OnAppearing / Loaded).
+	/// Returns the underlying task so callers can await if desired.
+	/// </summary>
+	public Task InitializeAsync(CancellationToken cancellationToken = default)
+	{
+		// Forward to the existing method which contains the actual async logic.
+		return LoadAuthStatusAsync(cancellationToken);
+	}
+
+	async void OnAuthStateChanged(object? sender, bool isAuthenticated)
+	{
+		await LoadAuthStatusAsync();
+	}
+
+	public async Task LoadAuthStatusAsync(CancellationToken cancellationToken = default)
+	{
+		var isAuth = await authenticationService.IsAuthenticatedAsync(cancellationToken);
+		var isLocal = await AuthenticationService.IsLocalOnlyModeAsync(cancellationToken);
+
+		IsAuthenticated = isAuth;
+		IsNotAuthenticated = !isAuth;
+		IsLocalOnly = isLocal;
+
+		if (isAuth)
+		{
+			var userEmail = await authenticationService.GetCurrentUserEmailAsync(cancellationToken);
+			AuthStatusText = string.IsNullOrWhiteSpace(userEmail)
+				? "Signed in - Cloud sync enabled"
+				: $"Signed in as:\n{userEmail}";
+		}
+	}
+
+	[RelayCommand]
+	async Task SignInAsync(CancellationToken cancellationToken = default)
+	{
+		await LoadAuthStatusAsync(cancellationToken);
+		//await Shell.Current.GoToAsync("LoginPage", true);
+		var navigationPage = new LoginPage(new LoginPageViewModel(authenticationService));
+		await Shell.Current.Navigation.PushModalAsync(navigationPage, true);
+	}
+
+	[RelayCommand]
+	async Task SignOutAsync(CancellationToken cancellationToken = default)
+	{
+		var page = Application.Current?.Windows[0]?.Page;
+		if (page is null)
+		{
+			return;
+		}
+
+		var result = await page.DisplayAlertAsync(
+			"Sign Out",
+			"Are you sure you want to sign out? This will disable cloud sync and switch to local-only mode.",
+			"Sign Out",
+			"Cancel");
+
+		if (result)
+		{
+			await authenticationService.SignOutAsync(cancellationToken);
+			await LoadAuthStatusAsync(cancellationToken);
+		}
 	}
 }

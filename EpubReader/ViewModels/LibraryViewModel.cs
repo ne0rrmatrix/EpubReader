@@ -1,5 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Maui.Extensions;
+using EpubReader.Interfaces;
+using EpubReader.Models;
+using EpubReader.Service;
+using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 
@@ -28,13 +33,14 @@ public partial class LibraryViewModel : BaseViewModel
 	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
 	/// thrown.</remarks>
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	
+	readonly ISyncService syncService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ISyncService>() ?? throw new InvalidOperationException();
+
 	/// <summary>
 	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
-	
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
 	/// </summary>
@@ -92,13 +98,15 @@ public partial class LibraryViewModel : BaseViewModel
 		{
 			var existingBook = await db.GetBook(book);
 			ArgumentNullException.ThrowIfNull(existingBook);
+			existingBook.SyncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, CancellationTokenSource.Token);
+			await db.SaveBookData(existingBook, CancellationTokenSource.Token);
 
 			Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true)
 				?? throw new InvalidOperationException("Error opening ebook");
 
-			// Restore reading position
-			Book.CurrentChapter = existingBook.CurrentChapter;
-			Book.CurrentPage = existingBook.CurrentPage;
+			Book.SyncId = existingBook.SyncId;
+			// Restore reading position from sync service (handles local cache and cloud)
+			await RestoreProgressAsync(existingBook);
 			Book.Id = existingBook.Id;
 
 			StreamExtensions.Instance?.SetBook(Book);
@@ -117,12 +125,43 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 
+	async Task RestoreProgressAsync(Book existingBook)
+	{
+		var token = CancellationTokenSource.Token;
+		var syncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, token);
+
+		// Get progress (sync service checks local cache first, then cloud)
+		var progress = await syncService.GetProgressAsync(syncId, token);
+
+		// Backfill from legacy Book fields if no progress record yet
+		if (progress is null && (existingBook.CurrentChapter > 0 || existingBook.CurrentPage > 0))
+		{
+			progress = new ReadingProgress
+			{
+				BookId = syncId,
+				CurrentChapter = existingBook.CurrentChapter,
+				CurrentPage = existingBook.CurrentPage,
+				LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+				DeviceId = string.Empty,
+				DeviceName = string.Empty,
+				IsSynced = false
+			};
+			await syncService.SaveProgressAsync(progress, token);
+		}
+
+		if (progress is not null)
+		{
+			Book.CurrentChapter = progress.CurrentChapter;
+			Book.CurrentPage = progress.CurrentPage;
+		}
+	}
+
 	/// <summary>
 	/// Removes the specified book from the library.
 	/// </summary>
 	/// <param name="book">The book to be removed.</param>
 	[RelayCommand]
-	public void RemoveBook(Book book)
+	public async Task RemoveBook(Book book)
 	{
 		try
 		{
@@ -135,7 +174,7 @@ public partial class LibraryViewModel : BaseViewModel
 				Directory.Delete(directory, true);
 			}
 
-			db.RemoveBook(book);
+			await db.RemoveBook(book, CancellationTokenSource.Token);
 			Books.Remove(book);
 
 			Logger.Info("Book removed from library");
@@ -145,7 +184,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Error($"Error removing book: {ex.Message}");
 		}
 	}
-	
+
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by the first author's name.
 	/// </summary>
@@ -178,7 +217,7 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	async Task Calibre()
 	{
-		if(CancellationTokenSource.IsCancellationRequested)
+		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
 		}
@@ -215,8 +254,8 @@ public partial class LibraryViewModel : BaseViewModel
 		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
-		
-		if(CancellationTokenSource.Token.IsCancellationRequested)
+
+		if (CancellationTokenSource.Token.IsCancellationRequested)
 		{
 			Logger.Info("Operation cancelled by user.");
 			await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
@@ -293,6 +332,6 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 	#endregion
-	
+
 }
 

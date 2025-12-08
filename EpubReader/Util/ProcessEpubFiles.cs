@@ -30,7 +30,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// <returns>A task representing the asynchronous operation.</returns>
 	public async Task<int> ProcessEpubFilesAsync(List<string> epubFiles, CancellationToken cancellationToken)
 	{
-		
+
 		int count = 0;
 		foreach (var file in epubFiles)
 		{
@@ -40,12 +40,12 @@ public partial class ProcessEpubFiles : BaseViewModel
 			}
 			count++;
 			await ProcessSingleEpubFileAsync(file, epubFiles.Count, count, cancellationToken).ConfigureAwait(false);
-			
+
 		}
 
 		return count;
 	}
-	
+
 	/// <summary>
 	/// Processes a single EPUB file from a folder operation.
 	/// </summary>
@@ -65,7 +65,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 			using (stream)
 			{
-				if(cancellationToken.IsCancellationRequested)
+				if (cancellationToken.IsCancellationRequested)
 				{
 					logger.Info("Operation cancelled by user.");
 					return;
@@ -99,7 +99,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}");
 		}
 	}
-	
+
 	/// <summary>
 	/// Saves a book to the library from a stream.
 	/// </summary>
@@ -112,9 +112,11 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			ebook.FilePath = await FileService.SaveFileAsync(stream, filePath, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(filePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
+			var fileNameOnly = Path.GetFileName(filePath);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, fileNameOnly, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(fileNameOnly, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
+			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 			if (ValidateBookFiles(ebook))
 			{
 				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
@@ -134,7 +136,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync("Error saving book");
 		}
 	}
-	
+
 	/// <summary>
 	/// Validates that the book files were saved successfully.
 	/// </summary>
@@ -216,7 +218,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		var books = await db.GetAllBooks();
 		return books.Any(x => string.Equals(x.Title, ebook.Title, StringComparison.OrdinalIgnoreCase));
 	}
-	
+
 	/// <summary>
 	/// Saves a book to the library from a FileResult.
 	/// </summary>
@@ -249,9 +251,9 @@ public partial class ProcessEpubFiles : BaseViewModel
 			await ShowErrorToastAsync("Error saving book to library");
 		}
 	}
-	
+
 	#endregion
-	
+
 	/// <summary>
 	/// Downloads and processes an EPUB file for a given book, saving it to the cache directory and adding it to the
 	/// library if not already present.
@@ -275,7 +277,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 			var cacheDirectory = FileSystem.Current.CacheDirectory;
 			var invalidPathChars = Path.GetInvalidFileNameChars();
-			var extraInvalidChars = new char[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+'};
+			var extraInvalidChars = new char[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+' };
 			var emptySpaces = " ";
 			invalidPathChars = [.. invalidPathChars, .. emptySpaces];
 			invalidPathChars = [.. invalidPathChars, .. extraInvalidChars];
@@ -288,10 +290,10 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file: {ex.Message}");
-			if(ex.StackTrace is not null) { logger.Error(ex.StackTrace); }
+			if (ex.StackTrace is not null) { logger.Error(ex.StackTrace); }
 			return false;
 		}
-	
+
 
 		try
 		{
@@ -314,7 +316,8 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error adding book: {ex.Message}");
-			if(ex.StackTrace is not null) {
+			if (ex.StackTrace is not null)
+			{
 				logger.Error(ex.StackTrace);
 			}
 			return false;

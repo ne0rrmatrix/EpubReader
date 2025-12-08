@@ -14,7 +14,7 @@ namespace EpubReader.Controls;
 class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	
+
 	/// <summary>
 	/// Handles the start of a custom URL scheme task in a <see cref="WKWebView"/>.
 	/// </summary>
@@ -29,7 +29,7 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 	public async void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
 	{
 		var url = urlSchemeTask.Request.Url.AbsoluteString ?? "";
-		if(!url.StartsWith("app://demo/"))
+		if (!url.StartsWith("app://demo/"))
 		{
 			urlSchemeTask.DidFailWithError(new NSError(new NSString("com.apple.webkit.error"), 0, new NSDictionary<NSString, NSString>()));
 			return;

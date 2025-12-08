@@ -43,4 +43,11 @@
     <Compile Remove="**\net\**\*.cs" />
     <None Include="**\net\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
   </ItemGroup>
+  <!-- Optional per-developer secrets file (project root). Keep for teams that prefer MSBuild props. -->
+  <Import Project="$(MSBuildThisFileDirectory)firebase.secrets.props" Condition="Exists('$(MSBuildThisFileDirectory)firebase.secrets.props')" />
+ <Target Name="GenerateFirebaseSecrets" BeforeTargets="CoreCompile">
+  <Error Condition="'$(FirebaseApiKey)' == ''" Text="FirebaseApiKey is not set. Set FIREBASE_API_KEY or pass /p:FirebaseApiKey=..." />
+  <Error Condition="'$(FirebaseAuthDomain)' == ''" Text="FirebaseAuthDomain is not set. Set FIREBASE_AUTH_DOMAIN or pass /p:FirebaseAuthDomain=..." />
+  <Error Condition="'$(FirebaseDatabaseUrl)' == ''" Text="FirebaseDatabaseUrl is not set. Set FIREBASE_DATABASE_URL or pass /p:FirebaseDatabaseUrl=..." />
+ </Target>
 </Project>
