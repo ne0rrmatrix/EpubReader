@@ -21,6 +21,10 @@ public partial class BookPage : ContentPage
 	readonly IDb db;
 	readonly ISyncService syncService;
 	readonly WebViewHelper webViewHelper;
+	bool loadSequenceStarted = false;
+	bool progressSyncComplete = false;
+	bool pageSettingsApplied = false;
+	bool pageAtCorrectPosition = false;
 	ToolbarItem? syncToolbarItem;
 
 	/// <summary>
@@ -39,16 +43,41 @@ public partial class BookPage : ContentPage
 		this.syncService = syncService;
 		webViewHelper = new(webView, db, syncService);
 
+		// Subscribe to webview helper lifecycle events to show/hide native overlay
+		webViewHelper.PageLoadStarted += OnWebViewPageLoadStarted;
+		webViewHelper.SettingsApplied += OnWebViewSettingsApplied;
+
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
 		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
 	}
 
-	protected override void OnAppearing()
+	protected override async void OnAppearing()
 	{
 		base.OnAppearing();
-		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
+		await UpdateSyncToolbarAsync().ConfigureAwait(false);
+		if (!loadSequenceStarted)
+		{
+			loadSequenceStarted = true;
+			progressSyncComplete = false;
+			pageSettingsApplied = false;
+			pageAtCorrectPosition = false;
+			ShowNativeOverlay();
+			// Attach webview handlers now that page is visible
+			try
+			{
+				webView.Navigated -= webView_Navigated;
+				webView.Navigating -= webView_Navigating;
+				webView.Navigated += webView_Navigated;
+				webView.Navigating += webView_Navigating;
+			}
+			catch (Exception ex)
+			{
+				Trace.TraceWarning($"Failed attaching webview handlers: {ex.Message}");
+			}
+			await StartLoadSequenceAsync().ConfigureAwait(false);
+		}
 	}
 
 	async Task UpdateSyncToolbarAsync()
@@ -86,15 +115,64 @@ public partial class BookPage : ContentPage
 	/// <remarks>This method unregisters all messages for the current instance and clears the toolbar items if the
 	/// popup is not active. It also ensures the navigation bar is visible. Overrides the base <see cref="OnDisappearing"/>
 	/// method.</remarks>
-	protected override void OnDisappearing()
+	protected override async void OnDisappearing()
 	{
 		if (!ViewModel.isPopupActive)
 		{
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 			Shell.Current.ToolbarItems.Clear();
 			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+			// Reset load sequence when the page is truly disappearing (not just a popup)
+			loadSequenceStarted = false;
+			progressSyncComplete = false;
+			pageSettingsApplied = false;
+			pageAtCorrectPosition = false;
+		}
+
+		// Unsubscribe events
+		webViewHelper.PageLoadStarted -= OnWebViewPageLoadStarted;
+		webViewHelper.SettingsApplied -= OnWebViewSettingsApplied;
+		// detach webview handlers we attached on appearing
+		try
+		{
+			webView.Navigated -= webView_Navigated;
+			webView.Navigating -= webView_Navigating;
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed detaching webview handlers: {ex.Message}");
 		}
 		base.OnDisappearing();
+	}
+
+	void OnWebViewPageLoadStarted()
+	{
+		// Ensure overlay shown on UI thread
+		Dispatcher.Dispatch(() =>
+		{
+			ShowNativeOverlay();
+		});
+	}
+
+	void OnWebViewSettingsApplied()
+	{
+		// Mark that webview settings / rendering work completed and try to hide overlay
+		pageSettingsApplied = true;
+		
+		if (progressSyncComplete && pageAtCorrectPosition && pageSettingsApplied)
+		{
+			Dispatcher.Dispatch(() => HideNativeOverlay());
+		}
+	}
+
+	void ShowNativeOverlay()
+	{
+		NativeLoadingOverlay.IsVisible = true;
+	}
+
+	void HideNativeOverlay()
+	{
+		NativeLoadingOverlay.IsVisible = false;
 	}
 
 	/// <summary>
@@ -129,7 +207,14 @@ public partial class BookPage : ContentPage
 	{
 		await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
 		await webViewHelper.LoadPageAsync(pageLabel, book);
-		Shimmer.IsActive = false;
+	}
+
+	async Task StartLoadSequenceAsync()
+	{
+		Dispatcher.Dispatch(() =>
+		{
+			webView.Source = ViewModel.Source;
+		});
 	}
 
 	/// <summary>
@@ -203,17 +288,18 @@ public partial class BookPage : ContentPage
 		}
 
 		var urlParts = url.Split('?')[1].Split('#')[0];
-		if (!string.IsNullOrEmpty(urlParts))
-		{
-			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
-			if (chapter is null)
-			{
-				return;
-			}
-			book.CurrentChapter = book.Chapters.IndexOf(chapter);
-			await webView.EvaluateJavaScriptAsync($"loadPage(\"{chapter.FileName}\")");
-			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-		}
+				if (!string.IsNullOrEmpty(urlParts))
+				{
+					var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
+					if (chapter is null)
+					{
+						return;
+					}
+					book.CurrentChapter = book.Chapters.IndexOf(chapter);
+					// Use helper to ensure native overlay is shown
+					await webViewHelper.LoadPageAsync(pageLabel, book);
+					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+				}
 	}
 
 	static async Task TryHandleExternalLinkAsync(string url)
@@ -277,6 +363,10 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
+				// JavaScript has reported page load and we've applied settings; mark that
+				// the WebView should be at the correct position now and try to hide overlay.
+				pageAtCorrectPosition = true;
+				Dispatcher.Dispatch(() => HideNativeOverlay());
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
@@ -364,8 +454,7 @@ public partial class BookPage : ContentPage
 					book.CurrentChapter = index;
 					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
 					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-					var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-					await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
+						await webViewHelper.LoadPageAsync(pageLabel, book);
 					CloseMenuAsync(this, EventArgs.Empty);
 				});
 			})
@@ -390,8 +479,7 @@ public partial class BookPage : ContentPage
                     book.CurrentChapter = index;
                     book.CurrentPage = 0; // Reset current page when changing chapter
                     await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-                    var file = Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-                    await webView.EvaluateJavaScriptAsync($"loadPage(\"{file}\")");
+						await webViewHelper.LoadPageAsync(pageLabel, book);
                     CloseMenuAsync(this, EventArgs.Empty);
                 });
             })
@@ -430,6 +518,9 @@ public partial class BookPage : ContentPage
 			}
 
 			pageLabel.Text = await GetCurrentPageInfoAsync();
+			// mark sync complete and attempt to hide overlay if render/settings also finished
+			progressSyncComplete = true;
+			Dispatcher.Dispatch(() => HideNativeOverlay());
 		}
 		catch (OperationCanceledException)
 		{

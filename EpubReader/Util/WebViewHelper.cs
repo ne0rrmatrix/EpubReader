@@ -1,7 +1,4 @@
 ﻿using EpubReader.Extensions;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using EpubReader.Service;
 
 namespace EpubReader.Util;
 
@@ -17,6 +14,10 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(WebViewHelper));
+
+	// Events to notify the UI layer about page load lifecycle
+	public event Action? PageLoadStarted;
+	public event Action? SettingsApplied;
 
 	/// <summary>
 	/// Asynchronously sets the color scheme and font data for the web view based on user settings.
@@ -38,6 +39,16 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 		await webView.EvaluateJavaScriptAsync("gotoEnd();");
 		await webView.EvaluateJavaScriptAsync("getPageCount()");
+
+		// Signal the UI that native settings have been applied and the overlay may be hidden
+		try
+		{
+			SettingsApplied?.Invoke();
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Error raising SettingsApplied event: {ex.Message}");
+		}
 	}
 
 	/// <summary>
@@ -53,6 +64,8 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 #elif IOS || MACCATALYST
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
+		// notify UI overlay that a new page load is starting
+		PageLoadStarted?.Invoke();
 		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
 		WebViewHelper.UpdatePageLabel(label, book);
 	}

@@ -2,7 +2,7 @@
 <ContentPage
     x:Class="EpubReader.Views.BookPage"
     xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
-    xmlns:shimmer="clr-namespace:Syncfusion.Maui.Toolkit.Shimmer;assembly=Syncfusion.Maui.Toolkit"
+    
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Name="CurrentPage"
     x:DataType="BookViewModel"
@@ -19,11 +19,6 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-    <shimmer:SfShimmer
-        x:Name="Shimmer"
-        AnimationDuration="3000"
-        IsActive="{Binding IsActive}">
-        <shimmer:SfShimmer.Content>
             <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
                 <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
                     <ScrollView.GestureRecognizers>
@@ -129,8 +124,42 @@
                                               MacCatalyst=20}"
                         HeightRequest="30"
                         HorizontalOptions="Center" />
+
+                    <!-- Native loading overlay shown while chapter renders and native settings apply -->
+                    <Grid x:Name="NativeLoadingOverlay"
+                          Grid.RowSpan="2"
+                          IsVisible="False"
+                          BackgroundColor="{AppThemeBinding Dark=#CC000000, Light=#CCFFFFFF}"
+                          HorizontalOptions="Fill"
+                          VerticalOptions="Fill">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="0.6*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Cover area: occupies ~60% of overlay height and centers the image -->
+                        <Grid Grid.Row="0" HorizontalOptions="Center" VerticalOptions="Center">
+                            <Image Source="{Binding CoverImage}"
+                                   Aspect="AspectFit"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center" />
+                        </Grid>
+
+                        <!-- Activity indicator centered below the cover -->
+                        <HorizontalStackLayout Grid.Row="1" HorizontalOptions="Center" VerticalOptions="Center" Spacing="8" Padding="0,10,0,0">
+                            <ActivityIndicator IsRunning="True" Color="{AppThemeBinding Dark=White, Light=Black}" WidthRequest="40" HeightRequest="40" />
+                        </HorizontalStackLayout>
+
+                        <!-- Loading text -->
+                        <Label Grid.Row="2"
+                               Text="Loading chapter..."
+                               HorizontalOptions="Center"
+                               VerticalOptions="Start"
+                               TextColor="{AppThemeBinding Dark=White, Light=Black}"
+                               FontAttributes="Bold"
+                               Margin="0,6,0,0" />
+                    </Grid>
                 </Grid>
             </Grid>
-        </shimmer:SfShimmer.Content>
-    </shimmer:SfShimmer>
 </ContentPage>
