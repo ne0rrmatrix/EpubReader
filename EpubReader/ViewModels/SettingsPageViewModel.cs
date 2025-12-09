@@ -112,7 +112,6 @@ public partial class SettingsPageViewModel : BaseViewModel
 	async Task SignInAsync(CancellationToken cancellationToken = default)
 	{
 		await LoadAuthStatusAsync(cancellationToken);
-		//await Shell.Current.GoToAsync("LoginPage", true);
 		var navigationPage = new LoginPage(new LoginPageViewModel(authenticationService));
 		await Shell.Current.Navigation.PushModalAsync(navigationPage, true);
 	}
