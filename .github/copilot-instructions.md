@@ -1,143 +1,159 @@
 # Overview
-This document provides guidelines for using GitHub Copilot to contribute to the .NET MAUI Community Toolkit. It includes instructions on setting up your environment, writing code, and following best practices specific to .NET MAUI.
+Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET MAUI EPUB reader with cloud sync, Calibre server integration, and multi-platform support (Windows, Android, iOS, macOS).
 
-## Prerequisites
-1.	Install the latest stable [.NET SDK](https://dotnet.microsoft.com/en-us/download).
-2.	Install .NET MAUI workloads (we recommend using Visual Studio installer).
+## Architecture Overview
 
-## Setting Up GitHub Copilot
-1.	Ensure you have GitHub Copilot installed and enabled in Visual Studio.
-2.	Familiarize yourself with the basic usage of GitHub Copilot by reviewing the [official documentation](https://docs.github.com/en/copilot).
+### Core Layers
+- **EbookService** (`Service/EbookService.cs`): Handles EPUB parsing via VersOne.Epub library, cover extraction, font/image embedding, and synthetic page numbering
+- **Database** (`Database/Db.cs`): SQLite wrapper for book metadata, settings, and sync state; auto-initializes tables on first use
+- **Authentication** (`Service/AuthenticationService.*.cs`): Platform-specific implementations for Google Firebase auth; supports local-only mode without authentication
+- **Sync** (`Service/FirebaseSyncService.cs`): Manages reading progress sync across devices; queues offline changes, reconciles on reconnect
+- **MVVM**: ViewModels inherit `ObservableObject` (MVVM Toolkit); communicate via `WeakReferenceMessenger` using message classes in `Messages/`
+- **Platform-Specific UI**: Platform folders contain `*.android.cs`, `*.macios.cs`, `*.windows.cs` implementations for WebView handlers, auth, and file pickers
 
-## Writing Code with GitHub Copilot
-### General Guidelines
-* Use GitHub Copilot to assist with code completion, documentation, and generating boilerplate code.
-* Always review and test the code suggested by GitHub Copilot to ensure it meets the project's standards and requirements.
+### Key Data Models
+- `Book`: Title, author, cover image, reading progress, sync ID
+- `Settings`: Theme, font, text size, color scheme preferences; synced across devices
+- `ReadingProgress`: Chapter/page position, timestamp for multi-device sync
+- `SyncQueueItem`: Tracks offline changes awaiting upload when reconnected
 
-### Specific to .NET MAUI
-* Ensure that any UI components or controls are compatible with .NET MAUI.
-* Avoid using Xamarin.Forms-specific code unless there is a direct .NET MAUI equivalent.
+## Build & Firebase Secrets
+
+**Build Script**: `build.ps1` (PowerShell)
+- Accepts Firebase secrets via CLI parameters (`-ApiKey`, `-AuthDomain`, `-DatabaseUrl`) or `google-services.json`
+- Sets environment variables: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_DATABASE_URL`
+- Loads via `FirebaseConfig.cs` at runtime; **never** writes secrets to source code
+- Validation: `FirebaseConfigLoader.IsConfigValid()` checks if config is present
+
+**Android**: Injects secrets early in `MauiProgram.cs` via `FirebaseConfigLoader.InjectFirebaseSecrets()`
+**Windows/iOS/macOS**: Load from environment variables or assets as fallback
 
 ## Best Practices
-* Use **Trace.WriteLine()** for debug logging instead of **Debug.WriteLine()**.
-* Include a **CancellationToken** as a parameter for methods returning **Task** or **ValueTask**.
-* Use **is** for null checking and type checking.
-* Use file-scoped namespaces to reduce code verbosity.
-* Avoid using the **!** null forgiving operator.
-* Follow naming conventions for enums and property names.
 
-### Debug Logging
-* Always use `Trace.WriteLine()` instead of `Debug.WriteLine` for debug logging because `Debug.WriteLine` is removed by the compiler in Release builds
+### Code Style
+- **Namespaces**: File-scoped (e.g., `namespace EpubReader.Service;`)
+- **Fields**: camelCase without `_` prefix (e.g., `readonly string dbPath = ...;`)
+- **Accessibility**: Omit `private` keyword (default in C#); use explicit `public`/`internal` only
+- **Null Checking**: Use `is null` / `is not null` pattern; avoid `!` null-forgiving operator
+- **Type Checking**: Use `is Type var` pattern instead of casting
+- **Collections**: Use C# 12+ collection expressions: `[1, 2, 3]`, `[]`
+- **Braces**: Always use `{ }` after control flow (`if`, `for`, `foreach`, etc.)
 
-### Methods Returning Task and ValueTask
-* Always include a `CancellationToken` as a parameter to every method returning `Task` or `ValueTask`
-* If the method is public, provide a the default value for the `CancellationToken` (e.g. `CancellationToken token = default`)
-* If the method is not public, do not provide a default value for the `CancellationToken`
-* If the method is used outside of a .net MAUI control, Use `CancellationToken.ThrowIfCancellationRequested()` to verify the `CancellationToken`, as it is not possible to catch exceptions in XAML.
+### Async/Task Patterns
+- **CancellationToken**: Required for all `Task`/`ValueTask` methods; provide default value `= default` for public methods, no default for internal
+- **CancellationToken Verification**: Use `CancellationToken.ThrowIfCancellationRequested()` in XAML-invoked methods (exceptions cannot be caught in XAML)
+- **Logging**: Use `Trace.WriteLine()`, not `Debug.WriteLine()` (Release builds strip Debug output)
 
 ### Enums
-* Always use `Unknown` at index 0 for return types that may have a value that is not known
-* Always use `Default` at index 0 for option types that can use the system default option
-* Follow naming guidelines for tense... `SensorSpeed` not `SensorSpeeds`
-* Assign values (0,1,2,3) for all enums, if not marked with a `Flags` attribute. This is to ensure that the enum can be serialized and deserialized correctly across platforms.
+- **Index 0**: Use `Unknown` for return types with unknown values; use `Default` for option types
+- **Naming**: Singular form (`SensorSpeed`, not `SensorSpeeds`)
+- **Values**: Explicitly assign 0, 1, 2, 3... unless marked `[Flags]` (required for cross-platform serialization)
 
-### Property Names
-* Include units only if one of the platforms includes it in their implementation. For instance HeadingMagneticNorth implies degrees on all platforms, but PressureInHectopascals is needed since platforms don't provide a consistent API for this.
+### Property Units & Naming
+- Include units only if platforms differ (e.g., `PressureInHectopascals` because iOS uses kPa while Android uses hPa)
+- Standard units: prefer Hectopascals, degrees implied in names like `HeadingMagneticNorth`
 
-### Units
-* Use the standard units and most well accepted units when possible. For instance Hectopascals are used on UWP/Android and iOS uses Kilopascals so we have chosen Hectopascals.
+### Database & Models
+- **Initialization**: `Db.InitializeAsync()` auto-creates tables on first use (Settings, Book)
+- **Sync IDs**: Books auto-generate sync IDs for cloud tracking via `EnsureBookSyncIdAsync()`
+- **Attributes**: SQLite-NET uses `[PrimaryKey]`, `[NotNull]`, `[Indexed]` for schema
 
-### Pattern matching
-#### Null checking
-* Prefer using `is` when checking for null instead of `==`.
+### MVVM & Messaging
+- **ViewModels**: Inherit `BaseViewModel : ObservableObject` (MVVM Toolkit)
+- **Properties**: Use `[ObservableProperty]` attribute for auto-generated bindable properties with PropertyChanged events
+- **Commands**: Implement as async methods decorated with `[RelayCommand]` for automatic `IAsyncRelayCommand` generation
+- **Cross-ViewModel Communication**: Use `WeakReferenceMessenger` with message classes (e.g., `BookMessage(book)`)
+- **Disposal**: ViewModels should implement `IDisposable` and unsubscribe from messages in `Dispose()`
 
-e.g.
+### Platform-Specific Code
+- **File Organization**: Platform-specific implementations use naming convention (e.g., `FolderPicker.android.cs`, `AuthenticationService.macios.cs`)
+- **Conditional Compilation**: Use `#if ANDROID`, `#if IOS || MACCATALYST`, `#if WINDOWS` directives in shared files
+- **Platform Handlers**: Register in `MauiProgram.cs` under platform-specific sections (WebViewHandler, etc.)
 
+### EPUB Reading
+- **VersOne.Epub**: Use `VersOne.Epub` NuGet package; configure via `EpubReaderOptions` in `EbookService`
+- **Cover Extraction**: Default 200x400px; handled in `EbookService.GetListingAsync()`
+- **Content Delivery**: HTML/CSS/JS injected into WebView via `Container.js`, `ReadiumCSS`, and `EpubText.js`
+- **Image Processing**: SixLabors.ImageSharp for manipulation; FFImageLoading for WebView display
+
+### Service Registration
+- **DI Container**: Configured in `MauiProgram.cs` using MAUI's service builder
+- **Singleton vs. Transient**: Auth/Sync services are singletons; platform-specific services registered per-platform
+- **Firebase Integration**: Plugin.Firebase for cross-platform Firebase API
+
+### Avoid
+- `NotImplementedException` (indicates incomplete PR, not a feature to be done later)
+- Xamarin.Forms-specific APIs (use .NET MAUI equivalents)
+- `Debug.WriteLine()` for logging (use `Trace.WriteLine()`)
+- Uncommitted Firebase secrets in source code
+
+## Developer Workflows
+
+### Building
+**Prerequisites**: .NET 10 SDK, Visual Studio 2026 with .NET MAUI workload, platform-specific SDKs (Android API 34+, Windows SDK, Xcode 16+ for iOS/macOS)
+
+**With Firebase Secrets**:
+```powershell
+# Debug build
+./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Debug
+
+# Release build
+./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Release
+
+# From google-services.json
+./build.ps1 -GoogleJsonPath "./build-secrets/google-services.json"
+
+# From .env file (via .vscode/build-from-env.ps1)
+./build.ps1
+```
+
+**Secrets Management**:
+- **Never** commit Firebase secrets to source code
+- Place secrets in `build-secrets/google-services.json` (not in repo)
+- Environment variables: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_DATABASE_URL`
+- CI/CD injects via build parameters; local development uses .env or google-services.json
+
+### Testing & Debugging
+- Use Visual Studio's built-in debugger or remote debugging for Android/iOS
+- Console output via `Trace.WriteLine()` visible in Visual Studio Output window
+- Database file location: `Db.DbPath` (platform-specific user directory)
+- Firebase config validation: `FirebaseConfigLoader.IsConfigValid()` before publishing
+
+### Common Patterns
+**Async Service Method**:
 ```csharp
-// null
-if (something is null)
+public async Task<Book?> GetBookAsync(string path, CancellationToken token = default)
 {
-
-}
-
-// or not null
-if (something is not null)
-{
-   
+    token.ThrowIfCancellationRequested();
+    // implementation
 }
 ```
 
-* Avoid using the `!` [null forgiving operator](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-forgiving) to avoid the unintended introduction of bugs.
-
-#### Type checking
-* Prefer `is` when checking for types instead of casting.
-
-e.g.
-
+**ViewModel with Messaging**:
 ```csharp
-if (something is Bucket bucket)
+public partial class BookViewModel : BaseViewModel
 {
-   bucket.Empty();
+    [ObservableProperty] Book? currentBook;
+    
+    [RelayCommand]
+    private async Task LoadBookAsync(CancellationToken token)
+    {
+        var book = await ebookService.GetListingAsync(path);
+        CurrentBook = book;
+        WeakReferenceMessenger.Default.Send(new BookMessage(book));
+    }
+    
+    public override void Dispose()
+    {
+        WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
+        base.Dispose();
+    }
 }
 ```
 
-### Use collection initializers or expressions
-* Use [Use collection initializers or expressions](https://learn.microsoft.com/en-gb/dotnet/fundamentals/code-analysis/style-rules/ide0028) Use collection initializers or expressions.
-
-e.g.
-
+**Platform-Specific Registration in MauiProgram**:
 ```csharp
-List<int> list = [1, 2, 3];
-List<int> list = [];
+#if ANDROID
+FirebaseConfigLoader.InjectFirebaseSecrets();
+#endif
 ```
-
-### File Scoped Namespaces
-* Use [file scoped namespaces](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-10.0/file-scoped-namespaces) to help reduce code verbosity.
-
-e.g.
-
-```csharp
-namespace CommunityToolkit.Maui.Converters;
-
-using System;
-
-class BoolToObjectConverter
-{
-}
-```
-
-### Braces
-Please use `{ }` after `if`, `for`, `foreach`, `do`, `while`, etc.
-
-e.g.
-
-```csharp
-if (something is not null)
-{
-   ActOnIt();
-}
-```
-
-### `NotImplementedException`
-* Please avoid adding new code that throws a `NotImplementedException`. According to the [Microsoft Docs](https://docs.microsoft.com/dotnet/api/system.notimplementedexception), we should only "throw a `NotImplementedException` exception in properties or methods in your own types when that member is still in development and will only later be implemented in production code. In other words, a NotImplementedException exception should be synonymous with 'still in development.'"
-In other words, `NotImplementedException` implies that a feature is still in development, indicating that the Pull Request is incomplete.
-
-### Bug Fixes
-If you're looking for something to fix, please browse [open issues](https://github.com/ne0rrmatrix/EpubReader/issues).
-
-Follow the style used by the [.NET Foundation](https://github.com/dotnet/runtime/blob/master/docs/coding-guidelines/coding-style.md), with two primary exceptions:
-
-* We do **not** use the `private` keyword as it is the default accessibility level in C#.
-* We will **not** use `_` or `s_` as a prefix for internal or private field names
-* We will use `camelCaseFieldName` for naming internal or private fields in both instance and static implementations
-
-## Submitting Contributions
-1.	Fork the repository and create a new branch for your changes.
-2.	Implement your changes using GitHub Copilot as needed.
-3.	Ensure your changes include tests, samples, and documentation.
-
-## Additional Resources
-* [GitHub Copilot Documentation](https://docs.github.com/en/copilot)
-* [.NET MAUI Documentation](https://learn.microsoft.com/en-us/dotnet/maui/)
-
-By following these guidelines, you can effectively use GitHub Copilot to contribute to the .NET MAUI Community Toolkit. Thank you for your contributions!
