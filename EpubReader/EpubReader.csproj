@@ -69,16 +69,10 @@
 		<!-- Firebase Google Services Configuration for Android (optional - add when configured) -->
 		<GoogleServicesJson Include="Resources\google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Resources\google-services.json')" />
     <!-- Ensure google-services.json is packaged so runtime FirebaseConfig can read it -->
-    <MauiAsset Include="Resources\google-services.json"
-              LogicalName="google-services.json"
-              Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Resources\google-services.json')" />
-    <MauiAsset Include="Resources\google-services.json"
-        LogicalName="google-services.json"
-        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND Exists('Resources\google-services.json')" />
+    <MauiAsset Include="Resources\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Resources\google-services.json')" />
+    <MauiAsset Include="Resources\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND Exists('Resources\google-services.json')" />
     <!-- Also include Platforms/Android/google-services.json if present (injected at build time) -->
-    <MauiAsset Include="Platforms\Android\google-services.json"
-              LogicalName="google-services.json"
-              Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Platforms\Android\google-services.json')" />
+    <MauiAsset Include="Platforms\Android\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Platforms\Android\google-services.json')" />
     <EmbeddedResource Include="firebase.secrets.props" Condition="Exists('firebase.secrets.props')" />
 	</ItemGroup>
 
@@ -102,25 +96,17 @@
     <Message Importance="high" Text="InjectAndroidSecrets: checking for $(AndroidSecretsXml) and $(AndroidSecretsJson)" />
 
     <!-- If a pre-generated strings.secrets.xml exists, copy it over -->
-    <Copy Condition="Exists('$(AndroidSecretsXml)')"
-          SourceFiles="$(AndroidSecretsXml)"
-          DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
+    <Copy Condition="Exists('$(AndroidSecretsXml)')" SourceFiles="$(AndroidSecretsXml)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
 
     <!-- If google-services.json exists, copy it into Platforms/Android and also attempt to generate strings.xml by invoking the PowerShell script on Windows or bash on Unix -->
-    <Copy Condition="Exists('$(AndroidSecretsJson)')"
-          SourceFiles="$(AndroidSecretsJson)"
-          DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\google-services.json" />
+    <Copy Condition="Exists('$(AndroidSecretsJson)')" SourceFiles="$(AndroidSecretsJson)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\google-services.json" />
 
-    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) == 'true'"
-          Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\gen-android-strings.ps1&quot; -GoogleServicesJson '$(AndroidSecretsJson)' -OutFile '$(AndroidSecretsXml)'" />
+    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) == 'true'" Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\gen-android-strings.ps1&quot; -GoogleServicesJson '$(AndroidSecretsJson)' -OutFile '$(AndroidSecretsXml)'" />
 
-    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) != 'true'"
-          Command="bash '$(MSBuildProjectDirectory)/scripts/gen-android-strings.sh' '$(AndroidSecretsJson)' '$(AndroidSecretsXml)'" />
+    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) != 'true'" Command="bash '$(MSBuildProjectDirectory)/scripts/gen-android-strings.sh' '$(AndroidSecretsJson)' '$(AndroidSecretsXml)'" />
 
     <!-- After generating strings.secrets.xml, copy to the android resources file so build picks it up -->
-    <Copy Condition="Exists('$(AndroidSecretsXml)')"
-          SourceFiles="$(AndroidSecretsXml)"
-          DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
+    <Copy Condition="Exists('$(AndroidSecretsXml)')" SourceFiles="$(AndroidSecretsXml)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
 
   </Target>
 
@@ -156,15 +142,21 @@
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.2" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.1" />
-    <!-- Required for Google Authentication - updated for .NET 10 compatibility -->
     <PackageReference Include="Xamarin.Google.Android.Material" Version="1.13.0" />
-    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.4.0.1" />
-    <PackageReference Include="Xamarin.GooglePlayServices.Identity" Version="118.1.0.7" />
+    <!-- AndroidX Credential Manager + Google Identity (replaces GoogleSignIn APIs) -->
+    <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.3" />
+    <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.3" />
+    <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.11" />
+    <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
   </ItemGroup>
   
   <ItemGroup>
     <Folder Include="Generated\" />
   </ItemGroup>
+  
+  <!-- Removed per-Framework android group; consolidated above -->
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>

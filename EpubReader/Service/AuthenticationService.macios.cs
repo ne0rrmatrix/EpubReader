@@ -43,7 +43,9 @@ public partial class AuthenticationService
 				new WebAuthenticatorOptions
 				{
 					Url = authUri,
+#pragma warning disable S1075 // Hardcoded URI
 					CallbackUrl = new Uri("http://localhost"),
+#pragma warning restore S1075 // Hardcoded URI
 					PrefersEphemeralWebBrowserSession = true
 				});
 

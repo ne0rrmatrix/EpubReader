@@ -1,8 +1,7 @@
 ﻿using System.Diagnostics;
-using Android.App;
-using Android.Content;
-using Android.Gms.Auth.Api.SignIn;
+using AndroidX.Credentials;
 using Firebase.Auth.Providers;
+using Xamarin.GoogleAndroid.Libraries.Identity.GoogleId;
 
 namespace EpubReader.Service;
 
@@ -10,22 +9,21 @@ public partial class AuthenticationService
 {
 	public async Task<string> SignInWithGooglePlatformAsync(CancellationToken cancellationToken)
 	{
-		// Use native Android Google Sign-In to obtain ID token, then exchange with FirebaseAuthClient
+		// Use AndroidX Credential Manager + Google ID to obtain ID token, then exchange with FirebaseAuthClient
 		if (Platform.CurrentActivity is not Android.App.Activity activity)
 		{
 			Trace.TraceError("Google sign-in: current Activity is null");
 			throw new InvalidOperationException("Current Activity is null");
 		}
 
-		var googleAccount = await GetGoogleSignInAccountAsync(activity).ConfigureAwait(false);
-		Trace.TraceInformation(googleAccount is null
-			? "Google sign-in: Google account task returned null"
-			: "Google sign-in: Google account task returned data");
+		var idToken = await GetGoogleIdTokenAsync(activity, cancellationToken).ConfigureAwait(false);
+		Trace.TraceInformation(string.IsNullOrEmpty(idToken)
+			? "Google sign-in: Google ID token retrieval returned empty"
+			: "Google sign-in: Google ID token retrieved");
 
-		if (googleAccount != null && !string.IsNullOrEmpty(googleAccount.IdToken))
+		if (!string.IsNullOrEmpty(idToken))
 		{
 			Trace.TraceInformation("Google sign-in: IdToken retrieved, exchanging with Firebase");
-			var idToken = googleAccount.IdToken;
 			// Exchange ID token with Firebase via FirebaseAuthClient
 			var authCredential = GoogleProvider.GetCredential(idToken, OAuthCredentialTokenType.IdToken);
 			var credential = await firebaseAuthClient!.SignInWithCredentialAsync(authCredential).ConfigureAwait(false);
@@ -45,57 +43,105 @@ public partial class AuthenticationService
 		return string.Empty;
 	}
 
-	Task<GoogleSignInAccount?> GetGoogleSignInAccountAsync(Android.App.Activity activity)
+	static async Task<string> GetGoogleIdTokenAsync(Android.App.Activity activity, CancellationToken cancellationToken)
 	{
-		var tcs = new TaskCompletionSource<GoogleSignInAccount?>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-		void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+		// Discover web client ID from resources if present (Firebase default_web_client_id)
+		var clientIdResId = activity.Resources?.GetIdentifier("default_web_client_id", "string", activity.PackageName) ?? 0;
+		var serverClientId = clientIdResId != 0 ? activity.GetString(clientIdResId) : string.Empty;
+	
+		// Build Google GetGoogleIdOption (requests a Google ID token via Credential Manager)
+		var googleOptionBuilder = new GetGoogleIdOption.Builder();
+		googleOptionBuilder.SetFilterByAuthorizedAccounts(false);
+		googleOptionBuilder.SetAutoSelectEnabled(false);
+		if (!string.IsNullOrEmpty(serverClientId))
 		{
-			if (requestCode == 9001)
+			googleOptionBuilder.SetServerClientId(serverClientId);
+		}
+		var googleOption = googleOptionBuilder.Build();
+
+		// Build GetCredentialRequest
+		var requestBuilder = new GetCredentialRequest.Builder();
+		requestBuilder.AddCredentialOption(googleOption);
+		var request = requestBuilder.Build();
+
+		try
+		{
+			var credentialManager = CredentialManager.Create(activity);
+			Trace.TraceInformation("Google sign-in: invoking CredentialManager.GetCredentialAsync (callback)");
+
+			var tcs = new TaskCompletionSource<Java.Lang.Object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+			var cancellationSignal = new Android.OS.CancellationSignal();
+			if (cancellationToken.CanBeCanceled)
 			{
-				Trace.TraceInformation($"Google sign-in: received ActivityResult with resultCode={resultCode}");
+				cancellationToken.Register(() =>
+				{
+					// Cancel the Android cancellation signal when .NET token cancels
+					cancellationSignal.Cancel();
+				});
+			}
+
+			var executor = Java.Util.Concurrent.Executors.NewSingleThreadExecutor() ?? throw new InvalidOperationException("CredentialManager executor creation failed");
+			var callback = new CredentialCallback(
+				onResult: result => tcs.TrySetResult(result),
+				onError: error =>
+				{
+					Trace.TraceError("Google sign-in: Credential error");
+					tcs.TrySetResult(null);
+				});
+
+			credentialManager.GetCredentialAsync(activity, request, cancellationSignal, executor, callback);
+
+			var resultObj = await tcs.Task.ConfigureAwait(false);
+			var response = resultObj as GetCredentialResponse;
+			var cred = response?.Credential;
+			var type = cred?.Type;
+			var data = cred?.Data;
+			if (type is not null && data is not null &&
+				(type.Equals(GoogleIdTokenCredential.TypeGoogleIdTokenCredential) || type.Equals(GoogleIdTokenCredential.TypeGoogleIdTokenSiwgCredential)))
+			{
 				try
 				{
-					var task = GoogleSignIn.GetSignedInAccountFromIntent(data);
-					var account = task?.Result as GoogleSignInAccount;
-					Trace.TraceInformation(account is null
-						? "Google sign-in: account result is null"
-						: "Google sign-in: account result received");
-					tcs.TrySetResult(account);
+					var googleIdTokenCredential = GoogleIdTokenCredential.CreateFrom(data);
+					var idToken = googleIdTokenCredential?.IdToken;
+					Trace.TraceInformation(string.IsNullOrEmpty(idToken)
+						? "Google sign-in: GoogleIdTokenCredential returned empty token"
+						: "Google sign-in: GoogleIdTokenCredential returned token");
+					return idToken ?? string.Empty;
 				}
-				catch (Exception ex)
+				catch (GoogleIdTokenParsingException)
 				{
-					Trace.TraceError($"Google sign-in: GetSignedInAccountFromIntent failed - {ex.Message}");
-					tcs.TrySetException(ex);
-				}
-				finally
-				{
-					MainActivity.ActivityResult -= OnActivityResult;
+					Trace.TraceError("Google sign-in: failed to parse GoogleIdTokenCredential from bundle");
+					return string.Empty;
 				}
 			}
+
+			Trace.TraceWarning("Google sign-in: CredentialManager returned non-GoogleIdTokenCredential or null");
+			return string.Empty;
 		}
-
-		MainActivity.ActivityResult += OnActivityResult;
-
-		// Configure Google Sign-In
-		var clientIdResId = activity.Resources?.GetIdentifier("default_web_client_id", "string", activity.PackageName) ?? 0;
-		var webClientId = clientIdResId != 0 ? activity.GetString(clientIdResId) : "";
-
-		Trace.TraceInformation($"Google sign-in: resolving default_web_client_id resource (id={clientIdResId})");
-
-		var gsoBuilder = new GoogleSignInOptions.Builder(GoogleSignInOptions.DefaultSignIn).RequestEmail();
-		if (!string.IsNullOrEmpty(webClientId))
+		catch (Java.Lang.Exception jex)
 		{
-			Trace.TraceInformation("Google sign-in: requesting IdToken with resolved web client id");
-			gsoBuilder = gsoBuilder.RequestIdToken(webClientId);
+			Trace.TraceError($"Google sign-in: CredentialManager Java exception - {jex.Message}");
+			return string.Empty;
 		}
-		var gso = gsoBuilder.Build();
-
-		var googleSignInClient = GoogleSignIn.GetClient(activity, gso);
-		var signInIntent = googleSignInClient.SignInIntent;
-		Trace.TraceInformation("Google sign-in: launching GoogleSignIn intent (requestCode=9001)");
-		activity.StartActivityForResult(signInIntent, 9001);
-
-		return tcs.Task;
+		catch (OperationCanceledException)
+		{
+			Trace.TraceWarning("Google sign-in: operation canceled");
+			return string.Empty;
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Google sign-in: CredentialManager error - {ex.Message}");
+			return string.Empty;
+		}
 	}
+}
+
+class CredentialCallback(Action<Java.Lang.Object?> onResult, Action<Java.Lang.Object?> onError) : Java.Lang.Object, ICredentialManagerCallback
+{
+	readonly Action<Java.Lang.Object?> onResult = onResult;
+	readonly Action<Java.Lang.Object?> onError = onError;
+
+	public void OnResult(Java.Lang.Object? result) => onResult(result);
+	public void OnError(Java.Lang.Object e) => onError(e);
 }
