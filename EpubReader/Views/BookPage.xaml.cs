@@ -305,7 +305,6 @@ public partial class BookPage : ContentPage
 			System.Diagnostics.Trace.TraceInformation("Not an internal link to handle");
 			return;
 		}
-		System.Diagnostics.Trace.TraceInformation("Handling internal link to jump to chapter");
 		var urlParts = url.Split('?')[1].Split('#')[0];
 				if (!string.IsNullOrEmpty(urlParts))
 				{
@@ -313,7 +312,6 @@ public partial class BookPage : ContentPage
 					{
 						urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
 					}
-					System.Diagnostics.Trace.TraceInformation($"Jumping to chapter file: {urlParts}");
 				
 			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 					if (chapter is null)
@@ -373,7 +371,6 @@ public partial class BookPage : ContentPage
 	{
 		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"),
 			out int parsedPage) ? parsedPage : 0;
-		System.Diagnostics.Trace.TraceInformation($"Handling WebView action: {methodName}");
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
@@ -521,106 +518,21 @@ public partial class BookPage : ContentPage
 		var pageLoaded = false;
 		try
 		{
+			token.ThrowIfCancellationRequested();
 			var bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
-
-			// Get cloud progress (which checks local cache first)
 			var cloud = await syncService.GetProgressAsync(bookId, token);
 
-			// Backfill from legacy Book fields if no progress record yet
-			if (cloud is null && (book.CurrentChapter > 0 || book.CurrentPage > 0))
+			if (cloud is null)
 			{
-				var progress = new ReadingProgress
-				{
-					BookId = bookId,
-					CurrentChapter = book.CurrentChapter,
-					CurrentPage = book.CurrentPage,
-					LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
-					DeviceId = string.Empty,
-					DeviceName = string.Empty,
-					IsSynced = false
-				};
-				await syncService.SaveProgressAsync(progress, token);
+				await BackfillLegacyProgressIfNeededAsync(bookId, token);
 			}
-			else if (cloud is not null)
+			else
 			{
-				// If cloud progress differs from the current (local) book position, ask the user
-				if (cloud.CurrentChapter != book.CurrentChapter || cloud.CurrentPage != book.CurrentPage)
-				{
-					var localChapterTitle = (book.CurrentChapter >= 0 && book.CurrentChapter < book.Chapters.Count)
-						? book.Chapters[book.CurrentChapter].Title
-						: "Unknown";
-					var cloudChapterTitle = (cloud.CurrentChapter >= 0 && cloud.CurrentChapter < book.Chapters.Count)
-						? book.Chapters[cloud.CurrentChapter].Title
-						: "Unknown";
-
-					// Build synthetic page info strings for display without mutating the real book
-					var tempLocal = new Book
-					{
-						Chapters = book.Chapters,
-						CurrentChapter = book.CurrentChapter,
-						CurrentPage = book.CurrentPage
-					};
-					var tempCloud = new Book
-					{
-						Chapters = book.Chapters,
-						CurrentChapter = cloud.CurrentChapter,
-						CurrentPage = cloud.CurrentPage
-					};
-
-					var localSynthetic = WebViewHelper.GetSyntheticPageInfo(tempLocal);
-					var cloudSynthetic = WebViewHelper.GetSyntheticPageInfo(tempCloud);
-
-					var localInfo = $"{localChapterTitle} — {localSynthetic}";
-					var cloudInfo = $"{cloudChapterTitle} — {cloudSynthetic}";
-
-					var moveToCloud = await Dispatcher.DispatchAsync(async () =>
-						await DisplayAlertAsync(
-							"Synced position found",
-							$"A different synced position was found for this book.\n\nCurrent (local): {localInfo}\nRemote (synced): {cloudInfo}\n\nMove to the remote position?",
-							"Move",
-							"Keep Local"
-						)
-					);
-
-					if (moveToCloud)
-					{
-						await ApplyProgressToUiAsync(cloud);
-						pageLoaded = true;
-						try
-						{
-							await ViewModel.ShowInfoToastAsync("Moved to latest synced position");
-						}
-						catch (Exception ex)
-						{
-							Trace.TraceWarning($"ShowInfoToastAsync failed: {ex.Message}");
-						}
-					}
-					else
-					{
-						// Keep local: push local progress up to cloud
-						await SaveProgressAsync(token);
-						try
-						{
-							await ViewModel.ShowInfoToastAsync("Saved local progress to cloud");
-						}
-						catch (Exception ex)
-						{
-							Trace.TraceWarning($"ShowInfoToastAsync failed: {ex.Message}");
-						}
-					}
-				}
-				else
-				{
-					// Cloud and local match, just apply (loads page)
-					await ApplyProgressToUiAsync(cloud);
-					pageLoaded = true;
-				}
+				pageLoaded = await ResolveProgressAsync(cloud, token);
 			}
 
 			pageLabel.Text = await GetCurrentPageInfoAsync();
-			// mark sync complete and attempt to hide overlay if render/settings also finished
 			progressSyncComplete = true;
-			Trace.TraceInformation($"BookPage: LoadAndMergeProgressAsync - progressSyncComplete set true, pageLoaded={pageLoaded}");
 			Dispatcher.Dispatch(() => HideNativeOverlay());
 			return pageLoaded;
 		}
@@ -633,6 +545,101 @@ public partial class BookPage : ContentPage
 			System.Diagnostics.Trace.TraceError($"Failed to load progress: {ex.Message}");
 		}
 		return pageLoaded;
+	}
+
+	async Task BackfillLegacyProgressIfNeededAsync(string bookId, CancellationToken token)
+	{
+		if (book.CurrentChapter <= 0 && book.CurrentPage <= 0)
+		{
+			return;
+		}
+		var progress = new ReadingProgress
+		{
+			BookId = bookId,
+			CurrentChapter = book.CurrentChapter,
+			CurrentPage = book.CurrentPage,
+			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
+			DeviceId = string.Empty,
+			DeviceName = string.Empty,
+			IsSynced = false
+		};
+		await syncService.SaveProgressAsync(progress, token);
+	}
+
+	async Task<bool> ResolveProgressAsync(ReadingProgress cloud, CancellationToken token)
+	{
+		if (cloud.CurrentChapter == book.CurrentChapter && cloud.CurrentPage == book.CurrentPage)
+		{
+			await ApplyProgressToUiAsync(cloud);
+			return true;
+		}
+
+		var (localInfo, cloudInfo) = BuildProgressComparisonStrings(cloud);
+		var moveToCloud = await AskMoveToCloudAsync(localInfo, cloudInfo);
+		if (moveToCloud)
+		{
+			await ApplyProgressToUiAsync(cloud);
+			await TryShowInfoAsync("Moved to latest synced position");
+			return true;
+		}
+
+		await SaveProgressAsync(token);
+		await TryShowInfoAsync("Saved local progress to cloud");
+		return false;
+	}
+
+	(string localInfo, string cloudInfo) BuildProgressComparisonStrings(ReadingProgress cloud)
+	{
+		var localChapterTitle = (book.CurrentChapter >= 0 && book.CurrentChapter < book.Chapters.Count)
+			? book.Chapters[book.CurrentChapter].Title
+			: "Unknown";
+		var cloudChapterTitle = (cloud.CurrentChapter >= 0 && cloud.CurrentChapter < book.Chapters.Count)
+			? book.Chapters[cloud.CurrentChapter].Title
+			: "Unknown";
+
+		var tempLocal = new Book
+		{
+			Chapters = book.Chapters,
+			CurrentChapter = book.CurrentChapter,
+			CurrentPage = book.CurrentPage
+		};
+		var tempCloud = new Book
+		{
+			Chapters = book.Chapters,
+			CurrentChapter = cloud.CurrentChapter,
+			CurrentPage = cloud.CurrentPage
+		};
+
+		var localSynthetic = WebViewHelper.GetSyntheticPageInfo(tempLocal);
+		var cloudSynthetic = WebViewHelper.GetSyntheticPageInfo(tempCloud);
+
+		var localInfo = $"{localChapterTitle} — {localSynthetic}";
+		var cloudInfo = $"{cloudChapterTitle} — {cloudSynthetic}";
+		return (localInfo, cloudInfo);
+	}
+
+	async Task<bool> AskMoveToCloudAsync(string localInfo, string cloudInfo)
+	{
+		return await Dispatcher.DispatchAsync(async () =>
+			await DisplayAlertAsync(
+				"Synced position found",
+				$"A different synced position was found for this book.\n\nCurrent (local): {localInfo}\nRemote (synced): {cloudInfo}\n\nMove to the remote position?",
+				"Move",
+				"Keep Local"
+			)
+		);
+	}
+
+	async Task TryShowInfoAsync(string message)
+	{
+		try
+		{
+			await ViewModel.ShowInfoToastAsync(message);
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"ShowInfoToastAsync failed: {ex.Message}");
+		}
 	}
 
 	async Task SaveProgressAsync(CancellationToken token)

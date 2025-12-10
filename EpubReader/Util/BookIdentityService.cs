@@ -47,16 +47,14 @@ public static class BookIdentityService
 	static async Task<string> ComputeFileHashAsync(string path, CancellationToken token)
 	{
 		await using var stream = File.OpenRead(path);
-		using var sha = SHA256.Create();
-		var hash = await sha.ComputeHashAsync(stream, token).ConfigureAwait(false);
+		var hash = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
 		return Convert.ToHexString(hash).ToLowerInvariant();
 	}
 
 	static string ComputeTextHash(string text)
 	{
-		using var sha = SHA256.Create();
 		var bytes = Encoding.UTF8.GetBytes(text?.ToLowerInvariant() ?? string.Empty);
-		var hash = sha.ComputeHash(bytes);
+		var hash = SHA256.HashData(bytes);
 		return Convert.ToHexString(hash).ToLowerInvariant();
 	}
 }

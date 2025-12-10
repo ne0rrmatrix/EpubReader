@@ -43,7 +43,6 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		dispatcher.Dispatch(() =>
 		{
 			SettingsApplied?.Invoke();
-			Trace.TraceInformation("WebViewHelper: OnSettingsClickedAsync - SettingsApplied invoked");
 		});
 	}
 

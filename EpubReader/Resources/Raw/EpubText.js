@@ -628,19 +628,19 @@ function sendToNativeMessage(obj) {
         const base64Json = btoa(json);
         console.log('Prepared native message payload:', base64Json);
         
-        if (window.jsBridge && platform.isAndroid) {
+        if (globalThis.jsBridge && platform.isAndroid) {
             console.info('Sending message to native bridge via window.NativeBridge.InvokeAction:', json);
-            window.jsBridge.sendMessageToCSharp(base64Json);
+            globalThis.jsBridge.sendMessageToCSharp(base64Json);
             return;
         }
         if(platform.isWindows){
             console.info('Sending message to native bridge via chrome.webview.postMessage:', json);
-            window.chrome.webview.postMessage(base64Json);
+            globalThis.chrome.webview.postMessage(base64Json);
             return;
         }
         if(platform.isIOS || platform.isMac){
             console.info('Sending message to native bridge via window.webkit.messageHandlers.webwindowinterop.postMessage:', json);
-            window.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
+            globalThis.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
             return;
         }
         // If we reach here, bridge not found or calls failed. Use fallback URL scheme for compatibility.
