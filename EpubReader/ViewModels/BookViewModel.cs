@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Maui.Extensions;
+﻿using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Extensions;
 
 namespace EpubReader.ViewModels;
 
@@ -96,9 +97,20 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService));
 		PopupOptions options = new()
 		{
-			CanBeDismissedByTappingOutsideOfPopup = true
+			CanBeDismissedByTappingOutsideOfPopup = true,
 		};
-		await Shell.Current.ShowPopupAsync(popup, options, cancellation);
+
+		IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(popup, options, cancellation);
+		if (result.WasDismissedByTappingOutsideOfPopup)
+		{
+			System.Diagnostics.Debug.WriteLine("Popup was dismissed by tapping outside of it.");
+			isPopupActive = false;
+		}
+		else
+		{
+			System.Diagnostics.Debug.WriteLine("Popup was closed by other means.");
+			isPopupActive = false;
+		}
 	}
 
 	/// <summary>

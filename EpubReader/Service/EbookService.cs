@@ -320,7 +320,10 @@ public static partial class EbookService
 	{
 		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
 		var chaptersRef = readingOrder.ToList();
-
+		foreach (var chapter in chaptersRef)
+		{
+			System.Diagnostics.Debug.WriteLine($"Chapter FilePath: {chapter.FilePath}");
+		}
 		return await GetChapters(chaptersRef, book);
 	}
 
@@ -331,6 +334,7 @@ public static partial class EbookService
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
+			System.Diagnostics.Debug.WriteLine("Processing split chapters...");
 			await ProcessSplitChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
@@ -338,10 +342,12 @@ public static partial class EbookService
 		// Handle books with few non-split chapters
 		if (HasFewNonSplitChapters(chaptersRef))
 		{
+			System.Diagnostics.Debug.WriteLine("Processing book with few non-split chapters...");
 			await ProcessAllChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
 
+		System.Diagnostics.Debug.WriteLine("Processing standard non-split chapters...");
 		// Handle standard books with multiple non-split chapters
 		await ProcessNonSplitChapters(chaptersRef, book, chapters);
 		return chapters;
@@ -394,7 +400,11 @@ public static partial class EbookService
 	static async Task ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
-
+		if(nonSplitChapters.Count() != chaptersRef.Count)
+		{
+			System.Diagnostics.Debug.WriteLine("Warning: Chapter count mismatch after sorting.");
+			nonSplitChapters = chaptersRef;
+		}
 		foreach (var item in nonSplitChapters)
 		{
 			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);

@@ -36,6 +36,14 @@ public interface IDb
 	Task SaveBookData(Book book, CancellationToken cancellationToken = default);
 
 	/// <summary>
+	/// Updates only the reading progress fields for a book in the database.
+	/// </summary>
+	/// <param name="bookId">The Id of the book to update.</param>
+	/// <param name="currentChapter">The current chapter index.</param>
+	/// <param name="currentPage">The current page index.</param>
+	Task UpdateBookProgress(Guid bookId, int currentChapter, int currentPage, CancellationToken cancellationToken = default);
+
+	/// <summary>
 	/// Saves the specified settings to the persistent storage.
 	/// </summary>
 	/// <param name="settings">The settings to be saved. Cannot be null.</param>

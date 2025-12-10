@@ -14,7 +14,7 @@ using EpubReader.Util;
 /// respectively.</remarks>
 public partial class BookPage : ContentPage
 {
-	const string externalLinkPrefix = "https://runcsharp.jump/?";
+	const string externalLinkPrefix = "https://runcsharp.jump?";
 	const uint animationDuration = 200u;
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
@@ -42,11 +42,11 @@ public partial class BookPage : ContentPage
 		this.db = db;
 		this.syncService = syncService;
 		webViewHelper = new(webView, db, syncService);
-
+		
 		// Subscribe to webview helper lifecycle events to show/hide native overlay
 		webViewHelper.PageLoadStarted += OnWebViewPageLoadStarted;
 		webViewHelper.SettingsApplied += OnWebViewSettingsApplied;
-
+		
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
@@ -147,7 +147,6 @@ public partial class BookPage : ContentPage
 
 	void OnWebViewPageLoadStarted()
 	{
-		// Ensure overlay shown on UI thread
 		Dispatcher.Dispatch(() =>
 		{
 			ShowNativeOverlay();
@@ -158,8 +157,7 @@ public partial class BookPage : ContentPage
 	{
 		// Mark that webview settings / rendering work completed and try to hide overlay
 		pageSettingsApplied = true;
-		
-		if (progressSyncComplete && pageAtCorrectPosition && pageSettingsApplied)
+		if (progressSyncComplete && pageAtCorrectPosition)
 		{
 			Dispatcher.Dispatch(() => HideNativeOverlay());
 		}
@@ -205,8 +203,11 @@ public partial class BookPage : ContentPage
 	/// <param name="e">The event data containing information about the navigation event.</param>
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs? e)
 	{
-		await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
-		await webViewHelper.LoadPageAsync(pageLabel, book);
+		var pageLoaded = await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token).ConfigureAwait(false);
+		if (!pageLoaded)
+		{
+			await webViewHelper.LoadPageAsync(pageLabel, book).ConfigureAwait(false);
+		}
 	}
 
 	async Task StartLoadSequenceAsync()
@@ -237,6 +238,23 @@ public partial class BookPage : ContentPage
 	/// <returns></returns>
 	async Task HandleJavascriptAsync(string url)
 	{
+		if (!string.IsNullOrEmpty(url) && url.TrimStart().StartsWith('{'))
+		{
+			if (BookPageJsMessage.TryParse(url, out var msg))
+			{
+				var resolved = msg.ToRuncsharpUrl();
+				if (!string.IsNullOrEmpty(resolved))
+				{
+					url = resolved;
+					Trace.TraceInformation($"Parsed JS action: {msg.Action}");
+					Trace.TraceInformation($"Converted JS action to URL: {url}");
+				}
+			}
+			else
+			{
+				Trace.TraceWarning("Failed parsing JSON message from JS bridge");
+			}
+		}
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
@@ -282,20 +300,29 @@ public partial class BookPage : ContentPage
 
 	async Task TryHandleInternalLinkAsync(string url)
 	{
-		if (!url.Contains("https://runcsharp.jump/?https://demo/", StringComparison.InvariantCultureIgnoreCase))
+		if (!url.Contains("https://runcsharp.jump?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
+			System.Diagnostics.Trace.TraceInformation("Not an internal link to handle");
 			return;
 		}
-
+		System.Diagnostics.Trace.TraceInformation("Handling internal link to jump to chapter");
 		var urlParts = url.Split('?')[1].Split('#')[0];
 				if (!string.IsNullOrEmpty(urlParts))
 				{
-					var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
+					if(urlParts.Contains("https://demo/"))
+					{
+						urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
+					}
+					System.Diagnostics.Trace.TraceInformation($"Jumping to chapter file: {urlParts}");
+				
+			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 					if (chapter is null)
 					{
+						System.Diagnostics.Trace.TraceWarning("Chapter not found for internal link");
 						return;
 					}
-					book.CurrentChapter = book.Chapters.IndexOf(chapter);
+					System.Diagnostics.Trace.TraceInformation($"Found chapter: {chapter.Title}");
+			book.CurrentChapter = book.Chapters.IndexOf(chapter);
 					// Use helper to ensure native overlay is shown
 					await webViewHelper.LoadPageAsync(pageLabel, book);
 					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
@@ -308,7 +335,6 @@ public partial class BookPage : ContentPage
 		{
 			return;
 		}
-
 		var urlParts = url.Split('?');
 		if (urlParts.Length <= 1)
 		{
@@ -318,6 +344,7 @@ public partial class BookPage : ContentPage
 		var queryString = urlParts[1].Replace("http://", "https://");
 		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
 		{
+			System.Diagnostics.Trace.TraceInformation($"Opening external link: {queryString}");
 			await Launcher.OpenAsync(queryString);
 		}
 	}
@@ -331,19 +358,22 @@ public partial class BookPage : ContentPage
 		}
 
 		var funcToCall = urlParts[1].Split('?');
-		if (string.IsNullOrEmpty(funcToCall[0]) || funcToCall[0].Length <= 1)
+		var candidate = funcToCall[0];
+		if (string.IsNullOrEmpty(candidate))
 		{
 			return string.Empty;
 		}
 
-		return funcToCall[0][..^1]; // Assumes format like "method()"
+		// Extract a valid identifier at the start (handles "prev", "prev()", "menu()", etc.)
+		var m = System.Text.RegularExpressions.Regex.Match(candidate, "[A-Za-z_][A-Za-z0-9_]*", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+		return m.Success ? m.Value : string.Empty;
 	}
 
 	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
 		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"),
 			out int parsedPage) ? parsedPage : 0;
-
+		System.Diagnostics.Trace.TraceInformation($"Handling WebView action: {methodName}");
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
@@ -363,8 +393,6 @@ public partial class BookPage : ContentPage
 					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 				}
 				pageLabel.Text = await GetCurrentPageInfoAsync();
-				// JavaScript has reported page load and we've applied settings; mark that
-				// the WebView should be at the correct position now and try to hide overlay.
 				pageAtCorrectPosition = true;
 				Dispatcher.Dispatch(() => HideNativeOverlay());
 				break;
@@ -488,8 +516,9 @@ public partial class BookPage : ContentPage
 #endif
 	}
 
-	async Task LoadAndMergeProgressAsync(CancellationToken token)
+	async Task<bool> LoadAndMergeProgressAsync(CancellationToken token)
 	{
+		var pageLoaded = false;
 		try
 		{
 			var bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
@@ -514,13 +543,86 @@ public partial class BookPage : ContentPage
 			}
 			else if (cloud is not null)
 			{
-				await ApplyProgressToUiAsync(cloud);
+				// If cloud progress differs from the current (local) book position, ask the user
+				if (cloud.CurrentChapter != book.CurrentChapter || cloud.CurrentPage != book.CurrentPage)
+				{
+					var localChapterTitle = (book.CurrentChapter >= 0 && book.CurrentChapter < book.Chapters.Count)
+						? book.Chapters[book.CurrentChapter].Title
+						: "Unknown";
+					var cloudChapterTitle = (cloud.CurrentChapter >= 0 && cloud.CurrentChapter < book.Chapters.Count)
+						? book.Chapters[cloud.CurrentChapter].Title
+						: "Unknown";
+
+					// Build synthetic page info strings for display without mutating the real book
+					var tempLocal = new Book
+					{
+						Chapters = book.Chapters,
+						CurrentChapter = book.CurrentChapter,
+						CurrentPage = book.CurrentPage
+					};
+					var tempCloud = new Book
+					{
+						Chapters = book.Chapters,
+						CurrentChapter = cloud.CurrentChapter,
+						CurrentPage = cloud.CurrentPage
+					};
+
+					var localSynthetic = WebViewHelper.GetSyntheticPageInfo(tempLocal);
+					var cloudSynthetic = WebViewHelper.GetSyntheticPageInfo(tempCloud);
+
+					var localInfo = $"{localChapterTitle} — {localSynthetic}";
+					var cloudInfo = $"{cloudChapterTitle} — {cloudSynthetic}";
+
+					var moveToCloud = await Dispatcher.DispatchAsync(async () =>
+						await DisplayAlertAsync(
+							"Synced position found",
+							$"A different synced position was found for this book.\n\nCurrent (local): {localInfo}\nRemote (synced): {cloudInfo}\n\nMove to the remote position?",
+							"Move",
+							"Keep Local"
+						)
+					);
+
+					if (moveToCloud)
+					{
+						await ApplyProgressToUiAsync(cloud);
+						pageLoaded = true;
+						try
+						{
+							await ViewModel.ShowInfoToastAsync("Moved to latest synced position");
+						}
+						catch (Exception ex)
+						{
+							Trace.TraceWarning($"ShowInfoToastAsync failed: {ex.Message}");
+						}
+					}
+					else
+					{
+						// Keep local: push local progress up to cloud
+						await SaveProgressAsync(token);
+						try
+						{
+							await ViewModel.ShowInfoToastAsync("Saved local progress to cloud");
+						}
+						catch (Exception ex)
+						{
+							Trace.TraceWarning($"ShowInfoToastAsync failed: {ex.Message}");
+						}
+					}
+				}
+				else
+				{
+					// Cloud and local match, just apply (loads page)
+					await ApplyProgressToUiAsync(cloud);
+					pageLoaded = true;
+				}
 			}
 
 			pageLabel.Text = await GetCurrentPageInfoAsync();
 			// mark sync complete and attempt to hide overlay if render/settings also finished
 			progressSyncComplete = true;
+			Trace.TraceInformation($"BookPage: LoadAndMergeProgressAsync - progressSyncComplete set true, pageLoaded={pageLoaded}");
 			Dispatcher.Dispatch(() => HideNativeOverlay());
+			return pageLoaded;
 		}
 		catch (OperationCanceledException)
 		{
@@ -530,10 +632,23 @@ public partial class BookPage : ContentPage
 		{
 			System.Diagnostics.Trace.TraceError($"Failed to load progress: {ex.Message}");
 		}
+		return pageLoaded;
 	}
 
 	async Task SaveProgressAsync(CancellationToken token)
 	{
+		// Persist the local book position to the local database first so we can always
+		// distinguish local vs cloud positions.
+		try
+		{
+			// Update only the progress columns to avoid overwriting other book fields
+			await db.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, token);
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed updating local book progress in DB: {ex.Message}");
+		}
+
 		var syncId = await BookIdentityService.ComputeSyncIdAsync(book, token);
 		var progress = new ReadingProgress
 		{

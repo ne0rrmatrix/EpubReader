@@ -608,14 +608,45 @@ function handleMessage(event, platform) {
     if (data.startsWith("jump.")) {
         const href = data.substring(5);
         console.log("Jumping to:", href);
-        globalThis.location.href = `https://runcsharp.jump?${href}`;
+        sendToNativeMessage({ action: 'jump', href: href });
     } else if (data === "next") {
         handleNextCommand();
     } else if (data === "prev") {
         handlePrevCommand();
     } else if (data === "menu") {
         console.log("Received menu command.");
-        globalThis.location.href = 'https://runcsharp.menu?true';
+        sendToNativeMessage({ action: 'menu' });
+    }
+}
+
+// Helper: send to native bridge on Android using base64-encoded JSON, fallback to location.href scheme
+function sendToNativeMessage(obj) {
+    try {
+        const payload = (typeof obj === 'string') ? { action: obj } : obj;
+        const json = JSON.stringify(payload);
+        const platform = domUtils.detectPlatform();
+        const base64Json = btoa(json);
+        console.log('Prepared native message payload:', base64Json);
+        
+        if (window.jsBridge && platform.isAndroid) {
+            console.info('Sending message to native bridge via window.NativeBridge.InvokeAction:', json);
+            window.jsBridge.sendMessageToCSharp(base64Json);
+            return;
+        }
+        if(platform.isWindows){
+            console.info('Sending message to native bridge via chrome.webview.postMessage:', json);
+            window.chrome.webview.postMessage(base64Json);
+            return;
+        }
+        if(platform.isIOS || platform.isMac){
+            console.info('Sending message to native bridge via window.webkit.messageHandlers.webwindowinterop.postMessage:', json);
+            window.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
+            return;
+        }
+        // If we reach here, bridge not found or calls failed. Use fallback URL scheme for compatibility.
+        console.info('Using fallback URL scheme for native message:', json);
+    } catch (ex) {
+        console.error('sendToNativeMessage failed', ex);
     }
 }
 
@@ -633,7 +664,7 @@ function handleNextCommand() {
 
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
-        globalThis.location.href = 'https://runcsharp.next?true';
+        sendToNativeMessage({ action: 'next' });
     } else {
         navigationUtils.scrollRight(platform);
     }
@@ -653,7 +684,7 @@ function handlePrevCommand() {
 
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
-        globalThis.location.href = 'https://runcsharp.prev?true';
+        sendToNativeMessage({ action: 'prev' });
     } else {
         navigationUtils.scrollLeft(platform);
     }
@@ -732,7 +763,7 @@ function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
     console.log(`Updating character position: ${characterPosition}`);
     // Notify C# code about the character position change
-    globalThis.location.href = `https://runcsharp.characterposition?${characterPosition}`;
+    sendToNativeMessage({ action: 'characterposition', position: characterPosition });
 }
 
 
@@ -780,7 +811,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 100); // Small delay to ensure content is fully rendered
             }
 
-            globalThis.location.href = 'https://runcsharp.pageLoad?true';
+            sendToNativeMessage({ action: 'pageload', value: true });
         } catch (error) {
             console.error("Error during iframe onload:", error);
         }

@@ -42,6 +42,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.TextZoom = 100;
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
+		handler.PlatformView.AddJavascriptInterface(new JSBridge(), "jsBridge");
 	}
 
 	/// <summary>

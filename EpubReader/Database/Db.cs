@@ -161,6 +161,23 @@ public partial class Db : IDb
 	}
 
 	/// <summary>
+	/// Updates only the CurrentChapter and CurrentPage columns for the specified book.
+	/// </summary>
+	public async Task UpdateBookProgress(Guid bookId, int currentChapter, int currentPage, CancellationToken cancellationToken = default)
+	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
+		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
+		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
+	}
+
+	/// <summary>
 	/// Removes all settings from the data store.
 	/// </summary>
 	/// <remarks>This method deletes all entries of type <c>Settings</c> from the connected data store. Ensure that

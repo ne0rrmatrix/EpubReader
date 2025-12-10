@@ -1,4 +1,6 @@
-﻿using Microsoft.Maui.Handlers;
+﻿using System.Text;
+using Foundation;
+using Microsoft.Maui.Handlers;
 using WebKit;
 
 namespace EpubReader.Controls;
@@ -83,4 +85,28 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	{
 		decisionHandler(WKNavigationActionPolicy.Allow);
 	}
+}
+
+public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
+{
+    public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
+    {
+        // 'message.Body' contains the data sent from JavaScript
+        if (message.Name == "webwindowinterop")
+        {
+            Console.WriteLine($"Received message from WKWebView: {message.Body}");
+            if (string.IsNullOrEmpty(message.Body?.ToString()))
+			{
+				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
+				return;
+			}
+			var bytes = Convert.FromBase64String(message.Body.ToString());
+			var json = Encoding.UTF8.GetString(bytes);
+			System.Diagnostics.Trace.TraceInformation($"Decoded message: {json}");
+			Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() =>
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json));
+			});
+        }
+    }
 }

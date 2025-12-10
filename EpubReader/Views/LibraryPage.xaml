@@ -21,6 +21,12 @@
             Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=AddFolderCommand}"
             IconImageSource="folder_24dp.png"
             Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=SettingsCommand}"
+            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
+                                                                Default=settings_lightmode.png},
+                                              Dark=settings_lightmode.png}"
+            Order="Primary" />
     </ContentPage.ToolbarItems>
     <Grid>
         <Grid.RowDefinitions>

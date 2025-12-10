@@ -1,4 +1,5 @@
-﻿using EpubReader.Extensions;
+﻿using System.Diagnostics;
+using EpubReader.Extensions;
 
 namespace EpubReader.Util;
 
@@ -10,6 +11,7 @@ namespace EpubReader.Util;
 /// <param name="syncService"></param>
 public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncService)
 {
+	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
 	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
@@ -29,26 +31,20 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		await SetColorSchemeAsync(settings);
 		await SetFontDataAsync(settings);
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
-
-		await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')");
+		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')"));
 		if (OperatingSystem.IsWindows())
 		{
 			var width = await GetWidthAsync(settings);
-			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');");
+			dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');"));
 		}
 
-		await webView.EvaluateJavaScriptAsync("gotoEnd();");
-		await webView.EvaluateJavaScriptAsync("getPageCount()");
-
-		// Signal the UI that native settings have been applied and the overlay may be hidden
-		try
+		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync("gotoEnd();"));
+		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync("getPageCount()"));
+		dispatcher.Dispatch(() =>
 		{
 			SettingsApplied?.Invoke();
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Error raising SettingsApplied event: {ex.Message}");
-		}
+			Trace.TraceInformation("WebViewHelper: OnSettingsClickedAsync - SettingsApplied invoked");
+		});
 	}
 
 	/// <summary>
@@ -64,10 +60,9 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 #elif IOS || MACCATALYST
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif
-		// notify UI overlay that a new page load is starting
-		PageLoadStarted?.Invoke();
-		await webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');");
-		WebViewHelper.UpdatePageLabel(label, book);
+		dispatcher.Dispatch(() => PageLoadStarted?.Invoke());
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');"));
+		UpdatePageLabel(label, book);
 	}
 
 	/// <summary>
@@ -100,7 +95,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			book.CurrentChapter--;
 			book.CurrentPage = 0;
 			await SaveProgressAsync(book);
-			await webView.EvaluateJavaScriptAsync("setPreviousPage()");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("setPreviousPage()"));
 			await LoadPageAsync(label, book);
 		}
 	}
@@ -110,7 +105,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// </summary>
 	/// <param name="label">The label to update.</param>
 	/// <param name="book">The book to get page information for.</param>
-	public static void UpdatePageLabel(Label label, Book book)
+	public void UpdatePageLabel(Label label, Book book)
 	{
 		try
 		{
@@ -118,13 +113,13 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			var totalPages = book.GetTotalPageCount();
 			var chapterTitle = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
 
-			label.Text = $"{chapterTitle} (Page {currentPage} of {totalPages})";
+			dispatcher.Dispatch(() => label.Text = $"{chapterTitle} (Page {currentPage} of {totalPages})");
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error updating page label: {ex.Message}");
 			// Fallback to chapter title only if synthetic page calculation fails
-			label.Text = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+			dispatcher.Dispatch(() => label.Text = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty);
 		}
 	}
 
@@ -165,15 +160,15 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		if (string.IsNullOrEmpty(settings.BackgroundColor) && string.IsNullOrEmpty(settings.TextColor))
 		{
-			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__backgroundColor')");
-			await webView.EvaluateJavaScriptAsync($"setBackgroundColor('{string.Empty}')");
-			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__textColor')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__backgroundColor')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setBackgroundColor('{string.Empty}')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__textColor')"));
 		}
 		else
 		{
-			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')");
-			await webView.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')");
-			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__backgroundColor', '{settings.BackgroundColor}')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setBackgroundColor('{settings.BackgroundColor}')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textColor', '{settings.TextColor}')"));
 		}
 	}
 
@@ -191,21 +186,21 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		if (!string.IsNullOrEmpty(settings.FontFamily))
 		{
-			await webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')");
-			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')"));
 		}
 		else
 		{
-			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontOverride')");
-			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontFamily')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontOverride')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontFamily')"));
 		}
 		if (settings.FontSize > 0)
 		{
-			await webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')"));
 		}
 		else
 		{
-			await webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontSize')");
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontSize')"));
 		}
 	}
 
@@ -219,7 +214,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <returns>A task that represents the asynchronous operation. The task result contains the calculated width as an integer.</returns>
 	async Task<int> GetWidthAsync(Settings settings)
 	{
-		var result = await webView.EvaluateJavaScriptAsync("getWidth()");
+		var result = await dispatcher.DispatchAsync	(() => webView.EvaluateJavaScriptAsync("getWidth()"));
 		var fontSize = settings.FontSize > 0 ? settings.FontSize * 10 : 30;
 
 		if (settings.SupportMultipleColumns)
@@ -242,6 +237,17 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			DeviceName = string.Empty,
 			IsSynced = false
 		};
+
+		// Persist the local book position to the local DB so local and cloud positions can be distinguished.
+		try
+		{
+			// Update only progress fields so we don't overwrite cover/image/title accidentally.
+			await database.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, CancellationToken.None);
+		}
+		catch (Exception ex)
+		{
+			logger.Error($"Failed to persist local book position: {ex.Message}");
+		}
 
 		// SaveProgressAsync now handles local storage and debouncing internally via Rx
 		await syncServiceInstance.SaveProgressAsync(progress, CancellationToken.None);

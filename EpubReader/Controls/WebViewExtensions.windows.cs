@@ -12,7 +12,7 @@ namespace EpubReader.Controls;
 /// conjunction with the <see cref="IWebViewHandler"/> interface.</remarks>
 public static partial class WebViewExtensions
 {
-	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	static readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	static IWebViewHandler? webViewHandler;
 
 	/// <summary>
@@ -40,6 +40,15 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested -= CoreWebView2_WebResourceRequested;
 		webViewHandler.PlatformView.CoreWebView2.DownloadStarting -= CoreWebView2_DownloadStarting;
+		webViewHandler.PlatformView.CoreWebView2.WebMessageReceived -= MessageReceived;
+	}
+
+	static void MessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+	{
+		var rawString = args.TryGetWebMessageAsString();
+		var bytes = Convert.FromBase64String(rawString);
+        var json = System.Text.Encoding.UTF8.GetString(bytes);
+		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
 	}
 
 	/// <summary>
@@ -67,6 +76,7 @@ public static partial class WebViewExtensions
 		settings.AreHostObjectsAllowed = true;
 		settings.IsWebMessageEnabled = true;
 		settings.IsScriptEnabled = true;
+		webViewHandler.PlatformView.CoreWebView2.WebMessageReceived += MessageReceived;
 		coreWebView.DownloadStarting += CoreWebView2_DownloadStarting;
 		coreWebView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
 		coreWebView.WebResourceRequested += CoreWebView2_WebResourceRequested;

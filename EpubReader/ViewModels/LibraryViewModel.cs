@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
 using EpubReader.Interfaces;
 using EpubReader.Models;
@@ -104,10 +105,16 @@ public partial class LibraryViewModel : BaseViewModel
 			Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true)
 				?? throw new InvalidOperationException("Error opening ebook");
 
-			Book.SyncId = existingBook.SyncId;
-			// Restore reading position from sync service (handles local cache and cloud)
-			await RestoreProgressAsync(existingBook);
+			// Ensure the Book has the existing DB Id immediately so any background saves
+			// (progress, webview helper) don't accidentally insert an incomplete record.
 			Book.Id = existingBook.Id;
+			Book.SyncId = existingBook.SyncId;
+
+			// Restore local reading position from the database so the book opens at the user's local position.
+			Book.CurrentChapter = existingBook.CurrentChapter;
+			Book.CurrentPage = existingBook.CurrentPage;
+			// Populate sync cache / cloud progress if available, but do NOT overwrite the Book's local position here.
+			await RestoreProgressAsync(existingBook);
 
 			StreamExtensions.Instance?.SetBook(Book);
 
@@ -149,11 +156,9 @@ public partial class LibraryViewModel : BaseViewModel
 			await syncService.SaveProgressAsync(progress, token);
 		}
 
-		if (progress is not null)
-		{
-			Book.CurrentChapter = progress.CurrentChapter;
-			Book.CurrentPage = progress.CurrentPage;
-		}
+		// Do not apply the remote progress to the opened Book here. BookPage will compare and prompt the user
+		// whether to move to the remote position. Leaving this method responsible only for ensuring the
+		// sync cache is populated and legacy backfill occurs.
 	}
 
 	/// <summary>
@@ -332,6 +337,30 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 	#endregion
+
+	[RelayCommand]
+	async Task Settings(CancellationToken cancellation = default)
+	{
+		try
+		{
+			var authenticationService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<AuthenticationService>() ?? throw new InvalidOperationException();
+			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService));
+			var settingsOptions = new PopupOptions
+			{
+				CanBeDismissedByTappingOutsideOfPopup = true,
+			};
+
+			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+			if (result.WasDismissedByTappingOutsideOfPopup)
+			{
+				Logger.Info("Settings popup dismissed by tapping outside.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.Error($"Error showing settings popup: {ex.Message}");
+		}
+	}
 
 }
 

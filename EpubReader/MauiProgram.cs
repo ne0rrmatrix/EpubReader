@@ -61,7 +61,10 @@ public static class MauiProgram
 
 		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
-	  (handler, view, args) => handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler)));
+	  (handler, view, args) =>
+	  {
+		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler));
+	  });
 #elif WINDOWS
 		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
@@ -69,7 +72,11 @@ public static class MauiProgram
 #elif IOS || MACCATALYST
 		WebViewHandler.PlatformViewFactory = (handler) =>
 		{
-			var config = new WKWebViewConfiguration();
+			var userContentController = new WKUserContentController();
+			var messageHandler = new MyWKScriptMessageHandler();
+			userContentController.AddScriptMessageHandler(messageHandler, "webwindowinterop"); // Register the handler with the name
+			var config = new WKWebViewConfiguration { UserContentController = userContentController };
+			//var config = new WKWebViewConfiguration();
 			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))
 			{
 				config.AllowsPictureInPictureMediaPlayback = true;
@@ -78,6 +85,9 @@ public static class MauiProgram
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
 			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
+			
+			
+			//var webView = new WKWebView(CGRect.Empty, config);
 
 			var webView = new CustomMauiWKWebView(CGRect.Empty, (WebViewHandler)handler, config)
 			{

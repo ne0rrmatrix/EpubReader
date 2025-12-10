@@ -112,6 +112,7 @@
                         Grid.Row="0"
                         Navigated="webView_Navigated"
                         Navigating="webView_Navigating"
+                        
                         Scale="1"
                         Source="{Binding Source}" />
 
