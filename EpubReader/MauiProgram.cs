@@ -76,7 +76,6 @@ public static class MauiProgram
 			var messageHandler = new MyWKScriptMessageHandler();
 			userContentController.AddScriptMessageHandler(messageHandler, "webwindowinterop"); // Register the handler with the name
 			var config = new WKWebViewConfiguration { UserContentController = userContentController };
-			//var config = new WKWebViewConfiguration();
 			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))
 			{
 				config.AllowsPictureInPictureMediaPlayback = true;
@@ -85,10 +84,7 @@ public static class MauiProgram
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
 			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
-			
-			
-			//var webView = new WKWebView(CGRect.Empty, config);
-
+		
 			var webView = new CustomMauiWKWebView(CGRect.Empty, (WebViewHandler)handler, config)
 			{
 				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),
