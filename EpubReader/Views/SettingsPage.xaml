@@ -155,6 +155,18 @@
                 Text="Sign Out"
                 WidthRequest="200" />
 
+            <!--  Delete Cloud Data (visible when authenticated)  -->
+            <Button
+                Command="{Binding DeleteCloudDataCommand}"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                IsVisible="{Binding IsAuthenticated}"
+                Text="Delete Cloud Data"
+                WidthRequest="200"
+                BackgroundColor="{StaticResource Reset}"
+                TextColor="{StaticResource White}"
+                BorderColor="{StaticResource Reset-Dark}" />
+
             <Button
                 HeightRequest="40"
                 HorizontalOptions="Center"

@@ -1,5 +1,3 @@
-using EpubReader.Models;
-
 namespace EpubReader.Interfaces;
 
 /// <summary>
@@ -7,6 +5,13 @@ namespace EpubReader.Interfaces;
 /// </summary>
 public interface ISyncService
 {
+	/// <summary>
+	/// Permanently deletes all cloud-synced data for the current user.
+	/// Should also clear any local sync cache/queue to prevent re-uploading.
+	/// </summary>
+	/// <param name="token">Cancellation token.</param>
+	Task DeleteAllCloudDataAsync(CancellationToken token = default);
+
 	/// <summary>
 	/// Raised when reading progress has been successfully synced to the cloud.
 	/// </summary>

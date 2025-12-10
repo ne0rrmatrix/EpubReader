@@ -12,6 +12,7 @@ namespace EpubReader.ViewModels;
 public partial class SettingsPageViewModel : BaseViewModel
 {
 	readonly AuthenticationService authenticationService;
+	readonly ISyncService syncService;
 	readonly List<EpubFonts> fonts = [
 		new EpubFonts { FontFamily = "Arial" },
 		new EpubFonts { FontFamily = "Times New Roman" },
@@ -60,9 +61,10 @@ public partial class SettingsPageViewModel : BaseViewModel
 	/// Initializes a new instance of the <see cref="SettingsPageViewModel"/> class.
 	/// Note: long-running async work is NOT started here. Call <see cref="InitializeAsync"/> from the view (OnAppearing/Loaded).
 	/// </summary>
-	public SettingsPageViewModel(AuthenticationService authenticationService)
+	public SettingsPageViewModel(AuthenticationService authenticationService, ISyncService syncService)
 	{
 		this.authenticationService = authenticationService;
+		this.syncService = syncService;
 		this.authenticationService.AuthStateChanged += OnAuthStateChanged;
 		InitializeAsync().SafeFireAndForget(onException: ex =>
 		{
@@ -135,6 +137,45 @@ public partial class SettingsPageViewModel : BaseViewModel
 		{
 			await authenticationService.SignOutAsync(cancellationToken);
 			await LoadAuthStatusAsync(cancellationToken);
+		}
+	}
+
+	[RelayCommand]
+	async Task DeleteCloudDataAsync(CancellationToken cancellationToken = default)
+	{
+		var page = Application.Current?.Windows[0]?.Page;
+		if (page is null)
+		{
+			return;
+		}
+
+		// Only allow when authenticated and not in local-only mode
+		await LoadAuthStatusAsync(cancellationToken);
+		if (!IsAuthenticated || IsLocalOnly)
+		{
+			await ShowInfoToastAsync("Cloud delete unavailable in local-only mode");
+			return;
+		}
+
+		var confirm = await page.DisplayAlertAsync(
+			"Delete Cloud Data",
+			"This will permanently delete your cloud-synced reading progress across all books for your account. This action cannot be undone.\n\nDo you want to continue?",
+			"Delete",
+			"Cancel");
+
+		if (!confirm)
+		{
+			return;
+		}
+
+		try
+		{
+			await syncService.DeleteAllCloudDataAsync(cancellationToken);
+			await ShowInfoToastAsync("Cloud data deleted");
+		}
+		catch (Exception ex)
+		{
+			await ShowErrorToastAsync($"Failed deleting cloud data: {ex.Message}");
 		}
 	}
 }

@@ -94,7 +94,9 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService));
+		var services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
+		var syncService = services.GetRequiredService<ISyncService>();
+		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = true,

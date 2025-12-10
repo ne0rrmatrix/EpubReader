@@ -55,6 +55,51 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 			.Subscribe(onNext: _ => { }));
 	}
 
+	public async Task DeleteAllCloudDataAsync(CancellationToken token = default)
+	{
+		token.ThrowIfCancellationRequested();
+		EnsureUserSet();
+
+		// Best-effort: clear local sync cache/queue so old items don't re-upload
+		try
+		{
+			if (localDb is null)
+			{
+				await InitializeLocalDbAsync(token);
+			}
+			await localDb!.DeleteAllAsync<ReadingProgress>().WaitAsync(token);
+			await localDb!.DeleteAllAsync<SyncQueueItem>().WaitAsync(token);
+			Trace.TraceInformation("Local sync cache cleared");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed clearing local sync cache: {ex.Message}");
+		}
+
+		// In local-only mode or when Firebase isn't configured, nothing to delete remotely
+		if (isLocalOnlyMode || !IsConfigured() || firebaseClient is null)
+		{
+			Trace.TraceInformation("DeleteAllCloudData: skipped remote delete (local-only or not configured)");
+			return;
+		}
+
+		try
+		{
+			// Remove all book progress under the user node
+			await firebaseClient
+				.Child(usersNode)
+				.Child(userId!)
+				.Child(booksNode)
+				.DeleteAsync();
+			Trace.TraceInformation($"Deleted all cloud data for user {userId}");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Failed deleting cloud data: {ex.Message}");
+			throw;
+		}
+	}
+
 	public async Task InitializeAsync(string userId, CancellationToken token = default)
 	{
 		token.ThrowIfCancellationRequested();

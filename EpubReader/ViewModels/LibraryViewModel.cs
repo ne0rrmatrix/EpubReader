@@ -343,8 +343,9 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			var authenticationService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<AuthenticationService>() ?? throw new InvalidOperationException();
-			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService));
+			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
+			var authenticationService = services.GetRequiredService<AuthenticationService>();
+			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
 			var settingsOptions = new PopupOptions
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
