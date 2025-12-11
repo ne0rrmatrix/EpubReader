@@ -55,6 +55,18 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	public partial bool IsNavMenuVisible { get; set; } = true;
 
 	/// <summary>
+	/// Gets or sets a value indicating whether reader mode is enabled (UI hidden).
+	/// </summary>
+	[ObservableProperty]
+	public partial bool IsReaderModeEnabled { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets the toolbar text for the reader mode toggle.
+	/// </summary>
+	[ObservableProperty]
+	public partial string ReaderModeToolbarText { get; set; } = "Hide Interface";
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
@@ -127,6 +139,16 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
 		IsNavMenuVisible = !IsNavMenuVisible;
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		Dispatcher.Dispatch(() => Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible));
+	}
+
+	/// <summary>
+	/// Toggles reader mode, hiding or showing supplemental interface chrome.
+	/// </summary>
+	[RelayCommand]
+	void ToggleReaderMode()
+	{
+		IsReaderModeEnabled = !IsReaderModeEnabled;
+		ReaderModeToolbarText = IsReaderModeEnabled ? "Show Interface" : "Hide Interface";
 	}
 }

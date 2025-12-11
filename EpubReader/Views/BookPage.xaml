@@ -18,6 +18,12 @@
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
+        <ToolbarItem
+            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}}"
+            Text="{Binding ReaderModeToolbarText}"
+            Command="{Binding ToggleReaderModeCommand}"
+            Order="Primary"
+            Priority="1" />
     </ContentPage.ToolbarItems>
             <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
                 <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
@@ -124,7 +130,15 @@
                                               WinUI=20,
                                               MacCatalyst=20}"
                         HeightRequest="30"
-                        HorizontalOptions="Center" />
+                        HorizontalOptions="Center">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label"
+                                         Binding="{Binding Path=BindingContext.IsReaderModeEnabled, Source={x:Reference CurrentPage}}"
+                                         Value="True">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
 
                     <!-- Native loading overlay shown while chapter renders and native settings apply -->
                     <Grid x:Name="NativeLoadingOverlay"

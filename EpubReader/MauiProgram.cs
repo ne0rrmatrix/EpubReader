@@ -7,6 +7,7 @@ using Microsoft.Maui.LifecycleEvents;
 using Syncfusion.Maui.Toolkit.Hosting;
 using LoggerFactory = MetroLog.LoggerFactory;
 using LogLevel = MetroLog.LogLevel;
+using Plugin.Maui.Audio;
 
 #if ANDROID
 using Plugin.Firebase.Core.Platforms.Android;
@@ -127,6 +128,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IDb, Db>();
 		builder.Services.AddSingleton<AuthenticationService>();
 		builder.Services.AddSingleton<ISyncService, FirebaseSyncService>();
+		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
 		LoggerFactory.Initialize(config);
 		builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();

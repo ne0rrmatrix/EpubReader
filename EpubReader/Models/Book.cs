@@ -1,4 +1,8 @@
-﻿using SQLite;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using SQLite;
+using EpubReader.Models.MediaOverlays;
 
 namespace EpubReader.Models;
 
@@ -98,6 +102,45 @@ public partial class Book : ObservableObject
 	/// </summary>
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
+
+	[Ignore]
+	public List<MediaOverlayDocument> MediaOverlays { get; set; } = [];
+
+	[Ignore]
+	public List<MediaOverlayAudioResource> MediaOverlayAudio { get; set; } = [];
+
+	[Ignore]
+	public string? MediaOverlayActiveClass { get; set; }
+
+	[Ignore]
+	public string? MediaOverlayPlaybackActiveClass { get; set; }
+
+	[Ignore]
+	public string? MediaOverlayNarrator { get; set; }
+
+	[Ignore]
+	public TimeSpan? MediaOverlayDuration { get; set; }
+
+	[Ignore]
+	public bool HasMediaOverlays => MediaOverlays.Count > 0;
+
+	[Ignore]
+	public bool HasNarratedMedia => HasMediaOverlays && MediaOverlayAudio.Count > 0;
+
+	public MediaOverlayAudioResource? FindMediaOverlayAudio(string? path)
+	{
+		if (!HasNarratedMedia || string.IsNullOrWhiteSpace(path))
+		{
+			return null;
+		}
+
+		var normalized = MediaOverlayPathHelper.Normalize(path);
+		var fileName = MediaOverlayPathHelper.ExtractFileName(path);
+
+		return MediaOverlayAudio.FirstOrDefault(resource =>
+			string.Equals(resource.NormalizedPath, normalized, StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(MediaOverlayPathHelper.ExtractFileName(resource.NormalizedPath), fileName, StringComparison.OrdinalIgnoreCase));
+	}
 
 	/// <summary>
 	/// Gets or sets the description text.

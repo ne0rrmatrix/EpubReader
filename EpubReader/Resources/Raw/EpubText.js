@@ -9,6 +9,59 @@ let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
+const mediaOverlayUi = {
+    root: null,
+    container: null,
+    eyebrow: null,
+    title: null,
+    narrator: null,
+    duration: null,
+    status: null,
+    toggleButton: null,
+    playButton: null,
+    prevButton: null,
+    nextButton: null,
+    state: {
+        supported: false,
+        enabled: false,
+        playing: false,
+        narrator: '',
+        durationSeconds: null,
+        chapterTitle: '',
+        segmentIndex: 0,
+        segmentCount: 0
+    }
+};
+
+const mediaOverlayHighlight = {
+    activeClass: null,
+    playbackClass: null,
+    elements: []
+};
+
+const mediaOverlayThemeDefaults = {
+    highlightBackground: 'rgba(79, 224, 181, 0.28)',
+    highlightText: '#041b15',
+    highlightOutline: 'rgba(79, 224, 181, 0.65)'
+};
+
+const mediaOverlayThemeState = { ...mediaOverlayThemeDefaults };
+let highlightThemeDirty = true;
+
+function logMediaOverlay(eventName, details) {
+    const entry = {
+        event: eventName || 'unknown',
+        details: details ?? null,
+        timestamp: new Date().toISOString()
+    };
+    console.log('[MediaOverlay]', entry);
+    try {
+        sendToNativeMessage({ action: 'mediaoverlaylog', message: JSON.stringify(entry) });
+    } catch (error) {
+        console.warn('Failed to forward media overlay log to native layer', error);
+    }
+}
+
 // New: navigation state to prevent interrupted smooth scrolling
 const navigationState = {
     isAnimating: false,
@@ -73,6 +126,57 @@ const domUtils = {
         }
     },
 };
+
+function requestMediaOverlayHighlightThemeRefresh() {
+    highlightThemeDirty = true;
+    applyMediaOverlayHighlightTheme();
+}
+
+function applyMediaOverlayHighlightTheme() {
+    if (!highlightThemeDirty) {
+        return;
+    }
+
+    const doc = domUtils.getIframeDocument();
+    if (!doc || !doc.head) {
+        return;
+    }
+
+    highlightThemeDirty = false;
+
+    const styleId = 'mediaOverlayHighlightTheme';
+    let styleNode = doc.getElementById(styleId);
+    if (!styleNode) {
+        styleNode = doc.createElement('style');
+        styleNode.id = styleId;
+        styleNode.setAttribute('data-generated-by', 'media-overlay');
+        doc.head.appendChild(styleNode);
+    }
+
+    const activeSelector = buildClassSelector(mediaOverlayHighlight.activeClass || '-epub-media-overlay-active');
+    const playbackSelector = buildClassSelector(mediaOverlayHighlight.playbackClass || '-epub-media-overlay-playing');
+
+    const highlightBackground = mediaOverlayThemeState.highlightBackground || mediaOverlayThemeDefaults.highlightBackground;
+    const highlightText = mediaOverlayThemeState.highlightText || mediaOverlayThemeDefaults.highlightText;
+    const highlightOutline = mediaOverlayThemeState.highlightOutline || mediaOverlayThemeDefaults.highlightOutline;
+
+    const rules = [];
+    if (activeSelector) {
+        rules.push(`${activeSelector} {
+    background-color: ${highlightBackground};
+    color: ${highlightText};
+    transition: background-color 0.18s ease, color 0.18s ease;
+}`);
+    }
+
+    if (playbackSelector) {
+        rules.push(`${playbackSelector} {
+    box-shadow: 0 0 0 2px ${highlightOutline};
+}`);
+    }
+
+    styleNode.textContent = rules.join('\n');
+}
 
 /**
  * Sets whether user interaction (scrolling, clicking) is enabled on the iframe
@@ -650,6 +754,529 @@ function sendToNativeMessage(obj) {
     }
 }
 
+function ensureMediaOverlayRoot() {
+    if (!mediaOverlayUi.root) {
+        mediaOverlayUi.root = document.getElementById('mediaOverlayPlayerRoot');
+        logMediaOverlay('Cached root element', { found: Boolean(mediaOverlayUi.root) });
+    }
+    return mediaOverlayUi.root;
+}
+
+function resetMediaOverlayDom() {
+    logMediaOverlay('Resetting UI element references');
+    mediaOverlayUi.container = null;
+    mediaOverlayUi.eyebrow = null;
+    mediaOverlayUi.title = null;
+    mediaOverlayUi.narrator = null;
+    mediaOverlayUi.duration = null;
+    mediaOverlayUi.status = null;
+    mediaOverlayUi.toggleButton = null;
+    mediaOverlayUi.playButton = null;
+    mediaOverlayUi.prevButton = null;
+    mediaOverlayUi.nextButton = null;
+}
+
+function ensureMediaOverlayUi() {
+    const root = ensureMediaOverlayRoot();
+    if (!root || !mediaOverlayUi.state.supported) {
+        logMediaOverlay('Skipping UI creation', { hasRoot: Boolean(root), supported: mediaOverlayUi.state.supported });
+        return null;
+    }
+
+    if (!mediaOverlayUi.container) {
+        logMediaOverlay('Building media overlay UI container');
+        buildMediaOverlayUi(root);
+    }
+
+    return mediaOverlayUi.container;
+}
+
+function buildMediaOverlayUi(root) {
+    logMediaOverlay('Constructing DOM nodes');
+    root.innerHTML = '';
+    const container = document.createElement('section');
+    container.className = 'media-overlay-player media-overlay-player--disabled';
+
+    const header = document.createElement('div');
+    header.className = 'media-overlay-player__header';
+
+    const titleWrap = document.createElement('div');
+
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'media-overlay-player__eyebrow';
+    eyebrow.textContent = 'Media Overlay';
+
+    const title = document.createElement('p');
+    title.className = 'media-overlay-player__title';
+    title.textContent = '';
+
+    titleWrap.append(eyebrow, title);
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'media-overlay-player__toggle';
+    toggleButton.setAttribute('aria-pressed', 'false');
+    toggleButton.textContent = 'Read Only';
+    toggleButton.addEventListener('click', handleMediaOverlayToggleClick);
+
+    header.append(titleWrap, toggleButton);
+
+    const meta = document.createElement('div');
+    meta.className = 'media-overlay-player__meta';
+
+    const narrator = document.createElement('span');
+    narrator.className = 'media-overlay-player__narrator';
+    narrator.textContent = 'Narrator unavailable';
+
+    const duration = document.createElement('span');
+    duration.className = 'media-overlay-player__duration';
+    duration.textContent = '';
+
+    meta.append(narrator, duration);
+
+    const controls = document.createElement('div');
+    controls.className = 'media-overlay-player__controls';
+
+    const status = document.createElement('span');
+    status.className = 'media-overlay-player__status';
+    status.textContent = 'Media overlay disabled';
+
+    const buttonsWrapper = document.createElement('div');
+    buttonsWrapper.className = 'media-overlay-player__buttons';
+
+    const prevButton = document.createElement('button');
+    prevButton.type = 'button';
+    prevButton.textContent = '<<';
+    prevButton.setAttribute('aria-label', 'Previous passage');
+    prevButton.addEventListener('click', handleMediaOverlayPrevClick);
+
+    const playButton = document.createElement('button');
+    playButton.type = 'button';
+    playButton.textContent = '>';
+    playButton.setAttribute('aria-label', 'Play narration');
+    playButton.addEventListener('click', handleMediaOverlayPlayClick);
+
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.textContent = '>>';
+    nextButton.setAttribute('aria-label', 'Next passage');
+    nextButton.addEventListener('click', handleMediaOverlayNextClick);
+
+    buttonsWrapper.append(prevButton, playButton, nextButton);
+    controls.append(status, buttonsWrapper);
+
+    container.append(header, meta, controls);
+    root.appendChild(container);
+
+    mediaOverlayUi.container = container;
+    mediaOverlayUi.eyebrow = eyebrow;
+    mediaOverlayUi.title = title;
+    mediaOverlayUi.narrator = narrator;
+    mediaOverlayUi.duration = duration;
+    mediaOverlayUi.status = status;
+    mediaOverlayUi.toggleButton = toggleButton;
+    mediaOverlayUi.prevButton = prevButton;
+    mediaOverlayUi.playButton = playButton;
+    mediaOverlayUi.nextButton = nextButton;
+}
+
+function sendMediaOverlayCommand(action, payload) {
+    if (!action) {
+        logMediaOverlay('Ignoring empty command request');
+        return;
+    }
+    const message = { action: action };
+    if (payload && typeof payload === 'object') {
+        Object.assign(message, payload);
+    }
+    logMediaOverlay('Dispatching command', message);
+    sendToNativeMessage(message);
+}
+
+function handleMediaOverlayToggleClick() {
+    if (!mediaOverlayUi.state.supported) {
+        logMediaOverlay('Toggle ignored, not supported');
+        return;
+    }
+    const nextValue = !mediaOverlayUi.state.enabled;
+    logMediaOverlay('Toggle pressed', { nextEnabled: nextValue });
+    sendMediaOverlayCommand('mediaoverlaytoggle', { enabled: nextValue });
+}
+
+function handleMediaOverlayPlayClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Play/pause ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    const action = mediaOverlayUi.state.playing ? 'mediaoverlaypause' : 'mediaoverlayplay';
+    logMediaOverlay('Play button pressed', { action: action });
+    sendMediaOverlayCommand(action);
+}
+
+function handleMediaOverlayPrevClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Prev ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    logMediaOverlay('Prev requested');
+    sendMediaOverlayCommand('mediaoverlayprev');
+}
+
+function handleMediaOverlayNextClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Next ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    logMediaOverlay('Next requested');
+    sendMediaOverlayCommand('mediaoverlaynext');
+}
+
+function setMediaOverlayVisibility(isSupported) {
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    const visible = Boolean(isSupported);
+    logMediaOverlay('Visibility updated', { supported: visible });
+    mediaOverlayUi.state.supported = visible;
+    root.dataset.visible = visible ? 'true' : 'false';
+
+    if (!visible) {
+        mediaOverlayUi.state.enabled = false;
+        mediaOverlayUi.state.playing = false;
+        mediaOverlayUi.state.segmentCount = 0;
+        mediaOverlayUi.state.segmentIndex = 0;
+        clearMediaOverlayHighlight();
+        root.innerHTML = '';
+        resetMediaOverlayDom();
+        return;
+    }
+
+    ensureMediaOverlayUi();
+}
+
+function setMediaOverlayReaderModeHidden(isHidden) {
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    const hidden = Boolean(isHidden);
+    root.dataset.readerModeHidden = hidden ? 'true' : 'false';
+    logMediaOverlay('Reader mode chrome visibility updated', { hidden });
+
+    if (!hidden && mediaOverlayUi.state.supported) {
+        ensureMediaOverlayUi();
+    }
+}
+
+function initializeMediaOverlayUi(config) {
+    const normalized = config || {};
+    logMediaOverlay('Initializing UI state', normalized);
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    if (typeof normalized.segmentCount === 'number') {
+        mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(normalized.segmentCount));
+    }
+    if (typeof normalized.enabled === 'boolean') {
+        mediaOverlayUi.state.enabled = normalized.enabled;
+    }
+    mediaOverlayUi.state.narrator = normalized.narrator || '';
+    mediaOverlayUi.state.durationSeconds = typeof normalized.durationSeconds === 'number' ? normalized.durationSeconds : null;
+    mediaOverlayUi.state.chapterTitle = normalized.chapterTitle || mediaOverlayUi.state.chapterTitle;
+
+    const container = ensureMediaOverlayUi();
+    if (!container) {
+        return;
+    }
+
+    if (mediaOverlayUi.title) {
+        mediaOverlayUi.title.textContent = mediaOverlayUi.state.chapterTitle || 'Narrated Section';
+    }
+
+    if (mediaOverlayUi.narrator) {
+        mediaOverlayUi.narrator.textContent = mediaOverlayUi.state.narrator
+            ? 'Narrated by ' + mediaOverlayUi.state.narrator
+            : 'Narrator unavailable';
+    }
+
+    if (mediaOverlayUi.duration) {
+        const formatted = formatDuration(mediaOverlayUi.state.durationSeconds);
+        mediaOverlayUi.duration.textContent = formatted ? 'Duration ' + formatted : '';
+    }
+
+    if (mediaOverlayUi.state.segmentCount === 0) {
+        mediaOverlayUi.state.segmentIndex = 0;
+    } else if (mediaOverlayUi.state.segmentIndex === 0) {
+        mediaOverlayUi.state.segmentIndex = 1;
+    }
+
+    updateMediaOverlayPlaybackState({
+        enabled: mediaOverlayUi.state.enabled,
+        playing: false,
+        segmentIndex: mediaOverlayUi.state.segmentIndex,
+        segmentCount: mediaOverlayUi.state.segmentCount,
+        chapterTitle: mediaOverlayUi.state.chapterTitle
+    });
+}
+
+function updateMediaOverlayPlaybackState(state) {
+    if (state) {
+       // logMediaOverlay('Playback state update received', state);
+    }
+    if (state) {
+        if (typeof state.enabled === 'boolean') {
+            mediaOverlayUi.state.enabled = state.enabled;
+        }
+        if (typeof state.playing === 'boolean') {
+            mediaOverlayUi.state.playing = state.playing;
+        }
+        if (typeof state.segmentIndex === 'number') {
+            mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
+        }
+        if (typeof state.segmentCount === 'number') {
+            mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(state.segmentCount));
+        }
+        if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
+            mediaOverlayUi.state.chapterTitle = state.chapterTitle;
+        }
+        if (Object.hasOwn(state, 'durationSeconds')) {
+            const value = state.durationSeconds;
+            mediaOverlayUi.state.durationSeconds = typeof value === 'number' ? value : null;
+        }
+    }
+
+    const container = ensureMediaOverlayUi();
+    if (!container) {
+        return;
+    }
+
+    if (mediaOverlayUi.title && mediaOverlayUi.state.chapterTitle) {
+        mediaOverlayUi.title.textContent = mediaOverlayUi.state.chapterTitle;
+    }
+
+    if (mediaOverlayUi.toggleButton) {
+        mediaOverlayUi.toggleButton.setAttribute('aria-pressed', mediaOverlayUi.state.enabled ? 'true' : 'false');
+        mediaOverlayUi.toggleButton.textContent = mediaOverlayUi.state.enabled ? 'Listening' : 'Read Only';
+    }
+
+    if (mediaOverlayUi.narrator) {
+        mediaOverlayUi.narrator.textContent = mediaOverlayUi.state.narrator
+            ? 'Narrated by ' + mediaOverlayUi.state.narrator
+            : 'Narrator unavailable';
+    }
+
+    if (mediaOverlayUi.duration) {
+        const formattedDuration = formatDuration(mediaOverlayUi.state.durationSeconds);
+        mediaOverlayUi.duration.textContent = formattedDuration ? 'Duration ' + formattedDuration : '';
+    }
+
+    const disableControls = !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0;
+
+    [mediaOverlayUi.prevButton, mediaOverlayUi.playButton, mediaOverlayUi.nextButton].forEach(button => {
+        if (button) {
+            button.disabled = disableControls;
+        }
+    });
+
+    if (mediaOverlayUi.playButton) {
+        mediaOverlayUi.playButton.textContent = mediaOverlayUi.state.playing ? '||' : '>';
+        mediaOverlayUi.playButton.setAttribute('aria-label', mediaOverlayUi.state.playing ? 'Pause narration' : 'Play narration');
+    }
+
+    if (mediaOverlayUi.status) {
+        if (mediaOverlayUi.state.segmentCount === 0) {
+            mediaOverlayUi.status.textContent = mediaOverlayUi.state.enabled
+                ? 'Audio not available for this section'
+                : 'Media overlay disabled';
+        } else {
+            const index = mediaOverlayUi.state.segmentIndex > 0 ? mediaOverlayUi.state.segmentIndex : 1;
+            mediaOverlayUi.status.textContent = 'Segment ' + index + ' of ' + mediaOverlayUi.state.segmentCount;
+        }
+    }
+
+    if (mediaOverlayUi.container) {
+        mediaOverlayUi.container.classList.toggle('media-overlay-player--disabled', disableControls);
+    }
+
+    applyPlaybackClassToHighlight();
+}
+
+function highlightMediaOverlayFragment(fragmentId, activeClass, playbackClass) {
+   // logMediaOverlay('Highlight request', { fragmentId, activeClass, playbackClass });
+    let selectorsChanged = false;
+    if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
+        mediaOverlayHighlight.activeClass = activeClass;
+        selectorsChanged = true;
+    }
+    if (playbackClass && mediaOverlayHighlight.playbackClass !== playbackClass) {
+        mediaOverlayHighlight.playbackClass = playbackClass;
+        selectorsChanged = true;
+    }
+    if (selectorsChanged) {
+        requestMediaOverlayHighlightThemeRefresh();
+    }
+
+    const doc = domUtils.getIframeDocument();
+    if (!doc || !fragmentId) {
+        return;
+    }
+
+    clearMediaOverlayHighlight(activeClass, playbackClass);
+
+    const target = doc.getElementById(fragmentId);
+    if (!target) {
+        console.warn('Media overlay fragment not found:', fragmentId);
+        return;
+    }
+
+    if (mediaOverlayHighlight.activeClass) {
+        target.classList.add(mediaOverlayHighlight.activeClass);
+    }
+    if (mediaOverlayHighlight.playbackClass && mediaOverlayUi.state.playing) {
+        target.classList.add(mediaOverlayHighlight.playbackClass);
+    }
+
+    mediaOverlayHighlight.elements = [target];
+
+    // Page advancement is handled by C# MediaOverlayPlaybackManager
+    // to prevent race conditions and duplicate page navigation.
+    // The C# code calls handleNextCommand() when needed before highlighting.
+}
+
+function clearMediaOverlayHighlight(activeClass, playbackClass) {
+  /*
+    logMediaOverlay('Clearing highlights', {
+        trackedElements: mediaOverlayHighlight.elements.length,
+        activeClass: activeClass || mediaOverlayHighlight.activeClass,
+        playbackClass: playbackClass || mediaOverlayHighlight.playbackClass
+    });
+    */
+    let selectorsChanged = false;
+    if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
+        mediaOverlayHighlight.activeClass = activeClass;
+        selectorsChanged = true;
+    }
+    if (playbackClass && mediaOverlayHighlight.playbackClass !== playbackClass) {
+        mediaOverlayHighlight.playbackClass = playbackClass;
+        selectorsChanged = true;
+    }
+    if (selectorsChanged) {
+        requestMediaOverlayHighlightThemeRefresh();
+    }
+
+    const doc = domUtils.getIframeDocument();
+    const active = mediaOverlayHighlight.activeClass;
+    const playback = mediaOverlayHighlight.playbackClass;
+
+    mediaOverlayHighlight.elements.forEach(element => {
+        if (!element) {
+            return;
+        }
+        if (active) {
+            element.classList.remove(active);
+        }
+        if (playback) {
+            element.classList.remove(playback);
+        }
+    });
+
+    mediaOverlayHighlight.elements = [];
+
+    if (!doc) {
+        return;
+    }
+
+    [active, playback]
+        .filter(Boolean)
+        .map(buildClassSelector)
+        .filter(Boolean)
+        .forEach(selector => {
+            doc.querySelectorAll(selector).forEach(node => {
+                if (active) {
+                    node.classList.remove(active);
+                }
+                if (playback) {
+                    node.classList.remove(playback);
+                }
+            });
+        });
+}
+
+function applyPlaybackClassToHighlight() {
+    if (!mediaOverlayHighlight.playbackClass || mediaOverlayHighlight.elements.length === 0) {
+        logMediaOverlay('No elements to update for playback class');
+        return;
+    }
+
+    mediaOverlayHighlight.elements = mediaOverlayHighlight.elements.filter(element => element && element.isConnected);
+    mediaOverlayHighlight.elements.forEach(element => {
+        if (!element) {
+            return;
+        }
+        if (mediaOverlayUi.state.playing) {
+            element.classList.add(mediaOverlayHighlight.playbackClass);
+        } else {
+            element.classList.remove(mediaOverlayHighlight.playbackClass);
+        }
+    });
+    /*
+    logMediaOverlay('Playback class applied', {
+        playing: mediaOverlayUi.state.playing,
+        elements: mediaOverlayHighlight.elements.length
+    });
+    */
+}
+
+function buildClassSelector(className) {
+    if (!className) {
+        return null;
+    }
+
+    if (globalThis.CSS && typeof globalThis.CSS.escape === 'function') {
+        return '.' + globalThis.CSS.escape(className);
+    }
+
+    return '.' + className.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
+}
+
+function formatDuration(seconds) {
+    if (seconds == null) {
+        return '';
+    }
+
+    const totalSeconds = Math.max(0, Math.floor(Number(seconds)));
+    if (Number.isNaN(totalSeconds)) {
+        return '';
+    }
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+
+    const twoDigit = value => (value < 10 ? '0' + value : String(value));
+    if (hours > 0) {
+        return hours + ':' + twoDigit(minutes) + ':' + twoDigit(remainingSeconds);
+    }
+    return minutes + ':' + twoDigit(remainingSeconds);
+}
+
 /**
  * Handles the "next" command
  */
@@ -777,6 +1404,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const root = document.documentElement;
     const platform = domUtils.detectPlatform();
 
+    mediaOverlayUi.root = document.getElementById('mediaOverlayPlayerRoot');
+    if (mediaOverlayUi.root) {
+        mediaOverlayUi.root.dataset.visible = 'false';
+        mediaOverlayUi.root.setAttribute('aria-live', 'polite');
+    }
+
     if (!frame || !body) {
         console.error("Required DOM elements (iframe with id 'page' or body with id 'body') not found.");
         return;
@@ -811,6 +1444,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 100); // Small delay to ensure content is fully rendered
             }
 
+            requestMediaOverlayHighlightThemeRefresh();
             sendToNativeMessage({ action: 'pageload', value: true });
         } catch (error) {
             console.error("Error during iframe onload:", error);
@@ -970,4 +1604,91 @@ function setBackgroundColor(color) {
  */
 function unsetBackgroundColor() {
     styleUtils.unsetBackgroundColor();
+}
+
+function setMediaOverlayTheme(theme) {
+    const values = (theme && typeof theme === 'object') ? theme : null;
+    const source = values ?? mediaOverlayThemeDefaults;
+
+    mediaOverlayThemeState.highlightBackground = source.highlightBackground || mediaOverlayThemeDefaults.highlightBackground;
+    mediaOverlayThemeState.highlightText = source.highlightText || mediaOverlayThemeDefaults.highlightText;
+    mediaOverlayThemeState.highlightOutline = source.highlightOutline || mediaOverlayThemeDefaults.highlightOutline;
+
+    requestMediaOverlayHighlightThemeRefresh();
+}
+
+/**
+ * Return the 0-based index of `fragmentId` within the list of currently visible
+ * segments on the active page, and the total count of visible segments.
+ *
+ * Usage from native: getVisibleSegmentPosition(fragmentId, ["f1","f2",...])
+ * Returns: { index: number, count: number }
+ */
+function getVisibleSegmentPosition(fragmentId, segmentList) {
+    try {
+        const doc = domUtils.getIframeDocument();
+        const win = domUtils.getContentWindow();
+        if (!doc || !win) {
+            return JSON.stringify({ index: -1, count: 0 });
+        }
+
+        const ids = Array.isArray(segmentList) ? segmentList : (segmentList ? JSON.parse(segmentList) : []);
+        const visible = [];
+        for (const id of ids) {
+            const el = doc.getElementById(id);
+            if (!el) continue;
+            const rect = el.getBoundingClientRect();
+            // Visible if any part intersects the viewport horizontally
+            if (rect.right >= 0 && rect.left <= win.innerWidth) {
+                visible.push(id);
+            }
+        }
+
+        const idx = visible.indexOf(fragmentId);
+        return JSON.stringify({ index: idx, count: visible.length });
+    } catch(e) {
+        console.error('getVisibleSegmentPosition failed', e);
+        return JSON.stringify({ index: -1, count: 0 });
+    }
+}
+
+/**
+ * Ensure the specified fragment is visible within the iframe viewport.
+ * If the fragment lies beyond the current visible area, use the existing
+ * pagination handlers so the host app can either scroll or ask native to
+ * advance pages. This mirrors the expectation from the C# side which calls
+ * this function before highlighting a fragment.
+ */
+function ensureFragmentVisibleUsingNext(fragmentId) {
+    try {
+        const doc = domUtils.getIframeDocument();
+        const win = domUtils.getContentWindow();
+        if (!doc || !win || !fragmentId) {
+            return;
+        }
+
+        const el = doc.getElementById(fragmentId);
+        if (!el) {
+            console.warn('ensureFragmentVisibleUsingNext: fragment not found', fragmentId);
+            return;
+        }
+
+        const rect = el.getBoundingClientRect();
+        // If any part of the element intersects the viewport horizontally it's visible
+        const isVisible = rect.right >= 0 && rect.left <= win.innerWidth;
+        if (isVisible) {
+            return;
+        }
+
+        // If element is to the right of viewport, request next; if to the left, request prev
+        if (rect.left > win.innerWidth) {
+            // move right/next (this may call native when at end of content)
+            handleNextCommand();
+        } else if (rect.right < 0) {
+            // move left/previous
+            handlePrevCommand();
+        }
+    } catch (e) {
+        console.error('ensureFragmentVisibleUsingNext failed', e);
+    }
 }

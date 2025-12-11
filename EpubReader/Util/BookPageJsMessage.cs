@@ -1,5 +1,6 @@
 namespace EpubReader.Util;
 
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
@@ -14,6 +15,10 @@ public sealed class BookPageJsMessage
     public string? Href { get; init; }
 
     public int? Position { get; init; }
+
+	public bool? Enabled { get; init; }
+
+	public string? Message { get; init; }
 
 	public static bool TryParse(string json, [NotNullWhen(true)] out BookPageJsMessage? message)
 	{
@@ -47,11 +52,26 @@ public sealed class BookPageJsMessage
 				pos = p;
 			}
 
+			bool? enabled = null;
+			if (root.TryGetProperty("enabled", out var enabledElem) &&
+				(enabledElem.ValueKind == JsonValueKind.True || enabledElem.ValueKind == JsonValueKind.False))
+			{
+				enabled = enabledElem.GetBoolean();
+			}
+
+			string? messageText = null;
+			if (root.TryGetProperty("message", out var messageElem))
+			{
+				messageText = messageElem.GetString();
+			}
+
 			message = new BookPageJsMessage
 			{
 				Action = action,
 				Href = href,
-				Position = pos
+				Position = pos,
+				Enabled = enabled,
+				Message = messageText
 			};
 			return true;
 		}
@@ -70,14 +90,20 @@ public sealed class BookPageJsMessage
 	public string? ToRuncsharpUrl()
     {
         var action = Action?.ToLowerInvariant() ?? string.Empty;
-        return action switch
+		return action switch
         {
             "jump" => Href is not null ? $"https://runcsharp.jump?{Href}" : null,
             "next" => "https://runcsharp.next?true",
             "prev" => "https://runcsharp.prev?true",
             "menu" => "https://runcsharp.menu?true",
             "pageload" => "https://runcsharp.pageLoad?true",
-            "characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
+			"characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
+			"mediaoverlaytoggle" => Enabled.HasValue ? $"https://runcsharp.mediaoverlaytoggle?{Enabled.Value}" : null,
+			"mediaoverlayplay" => "https://runcsharp.mediaoverlayplay?true",
+			"mediaoverlaypause" => "https://runcsharp.mediaoverlaypause?true",
+			"mediaoverlaynext" => "https://runcsharp.mediaoverlaynext?true",
+			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
+			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
             _ => null,
         };
     }

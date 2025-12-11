@@ -149,6 +149,11 @@ public class StreamExtensions
 			".ttf" => true,
 			".woff" => true,
 			".woff2" => true,
+			".mp3" => true,
+			".m4a" => true,
+			".aac" => true,
+			".wav" => true,
+			".ogg" => true,
 			".pdf" => true,
 			".ico" => true,
 			_ => false,
@@ -194,6 +199,7 @@ public class StreamExtensions
 		fileName = Path.GetFileName(fileName);
 		return Book.Images.ToList().Find(f => f.FileName.Contains(fileName))?.Content
 			?? Book.Fonts.ToList().Find(f => f.FileName.Contains(fileName))?.Content
-		   ?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.Content;
+		   ?? Book.Files.ToList().Find(f => f.FileName.Contains(fileName))?.Content
+		   ?? Book.FindMediaOverlayAudio(fileName)?.Content;
 	}
 }

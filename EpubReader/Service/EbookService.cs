@@ -1,9 +1,11 @@
 using System.Text;
+using System.Linq;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
+using EpubReader.Models.MediaOverlays;
 using Point = Microsoft.Maui.Graphics.Point;
 
 namespace EpubReader.Service;
@@ -113,6 +115,8 @@ public static partial class EbookService
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
 		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
+		var mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
+		var mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
 
 		return new Book
 		{
@@ -126,6 +130,12 @@ public static partial class EbookService
 			Chapters = chapters,
 			Images = images,
 			Css = cssFiles,
+			MediaOverlays = mediaOverlayResult.Documents.ToList(),
+			MediaOverlayAudio = mediaOverlayAudio,
+			MediaOverlayActiveClass = mediaOverlayResult.ActiveClass,
+			MediaOverlayPlaybackActiveClass = mediaOverlayResult.PlaybackActiveClass,
+			MediaOverlayNarrator = mediaOverlayResult.Narrator,
+			MediaOverlayDuration = mediaOverlayResult.Duration,
 		};
 	}
 
@@ -305,11 +315,137 @@ public static partial class EbookService
 		return images;
 	}
 
+	static async Task<List<MediaOverlayAudioResource>> ExtractMediaOverlayAudioAsync(EpubBookRef book, IReadOnlyList<MediaOverlayDocument> documents)
+	{
+		var resources = new List<MediaOverlayAudioResource>();
+		if (documents.Count == 0)
+		{
+			return resources;
+		}
+
+		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+		foreach (var document in documents)
+		{
+			foreach (var source in document.FlattenedNodes
+												.Select(node => node.Audio?.Source)
+												.Where(src => !string.IsNullOrWhiteSpace(src)))
+			{
+				var normalized = NormalizeMediaOverlayAudioPath(document, source!);
+				if (string.IsNullOrEmpty(normalized) || !seen.Add(normalized))
+				{
+					continue;
+				}
+
+				var file = FindLocalContentFile(book, normalized);
+				if (file is null)
+				{
+					logger.Warn($"Missing media overlay audio resource: {source}");
+					continue;
+				}
+				try
+				{
+					var bytes = await file.ReadContentAsBytesAsync().ConfigureAwait(false);
+					resources.Add(new MediaOverlayAudioResource
+					{
+						RelativePath = source!,
+						NormalizedPath = normalized,
+						Content = bytes,
+						ContentType = StreamExtensions.GetMimeType(source!)
+					});
+				}
+				catch (Exception ex)
+				{
+					logger.Warn($"Failed reading media overlay audio '{source}': {ex.Message}");
+				}
+			}
+		}
+
+		return resources;
+	}
+
 	static List<string> ExtractAuthors(EpubBookRef book)
 	{
 		return [.. book.Schema.Package.Metadata.Creators
 			.Where(author => !string.IsNullOrEmpty(author.Creator))
 			.Select(author =>   author.Creator )];
+	}
+
+	static EpubLocalContentFileRef? FindLocalContentFile(EpubBookRef book, string normalizedPath)
+	{
+		return book.Content.AllFiles.Local
+			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedPath));
+	}
+
+	static string NormalizeMediaOverlayAudioPath(MediaOverlayDocument document, string source)
+	{
+		var normalizedSource = MediaOverlayPathHelper.Normalize(source);
+		if (string.IsNullOrEmpty(normalizedSource))
+		{
+			System.Diagnostics.Debug.WriteLine("NormalizeMediaOverlayAudioPath called with null or empty source.");
+			return string.Empty;
+		}
+
+		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
+		if (string.IsNullOrEmpty(normalizedDocumentHref))
+		{
+			System.Diagnostics.Debug.WriteLine("Document href is null or empty; returning normalized source as is.");
+			return normalizedSource;
+		}
+
+		var directory = ExtractDirectory(normalizedDocumentHref);
+		if (string.IsNullOrEmpty(directory))
+		{
+			System.Diagnostics.Debug.WriteLine("Document href has no directory; returning normalized source as is.");
+			return normalizedSource;
+		}
+
+		if (normalizedSource.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
+		{
+			System.Diagnostics.Debug.WriteLine("Source already contains document directory; returning normalized source as is.");
+			return CollapseRelativeSegments(normalizedSource);
+		}
+
+		var combined = $"{directory}{normalizedSource}";
+		return CollapseRelativeSegments(combined);
+	}
+
+	static string ExtractDirectory(string normalizedPath)
+	{
+		var lastSlash = normalizedPath.LastIndexOf('/') + 1;
+		return lastSlash <= 0 ? string.Empty : normalizedPath[..lastSlash];
+	}
+
+	static string CollapseRelativeSegments(string normalizedPath)
+	{
+		if (string.IsNullOrEmpty(normalizedPath))
+		{
+			return string.Empty;
+		}
+
+		var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		var stack = new Stack<string>();
+
+		foreach (var segment in segments)
+		{
+			if (segment == ".")
+			{
+				continue;
+			}
+
+			if (segment == "..")
+			{
+				if (stack.Count > 0)
+				{
+					stack.Pop();
+				}
+				continue;
+			}
+
+			stack.Push(segment);
+		}
+
+		return string.Join('/', stack.Reverse());
 	}
 
 	#endregion
@@ -320,10 +456,6 @@ public static partial class EbookService
 	{
 		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
 		var chaptersRef = readingOrder.ToList();
-		foreach (var chapter in chaptersRef)
-		{
-			System.Diagnostics.Debug.WriteLine($"Chapter FilePath: {chapter.FilePath}");
-		}
 		return await GetChapters(chaptersRef, book);
 	}
 
@@ -334,7 +466,6 @@ public static partial class EbookService
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
-			System.Diagnostics.Debug.WriteLine("Processing split chapters...");
 			await ProcessSplitChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
@@ -342,12 +473,10 @@ public static partial class EbookService
 		// Handle books with few non-split chapters
 		if (HasFewNonSplitChapters(chaptersRef))
 		{
-			System.Diagnostics.Debug.WriteLine("Processing book with few non-split chapters...");
 			await ProcessAllChapters(chaptersRef, book, chapters);
 			return chapters;
 		}
 
-		System.Diagnostics.Debug.WriteLine("Processing standard non-split chapters...");
 		// Handle standard books with multiple non-split chapters
 		await ProcessNonSplitChapters(chaptersRef, book, chapters);
 		return chapters;

@@ -1,9 +1,13 @@
 namespace EpubReader.Views;
 
+using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading.Tasks;
 using EpubReader.Service;
 using EpubReader.Util;
+using Plugin.Maui.Audio;
 
 /// <summary>
 /// Represents a page in a book application, providing functionality for displaying and interacting with book content.
@@ -12,7 +16,7 @@ using EpubReader.Util;
 /// a single page of a book. It handles navigation, animations, and JavaScript interactions within a web view. The page
 /// is initialized with a view model and a database interface, which are used for data binding and data operations,
 /// respectively.</remarks>
-public partial class BookPage : ContentPage
+public partial class BookPage : ContentPage, IDisposable
 {
 	const string externalLinkPrefix = "https://runcsharp.jump?";
 	const uint animationDuration = 200u;
@@ -21,6 +25,8 @@ public partial class BookPage : ContentPage
 	readonly IDb db;
 	readonly ISyncService syncService;
 	readonly WebViewHelper webViewHelper;
+	readonly IAudioManager audioManager;
+	MediaOverlayPlaybackManager? mediaOverlayManager;
 	bool loadSequenceStarted = false;
 	bool progressSyncComplete = false;
 	bool pageSettingsApplied = false;
@@ -35,18 +41,21 @@ public partial class BookPage : ContentPage
 	/// <param name="viewModel">The view model that provides data binding for the page.</param>
 	/// <param name="db">The database interface used for data operations within the page.</param>
 	/// <param name="syncService">The sync service for managing reading progress synchronization.</param>
-	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService)
+	/// <param name="audioManager">The cross-platform audio manager used for narrated overlays.</param>
+	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService, IAudioManager audioManager)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		this.syncService = syncService;
+		this.audioManager = audioManager;
 		webViewHelper = new(webView, db, syncService);
-		
+        
 		// Subscribe to webview helper lifecycle events to show/hide native overlay
 		webViewHelper.PageLoadStarted += OnWebViewPageLoadStarted;
 		webViewHelper.SettingsApplied += OnWebViewSettingsApplied;
-		
+		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
@@ -56,9 +65,11 @@ public partial class BookPage : ContentPage
 	protected override async void OnAppearing()
 	{
 		base.OnAppearing();
-		await UpdateSyncToolbarAsync().ConfigureAwait(false);
+		await UpdateSyncToolbarAsync();
 		if (!loadSequenceStarted)
 		{
+			await EnsureMediaOverlayManagerInitialized();
+			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 			loadSequenceStarted = true;
 			progressSyncComplete = false;
 			pageSettingsApplied = false;
@@ -76,7 +87,7 @@ public partial class BookPage : ContentPage
 			{
 				Trace.TraceWarning($"Failed attaching webview handlers: {ex.Message}");
 			}
-			await StartLoadSequenceAsync().ConfigureAwait(false);
+			await StartLoadSequenceAsync();
 		}
 	}
 
@@ -189,9 +200,9 @@ public partial class BookPage : ContentPage
 		{
 			width = this.Width * 0.8;
 		}
-		await grid.TranslateToAsync(-width, this.Height * 0.1, animationDuration, Easing.CubicIn).ConfigureAwait(false);
-		await grid.ScaleToAsync(0.8, animationDuration).ConfigureAwait(false);
-		await grid.FadeToAsync(0.8, animationDuration).ConfigureAwait(false);
+		await grid.TranslateToAsync(-width, this.Height * 0.1, animationDuration, Easing.CubicIn);
+		await grid.ScaleToAsync(0.8, animationDuration);
+		await grid.FadeToAsync(0.8, animationDuration);
 	}
 
 	/// <summary>
@@ -203,11 +214,14 @@ public partial class BookPage : ContentPage
 	/// <param name="e">The event data containing information about the navigation event.</param>
 	async void webView_Navigated(object? sender, WebNavigatedEventArgs? e)
 	{
-		var pageLoaded = await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token).ConfigureAwait(false);
+		await Dispatcher.DispatchAsync(async () =>
+		{
+			var pageLoaded = await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
 		if (!pageLoaded)
 		{
-			await webViewHelper.LoadPageAsync(pageLabel, book).ConfigureAwait(false);
+			await LoadChapterContentAsync();
 		}
+		});
 	}
 
 	async Task StartLoadSequenceAsync()
@@ -246,8 +260,6 @@ public partial class BookPage : ContentPage
 				if (!string.IsNullOrEmpty(resolved))
 				{
 					url = resolved;
-					Trace.TraceInformation($"Parsed JS action: {msg.Action}");
-					Trace.TraceInformation($"Converted JS action to URL: {url}");
 				}
 			}
 			else
@@ -312,7 +324,7 @@ public partial class BookPage : ContentPage
 					{
 						urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
 					}
-				
+                
 			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
 					if (chapter is null)
 					{
@@ -321,8 +333,8 @@ public partial class BookPage : ContentPage
 					}
 					System.Diagnostics.Trace.TraceInformation($"Found chapter: {chapter.Title}");
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
-					// Use helper to ensure native overlay is shown
-					await webViewHelper.LoadPageAsync(pageLabel, book);
+					// Use helper to ensure native and media overlay state stay in sync
+					await LoadChapterContentAsync();
 					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 				}
 	}
@@ -371,31 +383,40 @@ public partial class BookPage : ContentPage
 	{
 		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"),
 			out int parsedPage) ? parsedPage : 0;
+        
 		switch (methodName.ToLowerInvariant())
 		{
 			case "next":
-				await webViewHelper.Next(pageLabel, book);
+					await webViewHelper.Next(pageLabel, book);
+					await NotifyMediaOverlayChapterRequestedAsync();
 				break;
 			case "prev":
-				await webViewHelper.Prev(pageLabel, book);
+					await webViewHelper.Prev(pageLabel, book);
+					await NotifyMediaOverlayChapterRequestedAsync();
 				break;
 			case "menu":
 				GridArea_Tapped(this, EventArgs.Empty);
 				break;
 			case "pageload":
-				await webViewHelper.OnSettingsClickedAsync();
-				await UpdateUiAppearance();
-				if (currentPage == 0 && book.CurrentPage > 0)
+				await Dispatcher.DispatchAsync(async () =>
 				{
-					await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
-				}
-				pageLabel.Text = await GetCurrentPageInfoAsync();
-				pageAtCorrectPosition = true;
-				Dispatcher.Dispatch(() => HideNativeOverlay());
+					await webViewHelper.OnSettingsClickedAsync();
+					await UpdateUiAppearance();
+					if (currentPage == 0 && book.CurrentPage > 0)
+					{
+						await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+					}
+					pageLabel.Text = await GetCurrentPageInfoAsync();
+					pageAtCorrectPosition = true;
+					HideNativeOverlay();
+					await NotifyMediaOverlayPageLoadedAsync();
+				});
 				break;
 			case "characterposition":
 				book.CurrentPage = currentPage;
-				await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+				await Dispatcher.DispatchAsync(async () =>
+				{
+					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 
 				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
 				{
@@ -405,8 +426,122 @@ public partial class BookPage : ContentPage
 				{
 					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
 				}
+				});
+				break;
+			case "mediaoverlaylog":
+				if (!string.IsNullOrEmpty(data))
+				{
+					var decoded = Uri.UnescapeDataString(data);
+					Trace.TraceInformation($"[MediaOverlay JS] {decoded}");
+				}
+				break;
+			case "mediaoverlaytoggle":
+				if (mediaOverlayManager is null)
+				{
+					Trace.TraceInformation("Media overlay toggle ignored; manager unavailable.");
+					break;
+				}
+				if (!bool.TryParse(data, out var enabled))
+				{
+					Trace.TraceWarning($"Invalid media overlay toggle payload: {data}");
+					break;
+				}
+				await mediaOverlayManager.SetEnabledAsync(enabled);
+				break;
+			case "mediaoverlayplay":
+				if (mediaOverlayManager is not null)
+				{
+					await mediaOverlayManager.PlayAsync();
+				}
+				break;
+			case "mediaoverlaypause":
+				if (mediaOverlayManager is not null)
+				{
+					await mediaOverlayManager.PauseAsync();
+				}
+				break;
+			case "mediaoverlaynext":
+				if (mediaOverlayManager is not null)
+				{
+					await mediaOverlayManager.NextAsync();
+				}
+				break;
+			case "mediaoverlayprev":
+				if (mediaOverlayManager is not null)
+				{
+					await mediaOverlayManager.PreviousAsync();
+				}
 				break;
 		}
+	}
+
+	async void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		switch (e.PropertyName)
+		{
+			case nameof(BookViewModel.Book):
+				await EnsureMediaOverlayManagerInitialized();
+				break;
+			case nameof(BookViewModel.IsReaderModeEnabled):
+				await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
+				break;
+		}
+	}
+
+	async Task EnsureMediaOverlayManagerInitialized()
+	{
+		if (mediaOverlayManager is not null)
+		{
+			mediaOverlayManager.UpdateBook(book);
+			return;
+		}
+
+		if (!book.HasNarratedMedia)
+		{
+			return;
+		}
+
+		mediaOverlayManager = new MediaOverlayPlaybackManager(ViewModel, webView, audioManager);
+		await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
+	}
+
+	async Task UpdateReaderModeOverlayAsync(bool isReaderModeEnabled)
+	{
+		var manager = mediaOverlayManager;
+		if (manager is null)
+		{
+			return;
+		}
+
+		await manager.SetReaderModeHiddenAsync(isReaderModeEnabled);
+	}
+
+	async Task NotifyMediaOverlayChapterRequestedAsync()
+	{
+		var manager = mediaOverlayManager;
+		if (manager is null)
+		{
+			return;
+		}
+		await manager.OnChapterRequestedAsync(book.CurrentChapter);
+	}
+
+	async Task NotifyMediaOverlayPageLoadedAsync()
+	{
+		var manager = mediaOverlayManager;
+		if (manager is null)
+		{
+			return;
+		}
+
+		await manager.OnPageLoadedAsync(book.CurrentChapter);
+	}
+
+	async Task LoadChapterContentAsync()
+	{
+		await EnsureMediaOverlayManagerInitialized();
+		await NotifyMediaOverlayChapterRequestedAsync();
+		await webViewHelper.LoadPageAsync(pageLabel, book);
 	}
 
 	/// <summary>
@@ -450,9 +585,9 @@ public partial class BookPage : ContentPage
 	async void CloseMenuAsync(object? sender, EventArgs? e)
 	{
 		ViewModel.Press();
-		await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
-		await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
-		await grid.TranslateToAsync(0, 0, animationDuration, Easing.CubicIn).ConfigureAwait(false);
+		await grid.FadeToAsync(1, animationDuration);
+		await grid.ScaleToAsync(1, animationDuration);
+		await grid.TranslateToAsync(0, 0, animationDuration, Easing.CubicIn);
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)
@@ -479,7 +614,7 @@ public partial class BookPage : ContentPage
 					book.CurrentChapter = index;
 					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
 					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-						await webViewHelper.LoadPageAsync(pageLabel, book);
+						await LoadChapterContentAsync();
 					CloseMenuAsync(this, EventArgs.Empty);
 				});
 			})
@@ -492,33 +627,34 @@ public partial class BookPage : ContentPage
 			Height = new GridLength(1, GridUnitType.Auto)
 		});
 #else
-        var toolbarItem = new ToolbarItem
-        {
-            Text = chapter.Title,
-            Order = ToolbarItemOrder.Secondary,
-            Priority = index,
-            Command = new Command(() =>
-            {
-                Dispatcher.Dispatch(async () =>
-                {
-                    book.CurrentChapter = index;
-                    book.CurrentPage = 0; // Reset current page when changing chapter
-                    await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-						await webViewHelper.LoadPageAsync(pageLabel, book);
-                    CloseMenuAsync(this, EventArgs.Empty);
-                });
-            })
-        };
-        Shell.Current.ToolbarItems.Add(toolbarItem);
+		var toolbarItem = new ToolbarItem
+		{
+			Text = chapter.Title,
+			Order = ToolbarItemOrder.Secondary,
+			Priority = index,
+			Command = new Command(() =>
+			{
+				Dispatcher.Dispatch(async () =>
+				{
+					book.CurrentChapter = index;
+					book.CurrentPage = 0; // Reset current page when changing chapter
+					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+						await LoadChapterContentAsync();
+					CloseMenuAsync(this, EventArgs.Empty);
+				});
+			})
+		};
+		Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
 	}
-
+    
 	async Task<bool> LoadAndMergeProgressAsync(CancellationToken token)
 	{
 		var pageLoaded = false;
 		try
 		{
 			token.ThrowIfCancellationRequested();
+
 			var bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
 			var cloud = await syncService.GetProgressAsync(bookId, token);
 
@@ -677,7 +813,7 @@ public partial class BookPage : ContentPage
 
 		if (book.Chapters.Count > book.CurrentChapter && book.CurrentChapter >= 0)
 		{
-			await webViewHelper.LoadPageAsync(pageLabel, book);
+			await LoadChapterContentAsync();
 			if (book.CurrentPage > 0)
 			{
 				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
@@ -751,5 +887,40 @@ public partial class BookPage : ContentPage
 		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
 			? parsed
 			: DateTimeOffset.MinValue;
+	}
+
+	bool disposedValue = false; // To detect redundant calls
+
+	/// <summary>
+	/// Dispose pattern implementation. Releases managed resources when disposing is true.
+	/// </summary>
+	/// <param name="disposing">If true, dispose managed resources.</param>
+	protected virtual void Dispose(bool disposing)
+	{
+		if (disposedValue)
+		{
+			return;
+		}
+
+		if (disposing)
+		{
+			WeakReferenceMessenger.Default.UnregisterAll(this);
+			webViewHelper.PageLoadStarted -= OnWebViewPageLoadStarted;
+			webViewHelper.SettingsApplied -= OnWebViewSettingsApplied;
+
+			webView.Navigated -= webView_Navigated;
+			webView.Navigating -= webView_Navigating;
+			ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+			mediaOverlayManager?.Dispose();
+			mediaOverlayManager = null;
+		}
+		disposedValue = true;
+	}
+
+	public void Dispose()
+	{
+		Dispose(true);
+		GC.SuppressFinalize(this);
 	}
 }

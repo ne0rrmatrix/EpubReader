@@ -6,6 +6,7 @@
     <OutputType>Exe</OutputType>
 		<RootNamespace>EpubReader</RootNamespace>
 		<UseMaui>true</UseMaui>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
 		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 		<SingleProject>true</SingleProject>
     <DefaultLanguage>en-us</DefaultLanguage>
@@ -137,6 +138,7 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
     <PackageReference Include="Zeroconf" Version="3.7.16" />
+    <PackageReference Include="Plugin.Maui.Audio" Version="1.5.1" />
  </ItemGroup>
   
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
@@ -150,6 +152,7 @@
     <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
+    <PackageReference Include="Xamarin.Build.Download" Version="0.11.4" />
   </ItemGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
