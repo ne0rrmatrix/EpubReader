@@ -141,14 +141,4 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		IsNavMenuVisible = !IsNavMenuVisible;
 		Dispatcher.Dispatch(() => Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible));
 	}
-
-	/// <summary>
-	/// Toggles reader mode, hiding or showing supplemental interface chrome.
-	/// </summary>
-	[RelayCommand]
-	void ToggleReaderMode()
-	{
-		IsReaderModeEnabled = !IsReaderModeEnabled;
-		ReaderModeToolbarText = IsReaderModeEnabled ? "Show Interface" : "Hide Interface";
-	}
 }

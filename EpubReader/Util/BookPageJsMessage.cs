@@ -2,6 +2,7 @@ namespace EpubReader.Util;
 
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json;
 
 /// <summary>
@@ -15,6 +16,7 @@ public sealed class BookPageJsMessage
 	public string? Href { get; init; }
 
 	public int? Position { get; init; }
+	public double? Seconds { get; init; }
 
 	public bool? Enabled { get; init; }
 
@@ -52,6 +54,12 @@ public sealed class BookPageJsMessage
 				pos = p;
 			}
 
+			double? seconds = null;
+			if (root.TryGetProperty("seconds", out var secondsElem) && secondsElem.ValueKind == JsonValueKind.Number && secondsElem.TryGetDouble(out var s))
+			{
+				seconds = s;
+			}
+
 			bool? enabled = null;
 			if (root.TryGetProperty("enabled", out var enabledElem) &&
 				(enabledElem.ValueKind == JsonValueKind.True || enabledElem.ValueKind == JsonValueKind.False))
@@ -71,7 +79,8 @@ public sealed class BookPageJsMessage
 				Href = href,
 				Position = pos,
 				Enabled = enabled,
-				Message = messageText
+				Message = messageText,
+				Seconds = seconds
 			};
 			return true;
 		}
@@ -104,6 +113,7 @@ public sealed class BookPageJsMessage
 			"mediaoverlaynext" => "https://runcsharp.mediaoverlaynext?true",
 			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
 			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
+			"mediaoverlayseek" => Seconds.HasValue ? $"https://runcsharp.mediaoverlayseek?{Seconds.Value.ToString(CultureInfo.InvariantCulture)}" : null,
 			_ => null,
 		};
 	}

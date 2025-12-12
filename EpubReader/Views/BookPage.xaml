@@ -18,12 +18,6 @@
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
-        <ToolbarItem
-            BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}}"
-            Text="{Binding ReaderModeToolbarText}"
-            Command="{Binding ToggleReaderModeCommand}"
-            Order="Primary"
-            Priority="1" />
     </ContentPage.ToolbarItems>
             <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
                 <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">

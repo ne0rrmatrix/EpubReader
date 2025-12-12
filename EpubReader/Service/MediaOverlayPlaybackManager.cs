@@ -40,6 +40,8 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	TimeSpan? currentClipEnd;
 	string? currentAudioResourceId;
 	bool isSeekPending;
+	int? lastReportedSecond;
+	double? pendingSeekOverrideSeconds;
 
 	string ActiveClass => string.IsNullOrWhiteSpace(book.MediaOverlayActiveClass)
 		? "-epub-media-overlay-active"
@@ -436,9 +438,10 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			}
 			if (forceSeek)
 			{
-				var seekSeconds = currentClipBegin <= TimeSpan.Zero ? 0 : currentClipBegin.TotalSeconds;
+				var seekSeconds = pendingSeekOverrideSeconds ?? (currentClipBegin <= TimeSpan.Zero ? 0 : currentClipBegin.TotalSeconds);
 				isSeekPending = true;
 				audioPlaybackService.Seek(seekSeconds);
+				pendingSeekOverrideSeconds = null;
 				if (!audioPlaybackService.IsPlaying)
 				{
 					audioPlaybackService.Play();
@@ -455,6 +458,96 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			isPlaying = true;
 			return Task.CompletedTask;
 		}).ConfigureAwait(false);
+	}
+
+	public async Task SeekAsync(double seconds)
+	{
+		if (!IsSupported || segments.Count == 0)
+		{
+			return;
+		}
+
+		// Clamp to available duration
+		var total = GetActiveDurationSeconds();
+		if (total is not null)
+		{
+			seconds = Math.Clamp(seconds, 0, total.Value);
+		}
+
+		// Find target segment by accumulating segment durations
+		double cumulative = 0;
+		int targetIndex = 0;
+		for (int i = 0; i < segments.Count; i++)
+		{
+			var audio = segments[i].Node.Audio;
+			if (audio?.ClipBegin is null || audio.ClipEnd is null)
+			{
+				// unknown length, treat as zero and pick this segment if we haven't found one
+				if (i == segments.Count - 1)
+				{
+					targetIndex = i;
+					break;
+				}
+				continue;
+			}
+
+			var segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
+			if (seconds < cumulative + segLen)
+			{
+				targetIndex = i;
+				var offsetInSeg = Math.Max(0, seconds - cumulative);
+				var seekSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
+				pendingSeekOverrideSeconds = seekSeconds;
+				segmentIndex = targetIndex;
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: seconds < cumulative).ConfigureAwait(false);
+				return;
+			}
+			cumulative += segLen;
+		}
+
+		// Fallback: seek to last segment
+		segmentIndex = Math.Clamp(segments.Count - 1, 0, segments.Count - 1);
+		var lastSegment = segments[segmentIndex];
+		if (lastSegment.Node.Audio is not null)
+		{
+			var clipBegin = lastSegment.Node.Audio.ClipBegin ?? TimeSpan.Zero;
+			pendingSeekOverrideSeconds = clipBegin.TotalSeconds;
+			await StartSegmentAsync(lastSegment, forceSeek: true).ConfigureAwait(false);
+		}
+	}
+
+	double? GetCurrentPositionSeconds()
+	{
+		if (!audioPlaybackService.HasSession)
+		{
+			return null;
+		}
+
+		var pos = audioPlaybackService.CurrentPosition;
+		if (double.IsNaN(pos) || double.IsInfinity(pos))
+		{
+			return null;
+		}
+
+		// Sum durations of segments before current index
+		double cumulative = 0;
+		for (int i = 0; i < segmentIndex; i++)
+		{
+			var audio = segments[i].Node.Audio;
+			if (audio?.ClipBegin is not null && audio.ClipEnd is not null)
+			{
+				cumulative += (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
+			}
+		}
+
+		// Add current playback position relative to current clip begin
+		var currentRelative = pos - (currentClipBegin.TotalSeconds);
+		if (currentRelative < 0)
+		{
+			currentRelative = 0;
+		}
+
+		return cumulative + currentRelative;
 	}
 
 
@@ -528,7 +621,8 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			segmentIndex = segments.Count == 0 ? 0 : segmentIndex + 1,
 			segmentCount = segments.Count,
 			chapterTitle = GetCurrentChapterTitle(),
-			durationSeconds = GetActiveDurationSeconds()
+			durationSeconds = GetActiveDurationSeconds(),
+			positionSeconds = GetCurrentPositionSeconds()
 		};
 
 		await InvokeScriptAsync("updateMediaOverlayPlaybackState", payload).ConfigureAwait(false);
@@ -677,7 +771,14 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		await HighlightCurrentSegmentAsync();
-		await UpdateUiStateAsync();
+
+		// Throttle UI position updates to once per second to reduce JS churn
+		var curSec = (int)Math.Floor(positionSeconds);
+		if (!lastReportedSecond.HasValue || lastReportedSecond.Value != curSec)
+		{
+			lastReportedSecond = curSec;
+			await UpdateUiStateAsync();
+		}
 
 		if (currentClipEnd is not null && positionSeconds >= currentClipEnd.Value.TotalSeconds)
 		{

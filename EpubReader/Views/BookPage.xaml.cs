@@ -416,6 +416,15 @@ public partial class BookPage : ContentPage, IDisposable
 				System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
 				await HandleMediaOverlayPrevAsync();
 				break;
+			case "mediaoverlayseek":
+				if (mediaOverlayManager is not null)
+				{
+					if (double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
+					{
+						await mediaOverlayManager.SeekAsync(secs);
+					}
+				}
+				break;
 		}
 	}
 	// --- Extracted methods below ---

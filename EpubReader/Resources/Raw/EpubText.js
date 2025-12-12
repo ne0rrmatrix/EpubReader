@@ -31,7 +31,9 @@ const mediaOverlayUi = {
         durationSeconds: null,
         chapterTitle: '',
         segmentIndex: 0,
-        segmentCount: 0
+        segmentCount: 0,
+        positionSeconds: null,
+        seeking: false
     }
 };
 
@@ -307,11 +309,18 @@ const navigationUtils = {
                 contentWindow.scrollTo(target, 0);
 
             } else {
-                contentWindow.scrollTo({
-                    left: target,
-                    top: 0,
-                    behavior: 'smooth'
-                });
+                // If media overlay is active (enabled), prefer instant jumps
+                // to avoid animation interfering with audio playback and
+                // highlight synchronization.
+                if (mediaOverlayUi.state?.enabled) {
+                    contentWindow.scrollTo(target, 0);
+                } else {
+                    contentWindow.scrollTo({
+                        left: target,
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                }
             }
         });
     },
@@ -757,12 +766,20 @@ function handleMessage(event, platform) {
         console.log("Jumping to:", href);
         sendToNativeMessage({ action: 'jump', href: href });
     } else if (data === "next") {
+        if (mediaOverlayUi.state.seeking) {
+            logMediaOverlay('Ignoring next command while user is seeking');
+            return;
+        }
         if (isUserNavigationLocked()) {
             logMediaOverlay('User navigation blocked during playback', { action: 'next' });
             return;
         }
         handleNextCommand();
     } else if (data === "prev") {
+        if (mediaOverlayUi.state.seeking) {
+            logMediaOverlay('Ignoring prev command while user is seeking');
+            return;
+        }
         if (isUserNavigationLocked()) {
             logMediaOverlay('User navigation blocked during playback', { action: 'prev' });
             return;
@@ -841,6 +858,12 @@ function resetMediaOverlayDom() {
     mediaOverlayUi.prevButton = null;
     mediaOverlayUi.nextButton = null;
     mediaOverlayUi.minimized = false;
+    // Clear seek-related references and state to avoid stale references when UI is rebuilt
+    mediaOverlayUi.seekInput = null;
+    mediaOverlayUi.timeLabel = null;
+    if (mediaOverlayUi.state) {
+        mediaOverlayUi.state.seeking = false;
+    }
 }
 
 function ensureMediaOverlayUi() {
@@ -907,16 +930,158 @@ function buildMediaOverlayUi(root) {
 
     const meta = document.createElement('div');
     meta.className = 'media-overlay-player__meta';
+    // Use flex layout so the progress bar can expand and replace the
+    // previously duplicated duration element that appeared near the center.
+    meta.style.display = 'flex';
+    meta.style.alignItems = 'center';
+    meta.style.gap = '0.75rem';
+    meta.style.width = '100%';
 
     const narrator = document.createElement('span');
     narrator.className = 'media-overlay-player__narrator';
     narrator.textContent = 'Narrator unavailable';
+    narrator.style.flex = '0 0 auto';
 
-    const duration = document.createElement('span');
-    duration.className = 'media-overlay-player__duration';
-    duration.textContent = '';
+    // Progress / seek bar
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'media-overlay-player__progress';
 
-    meta.append(narrator, duration);
+    const seekInput = document.createElement('input');
+    seekInput.type = 'range';
+    seekInput.className = 'media-overlay-player__seek';
+    seekInput.min = '0';
+    seekInput.max = '1';
+    seekInput.step = '0.1';
+    seekInput.value = '0';
+    seekInput.disabled = true;
+
+    const timeLabel = document.createElement('span');
+    timeLabel.className = 'media-overlay-player__time';
+    timeLabel.textContent = '';
+
+    // Seek interactions: set seeking flag while user drags; only send on change (release)
+    seekInput.addEventListener('input', function () {
+        // live update only locally
+        const ratio = Number(seekInput.value) || 0;
+        const secs = mediaOverlayUi.state.durationSeconds ? (ratio * mediaOverlayUi.state.durationSeconds) : null;
+        timeLabel.textContent = (secs != null ? formatDuration(secs) : '0:00') + (mediaOverlayUi.state.durationSeconds ? ' / ' + formatDuration(mediaOverlayUi.state.durationSeconds) : '');
+
+        // Update in-memory position so other UI helpers reflect the previewed position
+        if (secs != null) {
+            mediaOverlayUi.state.positionSeconds = secs;
+        }
+
+        // While dragging, move the document viewport to the corresponding horizontal position
+        try {
+            const contentWindow = domUtils.getContentWindow();
+            const doc = domUtils.getIframeDocument();
+            if (contentWindow && doc) {
+                const scrollElem = doc.scrollingElement || doc.documentElement;
+                const maxScrollLeft = Math.max(0, scrollElem.scrollWidth - contentWindow.innerWidth);
+
+                // Calculate per-page scroll amount and snap to nearest page
+                const scrollAmount = navigationUtils.calculateScrollAmount(contentWindow) || contentWindow.innerWidth;
+                let desiredLeft = Math.round(ratio * maxScrollLeft);
+
+                if (scrollAmount > 0) {
+                    const pageIndex = Math.round(desiredLeft / scrollAmount);
+                    const maxPageIndex = Math.max(0, Math.floor(maxScrollLeft / scrollAmount));
+                    const clampedIndex = Math.min(maxPageIndex, Math.max(0, pageIndex));
+                    desiredLeft = Math.round(clampedIndex * scrollAmount);
+                    // Update preview current page index
+                    currentPage = clampedIndex;
+                }
+
+                // Use existing page-turn animation utility so we don't create
+                // ad-hoc scrolling behavior. If a navigation animation is
+                // already active, skip to avoid interfering with it.
+                const platform = domUtils.detectPlatform();
+                if (!navigationState.isAnimating) {
+                    navigationUtils.animateTo(contentWindow, desiredLeft, platform).catch(() => { });
+                }
+
+                // Update highlighting to the element near viewport center for preview
+                try {
+                    const cx = Math.floor(contentWindow.innerWidth / 2);
+                    const cy = Math.floor(contentWindow.innerHeight / 2);
+                    // elementFromPoint is available on the iframe document
+                    const el = doc.elementFromPoint(cx, cy);
+                    if (el && el.nodeType === Node.ELEMENT_NODE) {
+                        // Clear previous highlights and apply preview classes
+                        clearMediaOverlayHighlight();
+                        if (mediaOverlayHighlight.activeClass) {
+                            el.classList.add(mediaOverlayHighlight.activeClass);
+                        }
+                        if (mediaOverlayHighlight.playbackClass) {
+                            // Apply playback class during preview only if playback is active
+                            if (mediaOverlayUi.state.playing) {
+                                el.classList.add(mediaOverlayHighlight.playbackClass);
+                            }
+                        }
+                        mediaOverlayHighlight.elements = [el];
+                    }
+                } catch (e) {
+                    console.warn('Preview highlight failed', e);
+                }
+            }
+        } catch (e) {
+            console.warn('Live preview scroll failed', e);
+        }
+    });
+    seekInput.addEventListener('change', function () {
+        if (!mediaOverlayUi.state.durationSeconds) return;
+        const secs = Number(seekInput.value) * mediaOverlayUi.state.durationSeconds;
+        // send seek command only when the user releases the thumb
+        sendMediaOverlayCommand('mediaoverlayseek', { seconds: secs });
+    });
+
+    // Pointer/touch handlers to mark seeking state so native UI updates are deferred
+    seekInput.addEventListener('pointerdown', function () {
+        mediaOverlayUi.state.seeking = true;
+    });
+    seekInput.addEventListener('pointerup', function () {
+        mediaOverlayUi.state.seeking = false;
+    });
+    seekInput.addEventListener('touchstart', function () {
+        mediaOverlayUi.state.seeking = true;
+    }, { passive: true });
+    seekInput.addEventListener('touchend', function () {
+        mediaOverlayUi.state.seeking = false;
+    });
+    // Also handle pointercancel/leave as end-of-drag to keep state consistent
+    seekInput.addEventListener('pointercancel', function () {
+        mediaOverlayUi.state.seeking = false;
+    });
+    seekInput.addEventListener('pointerleave', function () {
+        // Only clear seeking on pointerleave if buttons are not pressed (best-effort)
+        try {
+            if (!('buttons' in window.Event.prototype)) {
+                mediaOverlayUi.state.seeking = false;
+            } else {
+                // Conservative: clear seeking to avoid stuck state on some UAs
+                mediaOverlayUi.state.seeking = false;
+            }
+        } catch (e) {
+            mediaOverlayUi.state.seeking = false;
+        }
+    });
+
+    // Make the progress wrapper expand to use available horizontal space.
+    progressWrap.style.display = 'flex';
+    progressWrap.style.alignItems = 'center';
+    progressWrap.style.gap = '0.5rem';
+    progressWrap.style.flex = '1';
+
+    // Let the range input grow to fill the wrapper and keep the time label compact.
+    seekInput.style.flex = '1';
+    seekInput.style.minWidth = '0';
+    seekInput.style.width = '100%';
+    timeLabel.style.whiteSpace = 'nowrap';
+    timeLabel.style.flex = '0 0 auto';
+
+    progressWrap.append(seekInput, timeLabel);
+    // Append narrator and the expanded progress area to the meta row.
+    meta.append(narrator, progressWrap);
 
     const controls = document.createElement('div');
     controls.className = 'media-overlay-player__controls';
@@ -969,7 +1134,6 @@ function buildMediaOverlayUi(root) {
     mediaOverlayUi.eyebrow = eyebrow;
     mediaOverlayUi.title = title;
     mediaOverlayUi.narrator = narrator;
-    mediaOverlayUi.duration = duration;
     mediaOverlayUi.status = status;
     mediaOverlayUi.toggleButton = toggleButton;
     mediaOverlayUi.minimizeButton = minimizeButton;
@@ -977,6 +1141,8 @@ function buildMediaOverlayUi(root) {
     mediaOverlayUi.prevButton = prevButton;
     mediaOverlayUi.playButton = playButton;
     mediaOverlayUi.nextButton = nextButton;
+    mediaOverlayUi.seekInput = seekInput;
+    mediaOverlayUi.timeLabel = timeLabel;
 
     // container click restores when minimized (tap-to-restore)
     container.addEventListener('click', function (ev) {
@@ -996,14 +1162,11 @@ function setMediaOverlayMinimized(minimized) {
     if (root) {
         root.dataset.minimized = mediaOverlayUi.minimized ? 'true' : 'false';
     }
-    // When minimized, remove the full overlay container from the DOM so
-    // nothing of the UI remains visible — only the dock button will be shown.
+    // When minimized, visually hide the overlay container but keep it in
+    // memory so state is preserved. The CSS handles the visual hiding
+    // using the root[data-minimized] selector; we just make the dock
+    // (restore) button visible so the user can restore the overlay.
     if (mediaOverlayUi.minimized) {
-        if (mediaOverlayUi.container) {
-            mediaOverlayUi.container.remove();
-            mediaOverlayUi.container = null;
-        }
-
         if (mediaOverlayUi.dockButton) {
             mediaOverlayUi.dockButton.style.display = 'flex';
         }
@@ -1254,6 +1417,7 @@ function updateMediaOverlayPlaybackState(state) {
     updateUiToggleButton();
     updateUiNarrator();
     updateUiDuration();
+    updateUiProgress();
     const disableControls = !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0;
     updateUiControls(disableControls);
     updateUiPlayButton();
@@ -1270,7 +1434,12 @@ function updateUiStateFromPayload(state) {
         mediaOverlayUi.state.playing = state.playing;
     }
     if (typeof state.segmentIndex === 'number') {
-        mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
+        // Do not overwrite the current segment index while the user is actively seeking
+        if (!mediaOverlayUi.state.seeking) {
+            mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
+        } else {
+            logMediaOverlay('Skipping segmentIndex update while seeking', { incoming: state.segmentIndex });
+        }
     }
     if (typeof state.segmentCount === 'number') {
         mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(state.segmentCount));
@@ -1281,6 +1450,15 @@ function updateUiStateFromPayload(state) {
     if (Object.hasOwn(state, 'durationSeconds')) {
         const value = state.durationSeconds;
         mediaOverlayUi.state.durationSeconds = typeof value === 'number' ? value : null;
+    }
+    if (Object.hasOwn(state, 'positionSeconds')) {
+        // Do not let player/UI updates override the preview while user is seeking
+        if (!mediaOverlayUi.state.seeking) {
+            const v = state.positionSeconds;
+            mediaOverlayUi.state.positionSeconds = typeof v === 'number' ? v : null;
+        } else {
+            logMediaOverlay('Skipping positionSeconds update while seeking', { incoming: state.positionSeconds });
+        }
     }
 
     if (!mediaOverlayUi.state.playing) {
@@ -1314,6 +1492,33 @@ function updateUiDuration() {
     if (mediaOverlayUi.duration) {
         const formattedDuration = formatDuration(mediaOverlayUi.state.durationSeconds);
         mediaOverlayUi.duration.textContent = formattedDuration ? 'Duration ' + formattedDuration : '';
+    }
+}
+
+function updateUiProgress() {
+    if (!mediaOverlayUi.seekInput) return;
+    const input = mediaOverlayUi.seekInput;
+    const label = mediaOverlayUi.timeLabel;
+    const dur = mediaOverlayUi.state.durationSeconds;
+    const pos = mediaOverlayUi.state.positionSeconds;
+
+    if (typeof dur === 'number' && !Number.isNaN(dur) && dur > 0) {
+        input.disabled = false;
+        if (!mediaOverlayUi.state.seeking) {
+            const ratio = (typeof pos === 'number' && !Number.isNaN(pos)) ? Math.max(0, Math.min(1, pos / dur)) : 0;
+            input.value = String(ratio);
+        }
+        if (label) {
+            label.textContent = (typeof pos === 'number' ? formatDuration(pos) : '0:00') + ' / ' + formatDuration(dur);
+        }
+    } else {
+        if (!mediaOverlayUi.state.seeking) {
+            input.disabled = true;
+            input.value = '0';
+        }
+        if (label) {
+            label.textContent = dur ? formatDuration(dur) : '';
+        }
     }
 }
 
@@ -1502,6 +1707,10 @@ function formatDuration(seconds) {
  * Handles the "next" command
  */
 function handleNextCommand() {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay('handleNextCommand ignored while seeking');
+        return;
+    }
     const platform = domUtils.detectPlatform();
 
     if (mediaOverlayUi.state.playing && shouldThrottleMediaOverlayAutoAdvance()) {
@@ -1526,6 +1735,10 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay('handlePrevCommand ignored while seeking');
+        return;
+    }
     const platform = domUtils.detectPlatform();
 
     // If animation in progress, coalesce to a single pending "prev"
