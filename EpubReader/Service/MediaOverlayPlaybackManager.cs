@@ -265,11 +265,11 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			segmentIndex--;
 				if (isEnabled && isPlaying)
 				{
-					await StartSegmentAsync(segments[segmentIndex], forceSeek: true).ConfigureAwait(false);
+					await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: true).ConfigureAwait(false);
 				}
 			else
 			{
-				await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+				await HighlightCurrentSegmentAsync(preferPreviousPage: true).ConfigureAwait(false);
 				await UpdateUiStateAsync().ConfigureAwait(false);
 			}
 		}
@@ -364,7 +364,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		return list;
 	}
 
-	async Task StartSegmentAsync(MediaOverlaySegment segment, bool forceSeek = false)
+	async Task StartSegmentAsync(MediaOverlaySegment segment, bool forceSeek = false, bool preferPreviousPage = false)
 	{
 		if (!TryGetAudioResource(segment.Node.Audio?.Source, out var resource))
 		{
@@ -399,7 +399,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		StartClipTimer(currentClipEnd);
 		if (!isSeekPending)
 		{
-			await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+			await HighlightCurrentSegmentAsync(preferPreviousPage).ConfigureAwait(false);
 		}
 		await UpdateUiStateAsync().ConfigureAwait(false);
 
@@ -491,7 +491,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		return false;
 	}
 
-	async Task HighlightCurrentSegmentAsync()
+	async Task HighlightCurrentSegmentAsync(bool preferPreviousPage = false)
 	{
 		if (!isWebViewReady || segments.Count == 0)
 		{
@@ -503,10 +503,12 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		var fragmentLiteral = JsonSerializer.Serialize(segment.FragmentId, serializerOptions);
 		var activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
 		var playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
+		var navigationLiteral = JsonSerializer.Serialize(preferPreviousPage ? "prev" : "next", serializerOptions);
 
-		await dispatcher.DispatchAsync( async() => {
-		await webView.EvaluateJavaScriptAsync($"ensureFragmentVisibleUsingNext({fragmentLiteral})");
-		await webView.EvaluateJavaScriptAsync($"highlightMediaOverlayFragment({fragmentLiteral}, {activeLiteral}, {playbackLiteral})");
+		await dispatcher.DispatchAsync(async () =>
+		{
+			await webView.EvaluateJavaScriptAsync($"ensureFragmentVisibleUsingNext({fragmentLiteral}, {navigationLiteral})");
+			await webView.EvaluateJavaScriptAsync($"highlightMediaOverlayFragment({fragmentLiteral}, {activeLiteral}, {playbackLiteral})");
 		}).ConfigureAwait(false);
 	}
 
@@ -679,19 +681,8 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			}
 		}
 
-		// If we just cleared the pending state, apply highlighting now.
-		if (!isSeekPending)
-		{
-			try
-			{
-				await HighlightCurrentSegmentAsync();
-				await UpdateUiStateAsync();
-			}
-			catch (Exception ex)
-			{
-				System.Diagnostics.Trace.TraceWarning($"Highlight apply failed: {ex.Message}");
-			}
-		}
+		await HighlightCurrentSegmentAsync();
+		await UpdateUiStateAsync();
 	
 		if (currentClipEnd is not null && positionSeconds >= currentClipEnd.Value.TotalSeconds)
 		{

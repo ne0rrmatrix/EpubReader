@@ -1,5 +1,6 @@
 using System.Text;
 using Android.Webkit;
+using EpubReader.Converter;
 using Java.Interop;
 
 namespace EpubReader.Controls;
@@ -15,11 +16,12 @@ public class JSBridge : Java.Lang.Object
 			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 			return;
 		}
-		var bytes = Convert.FromBase64String(message);
-		var json = Encoding.UTF8.GetString(bytes);
-		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() =>
+		var json = Base64Decoder.DecodeFromBase64(message);
+		if (json is null)
 		{
-			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json));
-		});
+			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage failed to decode base64 message");
+			return;
+		}
+		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
     }
 }

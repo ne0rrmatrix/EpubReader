@@ -29,7 +29,6 @@ public partial class BookPage : ContentPage, IDisposable
 	MediaOverlayPlaybackManager? mediaOverlayManager;
 	bool loadSequenceStarted = false;
 	bool progressSyncComplete = false;
-	bool pageSettingsApplied = false;
 	bool pageAtCorrectPosition = false;
 	ToolbarItem? syncToolbarItem;
 
@@ -72,7 +71,6 @@ public partial class BookPage : ContentPage, IDisposable
 			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 			loadSequenceStarted = true;
 			progressSyncComplete = false;
-			pageSettingsApplied = false;
 			pageAtCorrectPosition = false;
 			ShowNativeOverlay();
 			// Attach webview handlers now that page is visible
@@ -136,7 +134,6 @@ public partial class BookPage : ContentPage, IDisposable
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
 			progressSyncComplete = false;
-			pageSettingsApplied = false;
 			pageAtCorrectPosition = false;
 		}
 
@@ -166,14 +163,12 @@ public partial class BookPage : ContentPage, IDisposable
 
 	void OnWebViewSettingsApplied()
 	{
-		// Mark that webview settings / rendering work completed and try to hide overlay
-		pageSettingsApplied = true;
 		if (progressSyncComplete && pageAtCorrectPosition)
 		{
 			Dispatcher.Dispatch(() => HideNativeOverlay());
 		}
 	}
-
+#pragma warning disable S2325 // Method can be static, but keeping as instance for consistency
 	void ShowNativeOverlay()
 	{
 		NativeLoadingOverlay.IsVisible = true;
@@ -183,6 +178,7 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		NativeLoadingOverlay.IsVisible = false;
 	}
+#pragma warning restore S2325 // Method can be static
 
 	/// <summary>
 	/// Handles the tap event on the grid area, triggering animations for translation, scaling, and fading.
@@ -381,97 +377,152 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task HandleWebViewActionAsync(string methodName, string data)
 	{
-		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"),
-			out int parsedPage) ? parsedPage : 0;
-        
-		switch (methodName.ToLowerInvariant())
+		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int parsedPage) ? parsedPage : 0;
+		var lowerMethod = methodName.ToLowerInvariant();
+		switch (lowerMethod)
 		{
 			case "next":
-					await webViewHelper.Next(pageLabel, book);
-					await NotifyMediaOverlayChapterRequestedAsync();
+				await HandleNextAsync();
 				break;
 			case "prev":
-					await webViewHelper.Prev(pageLabel, book);
-					await NotifyMediaOverlayChapterRequestedAsync();
+			System.Diagnostics.Trace.TraceInformation("Handling prev action from JS");
+				await HandlePrevAsync();
 				break;
 			case "menu":
-				GridArea_Tapped(this, EventArgs.Empty);
+				HandleMenu();
 				break;
 			case "pageload":
-				await Dispatcher.DispatchAsync(async () =>
-				{
-					await webViewHelper.OnSettingsClickedAsync();
-					await UpdateUiAppearance();
-					if (currentPage == 0 && book.CurrentPage > 0)
-					{
-						await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
-					}
-					pageLabel.Text = await GetCurrentPageInfoAsync();
-					pageAtCorrectPosition = true;
-					HideNativeOverlay();
-					await NotifyMediaOverlayPageLoadedAsync();
-				});
+				await HandlePageLoadAsync(currentPage);
 				break;
 			case "characterposition":
-				book.CurrentPage = currentPage;
-				await Dispatcher.DispatchAsync(async () =>
-				{
-					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-
-				if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
-				{
-					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
-				}
-				else
-				{
-					pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
-				}
-				});
+				await HandleCharacterPositionAsync(currentPage, data);
 				break;
 			case "mediaoverlaylog":
-				if (!string.IsNullOrEmpty(data))
-				{
-					var decoded = Uri.UnescapeDataString(data);
-					Trace.TraceInformation($"[MediaOverlay JS] {decoded}");
-				}
+				HandleMediaOverlayLog(data);
 				break;
 			case "mediaoverlaytoggle":
-				if (mediaOverlayManager is null)
-				{
-					Trace.TraceInformation("Media overlay toggle ignored; manager unavailable.");
-					break;
-				}
-				if (!bool.TryParse(data, out var enabled))
-				{
-					Trace.TraceWarning($"Invalid media overlay toggle payload: {data}");
-					break;
-				}
-				await mediaOverlayManager.SetEnabledAsync(enabled);
+				await HandleMediaOverlayToggleAsync(data);
 				break;
 			case "mediaoverlayplay":
-				if (mediaOverlayManager is not null)
-				{
-					await mediaOverlayManager.PlayAsync();
-				}
+				await HandleMediaOverlayPlayAsync();
 				break;
 			case "mediaoverlaypause":
-				if (mediaOverlayManager is not null)
-				{
-					await mediaOverlayManager.PauseAsync();
-				}
+				await HandleMediaOverlayPauseAsync();
 				break;
 			case "mediaoverlaynext":
-				if (mediaOverlayManager is not null)
-				{
-					await mediaOverlayManager.NextAsync();
-				}
+				await HandleMediaOverlayNextAsync();
 				break;
 			case "mediaoverlayprev":
-				if (mediaOverlayManager is not null)
-				{
-					await mediaOverlayManager.PreviousAsync();
-				}
+			System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
+				await HandleMediaOverlayPrevAsync();
 				break;
+		}
+	}
+	// --- Extracted methods below ---
+	async Task HandleNextAsync()
+	{
+		await webViewHelper.Next(pageLabel, book);
+		await NotifyMediaOverlayChapterRequestedAsync();
+	}
+
+	async Task HandlePrevAsync()
+	{
+		await webViewHelper.Prev(pageLabel, book);
+		await NotifyMediaOverlayChapterRequestedAsync();
+	}
+
+	void HandleMenu()
+	{
+		GridArea_Tapped(this, EventArgs.Empty);
+	}
+
+	async Task HandlePageLoadAsync(int currentPage)
+	{
+		await Dispatcher.DispatchAsync(async () =>
+		{
+			await webViewHelper.OnSettingsClickedAsync();
+			await UpdateUiAppearance();
+			if (currentPage == 0 && book.CurrentPage > 0)
+			{
+				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+			}
+			pageLabel.Text = await GetCurrentPageInfoAsync();
+			pageAtCorrectPosition = true;
+			HideNativeOverlay();
+			await NotifyMediaOverlayPageLoadedAsync();
+		});
+	}
+
+	async Task HandleCharacterPositionAsync(int currentPage, string data)
+	{
+		book.CurrentPage = currentPage;
+		await Dispatcher.DispatchAsync(async () =>
+		{
+			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+			if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
+			{
+				pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
+			}
+			else
+			{
+				pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
+			}
+		});
+	}
+
+	static void HandleMediaOverlayLog(string data)
+	{
+		if (!string.IsNullOrEmpty(data))
+		{
+			var decoded = Uri.UnescapeDataString(data);
+			Trace.TraceInformation($"[MediaOverlay JS] {decoded}");
+		}
+	}
+
+	async Task HandleMediaOverlayToggleAsync(string data)
+	{
+		if (mediaOverlayManager is null)
+		{
+			Trace.TraceInformation("Media overlay toggle ignored; manager unavailable.");
+			return;
+		}
+		if (!bool.TryParse(data, out var enabled))
+		{
+			Trace.TraceWarning($"Invalid media overlay toggle payload: {data}");
+			return;
+		}
+		await mediaOverlayManager.SetEnabledAsync(enabled);
+	}
+
+	async Task HandleMediaOverlayPlayAsync()
+	{
+		if (mediaOverlayManager is not null)
+		{
+			await mediaOverlayManager.PlayAsync();
+		}
+	}
+
+	async Task HandleMediaOverlayPauseAsync()
+	{
+		if (mediaOverlayManager is not null)
+		{
+			await mediaOverlayManager.PauseAsync();
+		}
+	}
+
+	async Task HandleMediaOverlayNextAsync()
+	{
+		if (mediaOverlayManager is not null)
+		{
+			await mediaOverlayManager.NextAsync();
+		}
+	}
+
+	async Task HandleMediaOverlayPrevAsync()
+	{
+		if (mediaOverlayManager is not null)
+		{
+			await mediaOverlayManager.PreviousAsync();
 		}
 	}
 

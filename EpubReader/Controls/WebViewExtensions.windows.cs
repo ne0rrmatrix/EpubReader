@@ -1,4 +1,5 @@
-﻿using Microsoft.Maui.Handlers;
+﻿using EpubReader.Converter;
+using Microsoft.Maui.Handlers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -46,8 +47,12 @@ public static partial class WebViewExtensions
 	static void MessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
 	{
 		var rawString = args.TryGetWebMessageAsString();
-		var bytes = Convert.FromBase64String(rawString);
-        var json = System.Text.Encoding.UTF8.GetString(bytes);
+		var json = Base64Decoder.DecodeFromBase64(rawString);
+		if (json is null)
+		{
+			System.Diagnostics.Trace.TraceWarning("WebView2 MessageReceived failed to decode base64 message");
+			return;
+		}
 		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
 	}
 

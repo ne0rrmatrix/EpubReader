@@ -68,6 +68,47 @@ const navigationState = {
     pending: null // 'next' | 'prev' | null
 };
 
+// Rate limit media-overlay navigation to avoid thrashing during smooth scrolls
+const mediaOverlayNavigationDebounceMs = 600;
+let mediaOverlayNavigationCooldownUntil = 0;
+const mediaOverlayAutoAdvanceCooldownMs = 1500;
+let mediaOverlayAutoAdvanceCooldownUntil = 0;
+
+function isUserNavigationLocked() {
+    return mediaOverlayUi.state.enabled && mediaOverlayUi.state.playing;
+}
+
+function shouldBlockMediaOverlayNavigation() {
+    if (navigationState.isAnimating) {
+        logMediaOverlay('Navigation ignored while animating');
+        return true;
+    }
+
+    const now = Date.now();
+    if (now < mediaOverlayNavigationCooldownUntil) {
+        logMediaOverlay('Navigation ignored by cooldown', { remainingMs: mediaOverlayNavigationCooldownUntil - now });
+        return true;
+    }
+
+    mediaOverlayNavigationCooldownUntil = now + mediaOverlayNavigationDebounceMs;
+    return false;
+}
+
+function shouldThrottleMediaOverlayAutoAdvance() {
+    if (!mediaOverlayUi.state.playing) {
+        return false;
+    }
+
+    const now = Date.now();
+    if (now < mediaOverlayAutoAdvanceCooldownUntil) {
+        logMediaOverlay('Auto-advance ignored by cooldown', { remainingMs: mediaOverlayAutoAdvanceCooldownUntil - now });
+        return true;
+    }
+
+    mediaOverlayAutoAdvanceCooldownUntil = now + mediaOverlayAutoAdvanceCooldownMs;
+    return false;
+}
+
 document.addEventListener('selectstart', function (e) {
     e.preventDefault();
 });
@@ -138,7 +179,7 @@ function applyMediaOverlayHighlightTheme() {
     }
 
     const doc = domUtils.getIframeDocument();
-    if (!doc || !doc.head) {
+    if (!doc?.head) {
         return;
     }
 
@@ -149,7 +190,7 @@ function applyMediaOverlayHighlightTheme() {
     if (!styleNode) {
         styleNode = doc.createElement('style');
         styleNode.id = styleId;
-        styleNode.setAttribute('data-generated-by', 'media-overlay');
+        styleNode.dataset.generatedBy = 'media-overlay';
         doc.head.appendChild(styleNode);
     }
 
@@ -714,13 +755,31 @@ function handleMessage(event, platform) {
         console.log("Jumping to:", href);
         sendToNativeMessage({ action: 'jump', href: href });
     } else if (data === "next") {
+        if (isUserNavigationLocked()) {
+            logMediaOverlay('User navigation blocked during playback', { action: 'next' });
+            return;
+        }
         handleNextCommand();
     } else if (data === "prev") {
+        if (isUserNavigationLocked()) {
+            logMediaOverlay('User navigation blocked during playback', { action: 'prev' });
+            return;
+        }
         handlePrevCommand();
     } else if (data === "menu") {
         console.log("Received menu command.");
         sendToNativeMessage({ action: 'menu' });
     }
+}
+
+function encodeForCSharp(str) {
+    // Convert to UTF-8 bytes, then to base64
+    const utf8Bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (const byte of utf8Bytes) {
+        binary += String.fromCodePoint(byte);
+    }
+    return btoa(binary);
 }
 
 // Helper: send to native bridge on Android using base64-encoded JSON, fallback to location.href scheme
@@ -729,7 +788,7 @@ function sendToNativeMessage(obj) {
         const payload = (typeof obj === 'string') ? { action: obj } : obj;
         const json = JSON.stringify(payload);
         const platform = domUtils.detectPlatform();
-        const base64Json = btoa(json);
+        const base64Json = encodeForCSharp(json);
         console.log('Prepared native message payload:', base64Json);
         
         if (globalThis.jsBridge && platform.isAndroid) {
@@ -917,6 +976,40 @@ function handleMediaOverlayPlayClick() {
     sendMediaOverlayCommand(action);
 }
 
+function getActiveMediaOverlayHighlightElement(doc) {
+    const connectedHighlight = mediaOverlayHighlight.elements.find(element => element?.isConnected);
+    if (connectedHighlight) {
+        return connectedHighlight;
+    }
+
+    const selector = buildClassSelector(mediaOverlayHighlight.activeClass);
+    if (selector && doc) {
+        return doc.querySelector(selector);
+    }
+
+    return null;
+}
+
+function maybeNavigateToPreviousPageFromHighlightTop() {
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+        return;
+    }
+
+    const highlightElement = getActiveMediaOverlayHighlightElement(doc);
+    if (!highlightElement) {
+        return;
+    }
+
+    const rect = highlightElement.getBoundingClientRect();
+    const topThresholdPx = 6;
+
+    if (rect.top <= topThresholdPx) {
+        logMediaOverlay('Highlight at top of page, paging previous', { top: rect.top });
+        handlePrevCommand();
+    }
+}
+
 function handleMediaOverlayPrevClick() {
     if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
         logMediaOverlay('Prev ignored', {
@@ -926,6 +1019,12 @@ function handleMediaOverlayPrevClick() {
         });
         return;
     }
+    if (shouldBlockMediaOverlayNavigation()) {
+        return;
+    }
+
+    maybeNavigateToPreviousPageFromHighlightTop();
+   
     logMediaOverlay('Prev requested');
     sendMediaOverlayCommand('mediaoverlayprev');
 }
@@ -937,6 +1036,9 @@ function handleMediaOverlayNextClick() {
             enabled: mediaOverlayUi.state.enabled,
             segments: mediaOverlayUi.state.segmentCount
         });
+        return;
+    }
+    if (shouldBlockMediaOverlayNavigation()) {
         return;
     }
     logMediaOverlay('Next requested');
@@ -1037,69 +1139,97 @@ function initializeMediaOverlayUi(config) {
 }
 
 function updateMediaOverlayPlaybackState(state) {
+
     if (state) {
-       // logMediaOverlay('Playback state update received', state);
-    }
-    if (state) {
-        if (typeof state.enabled === 'boolean') {
-            mediaOverlayUi.state.enabled = state.enabled;
-        }
-        if (typeof state.playing === 'boolean') {
-            mediaOverlayUi.state.playing = state.playing;
-        }
-        if (typeof state.segmentIndex === 'number') {
-            mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
-        }
-        if (typeof state.segmentCount === 'number') {
-            mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(state.segmentCount));
-        }
-        if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
-            mediaOverlayUi.state.chapterTitle = state.chapterTitle;
-        }
-        if (Object.hasOwn(state, 'durationSeconds')) {
-            const value = state.durationSeconds;
-            mediaOverlayUi.state.durationSeconds = typeof value === 'number' ? value : null;
-        }
+        updateUiStateFromPayload(state);
     }
 
     const container = ensureMediaOverlayUi();
-    if (!container) {
-        return;
+    if (!container) return;
+
+    updateUiTitle();
+    updateUiToggleButton();
+    updateUiNarrator();
+    updateUiDuration();
+    const disableControls = !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0;
+    updateUiControls(disableControls);
+    updateUiPlayButton();
+    updateUiStatus();
+    updateUiContainerClass(disableControls);
+    applyPlaybackClassToHighlight();
+}
+
+function updateUiStateFromPayload(state) {
+    if (typeof state.enabled === 'boolean') {
+        mediaOverlayUi.state.enabled = state.enabled;
+    }
+    if (typeof state.playing === 'boolean') {
+        mediaOverlayUi.state.playing = state.playing;
+    }
+    if (typeof state.segmentIndex === 'number') {
+        mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
+    }
+    if (typeof state.segmentCount === 'number') {
+        mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(state.segmentCount));
+    }
+    if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
+        mediaOverlayUi.state.chapterTitle = state.chapterTitle;
+    }
+    if (Object.hasOwn(state, 'durationSeconds')) {
+        const value = state.durationSeconds;
+        mediaOverlayUi.state.durationSeconds = typeof value === 'number' ? value : null;
     }
 
+    if (!mediaOverlayUi.state.playing) {
+        mediaOverlayNavigationCooldownUntil = 0;
+        mediaOverlayAutoAdvanceCooldownUntil = 0;
+    }
+}
+
+function updateUiTitle() {
     if (mediaOverlayUi.title && mediaOverlayUi.state.chapterTitle) {
         mediaOverlayUi.title.textContent = mediaOverlayUi.state.chapterTitle;
     }
+}
 
+function updateUiToggleButton() {
     if (mediaOverlayUi.toggleButton) {
         mediaOverlayUi.toggleButton.setAttribute('aria-pressed', mediaOverlayUi.state.enabled ? 'true' : 'false');
         mediaOverlayUi.toggleButton.textContent = mediaOverlayUi.state.enabled ? 'Listening' : 'Read Only';
     }
+}
 
+function updateUiNarrator() {
     if (mediaOverlayUi.narrator) {
         mediaOverlayUi.narrator.textContent = mediaOverlayUi.state.narrator
             ? 'Narrated by ' + mediaOverlayUi.state.narrator
             : 'Narrator unavailable';
     }
+}
 
+function updateUiDuration() {
     if (mediaOverlayUi.duration) {
         const formattedDuration = formatDuration(mediaOverlayUi.state.durationSeconds);
         mediaOverlayUi.duration.textContent = formattedDuration ? 'Duration ' + formattedDuration : '';
     }
+}
 
-    const disableControls = !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0;
-
+function updateUiControls(disableControls) {
     [mediaOverlayUi.prevButton, mediaOverlayUi.playButton, mediaOverlayUi.nextButton].forEach(button => {
         if (button) {
             button.disabled = disableControls;
         }
     });
+}
 
+function updateUiPlayButton() {
     if (mediaOverlayUi.playButton) {
         mediaOverlayUi.playButton.textContent = mediaOverlayUi.state.playing ? '||' : '>';
         mediaOverlayUi.playButton.setAttribute('aria-label', mediaOverlayUi.state.playing ? 'Pause narration' : 'Play narration');
     }
+}
 
+function updateUiStatus() {
     if (mediaOverlayUi.status) {
         if (mediaOverlayUi.state.segmentCount === 0) {
             mediaOverlayUi.status.textContent = mediaOverlayUi.state.enabled
@@ -1110,16 +1240,15 @@ function updateMediaOverlayPlaybackState(state) {
             mediaOverlayUi.status.textContent = 'Segment ' + index + ' of ' + mediaOverlayUi.state.segmentCount;
         }
     }
+}
 
+function updateUiContainerClass(disableControls) {
     if (mediaOverlayUi.container) {
         mediaOverlayUi.container.classList.toggle('media-overlay-player--disabled', disableControls);
     }
-
-    applyPlaybackClassToHighlight();
 }
 
 function highlightMediaOverlayFragment(fragmentId, activeClass, playbackClass) {
-   // logMediaOverlay('Highlight request', { fragmentId, activeClass, playbackClass });
     let selectorsChanged = false;
     if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
         mediaOverlayHighlight.activeClass = activeClass;
@@ -1161,13 +1290,7 @@ function highlightMediaOverlayFragment(fragmentId, activeClass, playbackClass) {
 }
 
 function clearMediaOverlayHighlight(activeClass, playbackClass) {
-  /*
-    logMediaOverlay('Clearing highlights', {
-        trackedElements: mediaOverlayHighlight.elements.length,
-        activeClass: activeClass || mediaOverlayHighlight.activeClass,
-        playbackClass: playbackClass || mediaOverlayHighlight.playbackClass
-    });
-    */
+
     let selectorsChanged = false;
     if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
         mediaOverlayHighlight.activeClass = activeClass;
@@ -1225,7 +1348,7 @@ function applyPlaybackClassToHighlight() {
         return;
     }
 
-    mediaOverlayHighlight.elements = mediaOverlayHighlight.elements.filter(element => element && element.isConnected);
+    mediaOverlayHighlight.elements = mediaOverlayHighlight.elements.filter(element => element?.isConnected);
     mediaOverlayHighlight.elements.forEach(element => {
         if (!element) {
             return;
@@ -1236,12 +1359,6 @@ function applyPlaybackClassToHighlight() {
             element.classList.remove(mediaOverlayHighlight.playbackClass);
         }
     });
-    /*
-    logMediaOverlay('Playback class applied', {
-        playing: mediaOverlayUi.state.playing,
-        elements: mediaOverlayHighlight.elements.length
-    });
-    */
 }
 
 function buildClassSelector(className) {
@@ -1253,7 +1370,8 @@ function buildClassSelector(className) {
         return '.' + globalThis.CSS.escape(className);
     }
 
-    return '.' + className.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
+    // Use String.raw to avoid escaping backslashes
+    return '.' + className.replaceAll(/([^a-zA-Z0-9_-])/g, String.raw`\$1`);
 }
 
 function formatDuration(seconds) {
@@ -1282,6 +1400,10 @@ function formatDuration(seconds) {
  */
 function handleNextCommand() {
     const platform = domUtils.detectPlatform();
+
+    if (mediaOverlayUi.state.playing && shouldThrottleMediaOverlayAutoAdvance()) {
+        return;
+    }
 
     // If animation in progress, coalesce to a single pending "next"
     if (navigationState.isAnimating) {
@@ -1632,7 +1754,12 @@ function getVisibleSegmentPosition(fragmentId, segmentList) {
             return JSON.stringify({ index: -1, count: 0 });
         }
 
-        const ids = Array.isArray(segmentList) ? segmentList : (segmentList ? JSON.parse(segmentList) : []);
+        let ids = [];
+        if (Array.isArray(segmentList)) {
+            ids = segmentList;
+        } else if (segmentList) {
+            ids = JSON.parse(segmentList);
+        }
         const visible = [];
         for (const id of ids) {
             const el = doc.getElementById(id);
@@ -1659,7 +1786,7 @@ function getVisibleSegmentPosition(fragmentId, segmentList) {
  * advance pages. This mirrors the expectation from the C# side which calls
  * this function before highlighting a fragment.
  */
-function ensureFragmentVisibleUsingNext(fragmentId) {
+function ensureFragmentVisibleUsingNext(fragmentId, direction) {
     try {
         const doc = domUtils.getIframeDocument();
         const win = domUtils.getContentWindow();
@@ -1667,9 +1794,16 @@ function ensureFragmentVisibleUsingNext(fragmentId) {
             return;
         }
 
+        const intent = direction === 'prev' ? 'prev' : 'next';
+
         const el = doc.getElementById(fragmentId);
         if (!el) {
             console.warn('ensureFragmentVisibleUsingNext: fragment not found', fragmentId);
+            if (intent === 'prev') {
+                handlePrevCommand();
+            } else {
+                handleNextCommand();
+            }
             return;
         }
 
@@ -1687,6 +1821,10 @@ function ensureFragmentVisibleUsingNext(fragmentId) {
         } else if (rect.right < 0) {
             // move left/previous
             handlePrevCommand();
+        } else if (intent === 'prev') {
+            handlePrevCommand();
+        } else {
+            handleNextCommand();
         }
     } catch (e) {
         console.error('ensureFragmentVisibleUsingNext failed', e);
