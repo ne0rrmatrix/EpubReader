@@ -205,3 +205,79 @@ iframe {
         align-items: flex-start;
     }
 }
+
+/* Minimized overlay styles */
+#mediaOverlayPlayerRoot[data-minimized="true"] {
+    bottom: 0.5rem;
+    left: 0;
+    right: 0;
+    justify-content: center;
+}
+
+/* When the root is minimized, hide the full overlay container entirely */
+#mediaOverlayPlayerRoot[data-minimized="true"] .media-overlay-player {
+    display: none !important;
+}
+
+.media-overlay-player.minimized {
+    width: 120px !important;
+    height: 48px !important;
+    padding: 0.25rem !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.25rem !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+}
+
+.media-overlay-player.minimized .media-overlay-player__controls,
+.media-overlay-player.minimized .media-overlay-player__meta {
+    display: none !important;
+}
+
+.media-overlay-player.minimized .media-overlay-player__title {
+    font-size: 0.9rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.media-overlay-player__minimize {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--media-overlay-border);
+    background: rgba(255,255,255,0.02);
+    color: var(--media-overlay-text);
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure overlay captures pointer events when visible/minimized */
+#mediaOverlayPlayerRoot[data-visible="true"] {
+    pointer-events: auto;
+}
+
+.media-overlay-player__dock {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 1px solid var(--media-overlay-border);
+    background: linear-gradient(135deg, var(--media-overlay-surface) 0%, rgba(11,26,37,0.88) 100%);
+    color: var(--media-overlay-text);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.05rem;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+}
+
+/* Dock button when root is minimized should be visible */
+#mediaOverlayPlayerRoot[data-minimized="true"] .media-overlay-player__dock {
+    display: flex;
+}

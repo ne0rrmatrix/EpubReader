@@ -18,9 +18,11 @@ const mediaOverlayUi = {
     duration: null,
     status: null,
     toggleButton: null,
+    minimizeButton: null,
     playButton: null,
     prevButton: null,
     nextButton: null,
+    minimized: false,
     state: {
         supported: false,
         enabled: false,
@@ -830,9 +832,15 @@ function resetMediaOverlayDom() {
     mediaOverlayUi.duration = null;
     mediaOverlayUi.status = null;
     mediaOverlayUi.toggleButton = null;
+    mediaOverlayUi.minimizeButton = null;
+    if (mediaOverlayUi.dockButton) {
+        mediaOverlayUi.dockButton.remove();
+    }
+    mediaOverlayUi.dockButton = null;
     mediaOverlayUi.playButton = null;
     mediaOverlayUi.prevButton = null;
     mediaOverlayUi.nextButton = null;
+    mediaOverlayUi.minimized = false;
 }
 
 function ensureMediaOverlayUi() {
@@ -875,10 +883,27 @@ function buildMediaOverlayUi(root) {
     toggleButton.type = 'button';
     toggleButton.className = 'media-overlay-player__toggle';
     toggleButton.setAttribute('aria-pressed', 'false');
-    toggleButton.textContent = 'Read Only';
+    toggleButton.textContent = 'Playback Disabled';
     toggleButton.addEventListener('click', handleMediaOverlayToggleClick);
 
-    header.append(titleWrap, toggleButton);
+    // Minimize/restore button
+    const minimizeButton = document.createElement('button');
+    minimizeButton.type = 'button';
+    minimizeButton.className = 'media-overlay-player__minimize';
+    minimizeButton.setAttribute('aria-label', 'Minimize media overlay');
+    minimizeButton.textContent = '\u2013'; // en dash as minimize glyph
+    minimizeButton.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        handleMediaOverlayMinimizeClick();
+    });
+
+    // Append minimize button near toggle for easy access
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.gap = '0.5rem';
+    headerRight.append(minimizeButton, toggleButton);
+
+    header.append(titleWrap, headerRight);
 
     const meta = document.createElement('div');
     meta.className = 'media-overlay-player__meta';
@@ -927,6 +952,19 @@ function buildMediaOverlayUi(root) {
     container.append(header, meta, controls);
     root.appendChild(container);
 
+    // Create a small docked restore button that is shown when minimized
+    const dockButton = document.createElement('button');
+    dockButton.type = 'button';
+    dockButton.className = 'media-overlay-player__dock';
+    dockButton.setAttribute('aria-label', 'Restore media overlay');
+    dockButton.textContent = '\u25A3'; // square glyph as restore icon
+    dockButton.style.display = 'none';
+    dockButton.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        setMediaOverlayMinimized(false);
+    });
+    root.appendChild(dockButton);
+
     mediaOverlayUi.container = container;
     mediaOverlayUi.eyebrow = eyebrow;
     mediaOverlayUi.title = title;
@@ -934,9 +972,71 @@ function buildMediaOverlayUi(root) {
     mediaOverlayUi.duration = duration;
     mediaOverlayUi.status = status;
     mediaOverlayUi.toggleButton = toggleButton;
+    mediaOverlayUi.minimizeButton = minimizeButton;
+    mediaOverlayUi.dockButton = dockButton;
     mediaOverlayUi.prevButton = prevButton;
     mediaOverlayUi.playButton = playButton;
     mediaOverlayUi.nextButton = nextButton;
+
+    // container click restores when minimized (tap-to-restore)
+    container.addEventListener('click', function (ev) {
+        if (mediaOverlayUi.minimized) {
+            ev.stopPropagation();
+            setMediaOverlayMinimized(false);
+        }
+    });
+
+    // Prevent underlying content from receiving taps when overlay is present
+    root.style.pointerEvents = 'auto';
+}
+
+function setMediaOverlayMinimized(minimized) {
+    const root = ensureMediaOverlayRoot();
+    mediaOverlayUi.minimized = Boolean(minimized);
+    if (root) {
+        root.dataset.minimized = mediaOverlayUi.minimized ? 'true' : 'false';
+    }
+    // When minimized, remove the full overlay container from the DOM so
+    // nothing of the UI remains visible — only the dock button will be shown.
+    if (mediaOverlayUi.minimized) {
+        if (mediaOverlayUi.container) {
+            mediaOverlayUi.container.remove();
+            mediaOverlayUi.container = null;
+        }
+
+        if (mediaOverlayUi.dockButton) {
+            mediaOverlayUi.dockButton.style.display = 'flex';
+        }
+
+        // Ensure root is visible so the dock button can be interacted with
+        if (root) {
+            root.dataset.visible = 'true';
+            root.style.pointerEvents = 'auto';
+        }
+    } else {
+        // Restoring: hide dock and recreate the full overlay UI
+        if (mediaOverlayUi.dockButton) {
+            mediaOverlayUi.dockButton.style.display = 'none';
+        }
+        // Rebuild container if needed
+        ensureMediaOverlayUi();
+        // Refresh the rebuilt UI from the in-memory state so metadata is shown
+        try {
+            updateMediaOverlayPlaybackState(mediaOverlayUi.state);
+        } catch (e) {
+            console.warn('Failed to refresh media overlay UI on restore', e);
+        }
+        if (root) {
+            root.dataset.visible = 'true';
+            root.style.pointerEvents = 'auto';
+        }
+    }
+
+    logMediaOverlay('Minimized state changed', { minimized: mediaOverlayUi.minimized });
+}
+
+function handleMediaOverlayMinimizeClick() {
+    setMediaOverlayMinimized(!mediaOverlayUi.minimized);
 }
 
 function sendMediaOverlayCommand(action, payload) {
@@ -1062,6 +1162,9 @@ function setMediaOverlayVisibility(isSupported) {
         mediaOverlayUi.state.segmentCount = 0;
         mediaOverlayUi.state.segmentIndex = 0;
         clearMediaOverlayHighlight();
+        // clear minimized state when hiding
+        root.dataset.minimized = 'false';
+        mediaOverlayUi.minimized = false;
         root.innerHTML = '';
         resetMediaOverlayDom();
         return;
@@ -1195,7 +1298,7 @@ function updateUiTitle() {
 function updateUiToggleButton() {
     if (mediaOverlayUi.toggleButton) {
         mediaOverlayUi.toggleButton.setAttribute('aria-pressed', mediaOverlayUi.state.enabled ? 'true' : 'false');
-        mediaOverlayUi.toggleButton.textContent = mediaOverlayUi.state.enabled ? 'Listening' : 'Read Only';
+        mediaOverlayUi.toggleButton.textContent = mediaOverlayUi.state.enabled ? 'Playable' : 'Playback Disabled';
     }
 }
 
@@ -1529,6 +1632,7 @@ document.addEventListener("DOMContentLoaded", function () {
     mediaOverlayUi.root = document.getElementById('mediaOverlayPlayerRoot');
     if (mediaOverlayUi.root) {
         mediaOverlayUi.root.dataset.visible = 'false';
+        mediaOverlayUi.root.dataset.minimized = 'false';
         mediaOverlayUi.root.setAttribute('aria-live', 'polite');
     }
 
