@@ -266,7 +266,7 @@ public static class MediaOverlayParser
         {
             result = default;
             // units: ms, s, min, h (case-insensitive)
-            var m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase);
+            var m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(2000));
             if (!m.Success)
             {
                 return false;
