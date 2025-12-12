@@ -1273,8 +1273,6 @@ function handleMediaOverlayPrevClick() {
         return;
     }
 
-    maybeNavigateToPreviousPageFromHighlightTop();
-   
     logMediaOverlay('Prev requested');
     sendMediaOverlayCommand('mediaoverlayprev');
 }
