@@ -1,5 +1,3 @@
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 public partial class LoginPage : ContentPage

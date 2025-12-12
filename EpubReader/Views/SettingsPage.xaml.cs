@@ -1,8 +1,5 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
-using CommunityToolkit.Maui.Extensions;
-using Syncfusion.Maui.Toolkit.Internals;
 
 namespace EpubReader.Views;
 

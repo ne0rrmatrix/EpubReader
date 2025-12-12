@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml.Controls;
 using WinUIWindow = Microsoft.UI.Xaml.Window;
-using WinUIApplication = Microsoft.UI.Xaml.Application;
 using WinUIGrid = Microsoft.UI.Xaml.Controls.Grid;
 using WinUIButton = Microsoft.UI.Xaml.Controls.Button;
 using WinUIRowDefinition = Microsoft.UI.Xaml.Controls.RowDefinition;

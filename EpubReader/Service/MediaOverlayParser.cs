@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 using EpubReader.Models.MediaOverlays;
 using VersOne.Epub;
@@ -25,7 +20,7 @@ public static class MediaOverlayParser
     {
         ArgumentNullException.ThrowIfNull(book);
 
-        var manifestItems = book.Schema.Package.Manifest.Items ?? new List<EpubManifestItem>();
+        var manifestItems = book.Schema.Package.Manifest.Items ?? [];
         var overlayDocuments = new Dictionary<string, MediaOverlayDocument>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
@@ -57,7 +52,7 @@ public static class MediaOverlayParser
             }
         }
 
-        var metaItems = book.Schema.Package.Metadata.MetaItems ?? new List<EpubMetadataMeta>();
+        var metaItems = book.Schema.Package.Metadata.MetaItems ?? [];
         var activeClass = ResolveMeta(metaItems, "media:active-class");
         var playbackActiveClass = ResolveMeta(metaItems, "media:playback-active-class");
         var narrator = ResolveMeta(metaItems, "media:narrator");
@@ -68,7 +63,7 @@ public static class MediaOverlayParser
             return MediaOverlayParseResult.Empty;
         }
 
-        return new MediaOverlayParseResult(overlayDocuments.Values.ToList(), activeClass, playbackActiveClass, narrator, duration);
+        return new MediaOverlayParseResult([.. overlayDocuments.Values], activeClass, playbackActiveClass, narrator, duration);
     }
 
     static MediaOverlayDocument ParseSmil(string manifestId, string href, string content)

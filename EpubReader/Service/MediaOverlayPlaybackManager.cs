@@ -1,11 +1,6 @@
-using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading;
-using EpubReader.Models;
 using EpubReader.Models.MediaOverlays;
-using EpubReader.ViewModels;
-using Microsoft.Maui.Dispatching;
 using Plugin.Maui.Audio;
 
 namespace EpubReader.Service;
@@ -27,7 +22,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
 	};
 	readonly Dictionary<string, MediaOverlayAudioResource> audioCache = new(StringComparer.OrdinalIgnoreCase);
-	IReadOnlyList<MediaOverlaySegment> segments = [];
+	List<MediaOverlaySegment> segments = [];
 	int currentChapterIndex = -1;
 	int segmentIndex;
 	bool isEnabled;

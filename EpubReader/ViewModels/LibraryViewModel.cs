@@ -1,11 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using EpubReader.Service;
-using EpubReader.Util;
 
 namespace EpubReader.ViewModels;
 

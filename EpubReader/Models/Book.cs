@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using SQLite;
+﻿using SQLite;
 using EpubReader.Models.MediaOverlays;
 
 namespace EpubReader.Models;

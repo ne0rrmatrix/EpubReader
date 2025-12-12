@@ -1,6 +1,4 @@
-using System;
 using System.Globalization;
-using Microsoft.Maui.Controls;
 
 namespace EpubReader.Converter;
 public class StringIsNotNullOrEmptyConverter : IValueConverter

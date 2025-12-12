@@ -1,4 +1,3 @@
-using System.Text;
 using Android.Webkit;
 using EpubReader.Converter;
 using Java.Interop;

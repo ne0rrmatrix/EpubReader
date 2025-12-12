@@ -1,5 +1,4 @@
 using System.Text;
-using System.Linq;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using VersOne.Epub;
@@ -130,7 +129,7 @@ public static partial class EbookService
 			Chapters = chapters,
 			Images = images,
 			Css = cssFiles,
-			MediaOverlays = mediaOverlayResult.Documents.ToList(),
+			MediaOverlays = [.. mediaOverlayResult.Documents],
 			MediaOverlayAudio = mediaOverlayAudio,
 			MediaOverlayActiveClass = mediaOverlayResult.ActiveClass,
 			MediaOverlayPlaybackActiveClass = mediaOverlayResult.PlaybackActiveClass,

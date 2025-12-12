@@ -1,5 +1,4 @@
-﻿using XmlnsPrefixAttribute = Microsoft.Maui.Controls.XmlnsPrefixAttribute;
-[assembly: XmlnsDefinition(
+﻿[assembly: XmlnsDefinition(
 	"http://schemas.microsoft.com/dotnet/maui/global",
 	"EpubReader.Views")]
 [assembly: XmlnsDefinition(
