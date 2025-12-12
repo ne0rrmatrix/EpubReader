@@ -4,7 +4,7 @@ set -e
 GJSON="${1:-./build-secrets/google-services.json}"
 OUT="${2:-./build-secrets/android/strings.secrets.xml}"
 
-if [ ! -f "$GJSON" ]; then
+if [[ ! -f "$GJSON" ]]; then
   echo "google-services.json not found at $GJSON"
   exit 1
 fi
