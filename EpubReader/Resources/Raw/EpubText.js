@@ -307,20 +307,15 @@ const navigationUtils = {
             if (platform.isWindows) {
                 // Windows Edge has issues with smooth scrolling; use instant
                 contentWindow.scrollTo(target, 0);
-
+            } else if (mediaOverlayUi.state?.enabled) {
+                // During media overlay playback, use instant scrolling to avoid disrupting narration timing
+                contentWindow.scrollTo(target, 0);
             } else {
-                // If media overlay is active (enabled), prefer instant jumps
-                // to avoid animation interfering with audio playback and
-                // highlight synchronization.
-                if (mediaOverlayUi.state?.enabled) {
-                    contentWindow.scrollTo(target, 0);
-                } else {
-                    contentWindow.scrollTo({
-                        left: target,
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                }
+                contentWindow.scrollTo({
+                    left: target,
+                    top: 0,
+                    behavior: 'smooth'
+                });
             }
         });
     },
@@ -960,73 +955,66 @@ function buildMediaOverlayUi(root) {
     timeLabel.textContent = '';
 
     // Seek interactions: set seeking flag while user drags; only send on change (release)
-    seekInput.addEventListener('input', function () {
-        // live update only locally
-        const ratio = Number(seekInput.value) || 0;
+    // Helper: update the time label and in-memory position
+    function _updateSeekPreviewTime(ratio) {
         const secs = mediaOverlayUi.state.durationSeconds ? (ratio * mediaOverlayUi.state.durationSeconds) : null;
-        timeLabel.textContent = (secs != null ? formatDuration(secs) : '0:00') + (mediaOverlayUi.state.durationSeconds ? ' / ' + formatDuration(mediaOverlayUi.state.durationSeconds) : '');
-
-        // Update in-memory position so other UI helpers reflect the previewed position
+        timeLabel.textContent = (secs == null ? '0:00' : formatDuration(secs)) + (mediaOverlayUi.state.durationSeconds ? ' / ' + formatDuration(mediaOverlayUi.state.durationSeconds) : '');
         if (secs != null) {
             mediaOverlayUi.state.positionSeconds = secs;
         }
+    }
 
-        // While dragging, move the document viewport to the corresponding horizontal position
+    // Helper: update highlight near viewport center
+    function _applyPreviewHighlight(doc, contentWindow) {
+        try {
+            const cx = Math.floor(contentWindow.innerWidth / 2);
+            const el = doc.elementFromPoint(cx, Math.floor(contentWindow.innerHeight / 2));
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+
+            clearMediaOverlayHighlight();
+            if (mediaOverlayHighlight.activeClass) el.classList.add(mediaOverlayHighlight.activeClass);
+            if (mediaOverlayHighlight.playbackClass && mediaOverlayUi.state.playing) el.classList.add(mediaOverlayHighlight.playbackClass);
+            mediaOverlayHighlight.elements = [el];
+        } catch (e) {
+            console.warn('Preview highlight failed', e);
+        }
+    }
+
+    // Helper: perform live preview scroll and page snapping
+    function _performLivePreviewScroll(ratio) {
         try {
             const contentWindow = domUtils.getContentWindow();
             const doc = domUtils.getIframeDocument();
-            if (contentWindow && doc) {
-                const scrollElem = doc.scrollingElement || doc.documentElement;
-                const maxScrollLeft = Math.max(0, scrollElem.scrollWidth - contentWindow.innerWidth);
+            if (!contentWindow || !doc) return;
 
-                // Calculate per-page scroll amount and snap to nearest page
-                const scrollAmount = navigationUtils.calculateScrollAmount(contentWindow) || contentWindow.innerWidth;
-                let desiredLeft = Math.round(ratio * maxScrollLeft);
+            const scrollElem = doc.scrollingElement || doc.documentElement;
+            const maxScrollLeft = Math.max(0, scrollElem.scrollWidth - contentWindow.innerWidth);
+            const scrollAmount = navigationUtils.calculateScrollAmount(contentWindow) || contentWindow.innerWidth;
 
-                if (scrollAmount > 0) {
-                    const pageIndex = Math.round(desiredLeft / scrollAmount);
-                    const maxPageIndex = Math.max(0, Math.floor(maxScrollLeft / scrollAmount));
-                    const clampedIndex = Math.min(maxPageIndex, Math.max(0, pageIndex));
-                    desiredLeft = Math.round(clampedIndex * scrollAmount);
-                    // Update preview current page index
-                    currentPage = clampedIndex;
-                }
-
-                // Use existing page-turn animation utility so we don't create
-                // ad-hoc scrolling behavior. If a navigation animation is
-                // already active, skip to avoid interfering with it.
-                const platform = domUtils.detectPlatform();
-                if (!navigationState.isAnimating) {
-                    navigationUtils.animateTo(contentWindow, desiredLeft, platform).catch(() => { });
-                }
-
-                // Update highlighting to the element near viewport center for preview
-                try {
-                    const cx = Math.floor(contentWindow.innerWidth / 2);
-                    const cy = Math.floor(contentWindow.innerHeight / 2);
-                    // elementFromPoint is available on the iframe document
-                    const el = doc.elementFromPoint(cx, cy);
-                    if (el && el.nodeType === Node.ELEMENT_NODE) {
-                        // Clear previous highlights and apply preview classes
-                        clearMediaOverlayHighlight();
-                        if (mediaOverlayHighlight.activeClass) {
-                            el.classList.add(mediaOverlayHighlight.activeClass);
-                        }
-                        if (mediaOverlayHighlight.playbackClass) {
-                            // Apply playback class during preview only if playback is active
-                            if (mediaOverlayUi.state.playing) {
-                                el.classList.add(mediaOverlayHighlight.playbackClass);
-                            }
-                        }
-                        mediaOverlayHighlight.elements = [el];
-                    }
-                } catch (e) {
-                    console.warn('Preview highlight failed', e);
-                }
+            let desiredLeft = Math.round(ratio * maxScrollLeft);
+            if (scrollAmount > 0) {
+                const pageIndex = Math.round(desiredLeft / scrollAmount);
+                const maxPageIndex = Math.max(0, Math.floor(maxScrollLeft / scrollAmount));
+                const clampedIndex = Math.min(maxPageIndex, Math.max(0, pageIndex));
+                desiredLeft = Math.round(clampedIndex * scrollAmount);
+                currentPage = clampedIndex;
             }
+
+            const platform = domUtils.detectPlatform();
+            if (!navigationState.isAnimating) {
+                navigationUtils.animateTo(contentWindow, desiredLeft, platform).catch(() => { });
+            }
+
+            _applyPreviewHighlight(doc, contentWindow);
         } catch (e) {
             console.warn('Live preview scroll failed', e);
         }
+    }
+
+    seekInput.addEventListener('input', function () {
+        const ratio = Number(seekInput.value) || 0;
+        _updateSeekPreviewTime(ratio);
+        _performLivePreviewScroll(ratio);
     });
     seekInput.addEventListener('change', function () {
         if (!mediaOverlayUi.state.durationSeconds) return;
@@ -1055,13 +1043,12 @@ function buildMediaOverlayUi(root) {
     seekInput.addEventListener('pointerleave', function () {
         // Only clear seeking on pointerleave if buttons are not pressed (best-effort)
         try {
-            if (!('buttons' in window.Event.prototype)) {
-                mediaOverlayUi.state.seeking = false;
-            } else {
-                // Conservative: clear seeking to avoid stuck state on some UAs
-                mediaOverlayUi.state.seeking = false;
-            }
+            // Clear seeking state on pointer leave. Use a simple, deterministic
+            // assignment instead of probing Event.prototype for broader
+            // compatibility and to avoid redundant branches.
+            mediaOverlayUi.state.seeking = false;
         } catch (e) {
+            console.warn('Failed to clear seeking state on pointerleave', e);
             mediaOverlayUi.state.seeking = false;
         }
     });
@@ -1427,41 +1414,60 @@ function updateMediaOverlayPlaybackState(state) {
 }
 
 function updateUiStateFromPayload(state) {
-    if (typeof state.enabled === 'boolean') {
-        mediaOverlayUi.state.enabled = state.enabled;
-    }
-    if (typeof state.playing === 'boolean') {
-        mediaOverlayUi.state.playing = state.playing;
-    }
-    if (typeof state.segmentIndex === 'number') {
-        // Do not overwrite the current segment index while the user is actively seeking
-        if (!mediaOverlayUi.state.seeking) {
-            mediaOverlayUi.state.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
-        } else {
-            logMediaOverlay('Skipping segmentIndex update while seeking', { incoming: state.segmentIndex });
+    if (!state) return;
+
+    const s = mediaOverlayUi.state;
+
+    // Helper: safely set a boolean property from payload
+    const setBool = (prop) => {
+        if (typeof state[prop] === 'boolean') s[prop] = state[prop];
+    };
+
+    // Helper: safely set an integer >= 0
+    const setNonNegInt = (prop, target) => {
+        if (typeof state[prop] === 'number') {
+            s[target || prop] = Math.max(0, Math.floor(state[prop]));
         }
-    }
-    if (typeof state.segmentCount === 'number') {
-        mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(state.segmentCount));
-    }
-    if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
-        mediaOverlayUi.state.chapterTitle = state.chapterTitle;
-    }
-    if (Object.hasOwn(state, 'durationSeconds')) {
-        const value = state.durationSeconds;
-        mediaOverlayUi.state.durationSeconds = typeof value === 'number' ? value : null;
-    }
-    if (Object.hasOwn(state, 'positionSeconds')) {
-        // Do not let player/UI updates override the preview while user is seeking
-        if (!mediaOverlayUi.state.seeking) {
-            const v = state.positionSeconds;
-            mediaOverlayUi.state.positionSeconds = typeof v === 'number' ? v : null;
+    };
+
+    // Helper: set numeric-or-null fields when explicitly present in payload
+    const setMaybeNumber = (prop, target) => {
+        if (Object.hasOwn(state, prop)) {
+            const v = state[prop];
+            s[target || prop] = typeof v === 'number' ? v : null;
+        }
+    };
+
+    setBool('enabled');
+    setBool('playing');
+
+    // Segment index: avoid overwriting while user is seeking
+    if (typeof state.segmentIndex === 'number') {
+        if (s.seeking) {
+            logMediaOverlay('Skipping segmentIndex update while seeking', { incoming: state.segmentIndex });
         } else {
-            logMediaOverlay('Skipping positionSeconds update while seeking', { incoming: state.positionSeconds });
+            s.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
         }
     }
 
-    if (!mediaOverlayUi.state.playing) {
+    setNonNegInt('segmentCount');
+
+    if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
+        s.chapterTitle = state.chapterTitle;
+    }
+
+    setMaybeNumber('durationSeconds');
+
+    if (Object.hasOwn(state, 'positionSeconds')) {
+        if (s.seeking) {
+            logMediaOverlay('Skipping positionSeconds update while seeking', { incoming: state.positionSeconds });
+        } else {
+            const v = state.positionSeconds;
+            s.positionSeconds = typeof v === 'number' ? v : null;
+        }
+    }
+
+    if (!s.playing) {
         mediaOverlayNavigationCooldownUntil = 0;
         mediaOverlayAutoAdvanceCooldownUntil = 0;
     }
@@ -1496,30 +1502,52 @@ function updateUiDuration() {
 }
 
 function updateUiProgress() {
+    // Simplified control flow: early returns and small helpers keep complexity low
     if (!mediaOverlayUi.seekInput) return;
     const input = mediaOverlayUi.seekInput;
     const label = mediaOverlayUi.timeLabel;
     const dur = mediaOverlayUi.state.durationSeconds;
     const pos = mediaOverlayUi.state.positionSeconds;
+    const seeking = Boolean(mediaOverlayUi.state.seeking);
 
-    if (typeof dur === 'number' && !Number.isNaN(dur) && dur > 0) {
-        input.disabled = false;
-        if (!mediaOverlayUi.state.seeking) {
-            const ratio = (typeof pos === 'number' && !Number.isNaN(pos)) ? Math.max(0, Math.min(1, pos / dur)) : 0;
-            input.value = String(ratio);
-        }
-        if (label) {
-            label.textContent = (typeof pos === 'number' ? formatDuration(pos) : '0:00') + ' / ' + formatDuration(dur);
-        }
-    } else {
-        if (!mediaOverlayUi.state.seeking) {
+    const hasDuration = typeof dur === 'number' && !Number.isNaN(dur) && dur > 0;
+
+    if (!hasDuration) {
+        if (!seeking) {
             input.disabled = true;
             input.value = '0';
         }
         if (label) {
             label.textContent = dur ? formatDuration(dur) : '';
         }
+        return;
     }
+
+    input.disabled = false;
+    if (!seeking) {
+        input.value = String(computeProgressRatio(pos, dur));
+    }
+    if (label) {
+        label.textContent = computeProgressLabel(pos, dur);
+    }
+}
+
+/**
+ * Helper: compute ratio (0..1) for given position/duration
+ */
+function computeProgressRatio(pos, dur) {
+    if (typeof pos === 'number' && !Number.isNaN(pos) && typeof dur === 'number' && dur > 0) {
+        return Math.max(0, Math.min(1, pos / dur));
+    }
+    return 0;
+}
+
+/**
+ * Helper: build progress label text like "M:SS / M:SS"
+ */
+function computeProgressLabel(pos, dur) {
+    const posText = (typeof pos === 'number' && !Number.isNaN(pos)) ? formatDuration(pos) : '0:00';
+    return posText + ' / ' + formatDuration(dur);
 }
 
 function updateUiControls(disableControls) {
