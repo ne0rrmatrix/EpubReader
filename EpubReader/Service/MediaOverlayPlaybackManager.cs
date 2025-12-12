@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using EpubReader.Models;
 using EpubReader.Models.MediaOverlays;
 using Plugin.Maui.Audio;
 
@@ -42,6 +43,11 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	bool isSeekPending;
 	int? lastReportedSecond;
 	double? pendingSeekOverrideSeconds;
+	double? restoredPositionSeconds;
+	MediaOverlayPlaybackProgress? pendingRestore;
+	bool isApplyingRestore;
+
+	public event EventHandler<MediaOverlayPlaybackProgress>? PlaybackProgressChanged;
 
 	string ActiveClass => string.IsNullOrWhiteSpace(book.MediaOverlayActiveClass)
 		? "-epub-media-overlay-active"
@@ -145,12 +151,194 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			await UpdateChapterContextAsync(chapterIndex).ConfigureAwait(false);
 		}
 
+		await ApplyPendingRestoreAsync().ConfigureAwait(false);
+
 		if (isEnabled)
 		{
 			await HighlightCurrentSegmentAsync().ConfigureAwait(false);
 		}
 
 		await UpdateUiStateAsync().ConfigureAwait(false);
+	}
+
+	public void SetPendingRestore(MediaOverlayPlaybackProgress? progress)
+	{
+		pendingRestore = progress;
+	}
+
+	public MediaOverlayPlaybackProgress? GetPlaybackProgressSnapshot()
+	{
+		if (!IsSupported)
+		{
+			return null;
+		}
+
+		var chapterIndex = currentChapterIndex >= 0 ? currentChapterIndex : book.CurrentChapter;
+		var fragmentId = segments.Count > 0 && segmentIndex >= 0 && segmentIndex < segments.Count
+			? segments[segmentIndex].FragmentId
+			: null;
+		var position = GetCurrentPositionSeconds() ?? restoredPositionSeconds;
+		return new MediaOverlayPlaybackProgress(
+			Enabled: isEnabled,
+			ChapterIndex: chapterIndex,
+			SegmentIndex: Math.Max(0, segmentIndex),
+			PositionSeconds: position,
+			FragmentId: fragmentId);
+	}
+
+	async Task ApplyPendingRestoreAsync()
+	{
+		if (!IsSupported || !isWebViewReady)
+		{
+			return;
+		}
+
+		var restore = pendingRestore;
+		if (restore is null)
+		{
+			return;
+		}
+
+		if (currentChapterIndex >= 0 && restore.ChapterIndex != currentChapterIndex)
+		{
+			// Wait until the intended chapter is active.
+			return;
+		}
+
+		pendingRestore = null;
+		isApplyingRestore = true;
+		try
+		{
+			isEnabled = restore.Enabled;
+			isPlaying = false;
+
+			// Avoid auto-play when restoring.
+			StopPlaybackInternal(disposeSession: true, pauseOnly: false);
+
+			if (segments.Count > 0)
+			{
+				if (restore.PositionSeconds is double pos)
+				{
+					if (!TryApplyRestoredPosition(pos))
+					{
+						ApplyRestoredAnchor(restore);
+					}
+				}
+				else
+				{
+					ApplyRestoredAnchor(restore);
+				}
+			}
+			else
+			{
+				restoredPositionSeconds = restore.PositionSeconds;
+				pendingSeekOverrideSeconds = null;
+			}
+
+			if (isEnabled)
+			{
+				await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+			}
+			else
+			{
+				await ClearHighlightAsync().ConfigureAwait(false);
+			}
+			await UpdateUiStateAsync().ConfigureAwait(false);
+		}
+		finally
+		{
+			isApplyingRestore = false;
+		}
+	}
+
+	void ApplyRestoredAnchor(MediaOverlayPlaybackProgress restore)
+	{
+		var target = restore.SegmentIndex;
+		if (!string.IsNullOrWhiteSpace(restore.FragmentId))
+		{
+			var idx = segments.FindIndex(seg => string.Equals(seg.FragmentId, restore.FragmentId, StringComparison.Ordinal));
+			if (idx >= 0)
+			{
+				target = idx;
+			}
+		}
+		segmentIndex = Math.Clamp(target, 0, Math.Max(0, segments.Count - 1));
+		pendingSeekOverrideSeconds = segments[segmentIndex].Node.Audio?.ClipBegin?.TotalSeconds ?? 0;
+		restoredPositionSeconds = restore.PositionSeconds;
+	}
+
+	bool TryApplyRestoredPosition(double positionSeconds)
+	{
+		var total = GetActiveDurationSeconds();
+		if (total is not null)
+		{
+			positionSeconds = Math.Clamp(positionSeconds, 0, total.Value);
+		}
+
+		var hasAnyDuration = false;
+		var mapped = false;
+		double cumulative = 0;
+		for (int i = 0; i < segments.Count; i++)
+		{
+			var audio = segments[i].Node.Audio;
+			if (audio?.ClipBegin is null || audio.ClipEnd is null)
+			{
+				continue;
+			}
+
+			hasAnyDuration = true;
+
+			var segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
+			if (positionSeconds < cumulative + segLen)
+			{
+				segmentIndex = i;
+				var offsetInSeg = Math.Max(0, positionSeconds - cumulative);
+				pendingSeekOverrideSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
+				restoredPositionSeconds = positionSeconds;
+				mapped = true;
+				break;
+			}
+			cumulative += segLen;
+		}
+
+		if (!hasAnyDuration)
+		{
+			// Can't map position to a clip without durations.
+			return false;
+		}
+
+		if (!mapped)
+		{
+			// Position beyond known durations; best-effort: clamp to end.
+			segmentIndex = Math.Clamp(segments.Count - 1, 0, Math.Max(0, segments.Count - 1));
+			pendingSeekOverrideSeconds = segments[segmentIndex].Node.Audio?.ClipBegin?.TotalSeconds ?? 0;
+			restoredPositionSeconds = positionSeconds;
+		}
+
+		return true;
+	}
+
+	void RaisePlaybackProgressChanged()
+	{
+		if (PlaybackProgressChanged is null || isApplyingRestore)
+		{
+			return;
+		}
+
+		var snapshot = GetPlaybackProgressSnapshot();
+		if (snapshot is null)
+		{
+			return;
+		}
+
+		try
+		{
+			PlaybackProgressChanged?.Invoke(this, snapshot);
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Trace.TraceWarning($"Media overlay progress callback failed: {ex.Message}");
+		}
 	}
 
 	public async Task SetEnabledAsync(bool enabled)
@@ -206,9 +394,10 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
-		await StartSegmentAsync(segments[segmentIndex]).ConfigureAwait(false);
+		// If a restore (or seek) provided an explicit position, ensure playback begins at it.
+		var forceSeek = pendingSeekOverrideSeconds is not null;
+		await StartSegmentAsync(segments[segmentIndex], forceSeek: forceSeek).ConfigureAwait(false);
 	}
 
 	public async Task PauseAsync()
@@ -442,6 +631,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 				isSeekPending = true;
 				audioPlaybackService.Seek(seekSeconds);
 				pendingSeekOverrideSeconds = null;
+				restoredPositionSeconds = null;
 				if (!audioPlaybackService.IsPlaying)
 				{
 					audioPlaybackService.Play();
@@ -450,6 +640,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			else
 			{
 				isSeekPending = position < currentClipBegin.TotalSeconds;
+				restoredPositionSeconds = null;
 				if (!audioPlaybackService.IsPlaying)
 				{
 					audioPlaybackService.Play();
@@ -622,10 +813,11 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			segmentCount = segments.Count,
 			chapterTitle = GetCurrentChapterTitle(),
 			durationSeconds = GetActiveDurationSeconds(),
-			positionSeconds = GetCurrentPositionSeconds()
+			positionSeconds = GetCurrentPositionSeconds() ?? restoredPositionSeconds
 		};
 
 		await InvokeScriptAsync("updateMediaOverlayPlaybackState", payload).ConfigureAwait(false);
+		RaisePlaybackProgressChanged();
 	}
 
 	Task InvokeScriptAsync(string functionName, object? payload = null)
@@ -664,6 +856,12 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 		if (audioPlaybackService is not null && audioPlaybackService.HasSession)
 		{
+			var lastPosition = GetCurrentPositionSeconds();
+			if (disposeSession && lastPosition is double pos)
+			{
+				restoredPositionSeconds = pos;
+			}
+
 			if (pauseOnly)
 			{
 				audioPlaybackService.Pause();

@@ -52,8 +52,49 @@ public partial class Db : IDb
 		logger.Info("Book Table created");
 		await EnsureSyncIdColumnAsync(cancellationToken);
 		await BackfillBookSyncIdsAsync(cancellationToken);
+		await EnsureBookMediaOverlayColumnsAsync(conn, cancellationToken);
 		isInitialized = true;
 	}
+
+	static async Task EnsureBookMediaOverlayColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		// Keep schema in sync with Models/Book.cs optional MediaOverlay fields.
+		await EnsureColumnsAsync(
+			connection,
+			"Book",
+			new (string ColumnName, string SqlType)[]
+			{
+				("MediaOverlayEnabled", "INTEGER"),
+				("MediaOverlayChapter", "INTEGER"),
+				("MediaOverlaySegmentIndex", "INTEGER"),
+				("MediaOverlayPositionSeconds", "REAL"),
+				("MediaOverlayFragmentId", "TEXT")
+			},
+			cancellationToken);
+	}
+
+	static async Task EnsureColumnsAsync(
+		SQLiteAsyncConnection connection,
+		string tableName,
+		IReadOnlyList<(string ColumnName, string SqlType)> columns,
+		CancellationToken cancellationToken)
+	{
+		var tableInfo = await connection.GetTableInfoAsync(tableName).WaitAsync(cancellationToken);
+		var existing = tableInfo.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+		foreach (var (columnName, sqlType) in columns)
+		{
+			if (existing.Contains(columnName))
+			{
+				continue;
+			}
+
+			await connection
+				.ExecuteAsync($"ALTER TABLE {tableName} ADD COLUMN {columnName} {sqlType}")
+				.WaitAsync(cancellationToken);
+		}
+	}
+
 	/// <summary>
 	/// Retrieves the current application settings from the database.
 	/// </summary>
@@ -126,7 +167,6 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-
 		logger.Info("Inserting or updating settings");
 		await conn.InsertOrReplaceAsync(settings).WaitAsync(cancellationToken);
 	}
@@ -175,6 +215,37 @@ public partial class Db : IDb
 		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
 		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
 		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
+	}
+
+	public async Task UpdateBookMediaOverlayProgress(
+		Guid bookId,
+		bool? enabled,
+		int? chapterIndex,
+		int? segmentIndex,
+		double? positionSeconds,
+		string? fragmentId,
+		CancellationToken cancellationToken = default)
+	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		const string sql = @"
+			UPDATE Book
+			SET
+				MediaOverlayEnabled = ?,
+				MediaOverlayChapter = ?,
+				MediaOverlaySegmentIndex = ?,
+				MediaOverlayPositionSeconds = ?,
+				MediaOverlayFragmentId = ?
+			WHERE Id = ?";
+
+		await conn
+			.ExecuteAsync(sql, enabled, chapterIndex, segmentIndex, positionSeconds, fragmentId, bookId)
+			.WaitAsync(cancellationToken);
 	}
 
 	/// <summary>

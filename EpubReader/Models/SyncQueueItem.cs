@@ -29,4 +29,20 @@ public class SyncQueueItem
 
 	[Column("RetryCount")]
 	public int RetryCount { get; set; }
+
+	// --- Media Overlay playback sync ---
+	[Column("MediaOverlayEnabled")]
+	public bool? MediaOverlayEnabled { get; set; }
+
+	[Column("MediaOverlayChapter")]
+	public int? MediaOverlayChapter { get; set; }
+
+	[Column("MediaOverlaySegmentIndex")]
+	public int? MediaOverlaySegmentIndex { get; set; }
+
+	[Column("MediaOverlayPositionSeconds")]
+	public double? MediaOverlayPositionSeconds { get; set; }
+
+	[Column("MediaOverlayFragmentId")]
+	public string? MediaOverlayFragmentId { get; set; }
 }

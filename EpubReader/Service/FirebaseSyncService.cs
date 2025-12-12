@@ -348,6 +348,11 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 				BookId = item.BookId,
 				CurrentChapter = item.CurrentChapter,
 				CurrentPage = item.CurrentPage,
+				MediaOverlayEnabled = item.MediaOverlayEnabled,
+				MediaOverlayChapter = item.MediaOverlayChapter,
+				MediaOverlaySegmentIndex = item.MediaOverlaySegmentIndex,
+				MediaOverlayPositionSeconds = item.MediaOverlayPositionSeconds,
+				MediaOverlayFragmentId = item.MediaOverlayFragmentId,
 				LastUpdated = item.Timestamp,
 				DeviceId = deviceId,
 				DeviceName = deviceName,
@@ -384,7 +389,58 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 		localDb = new SQLiteAsyncConnection(dbPath, flags);
 		await localDb.CreateTableAsync<ReadingProgress>().WaitAsync(token);
 		await localDb.CreateTableAsync<SyncQueueItem>().WaitAsync(token);
+		await EnsureLocalDbSchemaAsync(localDb, token).ConfigureAwait(false);
 		Trace.TraceInformation("Local sync database initialized");
+	}
+
+	static async Task EnsureLocalDbSchemaAsync(SQLiteAsyncConnection db, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		await EnsureColumnsAsync(db, "ReadingProgress", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+		{
+			["MediaOverlayEnabled"] = "INTEGER",
+			["MediaOverlayChapter"] = "INTEGER",
+			["MediaOverlaySegmentIndex"] = "INTEGER",
+			["MediaOverlayPositionSeconds"] = "REAL",
+			["MediaOverlayFragmentId"] = "TEXT"
+		}, token).ConfigureAwait(false);
+
+		await EnsureColumnsAsync(db, "SyncQueue", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+		{
+			["MediaOverlayEnabled"] = "INTEGER",
+			["MediaOverlayChapter"] = "INTEGER",
+			["MediaOverlaySegmentIndex"] = "INTEGER",
+			["MediaOverlayPositionSeconds"] = "REAL",
+			["MediaOverlayFragmentId"] = "TEXT"
+		}, token).ConfigureAwait(false);
+	}
+
+	static async Task EnsureColumnsAsync(SQLiteAsyncConnection db, string tableName, IReadOnlyDictionary<string, string> columns, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+		List<SQLiteConnection.ColumnInfo> tableInfo;
+		try
+		{
+			tableInfo = await db.GetTableInfoAsync(tableName).WaitAsync(token);
+		}
+		catch (Exception)
+		{
+			// Table may not exist yet; CreateTableAsync should have created it.
+			return;
+		}
+
+		var existing = new HashSet<string>(tableInfo.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+		foreach (var (name, type) in columns)
+		{
+			if (existing.Contains(name))
+			{
+				continue;
+			}
+			// SQLite allows ADD COLUMN without NOT NULL constraint for migrations.
+			var sql = $"ALTER TABLE {tableName} ADD COLUMN {name} {type}";
+			await db.ExecuteAsync(sql).WaitAsync(token);
+		}
 	}
 
 	public async Task<ReadingProgress?> GetLocalProgressAsync(string bookId, CancellationToken token = default)
@@ -417,6 +473,11 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 			BookId = progress.BookId,
 			CurrentChapter = progress.CurrentChapter,
 			CurrentPage = progress.CurrentPage,
+			MediaOverlayEnabled = progress.MediaOverlayEnabled,
+			MediaOverlayChapter = progress.MediaOverlayChapter,
+			MediaOverlaySegmentIndex = progress.MediaOverlaySegmentIndex,
+			MediaOverlayPositionSeconds = progress.MediaOverlayPositionSeconds,
+			MediaOverlayFragmentId = progress.MediaOverlayFragmentId,
 			Timestamp = progress.LastUpdated,
 			RetryCount = 0
 		};

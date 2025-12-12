@@ -43,6 +43,22 @@ public partial class Book : ObservableObject
 	[Column("CurrentPage")]
 	public int CurrentPage { get; set; } = 0;
 
+	// --- Media Overlay playback (local persistence; optional) ---
+	[Column("MediaOverlayEnabled")]
+	public bool? MediaOverlayEnabled { get; set; }
+
+	[Column("MediaOverlayChapter")]
+	public int? MediaOverlayChapter { get; set; }
+
+	[Column("MediaOverlaySegmentIndex")]
+	public int? MediaOverlaySegmentIndex { get; set; }
+
+	[Column("MediaOverlayPositionSeconds")]
+	public double? MediaOverlayPositionSeconds { get; set; }
+
+	[Column("MediaOverlayFragmentId")]
+	public string? MediaOverlayFragmentId { get; set; }
+
 	/// <summary>
 	/// Gets or sets the file path to the cover image.
 	/// </summary>

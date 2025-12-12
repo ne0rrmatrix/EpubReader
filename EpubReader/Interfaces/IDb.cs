@@ -44,6 +44,18 @@ public interface IDb
 	Task UpdateBookProgress(Guid bookId, int currentChapter, int currentPage, CancellationToken cancellationToken = default);
 
 	/// <summary>
+	/// Updates only the media overlay playback progress fields for a book in the database.
+	/// </summary>
+	Task UpdateBookMediaOverlayProgress(
+		Guid bookId,
+		bool? enabled,
+		int? chapterIndex,
+		int? segmentIndex,
+		double? positionSeconds,
+		string? fragmentId,
+		CancellationToken cancellationToken = default);
+
+	/// <summary>
 	/// Saves the specified settings to the persistent storage.
 	/// </summary>
 	/// <param name="settings">The settings to be saved. Cannot be null.</param>

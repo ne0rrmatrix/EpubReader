@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
+using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
 using Plugin.Maui.Audio;
@@ -27,6 +28,9 @@ public partial class BookPage : ContentPage, IDisposable
 	readonly WebViewHelper webViewHelper;
 	readonly IAudioManager audioManager;
 	MediaOverlayPlaybackManager? mediaOverlayManager;
+	MediaOverlayPlaybackProgress? latestMediaOverlayProgress;
+	DateTimeOffset lastMediaOverlayProgressSyncedAt = DateTimeOffset.MinValue;
+	MediaOverlayPlaybackProgress? lastMediaOverlayProgressSent;
 	bool loadSequenceStarted = false;
 	bool progressSyncComplete = false;
 	bool pageAtCorrectPosition = false;
@@ -562,7 +566,64 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 
 		mediaOverlayManager = new MediaOverlayPlaybackManager(ViewModel, webView, audioManager);
+		mediaOverlayManager.PlaybackProgressChanged += OnMediaOverlayPlaybackProgressChanged;
 		await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
+	}
+
+	void OnMediaOverlayPlaybackProgressChanged(object? sender, MediaOverlayPlaybackProgress progress)
+	{
+		latestMediaOverlayProgress = progress;
+
+		// Only sync progress for the currently open chapter to avoid cross-chapter confusion.
+		if (progress.ChapterIndex != book.CurrentChapter)
+		{
+			return;
+		}
+
+		var now = DateTimeOffset.UtcNow;
+		var previous = lastMediaOverlayProgressSent;
+
+		var enabledChanged = previous is null || previous.Enabled != progress.Enabled;
+		var segmentChanged = previous is null || previous.SegmentIndex != progress.SegmentIndex;
+		var posChanged = (previous?.PositionSeconds is double a && progress.PositionSeconds is double b)
+			? Math.Abs(a - b) >= 1
+			: (previous?.PositionSeconds != progress.PositionSeconds);
+
+		// Sync policy:
+		// - always sync enable/segment changes
+		// - treat large position jumps (seek) as immediate
+		// - otherwise, sync periodically while position moves
+		var positionJump = (previous?.PositionSeconds is double pa && progress.PositionSeconds is double pb)
+			? Math.Abs(pa - pb) >= 5
+			: false;
+
+		var periodicDue = now - lastMediaOverlayProgressSyncedAt >= TimeSpan.FromSeconds(10);
+		var shouldSync = enabledChanged || segmentChanged || positionJump || (periodicDue && posChanged);
+
+		if (!shouldSync)
+		{
+			return;
+		}
+
+		lastMediaOverlayProgressSyncedAt = now;
+		lastMediaOverlayProgressSent = progress;
+
+		// Fire-and-forget: debounced at this layer.
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+			}
+			catch (OperationCanceledException)
+			{
+				// ignore
+			}
+			catch (Exception ex)
+			{
+				Trace.TraceWarning($"Failed syncing media overlay progress: {ex.Message}");
+			}
+		});
 	}
 
 	async Task UpdateReaderModeOverlayAsync(bool isReaderModeEnabled)
@@ -720,6 +781,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 			if (cloud is null)
 			{
+				await PrimeLocalMediaOverlayRestoreAsync(token);
 				await BackfillLegacyProgressIfNeededAsync(bookId, token);
 			}
 			else
@@ -852,6 +914,33 @@ public partial class BookPage : ContentPage, IDisposable
 			Trace.TraceWarning($"Failed updating local book progress in DB: {ex.Message}");
 		}
 
+		// Persist Media Overlay playback state to the main Book DB for local-only users.
+		try
+		{
+			var localMo = latestMediaOverlayProgress;
+			if (localMo is not null && localMo.ChapterIndex == book.CurrentChapter)
+			{
+				book.MediaOverlayEnabled = localMo.Enabled;
+				book.MediaOverlayChapter = localMo.ChapterIndex;
+				book.MediaOverlaySegmentIndex = localMo.SegmentIndex;
+				book.MediaOverlayPositionSeconds = localMo.PositionSeconds;
+				book.MediaOverlayFragmentId = localMo.FragmentId;
+
+				await db.UpdateBookMediaOverlayProgress(
+					book.Id,
+					localMo.Enabled,
+					localMo.ChapterIndex,
+					localMo.SegmentIndex,
+					localMo.PositionSeconds,
+					localMo.FragmentId,
+					token);
+			}
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed updating local media overlay progress in DB: {ex.Message}");
+		}
+
 		var syncId = await BookIdentityService.ComputeSyncIdAsync(book, token);
 		var progress = new ReadingProgress
 		{
@@ -863,13 +952,92 @@ public partial class BookPage : ContentPage, IDisposable
 			DeviceName = string.Empty,
 			IsSynced = false,
 		};
+
+		// Include Media Overlay playback state when available.
+		var mo = latestMediaOverlayProgress;
+		if (mo is not null && mo.ChapterIndex == book.CurrentChapter)
+		{
+			progress.MediaOverlayEnabled = mo.Enabled;
+			progress.MediaOverlayChapter = mo.ChapterIndex;
+			progress.MediaOverlaySegmentIndex = mo.SegmentIndex;
+			progress.MediaOverlayPositionSeconds = mo.PositionSeconds;
+			progress.MediaOverlayFragmentId = mo.FragmentId;
+		}
 		await syncService.SaveProgressAsync(progress, token);
+	}
+
+	async Task PrimeLocalMediaOverlayRestoreAsync(CancellationToken token)
+	{
+		// Local persistence uses the Book table. This is also used when cloud sync
+		// is disabled or no cloud progress exists.
+		if (book.MediaOverlayEnabled is not bool enabled || book.MediaOverlayChapter is not int chapter)
+		{
+			return;
+		}
+
+		// Keep restore scoped to the current chapter (same as cloud restore).
+		if (chapter != book.CurrentChapter)
+		{
+			return;
+		}
+
+		await EnsureMediaOverlayManagerInitialized();
+		var restore = new MediaOverlayPlaybackProgress(
+			Enabled: enabled,
+			ChapterIndex: chapter,
+			SegmentIndex: Math.Max(0, book.MediaOverlaySegmentIndex ?? 0),
+			PositionSeconds: book.MediaOverlayPositionSeconds,
+			FragmentId: book.MediaOverlayFragmentId);
+		latestMediaOverlayProgress = restore;
+		mediaOverlayManager?.SetPendingRestore(restore);
 	}
 
 	async Task ApplyProgressToUiAsync(ReadingProgress progress)
 	{
 		book.CurrentChapter = progress.CurrentChapter;
 		book.CurrentPage = progress.CurrentPage;
+
+		// Prime Media Overlay restore before loading the chapter so the manager can
+		// apply it on the next page load (restoring timeline + highlight).
+		if (progress.MediaOverlayEnabled is bool moEnabled && progress.MediaOverlayChapter is int moChapter)
+		{
+			// Keep restore scoped to the current chapter.
+			if (moChapter == book.CurrentChapter)
+			{
+				await EnsureMediaOverlayManagerInitialized();
+				var restore = new MediaOverlayPlaybackProgress(
+					Enabled: moEnabled,
+					ChapterIndex: moChapter,
+					SegmentIndex: Math.Max(0, progress.MediaOverlaySegmentIndex ?? 0),
+					PositionSeconds: progress.MediaOverlayPositionSeconds,
+					FragmentId: progress.MediaOverlayFragmentId);
+				latestMediaOverlayProgress = restore;
+				mediaOverlayManager?.SetPendingRestore(restore);
+
+				// Persist the restore state locally so local-only users get it too.
+				try
+				{
+					book.MediaOverlayEnabled = moEnabled;
+					book.MediaOverlayChapter = moChapter;
+					book.MediaOverlaySegmentIndex = restore.SegmentIndex;
+					book.MediaOverlayPositionSeconds = restore.PositionSeconds;
+					book.MediaOverlayFragmentId = restore.FragmentId;
+
+					await db.UpdateBookMediaOverlayProgress(
+						book.Id,
+						moEnabled,
+						moChapter,
+						restore.SegmentIndex,
+						restore.PositionSeconds,
+						restore.FragmentId,
+						ViewModel.CancellationTokenSource.Token);
+				}
+				catch (Exception ex)
+				{
+					Trace.TraceWarning($"Failed persisting restored media overlay state: {ex.Message}");
+				}
+			}
+		}
 
 		if (book.Chapters.Count > book.CurrentChapter && book.CurrentChapter >= 0)
 		{
@@ -972,7 +1140,11 @@ public partial class BookPage : ContentPage, IDisposable
 			webView.Navigating -= webView_Navigating;
 			ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
-			mediaOverlayManager?.Dispose();
+			if (mediaOverlayManager is not null)
+			{
+				mediaOverlayManager.PlaybackProgressChanged -= OnMediaOverlayPlaybackProgressChanged;
+				mediaOverlayManager.Dispose();
+			}
 			mediaOverlayManager = null;
 		}
 		disposedValue = true;
