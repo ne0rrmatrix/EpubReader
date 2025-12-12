@@ -15,7 +15,7 @@ public static partial class StatusBarExtensions
 	static Android.Views.Window window => Platform.CurrentActivity?.Window ?? throw new InvalidOperationException("Current activity is null");
 	static Android.Views.View decorView => window.DecorView ?? throw new InvalidOperationException("DecorView is null");
 	static AndroidX.Core.View.WindowInsetsControllerCompat insetsController => WindowCompat.GetInsetsController(window, decorView) ?? throw new InvalidOperationException("InsetsController is null");
-	
+
 	/// <summary>
 	/// Sets the visibility of the status bars on Android devices.
 	/// </summary>
@@ -48,6 +48,6 @@ public static partial class StatusBarExtensions
 				}
 			}
 		}
-		
+
 	}
 }

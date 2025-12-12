@@ -29,14 +29,14 @@ public partial class AuthenticationService
 	{
 		// Construct Google OAuth URL manually
 		Trace.TraceInformation("Google manual flow: starting OAuth URL construction");
-		
+
 		var googleClientId = "507277680982-ivsanmk66uqk5t6dm3f2bbotknjjleg3.apps.googleusercontent.com";
 		// Use Firebase's standard auth handler redirect URI for Windows
 		var redirectUri = $"https://{FirebaseConfig.AuthDomain}/__/auth/handler";
 		var callbackUrlScheme = $"https://{FirebaseConfig.AuthDomain}";
 		var scope = "email profile openid";
 		Trace.TraceInformation($"Google manual flow: clientId set, redirectUri={redirectUri}, scope={scope}");
-		
+
 		// Force account selection on every sign-in to allow switching accounts
 		// This prevents automatic sign-in with cached credentials
 		var authUrl = $"https://accounts.google.com/o/oauth2/v2/auth?" +

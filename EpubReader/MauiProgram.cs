@@ -48,7 +48,7 @@ public static class MauiProgram
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST
-				handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
+			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
 #endif
 		});
 #if ANDROID
@@ -85,7 +85,7 @@ public static class MauiProgram
 			}
 			config.DefaultWebpagePreferences!.AllowsContentJavaScript = true;
 			config.SetUrlSchemeHandler(new CustomUrlSchemeHandler(), "app");
-		
+
 			var webView = new CustomMauiWKWebView(CGRect.Empty, (WebViewHandler)handler, config)
 			{
 				NavigationDelegate = new CustomWebViewNavigationDelegate((WebViewHandler)handler),

@@ -73,13 +73,13 @@ public partial class App : Application, IDisposable
 		else if (isAuthenticated)
 		{
 			var userId = await authenticationService.GetCurrentUserIdAsync(token);
-			
+
 			await syncService.InitializeAsync(userId, token);
 			await syncService.SubscribeToRemoteChangesAsync(token);
 		}
 		else
 		{
-			await syncService.InitializeLocalOnlyAsync(token);	
+			await syncService.InitializeLocalOnlyAsync(token);
 		}
 	}
 

@@ -48,7 +48,7 @@ public partial class AuthenticationService
 		// Discover web client ID from resources if present (Firebase default_web_client_id)
 		var clientIdResId = activity.Resources?.GetIdentifier("default_web_client_id", "string", activity.PackageName) ?? 0;
 		var serverClientId = clientIdResId != 0 ? activity.GetString(clientIdResId) : string.Empty;
-	
+
 		// Build Google GetGoogleIdOption (requests a Google ID token via Credential Manager)
 		var googleOptionBuilder = new GetGoogleIdOption.Builder();
 		googleOptionBuilder.SetFilterByAuthorizedAccounts(false);

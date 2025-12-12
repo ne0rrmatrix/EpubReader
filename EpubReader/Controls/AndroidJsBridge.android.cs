@@ -10,7 +10,7 @@ public class JSBridge : Java.Lang.Object
 	[Export("sendMessageToCSharp")] // This is the name JavaScript will use
 	public static void SendMessageToCSharp(string message)
 	{
-        if (string.IsNullOrEmpty(message))
+		if (string.IsNullOrEmpty(message))
 		{
 			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 			return;
@@ -22,5 +22,5 @@ public class JSBridge : Java.Lang.Object
 			return;
 		}
 		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
-    }
+	}
 }

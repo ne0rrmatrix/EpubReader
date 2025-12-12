@@ -1,10 +1,10 @@
 using System.Text;
+using EpubReader.Models.MediaOverlays;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
-using EpubReader.Models.MediaOverlays;
 using Point = Microsoft.Maui.Graphics.Point;
 
 namespace EpubReader.Service;
@@ -528,7 +528,7 @@ public static partial class EbookService
 	static async Task ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
-		if(nonSplitChapters.Count() != chaptersRef.Count)
+		if (nonSplitChapters.Count() != chaptersRef.Count)
 		{
 			System.Diagnostics.Debug.WriteLine("Warning: Chapter count mismatch after sorting.");
 			nonSplitChapters = chaptersRef;

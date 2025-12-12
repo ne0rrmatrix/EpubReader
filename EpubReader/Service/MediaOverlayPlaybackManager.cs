@@ -13,7 +13,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	readonly BookViewModel viewModel;
 	Book book;
 	readonly WebView webView;
-    
+
 	readonly IDispatcher dispatcher;
 	readonly JsonSerializerOptions serializerOptions = new()
 	{
@@ -71,13 +71,13 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		{
 			audioCache[resource.NormalizedPath] = resource;
 		}
-    }
+	}
 
 	public async Task InitializeUiAsync()
 	{
 		if (!IsSupported)
 		{
-            System.Diagnostics.Debug.WriteLine("Media overlay playback not supported for this book; skipping UI initialization.");
+			System.Diagnostics.Debug.WriteLine("Media overlay playback not supported for this book; skipping UI initialization.");
 			await InvokeScriptAsync("setMediaOverlayVisibility", false).ConfigureAwait(false);
 			return;
 		}
@@ -99,7 +99,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 				chapterTitle = GetCurrentChapterTitle(),
 				segmentCount = segments.Count
 			}));
-            System.Diagnostics.Debug.WriteLine("Media overlay UI initialized.");
+			System.Diagnostics.Debug.WriteLine("Media overlay UI initialized.");
 		}
 		await Task.WhenAll(tasks).ConfigureAwait(false);
 	}
@@ -161,7 +161,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 		if (isEnabled == enabled)
 		{
-            System.Diagnostics.Debug.WriteLine("Media overlay enabled state is already set to the requested value; no change made.");
+			System.Diagnostics.Debug.WriteLine("Media overlay enabled state is already set to the requested value; no change made.");
 			await UpdateUiStateAsync().ConfigureAwait(false);
 			return;
 		}
@@ -204,7 +204,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-        
+
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
 		await StartSegmentAsync(segments[segmentIndex]).ConfigureAwait(false);
 	}
@@ -227,14 +227,14 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-        
+
 		if (segmentIndex < segments.Count - 1)
 		{
 			segmentIndex++;
-				if (isEnabled && isPlaying)
-				{
-					await StartSegmentAsync(segments[segmentIndex], forceSeek: true).ConfigureAwait(false);
-				}
+			if (isEnabled && isPlaying)
+			{
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true).ConfigureAwait(false);
+			}
 			else
 			{
 				await HighlightCurrentSegmentAsync().ConfigureAwait(false);
@@ -254,14 +254,14 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-        
+
 		if (segmentIndex > 0)
 		{
 			segmentIndex--;
-				if (isEnabled && isPlaying)
-				{
-					await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: true).ConfigureAwait(false);
-				}
+			if (isEnabled && isPlaying)
+			{
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: true).ConfigureAwait(false);
+			}
 			else
 			{
 				await HighlightCurrentSegmentAsync(preferPreviousPage: true).ConfigureAwait(false);
@@ -276,7 +276,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 	public async Task StopAsync()
 	{
-        
+
 		StopPlaybackInternal();
 		await ClearHighlightAsync().ConfigureAwait(false);
 		await UpdateUiStateAsync().ConfigureAwait(false);
@@ -456,7 +456,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return Task.CompletedTask;
 		}).ConfigureAwait(false);
 	}
-	
+
 
 	bool TryGetAudioResource(string? source, out MediaOverlayAudioResource resource)
 	{
@@ -625,7 +625,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		try
 		{
 			var raw = await webView.EvaluateJavaScriptAsync(script);
-			
+
 			raw = raw.Replace("\\", "");
 			System.Diagnostics.Debug.WriteLine($"getVisibleSegmentPosition returned: {raw}");
 			if (string.IsNullOrWhiteSpace(raw))
@@ -639,7 +639,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			var count = root.TryGetProperty("count", out var jCount) ? jCount.GetInt32() : 0;
 			return (index, count);
 		}
-	
+
 		catch (JsonException ex)
 		{
 			System.Diagnostics.Trace.TraceWarning($"getVisibleSegmentPosition JSON parse failed: {ex.Message}");
@@ -678,7 +678,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 		await HighlightCurrentSegmentAsync();
 		await UpdateUiStateAsync();
-	
+
 		if (currentClipEnd is not null && positionSeconds >= currentClipEnd.Value.TotalSeconds)
 		{
 			// Do not stop the timer here; keep it running for the whole audio resource.

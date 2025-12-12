@@ -12,286 +12,286 @@ namespace EpubReader.Service;
 /// </summary>
 public static class MediaOverlayParser
 {
-    const string mediaOverlayMimeType = "application/smil+xml";
-    static readonly XNamespace smilNamespace = "http://www.w3.org/ns/SMIL";
-    static readonly XNamespace epubNamespace = "http://www.idpf.org/2007/ops";
+	const string mediaOverlayMimeType = "application/smil+xml";
+	static readonly XNamespace smilNamespace = "http://www.w3.org/ns/SMIL";
+	static readonly XNamespace epubNamespace = "http://www.idpf.org/2007/ops";
 
-    public static async Task<MediaOverlayParseResult> ParseAsync(EpubBookRef book, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(book);
+	public static async Task<MediaOverlayParseResult> ParseAsync(EpubBookRef book, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(book);
 
-        var manifestItems = book.Schema.Package.Manifest.Items ?? [];
-        var overlayDocuments = new Dictionary<string, MediaOverlayDocument>(StringComparer.OrdinalIgnoreCase);
+		var manifestItems = book.Schema.Package.Manifest.Items ?? [];
+		var overlayDocuments = new Dictionary<string, MediaOverlayDocument>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var smilFile = FindLocalTextFile(book, manifestItem.Href);
-            if (smilFile is null)
-            {
-                System.Diagnostics.Debug.WriteLine($"Media overlay SMIL file not found: {manifestItem.Href}");
-                continue;
-            }
+		foreach (var manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			var smilFile = FindLocalTextFile(book, manifestItem.Href);
+			if (smilFile is null)
+			{
+				System.Diagnostics.Debug.WriteLine($"Media overlay SMIL file not found: {manifestItem.Href}");
+				continue;
+			}
 
-            var content = await smilFile.ReadContentAsTextAsync().ConfigureAwait(false);
-            var resolvedHref = MediaOverlayPathHelper.Normalize(smilFile.FilePath);
-            var overlayDocument = ParseSmil(manifestItem.Id, resolvedHref, content);
-            overlayDocuments[manifestItem.Id] = overlayDocument;
-        }
-        System.Diagnostics.Debug.WriteLine($"Parsed {overlayDocuments.Count} media overlay documents.");
-        foreach (var manifestItem in manifestItems)
-        {
-            if (string.IsNullOrWhiteSpace(manifestItem.MediaOverlay))
-            {
-                continue;
-            }
+			var content = await smilFile.ReadContentAsTextAsync().ConfigureAwait(false);
+			var resolvedHref = MediaOverlayPathHelper.Normalize(smilFile.FilePath);
+			var overlayDocument = ParseSmil(manifestItem.Id, resolvedHref, content);
+			overlayDocuments[manifestItem.Id] = overlayDocument;
+		}
+		System.Diagnostics.Debug.WriteLine($"Parsed {overlayDocuments.Count} media overlay documents.");
+		foreach (var manifestItem in manifestItems)
+		{
+			if (string.IsNullOrWhiteSpace(manifestItem.MediaOverlay))
+			{
+				continue;
+			}
 
-            if (overlayDocuments.TryGetValue(manifestItem.MediaOverlay, out var document))
-            {
-                document.AddAssociatedDocument(manifestItem.Href);
-            }
-        }
+			if (overlayDocuments.TryGetValue(manifestItem.MediaOverlay, out var document))
+			{
+				document.AddAssociatedDocument(manifestItem.Href);
+			}
+		}
 
-        var metaItems = book.Schema.Package.Metadata.MetaItems ?? [];
-        var activeClass = ResolveMeta(metaItems, "media:active-class");
-        var playbackActiveClass = ResolveMeta(metaItems, "media:playback-active-class");
-        var narrator = ResolveMeta(metaItems, "media:narrator");
-        var duration = ParseClockValue(ResolveMeta(metaItems, "media:duration"));
+		var metaItems = book.Schema.Package.Metadata.MetaItems ?? [];
+		var activeClass = ResolveMeta(metaItems, "media:active-class");
+		var playbackActiveClass = ResolveMeta(metaItems, "media:playback-active-class");
+		var narrator = ResolveMeta(metaItems, "media:narrator");
+		var duration = ParseClockValue(ResolveMeta(metaItems, "media:duration"));
 
-        if (overlayDocuments.Count == 0 && activeClass is null && playbackActiveClass is null && narrator is null && duration is null)
-        {
-            return MediaOverlayParseResult.Empty;
-        }
+		if (overlayDocuments.Count == 0 && activeClass is null && playbackActiveClass is null && narrator is null && duration is null)
+		{
+			return MediaOverlayParseResult.Empty;
+		}
 
-        return new MediaOverlayParseResult([.. overlayDocuments.Values], activeClass, playbackActiveClass, narrator, duration);
-    }
+		return new MediaOverlayParseResult([.. overlayDocuments.Values], activeClass, playbackActiveClass, narrator, duration);
+	}
 
-    static MediaOverlayDocument ParseSmil(string manifestId, string href, string content)
-    {
-        var document = XDocument.Parse(content);
-        var bodyElement = document.Root?.Element(smilNamespace + "body") ?? throw new InvalidOperationException("Media overlay SMIL document is missing the <body> element.");
-        var bodySequence = ParseSequence(bodyElement);
-        var flattened = FlattenParallels(bodySequence).ToList();
-        return new MediaOverlayDocument(manifestId, href, bodySequence, flattened);
-    }
+	static MediaOverlayDocument ParseSmil(string manifestId, string href, string content)
+	{
+		var document = XDocument.Parse(content);
+		var bodyElement = document.Root?.Element(smilNamespace + "body") ?? throw new InvalidOperationException("Media overlay SMIL document is missing the <body> element.");
+		var bodySequence = ParseSequence(bodyElement);
+		var flattened = FlattenParallels(bodySequence).ToList();
+		return new MediaOverlayDocument(manifestId, href, bodySequence, flattened);
+	}
 
-    static MediaOverlaySequence ParseSequence(XElement element)
-    {
-        var sequence = new MediaOverlaySequence
-        {
-            Id = (string?)element.Attribute("id"),
-            EpubType = (string?)element.Attribute(epubNamespace + "type"),
-            TextReference = (string?)element.Attribute(epubNamespace + "textref")
-        };
-       
-        foreach (var child in element.Elements())
-        {
-            if (child.Name == smilNamespace + "seq")
-            {
-                sequence.Children.Add(ParseSequence(child));
-            }
-            else if (child.Name == smilNamespace + "par")
-            {
-                sequence.Children.Add(ParseParallel(child));
-            }
-        }
-        return sequence;
-    }
+	static MediaOverlaySequence ParseSequence(XElement element)
+	{
+		var sequence = new MediaOverlaySequence
+		{
+			Id = (string?)element.Attribute("id"),
+			EpubType = (string?)element.Attribute(epubNamespace + "type"),
+			TextReference = (string?)element.Attribute(epubNamespace + "textref")
+		};
 
-    static MediaOverlayParallel ParseParallel(XElement element)
-    {
-        return new MediaOverlayParallel
-        {
-            Id = (string?)element.Attribute("id"),
-            EpubType = (string?)element.Attribute(epubNamespace + "type"),
-            Text = ParseText(element.Element(smilNamespace + "text")),
-            Audio = ParseAudio(element.Element(smilNamespace + "audio"))
-        };
-    }
+		foreach (var child in element.Elements())
+		{
+			if (child.Name == smilNamespace + "seq")
+			{
+				sequence.Children.Add(ParseSequence(child));
+			}
+			else if (child.Name == smilNamespace + "par")
+			{
+				sequence.Children.Add(ParseParallel(child));
+			}
+		}
+		return sequence;
+	}
 
-    static MediaOverlayText? ParseText(XElement? textElement)
-    {
-        var src = textElement?.Attribute("src")?.Value;
-        return string.IsNullOrWhiteSpace(src) ? null : new MediaOverlayText(src);
-    }
+	static MediaOverlayParallel ParseParallel(XElement element)
+	{
+		return new MediaOverlayParallel
+		{
+			Id = (string?)element.Attribute("id"),
+			EpubType = (string?)element.Attribute(epubNamespace + "type"),
+			Text = ParseText(element.Element(smilNamespace + "text")),
+			Audio = ParseAudio(element.Element(smilNamespace + "audio"))
+		};
+	}
 
-    static MediaOverlayAudio? ParseAudio(XElement? audioElement)
-    {
-        if( audioElement is null)
-        {
-            return null;
-        }
-        var src = audioElement.Attribute("src")?.Value;
-        if (string.IsNullOrWhiteSpace(src))
-        {
-            return null;
-        }
-        var clipBegin = ParseClockValue(audioElement.Attribute("clipBegin")?.Value);
-        var clipEnd = ParseClockValue(audioElement.Attribute("clipEnd")?.Value);
-        return new MediaOverlayAudio(src, clipBegin, clipEnd);
-    }
+	static MediaOverlayText? ParseText(XElement? textElement)
+	{
+		var src = textElement?.Attribute("src")?.Value;
+		return string.IsNullOrWhiteSpace(src) ? null : new MediaOverlayText(src);
+	}
 
-    static IEnumerable<MediaOverlayParallel> FlattenParallels(MediaOverlayNode node)
-    {
-        if (node is MediaOverlayParallel parallel)
-        {
-            yield return parallel;
-            yield break;
-        }
+	static MediaOverlayAudio? ParseAudio(XElement? audioElement)
+	{
+		if (audioElement is null)
+		{
+			return null;
+		}
+		var src = audioElement.Attribute("src")?.Value;
+		if (string.IsNullOrWhiteSpace(src))
+		{
+			return null;
+		}
+		var clipBegin = ParseClockValue(audioElement.Attribute("clipBegin")?.Value);
+		var clipEnd = ParseClockValue(audioElement.Attribute("clipEnd")?.Value);
+		return new MediaOverlayAudio(src, clipBegin, clipEnd);
+	}
 
-        if (node is not MediaOverlaySequence sequence)
-        {
-            yield break;
-        }
+	static IEnumerable<MediaOverlayParallel> FlattenParallels(MediaOverlayNode node)
+	{
+		if (node is MediaOverlayParallel parallel)
+		{
+			yield return parallel;
+			yield break;
+		}
 
-        foreach (var child in sequence.Children)
-        {
-            foreach (var flattened in FlattenParallels(child))
-            {
-                yield return flattened;
-            }
-        }
-    }
+		if (node is not MediaOverlaySequence sequence)
+		{
+			yield break;
+		}
 
-    static EpubLocalTextContentFileRef? FindLocalTextFile(EpubBookRef book, string? href)
-    {
-        if (string.IsNullOrWhiteSpace(href))
-        {
-            return null;
-        }
+		foreach (var child in sequence.Children)
+		{
+			foreach (var flattened in FlattenParallels(child))
+			{
+				yield return flattened;
+			}
+		}
+	}
 
-        var normalizedTarget = MediaOverlayPathHelper.Normalize(href);
-        return book.Content.AllFiles.Local
-            .OfType<EpubLocalTextContentFileRef>()
-            .FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedTarget));
-    }
+	static EpubLocalTextContentFileRef? FindLocalTextFile(EpubBookRef book, string? href)
+	{
+		if (string.IsNullOrWhiteSpace(href))
+		{
+			return null;
+		}
 
-    static string? ResolveMeta(IEnumerable<EpubMetadataMeta> metaItems, string property)
-    {
-        return metaItems.FirstOrDefault(meta => string.Equals(meta.Property, property, StringComparison.OrdinalIgnoreCase))?.Content;
-    }
+		var normalizedTarget = MediaOverlayPathHelper.Normalize(href);
+		return book.Content.AllFiles.Local
+			.OfType<EpubLocalTextContentFileRef>()
+			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedTarget));
+	}
 
-    static TimeSpan? ParseClockValue(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
+	static string? ResolveMeta(IEnumerable<EpubMetadataMeta> metaItems, string property)
+	{
+		return metaItems.FirstOrDefault(meta => string.Equals(meta.Property, property, StringComparison.OrdinalIgnoreCase))?.Content;
+	}
 
-        value = value.Trim();
+	static TimeSpan? ParseClockValue(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return null;
+		}
 
-        // Try colon format (hh:mm:ss(.fraction) | mm:ss(.fraction) | ss(.fraction))
-        if (TryParseColonTime(value, out TimeSpan ts))
-        {
-            return ts;
-        }
+		value = value.Trim();
 
-        // Try unit format (e.g., "1.5s", "200ms", "2min", "1h")
-        if (TryParseUnitTime(value, out ts))
-        {
-            return ts;
-        }
+		// Try colon format (hh:mm:ss(.fraction) | mm:ss(.fraction) | ss(.fraction))
+		if (TryParseColonTime(value, out TimeSpan ts))
+		{
+			return ts;
+		}
 
-        // Fallback: plain number = seconds
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double secondsFallback) &&
-            !double.IsNaN(secondsFallback) && !double.IsInfinity(secondsFallback))
-        {
-            return TimeSpan.FromSeconds(secondsFallback);
-        }
+		// Try unit format (e.g., "1.5s", "200ms", "2min", "1h")
+		if (TryParseUnitTime(value, out ts))
+		{
+			return ts;
+		}
 
-        return null;
+		// Fallback: plain number = seconds
+		if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double secondsFallback) &&
+			!double.IsNaN(secondsFallback) && !double.IsInfinity(secondsFallback))
+		{
+			return TimeSpan.FromSeconds(secondsFallback);
+		}
 
-        // Local helpers to keep cognitive complexity low
-        static bool TryParseColonTime(string input, out TimeSpan result)
-        {
-            result = default;
-            var parts = input.Split(':');
-            if (parts.Length < 1 || parts.Length > 3)
-            {
-                return false;
-            }
+		return null;
 
-            if (!TryParseSeconds(parts, out double seconds))
-            {
-                return false;
-            }
+		// Local helpers to keep cognitive complexity low
+		static bool TryParseColonTime(string input, out TimeSpan result)
+		{
+			result = default;
+			var parts = input.Split(':');
+			if (parts.Length < 1 || parts.Length > 3)
+			{
+				return false;
+			}
 
-            int minutes = 0;
-            int hours = 0;
+			if (!TryParseSeconds(parts, out double seconds))
+			{
+				return false;
+			}
 
-            if (parts.Length >= 2 && !TryParseMinutes(parts, out minutes))
-            {
-                return false;
-            }
+			int minutes = 0;
+			int hours = 0;
 
-            if (parts.Length == 3 && !TryParseHours(parts, out hours))
-            {
-                return false;
-            }
+			if (parts.Length >= 2 && !TryParseMinutes(parts, out minutes))
+			{
+				return false;
+			}
 
-            double totalSeconds = seconds + minutes * 60.0 + hours * 3600.0;
-            if (double.IsNaN(totalSeconds) || double.IsInfinity(totalSeconds))
-            {
-                return false;
-            }
+			if (parts.Length == 3 && !TryParseHours(parts, out hours))
+			{
+				return false;
+			}
 
-            result = TimeSpan.FromSeconds(totalSeconds);
-            return true;
-        }
+			double totalSeconds = seconds + minutes * 60.0 + hours * 3600.0;
+			if (double.IsNaN(totalSeconds) || double.IsInfinity(totalSeconds))
+			{
+				return false;
+			}
 
-        static bool TryParseSeconds(string[] parts, out double seconds)
-        {
-            seconds = 0;
-            return double.TryParse(parts[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
-        }
+			result = TimeSpan.FromSeconds(totalSeconds);
+			return true;
+		}
 
-        static bool TryParseMinutes(string[] parts, out int minutes)
-        {
-            minutes = 0;
-            return int.TryParse(parts[^2], NumberStyles.Integer, CultureInfo.InvariantCulture, out minutes);
-        }
+		static bool TryParseSeconds(string[] parts, out double seconds)
+		{
+			seconds = 0;
+			return double.TryParse(parts[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
+		}
 
-        static bool TryParseHours(string[] parts, out int hours)
-        {
-            hours = 0;
-            return int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out hours);
-        }
+		static bool TryParseMinutes(string[] parts, out int minutes)
+		{
+			minutes = 0;
+			return int.TryParse(parts[^2], NumberStyles.Integer, CultureInfo.InvariantCulture, out minutes);
+		}
 
-        static bool TryParseUnitTime(string input, out TimeSpan result)
-        {
-            result = default;
-            // units: ms, s, min, h (case-insensitive)
-            var m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(2000));
-            if (!m.Success)
-            {
-                return false;
-            }
+		static bool TryParseHours(string[] parts, out int hours)
+		{
+			hours = 0;
+			return int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out hours);
+		}
 
-            var numStr = m.Groups["num"].Value;
-            var unit = m.Groups["unit"].Value.ToLowerInvariant();
+		static bool TryParseUnitTime(string input, out TimeSpan result)
+		{
+			result = default;
+			// units: ms, s, min, h (case-insensitive)
+			var m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(2000));
+			if (!m.Success)
+			{
+				return false;
+			}
 
-            if (!double.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
-            {
-                return false;
-            }
+			var numStr = m.Groups["num"].Value;
+			var unit = m.Groups["unit"].Value.ToLowerInvariant();
 
-            if (double.IsNaN(value) || double.IsInfinity(value))
-            {
-                return false;
-            }
+			if (!double.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+			{
+				return false;
+			}
 
-            result = unit switch
-            {
-                "ms" => TimeSpan.FromMilliseconds(value),
-                "s" => TimeSpan.FromSeconds(value),
-                "min" => TimeSpan.FromMinutes(value),
-                "h" => TimeSpan.FromHours(value),
-                _ => default
-            };
+			if (double.IsNaN(value) || double.IsInfinity(value))
+			{
+				return false;
+			}
 
-            // Ensure a valid non-default TimeSpan when unit matched
-            const double epsilon = 1e-9;
-            return m.Success && (result != default || Math.Abs(value) < epsilon);
-        }
-    }
+			result = unit switch
+			{
+				"ms" => TimeSpan.FromMilliseconds(value),
+				"s" => TimeSpan.FromSeconds(value),
+				"min" => TimeSpan.FromMinutes(value),
+				"h" => TimeSpan.FromHours(value),
+				_ => default
+			};
+
+			// Ensure a valid non-default TimeSpan when unit matched
+			const double epsilon = 1e-9;
+			return m.Success && (result != default || Math.Abs(value) < epsilon);
+		}
+	}
 }

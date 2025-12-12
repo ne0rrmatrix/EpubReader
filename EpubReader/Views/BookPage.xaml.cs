@@ -49,12 +49,12 @@ public partial class BookPage : ContentPage, IDisposable
 		this.syncService = syncService;
 		this.audioManager = audioManager;
 		webViewHelper = new(webView, db, syncService);
-        
+
 		// Subscribe to webview helper lifecycle events to show/hide native overlay
 		webViewHelper.PageLoadStarted += OnWebViewPageLoadStarted;
 		webViewHelper.SettingsApplied += OnWebViewSettingsApplied;
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
-        
+
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
@@ -213,10 +213,10 @@ public partial class BookPage : ContentPage, IDisposable
 		await Dispatcher.DispatchAsync(async () =>
 		{
 			var pageLoaded = await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
-		if (!pageLoaded)
-		{
-			await LoadChapterContentAsync();
-		}
+			if (!pageLoaded)
+			{
+				await LoadChapterContentAsync();
+			}
 		});
 	}
 
@@ -314,25 +314,25 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 		var urlParts = url.Split('?')[1].Split('#')[0];
-				if (!string.IsNullOrEmpty(urlParts))
-				{
-					if(urlParts.Contains("https://demo/"))
-					{
-						urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
-					}
-                
+		if (!string.IsNullOrEmpty(urlParts))
+		{
+			if (urlParts.Contains("https://demo/"))
+			{
+				urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
+			}
+
 			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
-					if (chapter is null)
-					{
-						System.Diagnostics.Trace.TraceWarning("Chapter not found for internal link");
-						return;
-					}
-					System.Diagnostics.Trace.TraceInformation($"Found chapter: {chapter.Title}");
+			if (chapter is null)
+			{
+				System.Diagnostics.Trace.TraceWarning("Chapter not found for internal link");
+				return;
+			}
+			System.Diagnostics.Trace.TraceInformation($"Found chapter: {chapter.Title}");
 			book.CurrentChapter = book.Chapters.IndexOf(chapter);
-					// Use helper to ensure native and media overlay state stay in sync
-					await LoadChapterContentAsync();
-					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-				}
+			// Use helper to ensure native and media overlay state stay in sync
+			await LoadChapterContentAsync();
+			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+		}
 	}
 
 	static async Task TryHandleExternalLinkAsync(string url)
@@ -385,7 +385,7 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandleNextAsync();
 				break;
 			case "prev":
-			System.Diagnostics.Trace.TraceInformation("Handling prev action from JS");
+				System.Diagnostics.Trace.TraceInformation("Handling prev action from JS");
 				await HandlePrevAsync();
 				break;
 			case "menu":
@@ -413,7 +413,7 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandleMediaOverlayNextAsync();
 				break;
 			case "mediaoverlayprev":
-			System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
+				System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
 				await HandleMediaOverlayPrevAsync();
 				break;
 		}
@@ -665,7 +665,7 @@ public partial class BookPage : ContentPage, IDisposable
 					book.CurrentChapter = index;
 					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
 					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-						await LoadChapterContentAsync();
+					await LoadChapterContentAsync();
 					CloseMenuAsync(this, EventArgs.Empty);
 				});
 			})
@@ -698,7 +698,7 @@ public partial class BookPage : ContentPage, IDisposable
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 #endif
 	}
-    
+
 	async Task<bool> LoadAndMergeProgressAsync(CancellationToken token)
 	{
 		var pageLoaded = false;

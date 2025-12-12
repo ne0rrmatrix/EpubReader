@@ -37,7 +37,7 @@ public partial class FolderPicker : IFolderPicker
 
 		var result = await folderPicker.PickSingleFolderAsync();
 		pickedFolder = result;
-		if(result is null)
+		if (result is null)
 		{
 			logger.Info("No folder selected.");
 			return string.Empty; // Return an empty string if no folder is selected

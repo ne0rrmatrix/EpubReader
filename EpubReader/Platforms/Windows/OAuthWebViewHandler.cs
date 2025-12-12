@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml.Controls;
-using WinUIWindow = Microsoft.UI.Xaml.Window;
-using WinUIGrid = Microsoft.UI.Xaml.Controls.Grid;
 using WinUIButton = Microsoft.UI.Xaml.Controls.Button;
-using WinUIRowDefinition = Microsoft.UI.Xaml.Controls.RowDefinition;
+using WinUIGrid = Microsoft.UI.Xaml.Controls.Grid;
 using WinUIGridLength = Microsoft.UI.Xaml.GridLength;
 using WinUIGridUnitType = Microsoft.UI.Xaml.GridUnitType;
 using WinUIHorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment;
+using WinUIRowDefinition = Microsoft.UI.Xaml.Controls.RowDefinition;
 using WinUIThickness = Microsoft.UI.Xaml.Thickness;
+using WinUIWindow = Microsoft.UI.Xaml.Window;
 
 namespace EpubReader.Platforms.Windows;
 
@@ -73,7 +73,7 @@ public static class OAuthWebViewHandler
 		var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(authWindow);
 		var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
 		var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-		
+
 		// Set window size - larger to fit Google sign-in page properly
 		appWindow.Resize(new global::Windows.Graphics.SizeInt32 { Width = 600, Height = 900 });
 
@@ -176,7 +176,7 @@ public static class OAuthWebViewHandler
 		{
 			// Get the user data folder for WebView2
 			var userDataFolder = Path.Combine(FileSystem.AppDataDirectory, "WebView2");
-			
+
 			if (Directory.Exists(userDataFolder))
 			{
 				// Delete the entire WebView2 cache directory
@@ -192,16 +192,16 @@ public static class OAuthWebViewHandler
 					{
 						// Files might be in use, try to delete specific subdirectories
 						Trace.TraceWarning($"Could not delete entire WebView2 folder: {ioEx.Message}");
-						
+
 						// Try to delete the Cookies and Cache folders specifically
 						var cookiesPath = Path.Combine(userDataFolder, "Default", "Cookies");
 						var cachePath = Path.Combine(userDataFolder, "Default", "Cache");
-						
+
 						if (File.Exists(cookiesPath))
 						{
 							File.Delete(cookiesPath);
 						}
-						
+
 						if (Directory.Exists(cachePath))
 						{
 							Directory.Delete(cachePath, recursive: true);

@@ -9,7 +9,7 @@ using Plugin.Firebase.Auth.Google;
 
 namespace EpubReader;
 
-[Activity(Theme = "@style/Maui.SplashTheme", ResizeableActivity = true, MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density )]
+[Activity(Theme = "@style/Maui.SplashTheme", ResizeableActivity = true, MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
 [IntentFilter(
 	[Intent.ActionView],
 	Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
@@ -19,7 +19,7 @@ namespace EpubReader;
 
 public class MainActivity : MauiAppCompatActivity
 {
-    public static event Action<int, Result, Intent?>? ActivityResult;
+	public static event Action<int, Result, Intent?>? ActivityResult;
 
 	protected override void OnCreate(Bundle? savedInstanceState)
 	{
@@ -83,12 +83,12 @@ public class MainActivity : MauiAppCompatActivity
 		return base.DispatchTouchEvent(e);
 	}
 
-	 public override void OnRequestPermissionsResult(
-        int requestCode, 
-        string[] permissions, 
-        Permission[] grantResults)
-    {
-        Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-    }
+	public override void OnRequestPermissionsResult(
+	   int requestCode,
+	   string[] permissions,
+	   Permission[] grantResults)
+	{
+		Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+		base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+	}
 }

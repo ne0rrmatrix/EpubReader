@@ -10,11 +10,11 @@ using System.Text.Json;
 /// </summary>
 public sealed class BookPageJsMessage
 {
-    public string Action { get; init; } = string.Empty;
+	public string Action { get; init; } = string.Empty;
 
-    public string? Href { get; init; }
+	public string? Href { get; init; }
 
-    public int? Position { get; init; }
+	public int? Position { get; init; }
 
 	public bool? Enabled { get; init; }
 
@@ -88,15 +88,15 @@ public sealed class BookPageJsMessage
 	/// Returns null if no mapping is available.
 	/// </summary>
 	public string? ToRuncsharpUrl()
-    {
-        var action = Action?.ToLowerInvariant() ?? string.Empty;
+	{
+		var action = Action?.ToLowerInvariant() ?? string.Empty;
 		return action switch
-        {
-            "jump" => Href is not null ? $"https://runcsharp.jump?{Href}" : null,
-            "next" => "https://runcsharp.next?true",
-            "prev" => "https://runcsharp.prev?true",
-            "menu" => "https://runcsharp.menu?true",
-            "pageload" => "https://runcsharp.pageLoad?true",
+		{
+			"jump" => Href is not null ? $"https://runcsharp.jump?{Href}" : null,
+			"next" => "https://runcsharp.next?true",
+			"prev" => "https://runcsharp.prev?true",
+			"menu" => "https://runcsharp.menu?true",
+			"pageload" => "https://runcsharp.pageLoad?true",
 			"characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
 			"mediaoverlaytoggle" => Enabled.HasValue ? $"https://runcsharp.mediaoverlaytoggle?{Enabled.Value}" : null,
 			"mediaoverlayplay" => "https://runcsharp.mediaoverlayplay?true",
@@ -104,7 +104,7 @@ public sealed class BookPageJsMessage
 			"mediaoverlaynext" => "https://runcsharp.mediaoverlaynext?true",
 			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
 			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
-            _ => null,
-        };
-    }
+			_ => null,
+		};
+	}
 }

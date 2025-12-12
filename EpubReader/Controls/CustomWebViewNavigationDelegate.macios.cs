@@ -89,13 +89,13 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 
 public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
 {
-    public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
-    {
-        // 'message.Body' contains the data sent from JavaScript
-        if (message.Name == "webwindowinterop")
-        {
-            Console.WriteLine($"Received message from WKWebView: {message.Body}");
-            if (string.IsNullOrEmpty(message.Body?.ToString()))
+	public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
+	{
+		// 'message.Body' contains the data sent from JavaScript
+		if (message.Name == "webwindowinterop")
+		{
+			Console.WriteLine($"Received message from WKWebView: {message.Body}");
+			if (string.IsNullOrEmpty(message.Body?.ToString()))
 			{
 				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 				return;
@@ -107,6 +107,6 @@ public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
 			{
 				WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json));
 			});
-        }
-    }
+		}
+	}
 }

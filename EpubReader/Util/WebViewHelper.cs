@@ -224,7 +224,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <returns>A task that represents the asynchronous operation. The task result contains the calculated width as an integer.</returns>
 	async Task<int> GetWidthAsync(Settings settings)
 	{
-		var result = await dispatcher.DispatchAsync	(() => webView.EvaluateJavaScriptAsync("getWidth()"));
+		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getWidth()"));
 		var fontSize = settings.FontSize > 0 ? settings.FontSize * 10 : 30;
 
 		if (settings.SupportMultipleColumns)

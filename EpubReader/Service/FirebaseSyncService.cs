@@ -107,13 +107,13 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 		isLocalOnlyMode = false;
 		try
 		{
-				Preferences.Set(localOnlyModeKey, false);
+			Preferences.Set(localOnlyModeKey, false);
 		}
 		catch (Exception e)
 		{
 			Trace.TraceError($"Failed to set local-only mode preference: {e.Message}");
 		}
-	
+
 
 		LoadFirebaseConfig();
 
@@ -135,7 +135,7 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 		try
 		{
 			databaseUrl = Preferences.Get(dbUrlKey, string.Empty);
-			databaseUrl = FirebaseConfig.DatabaseUrl;	
+			databaseUrl = FirebaseConfig.DatabaseUrl;
 		}
 		catch (Exception ex)
 		{
@@ -169,7 +169,7 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 		{
 			Trace.TraceError($"Failed to set local-only mode preference: {e.Message}");
 		}
-		
+
 		await InitializeLocalDbAsync(token);
 
 		Trace.TraceInformation($"Sync service initialized in local-only mode for {userId}");

@@ -359,4 +359,3 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 }
-

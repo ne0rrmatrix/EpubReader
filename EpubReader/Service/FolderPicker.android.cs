@@ -32,7 +32,7 @@ public partial class FolderPicker : IFolderPicker
 	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default)
 	{
 		List<string> epubFiles = [];
-		
+
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			logger.Info("No folder URI provided.");
@@ -53,7 +53,7 @@ public partial class FolderPicker : IFolderPicker
 		{
 			logger.Info($"Error enumerating files: {ex.Message}");
 		}
-		
+
 		return Task.FromResult(epubFiles);
 	}
 
@@ -242,4 +242,3 @@ public partial class FolderPicker : IFolderPicker
 		}
 	}
 }
-
