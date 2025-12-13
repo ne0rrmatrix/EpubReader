@@ -1,3 +1,59 @@
+## EpubReader — Copilot instructions (concise)
+
+This file tells an AI coding agent how to be immediately productive in the EpubReader repo (a cross-platform .NET MAUI EPUB reader). Keep edits focused, preserve style, and follow project conventions.
+
+- **Big picture**: .NET MAUI app with MVVM. Core responsibilities are split into:
+  - UI & platform shims: `Platforms/`, `Views/`, and `Controls/` (platform files use suffixes like `.android.cs`, `.macios.cs`).
+  - Business logic & parsing: `Service/EbookService.cs` (VersOne.Epub + SixLabors.ImageSharp integrations).
+  - Persistence & sync: `Database/Db.cs`, `Service/FirebaseSyncService.cs`, and secrets in `build-secrets/`.
+  - Messaging & state: `ViewModels/` (MVVM Toolkit attributes) and `Messages/` (WeakReferenceMessenger).
+
+- **Key files to inspect for most tasks**:
+  - `Service/EbookService.cs` — EPUB parsing, cover extraction
+  - `Database/Db.cs` — SQLite initialization and models
+  - `MauiProgram.cs` — DI registration and platform wiring
+  - `ViewModels/` — look for `[ObservableProperty]` and `[RelayCommand]`
+  - `Messages/` — message classes used with `WeakReferenceMessenger`
+
+- **Build / Run**
+  - Primary build script: `build.ps1`. Example debug build:
+    ```powershell
+    pwsh -File ./build.ps1 -ApiKey <key> -AuthDomain <domain> -DatabaseUrl <url> -Configuration Debug
+    ```
+  - VS Code tasks available: "Build with Firebase Secrets", "Build (Release) with Firebase Secrets", "Build from .env file", and "Run app (Windows)".
+  - Secrets live in `build-secrets/google-services.json` or are passed via `build.ps1` flags. Do not commit secrets.
+
+- **Repository conventions (must follow)**
+  - File-scoped namespaces (e.g., `namespace EpubReader.Service;`).
+  - Fields use camelCase, no underscore prefix.
+  - Public async methods accept `CancellationToken token = default` and call `token.ThrowIfCancellationRequested()` early.
+  - Use `Trace.WriteLine()` for logging (not `Debug.WriteLine()`).
+  - Enums: index 0 should be `Unknown`/`Default` for safe deserialization.
+
+- **MVVM / messaging patterns**
+  - ViewModels inherit `BaseViewModel : ObservableObject`.
+  - Properties use `[ObservableProperty]` and commands use `[RelayCommand]` (source-generated code used broadly).
+  - Cross-VM communication uses `WeakReferenceMessenger.Default.Send(...)` with message classes under `Messages/`.
+  - ViewModels often `Dispose()` and unregister from messages.
+
+- **Platform integration notes**
+  - Platform-specific behavior is implemented via files with platform suffixes (`*.android.cs`, `*.macios.cs`, `*.windows.cs`).
+  - `MauiProgram.cs` performs DI registration and may call `FirebaseConfigLoader.InjectFirebaseSecrets()` under `#if ANDROID`.
+
+- **When modifying code**
+  - Make focused, minimal edits. Preserve style and public APIs.
+  - Prefer using repository source-generator patterns (`[ObservableProperty]`, `[RelayCommand]`) over hand-rolled implementations.
+  - Run `build.ps1` (or the VS Code tasks) after changes that affect the build.
+
+- **Helpful examples to copy from**
+  - `ViewModels/BookViewModel` — shows `[ObservableProperty]`, `[RelayCommand]`, and messenger usage.
+  - `Service/FirebaseSyncService.cs` — demonstrates offline queueing and reconciliation.
+
+- **What to avoid**
+  - Introducing `NotImplementedException` in production code.
+  - Committing any Firebase or secret files into source control.
+
+If anything is unclear or you want more examples/patches, tell me which area to expand and I will iterate.
 # Overview
 Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET MAUI EPUB reader with cloud sync, Calibre server integration, and multi-platform support (Windows, Android, iOS, macOS).
 

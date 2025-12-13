@@ -946,7 +946,8 @@ function buildMediaOverlayUi(root) {
     seekInput.className = 'media-overlay-player__seek';
     seekInput.min = '0';
     seekInput.max = '1';
-    seekInput.step = '0.1';
+    // Use finer granularity for smoother seeking & more accurate time label
+    seekInput.step = '0.01';
     seekInput.value = '0';
     seekInput.disabled = true;
 
@@ -1019,6 +1020,10 @@ function buildMediaOverlayUi(root) {
     seekInput.addEventListener('change', function () {
         if (!mediaOverlayUi.state.durationSeconds) return;
         const secs = Number(seekInput.value) * mediaOverlayUi.state.durationSeconds;
+        // Mark seeking false now so incoming UI updates are applied immediately
+        try { mediaOverlayUi.state.seeking = false; } catch (e) {
+            console.warn('Failed to clear seeking state on change', e);
+         }
         // send seek command only when the user releases the thumb
         sendMediaOverlayCommand('mediaoverlayseek', { seconds: secs });
     });
@@ -1873,6 +1878,14 @@ document.addEventListener("DOMContentLoaded", function () {
         mediaOverlayUi.root.dataset.visible = 'false';
         mediaOverlayUi.root.dataset.minimized = 'false';
         mediaOverlayUi.root.setAttribute('aria-live', 'polite');
+        // Prevent the overlay from being dragged or moving the underlying content
+        try {
+            mediaOverlayUi.root.style.touchAction = 'none';
+            mediaOverlayUi.root.style.userSelect = 'none';
+            mediaOverlayUi.root.style.webkitUserSelect = 'none';
+        } catch (e) {
+            console.warn('Failed to apply touch/user-select styles to media overlay root', e);
+        }
     }
 
     if (!frame || !body) {
@@ -2128,48 +2141,64 @@ function getVisibleSegmentPosition(fragmentId, segmentList) {
  * pagination handlers so the host app can either scroll or ask native to
  * advance pages. This mirrors the expectation from the C# side which calls
  * this function before highlighting a fragment.
+ * @param {string} fragmentId The ID of the element to check.
+ * @param {'prev' | 'next'} direction The user's intended navigation direction.
  */
 function ensureFragmentVisibleUsingNext(fragmentId, direction) {
-    try {
-        const doc = domUtils.getIframeDocument();
-        const win = domUtils.getContentWindow();
-        if (!doc || !win || !fragmentId) {
-            return;
-        }
-
-        const intent = direction === 'prev' ? 'prev' : 'next';
-
-        const el = doc.getElementById(fragmentId);
-        if (!el) {
-            console.warn('ensureFragmentVisibleUsingNext: fragment not found', fragmentId);
-            if (intent === 'prev') {
-                handlePrevCommand();
-            } else {
-                handleNextCommand();
-            }
-            return;
-        }
-
-        const rect = el.getBoundingClientRect();
-        // If any part of the element intersects the viewport horizontally it's visible
-        const isVisible = rect.right >= 0 && rect.left <= win.innerWidth;
-        if (isVisible) {
-            return;
-        }
-
-        // If element is to the right of viewport, request next; if to the left, request prev
-        if (rect.left > win.innerWidth) {
-            // move right/next (this may call native when at end of content)
-            handleNextCommand();
-        } else if (rect.right < 0) {
-            // move left/previous
-            handlePrevCommand();
-        } else if (intent === 'prev') {
-            handlePrevCommand();
-        } else {
-            handleNextCommand();
-        }
-    } catch (e) {
-        console.error('ensureFragmentVisibleUsingNext failed', e);
+  try {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win || !fragmentId) {
+      return;
     }
+
+    const intent = direction === "prev" ? "prev" : "next";
+    const seekMode = !!mediaOverlayUi?.state?.seeking;
+
+    // Helper to execute the correct navigation command based on the mode.
+    const executeNavigation = (action) => {
+      if (seekMode) {
+        sendToNativeMessage({ action });
+      } else if (action === "next") {
+        handleNextCommand();
+      } else {
+        handlePrevCommand();
+      }
+    };
+
+    const el = doc.getElementById(fragmentId);
+    if (!el) {
+      console.warn(
+        "ensureFragmentVisible: fragment not found, falling back to default navigation.",
+        fragmentId,
+      );
+      // If the element doesn't exist, just perform the intended action.
+      executeNavigation(intent);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const isVisible = rect.right >= 0 && rect.left <= win.innerWidth;
+
+    if (isVisible) {
+      return; // Element is already visible, no action needed.
+    }
+
+    // Determine the required action based on the element's position.
+    let requiredAction;
+    if (rect.left >= win.innerWidth) {
+      // Element is entirely to the right of the viewport.
+      requiredAction = "next";
+    } else if (rect.right <= 0) {
+      // Element is entirely to the left of the viewport.
+      requiredAction = "prev";
+    } else {
+      // Element is partially visible or in an unknown state; trust the original intent.
+      requiredAction = intent;
+    }
+
+    executeNavigation(requiredAction);
+  } catch (e) {
+    console.error("ensureFragmentVisible failed", e);
+  }
 }

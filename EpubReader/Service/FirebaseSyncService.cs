@@ -6,6 +6,7 @@ using System.Reactive.Subjects;
 using Firebase.Database;
 using Firebase.Database.Query;
 using SQLite;
+using SQLitePCL;
 
 namespace EpubReader.Service;
 
@@ -19,6 +20,7 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 	const string localOnlyModeKey = "Sync.LocalOnlyMode";
 	const string usersNode = "users";
 	const string booksNode = "books";
+	const string sqlInteger = "INTEGER";
 	readonly SQLite.SQLiteOpenFlags flags = SQLite.SQLiteOpenFlags.ReadWrite | SQLite.SQLiteOpenFlags.Create | SQLite.SQLiteOpenFlags.SharedCache;
 	readonly string deviceId;
 	readonly string deviceName;
@@ -399,18 +401,18 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 
 		await EnsureColumnsAsync(db, "ReadingProgress", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 		{
-			["MediaOverlayEnabled"] = "INTEGER",
-			["MediaOverlayChapter"] = "INTEGER",
-			["MediaOverlaySegmentIndex"] = "INTEGER",
+			["MediaOverlayEnabled"] = sqlInteger,
+			["MediaOverlayChapter"] = sqlInteger,
+			["MediaOverlaySegmentIndex"] = sqlInteger,
 			["MediaOverlayPositionSeconds"] = "REAL",
 			["MediaOverlayFragmentId"] = "TEXT"
 		}, token).ConfigureAwait(false);
 
 		await EnsureColumnsAsync(db, "SyncQueue", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 		{
-			["MediaOverlayEnabled"] = "INTEGER",
-			["MediaOverlayChapter"] = "INTEGER",
-			["MediaOverlaySegmentIndex"] = "INTEGER",
+			["MediaOverlayEnabled"] = sqlInteger,
+			["MediaOverlayChapter"] = sqlInteger,
+			["MediaOverlaySegmentIndex"] = sqlInteger,
 			["MediaOverlayPositionSeconds"] = "REAL",
 			["MediaOverlayFragmentId"] = "TEXT"
 		}, token).ConfigureAwait(false);

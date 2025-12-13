@@ -421,13 +421,10 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandleMediaOverlayPrevAsync();
 				break;
 			case "mediaoverlayseek":
-				if (mediaOverlayManager is not null)
-				{
-					if (double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
+				if (mediaOverlayManager is not null && double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
 					{
 						await mediaOverlayManager.SeekAsync(secs);
 					}
-				}
 				break;
 		}
 	}
@@ -570,7 +567,7 @@ public partial class BookPage : ContentPage, IDisposable
 		await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 	}
 
-	void OnMediaOverlayPlaybackProgressChanged(object? sender, MediaOverlayPlaybackProgress progress)
+	async void OnMediaOverlayPlaybackProgressChanged(object? sender, MediaOverlayPlaybackProgress progress)
 	{
 		latestMediaOverlayProgress = progress;
 
@@ -585,17 +582,15 @@ public partial class BookPage : ContentPage, IDisposable
 
 		var enabledChanged = previous is null || previous.Enabled != progress.Enabled;
 		var segmentChanged = previous is null || previous.SegmentIndex != progress.SegmentIndex;
-		var posChanged = (previous?.PositionSeconds is double a && progress.PositionSeconds is double b)
-			? Math.Abs(a - b) >= 1
-			: (previous?.PositionSeconds != progress.PositionSeconds);
+			var posChanged = (previous?.PositionSeconds is double a && progress.PositionSeconds is double b)
+				? Math.Abs(a - b) >= 1
+				: !(previous?.PositionSeconds is null && progress.PositionSeconds is null);
 
 		// Sync policy:
 		// - always sync enable/segment changes
 		// - treat large position jumps (seek) as immediate
 		// - otherwise, sync periodically while position moves
-		var positionJump = (previous?.PositionSeconds is double pa && progress.PositionSeconds is double pb)
-			? Math.Abs(pa - pb) >= 5
-			: false;
+		var positionJump = (previous?.PositionSeconds is double pa && progress.PositionSeconds is double pb) && Math.Abs(pa - pb) >= 5;
 
 		var periodicDue = now - lastMediaOverlayProgressSyncedAt >= TimeSpan.FromSeconds(10);
 		var shouldSync = enabledChanged || segmentChanged || positionJump || (periodicDue && posChanged);
@@ -608,22 +603,7 @@ public partial class BookPage : ContentPage, IDisposable
 		lastMediaOverlayProgressSyncedAt = now;
 		lastMediaOverlayProgressSent = progress;
 
-		// Fire-and-forget: debounced at this layer.
-		_ = Task.Run(async () =>
-		{
-			try
-			{
-				await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-			}
-			catch (OperationCanceledException)
-			{
-				// ignore
-			}
-			catch (Exception ex)
-			{
-				Trace.TraceWarning($"Failed syncing media overlay progress: {ex.Message}");
-			}
-		});
+		await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 	}
 
 	async Task UpdateReaderModeOverlayAsync(bool isReaderModeEnabled)
@@ -781,7 +761,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 			if (cloud is null)
 			{
-				await PrimeLocalMediaOverlayRestoreAsync(token);
+				await PrimeLocalMediaOverlayRestoreAsync();
 				await BackfillLegacyProgressIfNeededAsync(bookId, token);
 			}
 			else
@@ -794,9 +774,9 @@ public partial class BookPage : ContentPage, IDisposable
 			Dispatcher.Dispatch(() => HideNativeOverlay());
 			return pageLoaded;
 		}
-		catch (OperationCanceledException)
+		catch (OperationCanceledException ex)
 		{
-			// ignore
+			System.Diagnostics.Trace.TraceInformation($"Progress load cancelled: {ex.Message}");
 		}
 		catch (Exception ex)
 		{
@@ -966,7 +946,7 @@ public partial class BookPage : ContentPage, IDisposable
 		await syncService.SaveProgressAsync(progress, token);
 	}
 
-	async Task PrimeLocalMediaOverlayRestoreAsync(CancellationToken token)
+	async Task PrimeLocalMediaOverlayRestoreAsync()
 	{
 		// Local persistence uses the Book table. This is also used when cloud sync
 		// is disabled or no cloud progress exists.
@@ -999,43 +979,39 @@ public partial class BookPage : ContentPage, IDisposable
 
 		// Prime Media Overlay restore before loading the chapter so the manager can
 		// apply it on the next page load (restoring timeline + highlight).
-		if (progress.MediaOverlayEnabled is bool moEnabled && progress.MediaOverlayChapter is int moChapter)
+		if (progress.MediaOverlayEnabled is bool moEnabled && progress.MediaOverlayChapter is int moChapter && moChapter == book.CurrentChapter)
 		{
-			// Keep restore scoped to the current chapter.
-			if (moChapter == book.CurrentChapter)
+			await EnsureMediaOverlayManagerInitialized();
+			var restore = new MediaOverlayPlaybackProgress(
+				Enabled: moEnabled,
+				ChapterIndex: moChapter,
+				SegmentIndex: Math.Max(0, progress.MediaOverlaySegmentIndex ?? 0),
+				PositionSeconds: progress.MediaOverlayPositionSeconds,
+				FragmentId: progress.MediaOverlayFragmentId);
+			latestMediaOverlayProgress = restore;
+			mediaOverlayManager?.SetPendingRestore(restore);
+
+			// Persist the restore state locally so local-only users get it too.
+			try
 			{
-				await EnsureMediaOverlayManagerInitialized();
-				var restore = new MediaOverlayPlaybackProgress(
-					Enabled: moEnabled,
-					ChapterIndex: moChapter,
-					SegmentIndex: Math.Max(0, progress.MediaOverlaySegmentIndex ?? 0),
-					PositionSeconds: progress.MediaOverlayPositionSeconds,
-					FragmentId: progress.MediaOverlayFragmentId);
-				latestMediaOverlayProgress = restore;
-				mediaOverlayManager?.SetPendingRestore(restore);
+				book.MediaOverlayEnabled = moEnabled;
+				book.MediaOverlayChapter = moChapter;
+				book.MediaOverlaySegmentIndex = restore.SegmentIndex;
+				book.MediaOverlayPositionSeconds = restore.PositionSeconds;
+				book.MediaOverlayFragmentId = restore.FragmentId;
 
-				// Persist the restore state locally so local-only users get it too.
-				try
-				{
-					book.MediaOverlayEnabled = moEnabled;
-					book.MediaOverlayChapter = moChapter;
-					book.MediaOverlaySegmentIndex = restore.SegmentIndex;
-					book.MediaOverlayPositionSeconds = restore.PositionSeconds;
-					book.MediaOverlayFragmentId = restore.FragmentId;
-
-					await db.UpdateBookMediaOverlayProgress(
-						book.Id,
-						moEnabled,
-						moChapter,
-						restore.SegmentIndex,
-						restore.PositionSeconds,
-						restore.FragmentId,
-						ViewModel.CancellationTokenSource.Token);
-				}
-				catch (Exception ex)
-				{
-					Trace.TraceWarning($"Failed persisting restored media overlay state: {ex.Message}");
-				}
+				await db.UpdateBookMediaOverlayProgress(
+					book.Id,
+					moEnabled,
+					moChapter,
+					restore.SegmentIndex,
+					restore.PositionSeconds,
+					restore.FragmentId,
+					ViewModel.CancellationTokenSource.Token);
+			}
+			catch (Exception ex)
+			{
+				Trace.TraceWarning($"Failed persisting restored media overlay state: {ex.Message}");
 			}
 		}
 
