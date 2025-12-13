@@ -394,6 +394,34 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
+		// If the saved/restored segment isn't visible on the current page, prefer
+		// the first visible segment on the page (and make that the new saved segment).
+		var allFragmentIds = segments.Select(s => s.FragmentId).ToList();
+		// If the current segmentIndex points at a valid segment, check visibility.
+		if (segmentIndex >= 0 && segmentIndex < segments.Count)
+		{
+			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds).ConfigureAwait(false);
+			if (visibleIndex < 0)
+			{
+				var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds).ConfigureAwait(false);
+				if (firstVisible >= 0)
+				{
+					segmentIndex = firstVisible;
+					pendingSeekOverrideSeconds = segments[segmentIndex].Node.Audio?.ClipBegin?.TotalSeconds ?? 0;
+				}
+			}
+		}
+		else
+		{
+			// No saved segment; pick the first visible one on the page if any.
+			var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds).ConfigureAwait(false);
+			if (firstVisible >= 0)
+			{
+				segmentIndex = firstVisible;
+				pendingSeekOverrideSeconds = segments[segmentIndex].Node.Audio?.ClipBegin?.TotalSeconds ?? 0;
+			}
+		}
+
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
 		// If a restore (or seek) provided an explicit position, ensure playback begins at it.
 		var forceSeek = pendingSeekOverrideSeconds is not null;
@@ -934,6 +962,19 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			System.Diagnostics.Trace.TraceWarning($"getVisibleSegmentPosition JSON parse failed: {ex.Message}");
 			return (-1, 0);
 		}
+	}
+
+	async Task<int> FindFirstVisibleSegmentIndexAsync(IReadOnlyList<string> allFragmentIds)
+	{
+		for (int i = 0; i < segments.Count; i++)
+		{
+			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[i].FragmentId, allFragmentIds).ConfigureAwait(false);
+			if (visibleIndex >= 0)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	async void OnClipTimerTick(object? sender, EventArgs e)

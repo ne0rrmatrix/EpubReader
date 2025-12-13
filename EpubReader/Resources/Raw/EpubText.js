@@ -85,32 +85,32 @@ function isUserNavigationLocked() {
 function shouldBlockMediaOverlayNavigation() {
     if (navigationState.isAnimating) {
         logMediaOverlay('Navigation ignored while animating');
-        return true;
+      //  return true;
     }
 
     const now = Date.now();
     if (now < mediaOverlayNavigationCooldownUntil) {
         logMediaOverlay('Navigation ignored by cooldown', { remainingMs: mediaOverlayNavigationCooldownUntil - now });
-        return true;
+      //  return true;
     }
 
     mediaOverlayNavigationCooldownUntil = now + mediaOverlayNavigationDebounceMs;
-    return false;
+ //   return false;
 }
 
 function shouldThrottleMediaOverlayAutoAdvance() {
     if (!mediaOverlayUi.state.playing) {
-        return false;
+      //  return false;
     }
 
     const now = Date.now();
     if (now < mediaOverlayAutoAdvanceCooldownUntil) {
         logMediaOverlay('Auto-advance ignored by cooldown', { remainingMs: mediaOverlayAutoAdvanceCooldownUntil - now });
-        return true;
+       // return true;
     }
 
     mediaOverlayAutoAdvanceCooldownUntil = now + mediaOverlayAutoAdvanceCooldownMs;
-    return false;
+   // return false;
 }
 
 document.addEventListener('selectstart', function (e) {
@@ -1030,33 +1030,11 @@ function buildMediaOverlayUi(root) {
 
     // Pointer/touch handlers to mark seeking state so native UI updates are deferred
     seekInput.addEventListener('pointerdown', function () {
-        mediaOverlayUi.state.seeking = true;
-    });
-    seekInput.addEventListener('pointerup', function () {
-        mediaOverlayUi.state.seeking = false;
+       sendMediaOverlayCommand('mediaoverlaypause');
     });
     seekInput.addEventListener('touchstart', function () {
-        mediaOverlayUi.state.seeking = true;
+        sendMediaOverlayCommand('mediaoverlaypause');
     }, { passive: true });
-    seekInput.addEventListener('touchend', function () {
-        mediaOverlayUi.state.seeking = false;
-    });
-    // Also handle pointercancel/leave as end-of-drag to keep state consistent
-    seekInput.addEventListener('pointercancel', function () {
-        mediaOverlayUi.state.seeking = false;
-    });
-    seekInput.addEventListener('pointerleave', function () {
-        // Only clear seeking on pointerleave if buttons are not pressed (best-effort)
-        try {
-            // Clear seeking state on pointer leave. Use a simple, deterministic
-            // assignment instead of probing Event.prototype for broader
-            // compatibility and to avoid redundant branches.
-            mediaOverlayUi.state.seeking = false;
-        } catch (e) {
-            console.warn('Failed to clear seeking state on pointerleave', e);
-            mediaOverlayUi.state.seeking = false;
-        }
-    });
 
     // Make the progress wrapper expand to use available horizontal space.
     progressWrap.style.display = 'flex';
