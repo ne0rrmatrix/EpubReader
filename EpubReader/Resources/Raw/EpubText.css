@@ -42,6 +42,86 @@ iframe {
     background-color: transparent;
 }
 
+@font-face {
+    font-family: "OpenDyslexic3-Regular";
+    src: url("OpenDyslexic3-Regular.ttf") 
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Arial";
+    src: url("arial.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Times New Roman";
+    src: url("times.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Comic Sans MS";
+    src: url("comic.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Georgia";
+    src: url("georgia.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Courier New";
+    src: url("cour.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Trebuchet MS";
+    src: url("trebuc.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Helvetica";
+    src: url("Helvetica.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Verdana";
+    src: url("verdana.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Tahoma";
+    src: url("tahoma.ttf")
+    format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
 /* Apply margins only on non-Windows platforms */
 @supports selector(:root) {
     /* This is just to ensure the rule is applied in modern browsers */

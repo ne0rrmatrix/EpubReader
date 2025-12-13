@@ -1,24 +1,27 @@
 ﻿namespace EpubReader.Models;
 
 /// <summary>
-/// Represents a color scheme with specific background and text colors.
+/// Represents a reading-friendly color scheme used for EPUB rendering and app theming.
 /// </summary>
-/// <remarks>This class is used to define a set of colors for UI elements, allowing for consistent styling across
-/// an application. Each color scheme has a name, a background color, and a text color.</remarks>
+/// <remarks>
+/// Each scheme exposes a display `Name`, a `BackgroundColor` and a `TextColor` (foreground).
+/// Colors are stored as hex strings (e.g. "#FFFFFF"). Keep property names stable to avoid
+/// breaking existing bindings and persisted settings.
+/// </remarks>
 public class ColorScheme
 {
 	/// <summary>
-	/// Gets or sets the background color as a string.
-	/// </summary>
-	public string BackgroundColor { get; set; } = "#f4ecd8";
-
-	/// <summary>
-	/// Gets or sets the text color as a string representation.
-	/// </summary>
-	public string TextColor { get; set; } = "#5b4636";
-
-	/// <summary>
-	/// Gets or sets the name associated with the <code>ColorScheme</code>.
+	/// Display name for the color scheme (e.g. "Material Light", "Sepia").
 	/// </summary>
 	public string Name { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Background color (hex string). Use subtle, low‑glare backgrounds for long reading sessions.
+	/// </summary>
+	public string BackgroundColor { get; set; } = "#FAFAFA";
+
+	/// <summary>
+	/// Main text (foreground) color (hex string).
+	/// </summary>
+	public string TextColor { get; set; } = "#111827";
 }

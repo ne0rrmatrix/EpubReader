@@ -35,6 +35,16 @@ public static class MauiProgram
 		{
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+			fonts.AddFont("OpenDyslexic3-Regular.ttf", "OpenDyslexic3Regular");
+			fonts.AddFont("arial.ttf", "Arial");
+			fonts.AddFont("times.ttf", "Times New Roman");
+			fonts.AddFont("comic.ttf", "Comic Sans MS");
+			fonts.AddFont("georgia.ttf", "Georgia");
+			fonts.AddFont("cour.ttf", "Courier New");
+			fonts.AddFont("trebuc.ttf", "Trebuchet MS");
+			fonts.AddFont("Helvetica.ttf", "Helvetica");
+			fonts.AddFont("verdana.ttf", "Verdana");
+			fonts.AddFont("tahoma.ttf", "Tahoma");
 		})
 		.UseMauiCommunityToolkit(static options =>
 		{

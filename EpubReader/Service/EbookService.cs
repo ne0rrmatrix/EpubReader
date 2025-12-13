@@ -36,6 +36,16 @@ public static partial class EbookService
 		"favicon.ico",
 		"EpubText.css",
 		"EpubText.js",
+		"OpenDyslexic3-Regular.ttf",
+		"arial.ttf",
+		"times.ttf",
+		"comic.ttf",
+		"georgia.ttf",
+		"cour.ttf",
+		"trebuc.ttf",
+		"Helvetica.ttf",
+		"verdana.ttf",
+		"tahoma.ttf"
 	];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
@@ -116,7 +126,16 @@ public static partial class EbookService
 		var authors = ExtractAuthors(book);
 		var mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
 		var mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
-
+		var additionalFonts = sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
+														  f.FileName.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase) ?
+														  new[] { new EpubFonts
+														  {
+															  Content = f.Content ?? [],
+															  FileName = f.FileName,
+															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
+														  } } : []).ToList();
+		fonts.AddRange(additionalFonts);
+		fonts.ForEach(f => logger.Info($"Font extracted: {f.FontFamily} from {f.FileName} ({f.Content.Length} bytes)"));
 		return new Book
 		{
 			Title = book.Title.Trim(),
@@ -641,6 +660,7 @@ public static partial class EbookService
 	static string ProcessHtml(string htmlFile)
 	{
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
+		
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);

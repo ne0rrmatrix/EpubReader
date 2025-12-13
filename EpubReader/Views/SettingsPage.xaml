@@ -66,23 +66,51 @@
             Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}" />
 
 
-        <Picker
-            x:Name="FontPicker"
-            Title="Select Font"
-            Grid.Row="3"
-            ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
-            ItemsSource="{Binding Fonts}"
-            SelectedIndexChanged="FontPicker_SelectedIndexChanged"
-            WidthRequest="250" />
+        <StackLayout Grid.Row="3" Spacing="6" HorizontalOptions="Center">
+            <Picker
+                x:Name="FontPicker"
+                Title="Select Font"
+                ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
+                ItemsSource="{Binding Fonts}"
+                SelectedIndexChanged="FontPicker_SelectedIndexChanged"
+                WidthRequest="250" />
 
-        <Picker
-            x:Name="ThemePicker"
-            Title="Theme"
-            Grid.Row="4"
-            ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
-            ItemsSource="{Binding ColorSchemes}"
-            SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
-            WidthRequest="250" />
+            <Label
+                x:Name="FontPreview"
+                Text="The quick brown fox jumps over the lazy dog"
+                HorizontalOptions="Center"
+                LineBreakMode="NoWrap"
+                FontSize="16" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="4" Spacing="6" HorizontalOptions="Center">
+            <Picker
+                x:Name="ThemePicker"
+                Title="Theme"
+                ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
+                ItemsSource="{Binding ColorSchemes}"
+                SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
+                WidthRequest="250" />
+
+            <CollectionView
+                x:Name="ThemePreview"
+                ItemsSource="{Binding ColorSchemes}"
+                SelectionMode="Single"
+                SelectionChanged="ThemePreview_SelectionChanged"
+                HeightRequest="96"
+                ItemsLayout="HorizontalList">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:ColorScheme">
+                        <Frame Padding="6" HasShadow="False" Margin="6" CornerRadius="6" BackgroundColor="{Binding BackgroundColor}">
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="Aa" FontSize="20" TextColor="{Binding TextColor}" HorizontalOptions="Center" />
+                                <Label Text="{Binding Name}" FontSize="11" TextColor="{StaticResource Gray600}" HorizontalOptions="Center" />
+                            </VerticalStackLayout>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </StackLayout>
 
         <Button
             Grid.Row="5"

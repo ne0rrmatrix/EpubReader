@@ -22,17 +22,22 @@ public partial class SettingsPageViewModel : BaseViewModel
 		new EpubFonts { FontFamily = "Tahoma" },
 		new EpubFonts { FontFamily = "Trebuchet MS" },
 		new EpubFonts { FontFamily = "Comic Sans MS" },
-		new EpubFonts { FontFamily = "Helvetica" }
+		new EpubFonts { FontFamily = "Helvetica" },
+		// Dyslexic-friendly fonts (users must have these installed or bundled)
+		new EpubFonts { FontFamily = "OpenDyslexic3Regular" },
 ];
 	readonly List<ColorScheme> colorSchemes =
 		[
-			new ColorScheme() { Name = "Light", BackgroundColor = "#f4ecd8" , TextColor = "#5b4636"},
-			new ColorScheme() { Name = "Dark", BackgroundColor = "#121212", TextColor = "#E1E1E1" },
-			new ColorScheme() { Name = "Sepia", BackgroundColor = "#f4ecd8", TextColor = "#5b4636" },
-			new ColorScheme() { Name = "Ocean", BackgroundColor = "#e0f7fa", TextColor = "#01579b" },
-			new ColorScheme() { Name = "Sand", BackgroundColor = "#f5deb3", TextColor = "#000000" },
-			new ColorScheme() { Name = "Charcoal", BackgroundColor = "#36454f", TextColor = "#dcdcdc" },
-			new ColorScheme() { Name = "Vintage", BackgroundColor = "#f5f5dc", TextColor = "#000000" }
+			new ColorScheme() { Name = "Material Light", BackgroundColor = "#FAFAFA", TextColor = "#111827" },
+			new ColorScheme() { Name = "Sepia", BackgroundColor = "#F4E7D3", TextColor = "#5B4636" },
+			new ColorScheme() { Name = "Warm Paper", BackgroundColor = "#FFF8E1", TextColor = "#3E2723" },
+			new ColorScheme() { Name = "Dim", BackgroundColor = "#1E1E1E", TextColor = "#E6E1DA" },
+			new ColorScheme() { Name = "AMOLED", BackgroundColor = "#000000", TextColor = "#FFFFFF" },
+			new ColorScheme() { Name = "Solarized Light", BackgroundColor = "#FDF6E3", TextColor = "#586E75" },
+			// Accessibility-focused themes
+			new ColorScheme() { Name = "High Contrast", BackgroundColor = "#000000", TextColor = "#FFFF00" },
+			new ColorScheme() { Name = "Colorblind Friendly", BackgroundColor = "#F5F7FA", TextColor = "#0B3D91" },
+			new ColorScheme() { Name = "Dyslexic Friendly", BackgroundColor = "#F7F7F7", TextColor = "#0B0B0B" }
 		];
 
 	[ObservableProperty]

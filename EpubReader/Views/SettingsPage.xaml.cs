@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 
 namespace EpubReader.Views;
 
@@ -102,6 +103,25 @@ public partial class SettingsPage : Popup<bool>
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
+	async void ThemePreview_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change theme from preview.");
+			return;
+		}
+
+		var selected = e?.CurrentSelection?.FirstOrDefault() as ColorScheme;
+		if (selected is null || settings.ColorScheme == selected.Name)
+		{
+			return;
+		}
+
+		// Mirror selection to the picker and reuse existing handler
+		ThemePicker.SelectedItem = selected;
+		ThemePicker_SelectedIndexChanged(ThemePicker, EventArgs.Empty);
+	}
+
 	/// <summary>
 	/// Handles the event when the selected font changes in the font picker.
 	/// </summary>
@@ -122,10 +142,16 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		settings.FontFamily = font.FontFamily;
-		logger.Info($"Chaging Font to: {font.FontFamily}");
+		var family = SanitizeFontFamily(font.FontFamily);
+		settings.FontFamily = family;
+		logger.Info($"Chaging Font to: {family}");
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+
+		if (FontPreview is not null)
+		{
+			FontPreview.FontFamily = family;
+		}
 	}
 
 	[SuppressMessage("Performance", "CA1822:MarkMembersAsStatic", Justification = "Event handler must be instance scoped")]
@@ -170,11 +196,41 @@ public partial class SettingsPage : Popup<bool>
 		FontSizeSlider.Value = settings.FontSize;
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
-		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		ThemePicker.SelectedItem = scheme;
+		if (ThemePreview is not null && scheme is not null)
+		{
+			ThemePreview.SelectedItem = scheme;
+		}
+
+		if (FontPreview is not null && FontPicker.SelectedItem is EpubFonts selectedFont)
+		{
+			FontPreview.FontFamily = SanitizeFontFamily(selectedFont.FontFamily);
+		}
+
 		if (BindingContext is SettingsPageViewModel viewModel)
 		{
 			await viewModel.LoadAuthStatusAsync();
 		}
+	}
+
+	static string SanitizeFontFamily(string? family)
+	{
+		if (string.IsNullOrEmpty(family))
+		{
+			return string.Empty;
+		}
+
+		var name = family;
+		if (name.Contains('/') || name.Contains('\\'))
+		{
+			name = Path.GetFileName(name);
+		}
+		if (name.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) || name.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase))
+		{
+			name = Path.GetFileNameWithoutExtension(name);
+		}
+		return name;
 	}
 
 	async void OnCloseClicked(object? sender, EventArgs? e)
