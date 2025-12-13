@@ -41,7 +41,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	TimeSpan? currentClipEnd;
 	string? currentAudioResourceId;
 	bool isSeekPending;
-	int? lastReportedSecond;
+	long? lastUiUpdateAtMs = null;
 	double? pendingSeekOverrideSeconds;
 	double? restoredPositionSeconds;
 	MediaOverlayPlaybackProgress? pendingRestore;
@@ -86,7 +86,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		if (!IsSupported)
 		{
 			System.Diagnostics.Debug.WriteLine("Media overlay playback not supported for this book; skipping UI initialization.");
-			await InvokeScriptAsync("setMediaOverlayVisibility", false).ConfigureAwait(false);
+			await InvokeScriptAsync("setMediaOverlayVisibility", false);
 			return;
 		}
 
@@ -109,7 +109,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			}));
 			System.Diagnostics.Debug.WriteLine("Media overlay UI initialized.");
 		}
-		await Task.WhenAll(tasks).ConfigureAwait(false);
+		await Task.WhenAll(tasks);
 	}
 
 	public async Task SetReaderModeHiddenAsync(bool hidden)
@@ -121,7 +121,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		await InvokeScriptAsync("setMediaOverlayReaderModeHidden", hidden).ConfigureAwait(false);
+		await InvokeScriptAsync("setMediaOverlayReaderModeHidden", hidden);
 	}
 
 	public async Task OnChapterRequestedAsync(int chapterIndex)
@@ -144,21 +144,21 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		isWebViewReady = true;
-		await InitializeUiAsync().ConfigureAwait(false);
+		await InitializeUiAsync();
 
 		if (currentChapterIndex != chapterIndex)
 		{
 			await UpdateChapterContextAsync(chapterIndex).ConfigureAwait(false);
 		}
 
-		await ApplyPendingRestoreAsync().ConfigureAwait(false);
+		await ApplyPendingRestoreAsync();
 
 		if (isEnabled)
 		{
-			await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+			await HighlightCurrentSegmentAsync();
 		}
 
-		await UpdateUiStateAsync().ConfigureAwait(false);
+		await UpdateUiStateAsync();
 	}
 
 	public void SetPendingRestore(MediaOverlayPlaybackProgress? progress)
@@ -237,13 +237,13 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 			if (isEnabled)
 			{
-				await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+				await HighlightCurrentSegmentAsync();
 			}
 			else
 			{
-				await ClearHighlightAsync().ConfigureAwait(false);
+				await ClearHighlightAsync();
 			}
-			await UpdateUiStateAsync().ConfigureAwait(false);
+			await UpdateUiStateAsync();
 		}
 		finally
 		{
@@ -368,10 +368,10 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		}
 		else if (isWebViewReady)
 		{
-			await HighlightCurrentSegmentAsync().ConfigureAwait(false);
+			await HighlightCurrentSegmentAsync();
 		}
 
-		await UpdateUiStateAsync().ConfigureAwait(false);
+		await UpdateUiStateAsync();
 	}
 
 	public async Task PlayAsync()
@@ -384,7 +384,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 		if (!isEnabled)
 		{
-			await SetEnabledAsync(true).ConfigureAwait(false);
+			await SetEnabledAsync(true);
 			return;
 		}
 
@@ -394,16 +394,17 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
+
 		// If the saved/restored segment isn't visible on the current page, prefer
 		// the first visible segment on the page (and make that the new saved segment).
 		var allFragmentIds = segments.Select(s => s.FragmentId).ToList();
 		// If the current segmentIndex points at a valid segment, check visibility.
 		if (segmentIndex >= 0 && segmentIndex < segments.Count)
 		{
-			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds).ConfigureAwait(false);
+			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds);
 			if (visibleIndex < 0)
 			{
-				var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds).ConfigureAwait(false);
+				var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
 				if (firstVisible >= 0)
 				{
 					segmentIndex = firstVisible;
@@ -414,7 +415,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		else
 		{
 			// No saved segment; pick the first visible one on the page if any.
-			var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds).ConfigureAwait(false);
+			var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
 			if (firstVisible >= 0)
 			{
 				segmentIndex = firstVisible;
@@ -425,7 +426,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
 		// If a restore (or seek) provided an explicit position, ensure playback begins at it.
 		var forceSeek = pendingSeekOverrideSeconds is not null;
-		await StartSegmentAsync(segments[segmentIndex], forceSeek: forceSeek).ConfigureAwait(false);
+		await StartSegmentAsync(segments[segmentIndex], forceSeek: forceSeek);
 	}
 
 	public async Task PauseAsync()
@@ -436,7 +437,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		StopPlaybackInternal(disposeSession: false, pauseOnly: true);
-		await UpdateUiStateAsync().ConfigureAwait(false);
+		await UpdateUiStateAsync();
 	}
 
 	public async Task NextAsync()
@@ -452,17 +453,17 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			segmentIndex++;
 			if (isEnabled && isPlaying)
 			{
-				await StartSegmentAsync(segments[segmentIndex], forceSeek: true).ConfigureAwait(false);
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true);
 			}
 			else
 			{
-				await HighlightCurrentSegmentAsync().ConfigureAwait(false);
-				await UpdateUiStateAsync().ConfigureAwait(false);
+				await HighlightCurrentSegmentAsync();
+				await UpdateUiStateAsync();
 			}
 		}
 		else
 		{
-			await FinishDocumentAsync().ConfigureAwait(false);
+			await FinishDocumentAsync();
 		}
 	}
 
@@ -479,12 +480,12 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			segmentIndex--;
 			if (isEnabled && isPlaying)
 			{
-				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: true).ConfigureAwait(false);
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: true);
 			}
 			else
 			{
-				await HighlightCurrentSegmentAsync(preferPreviousPage: true).ConfigureAwait(false);
-				await UpdateUiStateAsync().ConfigureAwait(false);
+				await HighlightCurrentSegmentAsync(preferPreviousPage: true);
+				await UpdateUiStateAsync();
 			}
 		}
 		else
@@ -497,8 +498,8 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	{
 
 		StopPlaybackInternal();
-		await ClearHighlightAsync().ConfigureAwait(false);
-		await UpdateUiStateAsync().ConfigureAwait(false);
+		await ClearHighlightAsync();
+		await UpdateUiStateAsync();
 	}
 
 	public void Dispose()
@@ -582,7 +583,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	{
 		if (!TryGetAudioResource(segment.Node.Audio?.Source, out var resource))
 		{
-			await HandleMissingAudioResourceAsync().ConfigureAwait(false);
+			await HandleMissingAudioResourceAsync();
 			return;
 		}
 
@@ -597,13 +598,13 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		currentClipBegin = segment.Node.Audio?.ClipBegin ?? TimeSpan.Zero;
 		currentClipEnd = ResolveClipBoundary(segmentIndex, segment);
 
-		var sessionOpened = await EnsureAudioSessionAsync(normalizedResourceId, resource, reuseExistingSession).ConfigureAwait(false);
+		var sessionOpened = await EnsureAudioSessionAsync(normalizedResourceId, resource, reuseExistingSession);
 		if (!sessionOpened)
 		{
 			return;
 		}
 
-		await HandlePlaybackStartAsync(forceSeek).ConfigureAwait(false);
+		await HandlePlaybackStartAsync(forceSeek);
 
 		if (!audioPlaybackService.HasSession)
 		{
@@ -611,18 +612,22 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		StartClipTimer(currentClipEnd);
-		if (!isSeekPending)
+		// If this start was triggered by an explicit seek, update the highlight immediately
+		// so the UI reflects the user's scrub action instead of waiting for the timer.
+		// or the UI is not yet in sync with playback.
+		if (forceSeek || !isSeekPending)
 		{
-			await HighlightCurrentSegmentAsync(preferPreviousPage).ConfigureAwait(false);
+			await HighlightCurrentSegmentAsync(preferPreviousPage);
 		}
-		await UpdateUiStateAsync().ConfigureAwait(false);
+
+		await UpdateUiStateAsync();
 
 	}
 
 	async Task HandleMissingAudioResourceAsync()
 	{
-		await viewModel.ShowInfoToastAsync("Audio clip missing for this passage.").ConfigureAwait(false);
-		await NextAsync().ConfigureAwait(false);
+		await viewModel.ShowInfoToastAsync("Audio clip missing for this passage.");
+		await NextAsync();
 	}
 
 	async Task<bool> EnsureAudioSessionAsync(string normalizedResourceId, MediaOverlayAudioResource resource, bool reuseExistingSession)
@@ -631,17 +636,17 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		{
 			if (!audioPlaybackService.HasSession || !reuseExistingSession)
 			{
-				var opened = await audioPlaybackService.OpenResourceAsync(normalizedResourceId, resource.Content).ConfigureAwait(false);
+				var opened = await audioPlaybackService.OpenResourceAsync(normalizedResourceId, resource.Content);
 				if (!opened)
 				{
-					await viewModel.ShowErrorToastAsync("Unable to start audio playback.").ConfigureAwait(false);
+					await viewModel.ShowErrorToastAsync("Unable to start audio playback.");
 					currentAudioResourceId = null;
 					return false;
 				}
 				currentAudioResourceId = normalizedResourceId;
 			}
 			return true;
-		}).ConfigureAwait(false);
+		});
 	}
 
 	async Task HandlePlaybackStartAsync(bool forceSeek)
@@ -676,7 +681,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			}
 			isPlaying = true;
 			return Task.CompletedTask;
-		}).ConfigureAwait(false);
+		});
 	}
 
 	public async Task SeekAsync(double seconds)
@@ -715,7 +720,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 				var seekSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
 				pendingSeekOverrideSeconds = seekSeconds;
 				segmentIndex = i;
-				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: seconds < cumulative).ConfigureAwait(false);
+				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: seconds < cumulative);
 				return;
 			}
 			cumulative += segLen;
@@ -728,7 +733,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		{
 			var clipBegin = lastSegment.Node.Audio.ClipBegin ?? TimeSpan.Zero;
 			pendingSeekOverrideSeconds = clipBegin.TotalSeconds;
-			await StartSegmentAsync(lastSegment, forceSeek: true).ConfigureAwait(false);
+			await StartSegmentAsync(lastSegment, forceSeek: true);
 		}
 	}
 
@@ -813,7 +818,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		{
 			await webView.EvaluateJavaScriptAsync($"ensureFragmentVisibleUsingNext({fragmentLiteral}, {navigationLiteral})");
 			await webView.EvaluateJavaScriptAsync($"highlightMediaOverlayFragment({fragmentLiteral}, {activeLiteral}, {playbackLiteral})");
-		}).ConfigureAwait(false);
+		});
 	}
 
 	Task<string> ClearHighlightAsync()
@@ -841,7 +846,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			positionSeconds = GetCurrentPositionSeconds() ?? restoredPositionSeconds
 		};
 
-		await InvokeScriptAsync("updateMediaOverlayPlaybackState", payload).ConfigureAwait(false);
+		await InvokeScriptAsync("updateMediaOverlayPlaybackState", payload);
 		RaisePlaybackProgressChanged();
 	}
 
@@ -854,7 +859,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 				: $"{functionName}({JsonSerializer.Serialize(payload, serializerOptions)});";
 			try
 			{
-				await webView.EvaluateJavaScriptAsync(script).ConfigureAwait(false);
+				await webView.EvaluateJavaScriptAsync(script);
 			}
 			catch (Exception ex)
 			{
@@ -928,8 +933,8 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		clipTimer = dispatcher.CreateTimer();
-		clipTimer.Interval = TimeSpan.FromMilliseconds(120);
+			clipTimer = dispatcher.CreateTimer();
+		clipTimer.Interval = TimeSpan.FromMilliseconds(50);
 		clipTimer.Tick += OnClipTimerTick;
 		clipTimer.Start();
 	}
@@ -968,7 +973,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	{
 		for (int i = 0; i < segments.Count; i++)
 		{
-			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[i].FragmentId, allFragmentIds).ConfigureAwait(false);
+			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[i].FragmentId, allFragmentIds);
 			if (visibleIndex >= 0)
 			{
 				return i;
@@ -1006,13 +1011,14 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			}
 		}
 
+		// Always update highlight promptly for responsiveness
 		await HighlightCurrentSegmentAsync();
 
-		// Throttle UI position updates to once per second to reduce JS churn
-		var curSec = (int)Math.Floor(positionSeconds);
-		if (!lastReportedSecond.HasValue || lastReportedSecond.Value != curSec)
+		// Throttle UI payloads to ~200ms to reduce JS churn
+		var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+		if (!lastUiUpdateAtMs.HasValue || nowMs - lastUiUpdateAtMs.Value >= 200)
 		{
-			lastReportedSecond = curSec;
+			lastUiUpdateAtMs = nowMs;
 			await UpdateUiStateAsync();
 		}
 

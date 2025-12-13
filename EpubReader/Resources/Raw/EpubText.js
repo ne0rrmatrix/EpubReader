@@ -82,40 +82,6 @@ function isUserNavigationLocked() {
     return mediaOverlayUi.state.enabled && mediaOverlayUi.state.playing;
 }
 
-function shouldBlockMediaOverlayNavigation() {
-    if (navigationState.isAnimating) {
-        logMediaOverlay('Navigation ignored while animating');
-      //  return true;
-    }
-
-    const now = Date.now();
-    if (now < mediaOverlayNavigationCooldownUntil) {
-        logMediaOverlay('Navigation ignored by cooldown', { remainingMs: mediaOverlayNavigationCooldownUntil - now });
-      //  return true;
-    }
-
-    mediaOverlayNavigationCooldownUntil = now + mediaOverlayNavigationDebounceMs;
- //   return false;
-}
-
-function shouldThrottleMediaOverlayAutoAdvance() {
-    if (!mediaOverlayUi.state.playing) {
-      //  return false;
-    }
-
-    const now = Date.now();
-    if (now < mediaOverlayAutoAdvanceCooldownUntil) {
-        logMediaOverlay('Auto-advance ignored by cooldown', { remainingMs: mediaOverlayAutoAdvanceCooldownUntil - now });
-       // return true;
-    }
-
-    mediaOverlayAutoAdvanceCooldownUntil = now + mediaOverlayAutoAdvanceCooldownMs;
-   // return false;
-}
-
-document.addEventListener('selectstart', function (e) {
-    e.preventDefault();
-});
 
 /**
  * DOM and Platform Utilities
@@ -1252,10 +1218,7 @@ function handleMediaOverlayPrevClick() {
         });
         return;
     }
-    if (shouldBlockMediaOverlayNavigation()) {
-        return;
-    }
-
+    maybeNavigateToPreviousPageFromHighlightTop();
     logMediaOverlay('Prev requested');
     sendMediaOverlayCommand('mediaoverlayprev');
 }
@@ -1267,9 +1230,6 @@ function handleMediaOverlayNextClick() {
             enabled: mediaOverlayUi.state.enabled,
             segments: mediaOverlayUi.state.segmentCount
         });
-        return;
-    }
-    if (shouldBlockMediaOverlayNavigation()) {
         return;
     }
     logMediaOverlay('Next requested');
@@ -1722,8 +1682,8 @@ function handleNextCommand() {
     }
     const platform = domUtils.detectPlatform();
 
-    if (mediaOverlayUi.state.playing && shouldThrottleMediaOverlayAutoAdvance()) {
-        return;
+      if (mediaOverlayUi.state.playing) {
+       // return;
     }
 
     // If animation in progress, coalesce to a single pending "next"
@@ -2112,6 +2072,7 @@ function getVisibleSegmentPosition(fragmentId, segmentList) {
         return JSON.stringify({ index: -1, count: 0 });
     }
 }
+
 
 /**
  * Ensure the specified fragment is visible within the iframe viewport.

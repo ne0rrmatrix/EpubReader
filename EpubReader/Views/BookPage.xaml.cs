@@ -414,11 +414,11 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandleMediaOverlayPauseAsync();
 				break;
 			case "mediaoverlaynext":
-				await HandleMediaOverlayNextAsync();
+				await HandleMediaOverlayNextAsync().ConfigureAwait(false);
 				break;
 			case "mediaoverlayprev":
 				System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
-				await HandleMediaOverlayPrevAsync();
+				await HandleMediaOverlayPrevAsync().ConfigureAwait(false);
 				break;
 			case "mediaoverlayseek":
 				if (mediaOverlayManager is not null && double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
