@@ -62,14 +62,13 @@ public partial class Db : IDb
 		await EnsureColumnsAsync(
 			connection,
 			"Book",
-			new (string ColumnName, string SqlType)[]
-			{
+			[
 				("MediaOverlayEnabled", "INTEGER"),
 				("MediaOverlayChapter", "INTEGER"),
 				("MediaOverlaySegmentIndex", "INTEGER"),
 				("MediaOverlayPositionSeconds", "REAL"),
 				("MediaOverlayFragmentId", "TEXT")
-			},
+			],
 			cancellationToken);
 	}
 

@@ -667,7 +667,6 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 		// Find target segment by accumulating segment durations
 		double cumulative = 0;
-		int targetIndex = 0;
 		for (int i = 0; i < segments.Count; i++)
 		{
 			var audio = segments[i].Node.Audio;
@@ -676,7 +675,6 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 				// unknown length, treat as zero and pick this segment if we haven't found one
 				if (i == segments.Count - 1)
 				{
-					targetIndex = i;
 					break;
 				}
 				continue;
@@ -685,11 +683,10 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			var segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
 			if (seconds < cumulative + segLen)
 			{
-				targetIndex = i;
 				var offsetInSeg = Math.Max(0, seconds - cumulative);
 				var seekSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
 				pendingSeekOverrideSeconds = seekSeconds;
-				segmentIndex = targetIndex;
+				segmentIndex = i;
 				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: seconds < cumulative).ConfigureAwait(false);
 				return;
 			}
@@ -795,7 +792,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	{
 		var activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
 		var playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
-		return webView.EvaluateJavaScriptAsync($"clearMediaOverlayHighlight({activeLiteral}, {playbackLiteral})");
+		return dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"clearMediaOverlayHighlight({activeLiteral}, {playbackLiteral})"));
 	}
 
 	async Task UpdateUiStateAsync()
@@ -916,7 +913,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 		var script = $"getVisibleSegmentPosition({fragmentLiteral}, {listLiteral})";
 		try
 		{
-			var raw = await webView.EvaluateJavaScriptAsync(script);
+			var raw = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
 
 			raw = raw.Replace("\\", "");
 			System.Diagnostics.Debug.WriteLine($"getVisibleSegmentPosition returned: {raw}");
@@ -1026,7 +1023,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 	async Task HandleLastSegmentOnPageAsync(int nextIndex, MediaOverlaySegment nextSegment)
 	{
 		System.Diagnostics.Trace.TraceInformation($"Current segment {segmentIndex} is last on page; advancing page via JS next.");
-		await webView.EvaluateJavaScriptAsync("handleNextCommand()");
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("handleNextCommand()"));
 
 		var nextHasResourceAfter = TryGetAudioResource(nextSegment.Node.Audio?.Source, out var nextResourceAfter);
 		var sameResourceAfter = nextHasResourceAfter && string.Equals(nextResourceAfter?.NormalizedPath, currentAudioResourceId, StringComparison.OrdinalIgnoreCase);

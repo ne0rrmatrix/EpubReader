@@ -153,13 +153,13 @@ public partial class SettingsPage : Popup<bool>
 			FontPreview.FontFamily = family;
 		}
 	}
-
-	[SuppressMessage("Performance", "CA1822:MarkMembersAsStatic", Justification = "Event handler must be instance scoped")]
+	#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
 		stackLayout.Remove(switchControl);
 	}
-
+	#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
+	
 	/// <summary>
 	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
 	/// </summary>

@@ -7,6 +7,8 @@ html, body {
     background-color: var(--background-color);
     width: var(--root-width);
     height: var(--root-height);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 :root {
@@ -21,6 +23,25 @@ html, body {
     --media-overlay-accent: #4fe0b5;
 }
 
+/* Ensure consistent box-sizing and improve text wrapping to avoid overflow */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Prevent long words, URLs or custom font glyphs from overflowing their containers */
+p, h1, h2, h3, h4, h5, h6, li, dd, dt, div, span, a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    line-height: 1.45;
+}
+
+/* Images and other replaced elements should not overflow columns/pages */
+img, svg, video, canvas {
+    max-width: 100%;
+    height: auto;
+}
 body {
     border: 0;
     padding: 0;
