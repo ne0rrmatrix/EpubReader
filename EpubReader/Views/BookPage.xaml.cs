@@ -428,7 +428,7 @@ public partial class BookPage : ContentPage, IDisposable
 				break;
 		}
 	}
-	// --- Extracted methods below ---
+	
 	async Task HandleNextAsync()
 	{
 		await webViewHelper.Next(pageLabel, book);
