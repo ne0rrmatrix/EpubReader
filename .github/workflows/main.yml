@@ -130,9 +130,12 @@ jobs:
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
 
       - name: Build and analyze
+        env:
+          NuGetPackageSourceCredentials_github: Username=${{ github.actor }};Password=${{ secrets.NUGET_SECRET }}
         shell: powershell
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET"
+          dotnet nuget add source --username ${{ github.actor }} --password ${{ secrets.NUGET_SECRET }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/CommunityToolkit/index.json"
           dotnet restore EpubReader/EpubReader.csproj
           dotnet build EpubReader/EpubReader.csproj -c:Debug
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SECRET"
