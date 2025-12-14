@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,8 +8,6 @@ namespace EpubReader.Util;
 /// </summary>
 public static class BookIdentityService
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(BookIdentityService));
-
 	public static async Task<string> ComputeSyncIdAsync(Book book, CancellationToken token)
 	{
 		ArgumentNullException.ThrowIfNull(book);
@@ -20,25 +17,9 @@ public static class BookIdentityService
 		{
 			return book.SyncId;
 		}
-
-		if (!string.IsNullOrWhiteSpace(book.FilePath) && File.Exists(book.FilePath))
-		{
-			try
-			{
-				var fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
-				var fileName = Path.GetFileName(book.FilePath);
-				book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
-				return book.SyncId;
-			}
-			catch (Exception ex)
-			{
-				logger.Warn($"Failed to hash file for sync id: {ex.Message}");
-			}
-		}
-
-		var fileNameOnly = Path.GetFileName(book.FilePath);
-		var metadata = $"{fileNameOnly}|{book.Title}|{book.Author}|{book.PublishedDate?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty}|{book.Isbn}|{book.Language}";
-		book.SyncId = $"meta-{ComputeTextHash(metadata)}";
+		var fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
+		var fileName = Path.GetFileName(book.FilePath);
+		book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
 		return book.SyncId;
 	}
 
