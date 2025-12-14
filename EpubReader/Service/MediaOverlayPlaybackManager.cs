@@ -933,7 +933,7 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-			clipTimer = dispatcher.CreateTimer();
+		clipTimer = dispatcher.CreateTimer();
 		clipTimer.Interval = TimeSpan.FromMilliseconds(50);
 		clipTimer.Tick += OnClipTimerTick;
 		clipTimer.Start();

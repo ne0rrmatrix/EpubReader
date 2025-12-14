@@ -422,13 +422,13 @@ public partial class BookPage : ContentPage, IDisposable
 				break;
 			case "mediaoverlayseek":
 				if (mediaOverlayManager is not null && double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
-					{
-						await mediaOverlayManager.SeekAsync(secs);
-					}
+				{
+					await mediaOverlayManager.SeekAsync(secs);
+				}
 				break;
 		}
 	}
-	
+
 	async Task HandleNextAsync()
 	{
 		await webViewHelper.Next(pageLabel, book);
@@ -582,9 +582,9 @@ public partial class BookPage : ContentPage, IDisposable
 
 		var enabledChanged = previous is null || previous.Enabled != progress.Enabled;
 		var segmentChanged = previous is null || previous.SegmentIndex != progress.SegmentIndex;
-			var posChanged = (previous?.PositionSeconds is double a && progress.PositionSeconds is double b)
-				? Math.Abs(a - b) >= 1
-				: !(previous?.PositionSeconds is null && progress.PositionSeconds is null);
+		var posChanged = (previous?.PositionSeconds is double a && progress.PositionSeconds is double b)
+			? Math.Abs(a - b) >= 1
+			: !(previous?.PositionSeconds is null && progress.PositionSeconds is null);
 
 		// Sync policy:
 		// - always sync enable/segment changes

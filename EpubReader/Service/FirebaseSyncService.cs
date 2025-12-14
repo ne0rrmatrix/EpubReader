@@ -261,16 +261,17 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 			Trace.TraceInformation($"Progress saved locally for {progress.BookId} (local-only mode)");
 			return;
 		}
-		try {
-		// Queue for cloud sync (debounced)
-		if (await IsOnlineAsync(token))
+		try
 		{
-			saveSubject.OnNext(progress);
-		}
-		else
-		{
-			await QueueProgressAsync(progress, token);
-		}
+			// Queue for cloud sync (debounced)
+			if (await IsOnlineAsync(token))
+			{
+				saveSubject.OnNext(progress);
+			}
+			else
+			{
+				await QueueProgressAsync(progress, token);
+			}
 		}
 		catch (Exception ex)
 		{

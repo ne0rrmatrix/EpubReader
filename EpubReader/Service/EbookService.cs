@@ -660,7 +660,7 @@ public static partial class EbookService
 	static string ProcessHtml(string htmlFile)
 	{
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
-		
+
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);

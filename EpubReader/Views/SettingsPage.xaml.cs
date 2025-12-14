@@ -147,7 +147,7 @@ public partial class SettingsPage : Popup<bool>
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 
-		if(!string.IsNullOrEmpty(family) && FontPreview is not null)
+		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
 		{
 			FontPreview.FontFamily = family;
 		}
@@ -156,13 +156,13 @@ public partial class SettingsPage : Popup<bool>
 			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
 		}
 	}
-	#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
+#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
 		stackLayout.Remove(switchControl);
 	}
-	#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
-	
+#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
+
 	/// <summary>
 	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
 	/// </summary>
