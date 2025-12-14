@@ -10,7 +10,6 @@
 		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 		<SingleProject>true</SingleProject>
     <DefaultLanguage>en-us</DefaultLanguage>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 
     <!-- Display name -->
 		<ApplicationTitle>EpubReader</ApplicationTitle>
