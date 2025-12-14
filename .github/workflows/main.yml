@@ -136,7 +136,11 @@ jobs:
         run: |
           $sourceUrl = "https://nuget.pkg.github.com/CommunityToolkit/index.json"
           Write-Host "Ensuring NuGet source 'CommunityToolkit' is not present unless authorized"
-          dotnet nuget remove source CommunityToolkit --configfile nuget.config || Write-Host "Source 'CommunityToolkit' not present; continuing"
+           try {
+             dotnet nuget remove source CommunityToolkit --configfile nuget.config | Out-Null
+           } catch {
+             Write-Host "Source 'CommunityToolkit' not present; continuing"
+           }
           if ("${{ env.NUGET_SECRET }}") {
             Write-Host "Adding NuGet source 'CommunityToolkit' -> $sourceUrl"
             dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile nuget.config
