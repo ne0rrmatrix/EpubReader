@@ -2739,19 +2739,6 @@
         "contentHash": "KpctA5Pl7FU3NontirABvMYW+DDEZoYbJrF3ODg1sbMQ9XdstrxkHXdoYB3TptNjpmma8Z1MCSyUvvF7LW8r9w=="
       }
     },
-    "net10.0-android36.0/maccatalyst-arm64": {
-      "HarfBuzzSharp.NativeAssets.Android": {
-        "type": "Direct",
-        "requested": "[8.3.1.2, )",
-        "resolved": "8.3.1.2",
-        "contentHash": "HoeeEjUhlUSz09nWzNzSV5BGbI8FPi3kH0L0XY3OuQcs/ycuSb/W9a4hSG4SrqfautJnuU/5c/H8UVV0/g0ccg=="
-      },
-      "SkiaSharp.NativeAssets.Android": {
-        "type": "Transitive",
-        "resolved": "3.116.1",
-        "contentHash": "KpctA5Pl7FU3NontirABvMYW+DDEZoYbJrF3ODg1sbMQ9XdstrxkHXdoYB3TptNjpmma8Z1MCSyUvvF7LW8r9w=="
-      }
-    },
     "net10.0-android36.0/maccatalyst-x64": {
       "HarfBuzzSharp.NativeAssets.Android": {
         "type": "Direct",
@@ -3608,18 +3595,6 @@
         "contentHash": "/G5vV5jHvGL/0OSSWv+BbaIlnCjdjzGKReKwyGGHXpW4sfnDYOl36z0rMVliiBseRl5VDsgpI8eZfG/0MUN2fQ=="
       }
     },
-    "net10.0-ios26.1/maccatalyst-arm64": {
-      "HarfBuzzSharp.NativeAssets.iOS": {
-        "type": "Transitive",
-        "resolved": "8.3.0.1",
-        "contentHash": "w7KSGla44MXt5iSMBo9hjHpirRSrNV2fCEOZjYyFXMeJukUdwHxIOVoYMxYvBovrHFuAsJChjbfHz9nSHAwttw=="
-      },
-      "SkiaSharp.NativeAssets.iOS": {
-        "type": "Transitive",
-        "resolved": "3.116.1",
-        "contentHash": "/G5vV5jHvGL/0OSSWv+BbaIlnCjdjzGKReKwyGGHXpW4sfnDYOl36z0rMVliiBseRl5VDsgpI8eZfG/0MUN2fQ=="
-      }
-    },
     "net10.0-ios26.1/maccatalyst-x64": {
       "HarfBuzzSharp.NativeAssets.iOS": {
         "type": "Transitive",
@@ -4268,23 +4243,6 @@
       }
     },
     "net10.0-maccatalyst26.1/iossimulator-x64": {
-      "HarfBuzzSharp.NativeAssets.MacCatalyst": {
-        "type": "Transitive",
-        "resolved": "8.3.0.1",
-        "contentHash": "tZuw5pONJgNVIyF55q4vhX8FA7V4GpTl8tdqYCVnIzsiqCrHg8801k0SpebVCcSqciDt7AbZaTn3x+Z6y+g89Q=="
-      },
-      "SkiaSharp.NativeAssets.MacCatalyst": {
-        "type": "Transitive",
-        "resolved": "3.116.1",
-        "contentHash": "Wb+9L56vC8aZH+D4vq/co+DuPg1Tga1sMofjsRlg2Z1Z2qu2pCfl4WS8RPRIyxSvSldX8yDG4OwpRWSGnsatXw=="
-      },
-      "SQLitePCLRaw.lib.e_sqlite3": {
-        "type": "Transitive",
-        "resolved": "2.1.11",
-        "contentHash": "Ev2ytaXiOlWZ4b3R67GZBsemTINslLD1DCJr2xiacpn4tbapu0Q4dHEzSvZSMnVWeE5nlObU3VZN2p81q3XOYQ=="
-      }
-    },
-    "net10.0-maccatalyst26.1/maccatalyst-arm64": {
       "HarfBuzzSharp.NativeAssets.MacCatalyst": {
         "type": "Transitive",
         "resolved": "8.3.0.1",
@@ -5076,55 +5034,6 @@
       }
     },
     "net10.0-windows10.0.19041/iossimulator-x64": {
-      "HarfBuzzSharp.NativeAssets.Win32": {
-        "type": "Transitive",
-        "resolved": "8.3.0.1",
-        "contentHash": "ow0DtGEUjo65qhiI22of7qiVbN1xDFsZ5P5xJljRmGZ5WSxNy+1batLNJFGxahqhB1MTHYV8kAXf0GqC8WaevQ=="
-      },
-      "Microsoft.Graphics.Win2D": {
-        "type": "Transitive",
-        "resolved": "1.3.2",
-        "contentHash": "xAv4+Xj8wePW1innIUSXebX6UHMGDzOxwKPwYNUNY7mBrsRL/hPFEtuPLpBSxc3iBnuaCogPDCDeN7T4b1xV0Q==",
-        "dependencies": {
-          "Microsoft.WindowsAppSDK": "1.6.241114003"
-        }
-      },
-      "Microsoft.Web.WebView2": {
-        "type": "Transitive",
-        "resolved": "1.0.3179.45",
-        "contentHash": "3pokSH5CnN0G6rGhGFo1y87inxYhNxBQ2Vdf0wlvBj99KHxQJormjDACmqRnFeUsmuNFIhWwfAL1ztq7wD5qRA=="
-      },
-      "Microsoft.WindowsAppSDK": {
-        "type": "Transitive",
-        "resolved": "1.7.250909003",
-        "contentHash": "zeVFVrkFYPkAL1cmXo62D1LVC66VqBiMx+WfZ3aDUmizNECCJewMTk0JwjlgYQcIqxqsK1SjF1CeG74TsokWpQ==",
-        "dependencies": {
-          "Microsoft.Web.WebView2": "1.0.2903.40",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.22621.756"
-        }
-      },
-      "SkiaSharp.NativeAssets.Win32": {
-        "type": "Transitive",
-        "resolved": "3.116.1",
-        "contentHash": "dRQ75MCI8oz6zAs2Y1w6pq6ARs4MhdNG+gf3doOxOxdnueDXffQLGQIxON54GDoxc0WjKOoHMKBR4DhaduwwQw=="
-      },
-      "SkiaSharp.NativeAssets.WinUI": {
-        "type": "Transitive",
-        "resolved": "3.116.1",
-        "contentHash": "4C4f5zKkiLKdyg0Z8W8ggtNsucl5VxetyJBAlWcyj0LDSoa1StemXu81JtgaMJfNA1BB2kTiR1T14sIPnZAZqQ=="
-      },
-      "SQLitePCLRaw.lib.e_sqlite3": {
-        "type": "Transitive",
-        "resolved": "2.1.11",
-        "contentHash": "Ev2ytaXiOlWZ4b3R67GZBsemTINslLD1DCJr2xiacpn4tbapu0Q4dHEzSvZSMnVWeE5nlObU3VZN2p81q3XOYQ=="
-      },
-      "System.Speech": {
-        "type": "Transitive",
-        "resolved": "9.0.5",
-        "contentHash": "nPZ2rcEVaZlxaLwBamFzz8f5MVM7Y08kzmDbcedXgeSWCGS9NN8mFjSsuTZm3W5pQLI4QhHmcu4h7A0Wf+cD/Q=="
-      }
-    },
-    "net10.0-windows10.0.19041/maccatalyst-arm64": {
       "HarfBuzzSharp.NativeAssets.Win32": {
         "type": "Transitive",
         "resolved": "8.3.0.1",

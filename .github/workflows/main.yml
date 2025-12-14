@@ -132,13 +132,17 @@ jobs:
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
 
       - name: Configure CommunityToolkit GitHub Packages source (NuGet)
-        if: ${{ env.NUGET_SECRET != '' }}
         shell: powershell
         run: |
           $sourceUrl = "https://nuget.pkg.github.com/CommunityToolkit/index.json"
-          Write-Host "Adding NuGet source 'CommunityToolkit' -> $sourceUrl"
+          Write-Host "Ensuring NuGet source 'CommunityToolkit' is not present unless authorized"
           dotnet nuget remove source CommunityToolkit --configfile nuget.config || Write-Host "Source 'CommunityToolkit' not present; continuing"
-          dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile nuget.config
+          if ("${{ env.NUGET_SECRET }}") {
+            Write-Host "Adding NuGet source 'CommunityToolkit' -> $sourceUrl"
+            dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile nuget.config
+          } else {
+            Write-Host "NUGET_SECRET not provided; will use NuGet.org only"
+          }
 
       - name: Build and analyze
         env:
@@ -147,6 +151,6 @@ jobs:
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET" /d:sonar.host.url="https://sonarcloud.io"
           dotnet workload install maui --source https://api.nuget.org/v3/index.json
-          dotnet restore EpubReader.slnx --no-cache --configfile nuget.config
+          dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
           dotnet build EpubReader.slnx -c:Debug
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SECRET"
