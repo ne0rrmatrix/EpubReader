@@ -147,7 +147,14 @@ public partial class SettingsPage : Popup<bool>
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 
-		FontPreview?.FontFamily = family;
+		if(!string.IsNullOrEmpty(family) && FontPreview is not null)
+		{
+			FontPreview.FontFamily = family;
+		}
+		else
+		{
+			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
+		}
 	}
 	#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)

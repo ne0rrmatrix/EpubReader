@@ -206,6 +206,7 @@ PublishScripts/
 .env
 .env.local
 .env.*.local
+nuget.local.config
 
 # The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
