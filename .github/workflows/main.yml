@@ -145,7 +145,12 @@ jobs:
           $tempConfig = "${{ runner.temp }}\nuget.temp.config"
           if ("${{ env.NUGET_SECRET }}") {
             Write-Host "Creating ephemeral NuGet config at $tempConfig and adding CommunityToolkit with credentials"
-            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            $dir = Split-Path $tempConfig
+            New-Item -Path $dir -ItemType Directory -Force | Out-Null
+
+            # create a minimal nuget.config file so dotnet nuget add source can operate reliably
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+
             dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
             dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
             Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
