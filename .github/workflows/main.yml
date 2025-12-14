@@ -11,6 +11,7 @@ jobs:
     env:
       SECRET: ${{ secrets.SONAR_TOKEN }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      NUGET_SECRET: ${{ secrets.NUGET_SECRET }}
     runs-on: windows-latest
     steps:
       - uses: actions/setup-dotnet@v5
@@ -125,13 +126,22 @@ jobs:
           New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
 
+      - name: Configure CommunityToolkit GitHub Packages source (NuGet)
+        if: ${{ env.NUGET_SECRET != '' }}
+        shell: powershell
+        run: |
+          $sourceUrl = "https://nuget.pkg.github.com/CommunityToolkit/index.json"
+          Write-Host "Adding NuGet source 'CommunityToolkit' -> $sourceUrl"
+          dotnet nuget remove source CommunityToolkit --configfile nuget.config || Write-Host "Source 'CommunityToolkit' not present; continuing"
+          dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile nuget.config
+
       - name: Build and analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: powershell
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET" /d:sonar.host.url="https://sonarcloud.io"
-          dotnet nuget add source --username ${{ github.actor }} --password ${{ secrets.NUGET_SECRET }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/CommunityToolkit/index.json"
-          dotnet restore EpubReader/EpubReader.csproj
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json
+          dotnet restore EpubReader/EpubReader.csproj --no-cache --configfile nuget.config
           dotnet build EpubReader/EpubReader.csproj -c:Debug
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SECRET"
