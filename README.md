@@ -44,9 +44,10 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 
 ### ☁️ Cloud Sync & Authentication
 - **🔐 Google Authentication:** Sign in with your Google account for cloud features
-- **📱 Cross-Device Sync:** Reading progress syncs across all your devices in real-time
-- **🔄 Automatic Backup:** Your reading progress is automatically backed up to Firebase
+- **📱 Cross-Device Sync:** Reading progress and settings sync across devices in real-time
+- **🔄 Automatic Backup:** Reading progress is automatically backed up to Firebase
 - **📍 Position Tracking:** Resume reading exactly where you left off on any device
+- **🔁 Offline Queueing:** Progress updates queue locally and reconcile on reconnect
 - **🔒 Local-Only Mode:** Use the app without authentication for complete privacy
 
 ### 🔗 Calibre Integration
@@ -64,6 +65,12 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 - **🖼️ Images:** Full support for embedded images
 - **💄 CSS Styling:** Complete CSS styles support within books
 - **🔤 Fonts:** Full support for fonts embedded within ebooks
+
+### 🔊 Media Overlays (EPUB 3)
+- **Audio Playback:** Plays synchronized audio tracks embedded via MediaOverlays
+- **SMIL Highlighting:** Highlights text in sync with audio using SMIL files
+- **Read-Along Support:** Provides a seamless read-along experience with word/phrase highlighting
+- **Granular Controls:** Play/pause and navigation work across chapters with overlays
 
 ---
 
