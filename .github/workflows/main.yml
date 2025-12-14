@@ -24,6 +24,11 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install .NET MAUI Workload
         run: |
           dotnet workload install maui
@@ -142,6 +147,6 @@ jobs:
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET" /d:sonar.host.url="https://sonarcloud.io"
           dotnet workload install maui --source https://api.nuget.org/v3/index.json
-          dotnet restore EpubReader/EpubReader.csproj --no-cache --configfile nuget.config
-          dotnet build EpubReader/EpubReader.csproj -c:Debug
+          dotnet restore EpubReader.slnx --no-cache --configfile nuget.config
+          dotnet build EpubReader.slnx -c:Debug
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SECRET"
