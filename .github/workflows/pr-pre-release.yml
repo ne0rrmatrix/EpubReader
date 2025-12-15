@@ -350,16 +350,6 @@ jobs:
         with:
           path: artifacts
 
-      - name: Check for windows artifact
-        id: check_windows
-        run: |
-          if [ -f artifacts/windows-artifact/windows-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
-
-      - name: Check for android artifact
-        id: check_android
-        run: |
-          if [ -f artifacts/android-artifact/android-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
-
       - name: Generate changelog
         id: changelog
         run: |
@@ -371,28 +361,20 @@ jobs:
           cat pr-changelog.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Prepare release assets list
-        id: prepare_assets
+      - name: Write release body file
         run: |
-          files=""
-          if [ "${{ steps.check_windows.outputs.present }}" = "true" ]; then
-            files="$files artifacts/windows-artifact.zip"
-          fi
-          if [ "${{ steps.check_android.outputs.present }}" = "true" ]; then
-            files="$files artifacts/android-artifact.zip"
-          fi
-          # trim leading whitespace
-          files="$(echo "$files" | sed -e 's/^ *//')"
-          echo "files=$files" >> $GITHUB_OUTPUT
+          echo "# PR ${{ github.event.pull_request.number }} Changes" > body.md
+          echo "" >> body.md
+          echo "${{ steps.changelog.outputs.changelog }}" >> body.md
 
       - name: Create release and upload assets
         uses: ncipollo/release-action@v1
         with:
           tag: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           name: "PR #${{ github.event.pull_request.number }} release"
-          body: ${{ steps.changelog.outputs.changelog }}
+          bodyFile: body.md
           draft: false
           prerelease: ${{ github.event.pull_request.merged != true }}
-          files: ${{ steps.prepare_assets.outputs.files }}
+          artifacts: "artifacts/windows-artifact/windows-artifact.zip,artifacts/android-artifact/android-artifact.zip"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
