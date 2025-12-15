@@ -249,7 +249,7 @@ jobs:
             echo "Decoding Android keystore from secret"
             mkdir -p EpubReader
             echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode > EpubReader/EpubReader.keystore
-            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android \
+            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore -o artifacts/android \
               /p:AndroidKeyStore=true \
               /p:AndroidSigningKeyStore="$(pwd)/EpubReader/EpubReader.keystore" \
               /p:AndroidSigningStorePass="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
