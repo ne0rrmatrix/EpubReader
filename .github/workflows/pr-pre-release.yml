@@ -3,6 +3,7 @@ name: PR Build and Pre-release
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -342,10 +343,10 @@ jobs:
         uses: actions/create-release@v1
         with:
           tag_name: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          release_name: "PR #${{ github.event.pull_request.number }} pre-release"
+          release_name: "PR #${{ github.event.pull_request.number }} release"
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
-          prerelease: true
+          prerelease: ${{ github.event.pull_request.merged != true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
