@@ -128,21 +128,23 @@ jobs:
             Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
           }
 
-      - name: Restore
+      - name: Restore Windows project
         shell: powershell
         run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-windows10.0.19041.0'
           if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
-            dotnet restore EpubReader.slnx --no-cache --configfile $env:NUGET_CONFIG
+            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG /p:TargetFramework=$tfm /p:RuntimeIdentifier=win-x64
           } else {
-            dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
+            dotnet restore $proj --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json /p:TargetFramework=$tfm /p:RuntimeIdentifier=win-x64
           }
 
-      - name: Build
-        run: dotnet build EpubReader.slnx -c Release --no-restore
+      - name: Build Windows project
+        run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --no-restore
 
       - name: Publish Windows app
         run: |
-          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows || true
+          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -o artifacts/windows || true
 
       - name: Package Windows artifact
         run: |
