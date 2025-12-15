@@ -35,7 +35,7 @@ jobs:
         id: decode
         if: steps.check.outputs.no_secret == 'false'
         run: |
-          echo "$GOOGLE_SECRET_B64" | base64 --decode > google-services.json
+          printf '%s' "$GOOGLE_SECRET_B64" | tr -d '\r' | base64 --decode > google-services.json
 
       - name: Parse FIREBASE_* values
         id: parse
