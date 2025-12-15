@@ -5,8 +5,7 @@ namespace EpubReader.ViewModels;
 /// </summary>
 public class PrivacyPageViewModel : BaseViewModel
 {
-public PrivacyPageViewModel()
-{
+	public PrivacyPageViewModel()
+	{
+	}
 }
-}
-

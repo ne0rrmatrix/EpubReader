@@ -94,6 +94,7 @@ public partial class FolderPicker : IFolderPicker
 	/// <param name="epubFilePath">The file path of the EPUB file to be opened. Must be a valid path to an existing file.</param>
 	/// <returns>A <see cref="Stream"/> for reading the contents of the EPUB file.  Returns <see cref="Stream.Null"/> if the file is
 	/// not found or cannot be opened.</returns>
+#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	public async Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath, CancellationToken cancellationToken = default)
 	{
 		var file = await StorageFile.GetFileFromPathAsync(epubFilePath);
@@ -104,6 +105,7 @@ public partial class FolderPicker : IFolderPicker
 		}
 		return Stream.Null; // Return an empty stream if the file is not found or cannot be opened
 	}
+#pragma warning restore S2325 // Restore S2325 warning
 
 	static IntPtr GetWindowsHandle()
 	{

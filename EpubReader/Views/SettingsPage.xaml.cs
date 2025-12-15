@@ -17,9 +17,11 @@ public partial class SettingsPage : Popup<bool>
 {
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
+	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
 	const string deleteLocalDataTitle = "Delete Local Data";
+	const string exportDataTitle = "Export Data";
 
 
 	/// <summary>
@@ -164,6 +166,7 @@ public partial class SettingsPage : Popup<bool>
 			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
 		}
 	}
+
 #pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
@@ -271,7 +274,7 @@ public partial class SettingsPage : Popup<bool>
 			await this.CloseAsync();
 			if (db is null)
 			{
-				await Shell.Current.DisplayAlertAsync("Export Data", "Database not available.", "OK");
+				await Shell.Current.DisplayAlertAsync(exportDataTitle, "Database not available.", "OK");
 				return;
 			}
 			var export = new
@@ -280,20 +283,36 @@ public partial class SettingsPage : Popup<bool>
 				Books = await db.GetAllBooks()
 			};
 			var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
-			var path = Path.Combine(FileSystem.AppDataDirectory, "epubreader_export.json");
+
+			// Prompt user to choose a folder to save the export
+
+			string path;
+			if (folderPicker is null)
+			{
+				await Shell.Current.DisplayAlertAsync(exportDataTitle, "Export Failed.", "OK");
+				return;
+			}
+
+			var folder = await folderPicker.PickFolderAsync();
+			if (string.IsNullOrEmpty(folder))
+			{
+				// User cancelled folder selection
+				return;
+			}
+			path = Path.Combine(folder, "epubreader_export.json");
 			await File.WriteAllTextAsync(path, json);
-			await Shell.Current.DisplayAlertAsync("Export Data", $"Export saved to {path}", "OK");
+			await Shell.Current.DisplayAlertAsync(exportDataTitle, $"Export saved to {path}", "OK");
 		}
 		catch (Exception ex)
 		{
 			Trace.TraceError($"Export failed: {ex}");
-			await Shell.Current.DisplayAlertAsync("Export Data", "Export failed", "OK");
+			await Shell.Current.DisplayAlertAsync(exportDataTitle, "Export failed", "OK");
 		}
 	}
 
 	async void OnDeleteLocalDataClicked(object? sender, EventArgs? e)
 	{
-			var ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
+		var ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
 		if (!ok)
 		{
 			return;

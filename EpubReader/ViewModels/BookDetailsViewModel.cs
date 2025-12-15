@@ -6,16 +6,16 @@ namespace EpubReader.ViewModels;
 
 public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 {
-    readonly ISyncService syncService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ISyncService>() ?? throw new InvalidOperationException();
+	readonly ISyncService syncService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ISyncService>() ?? throw new InvalidOperationException();
 
-    [ObservableProperty]
-    public partial string CoverImage { get; set; } = "";
+	[ObservableProperty]
+	public partial string CoverImage { get; set; } = "";
 
-    public async void ApplyQueryAttributes(IDictionary<string, object> query)
-    {
-        if (query.TryGetValue("Book", out var bookObj) && bookObj is Book b)
-        {
-            Book = b;
+	public async void ApplyQueryAttributes(IDictionary<string, object> query)
+	{
+		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book b)
+		{
+			Book = b;
 			CoverImage = b.CoverImagePath;
 			var existingBook = await db.GetBook(Book);
 			ArgumentNullException.ThrowIfNull(existingBook);
@@ -29,9 +29,9 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			// (progress, webview helper) don't accidentally insert an incomplete record.
 			Book.Id = existingBook.Id;
 			Book.SyncId = existingBook.SyncId;
-            Book.CoverImagePath = b.CoverImagePath;
-           
-            
+			Book.CoverImagePath = b.CoverImagePath;
+
+
 			// Restore local reading position from the database so the book opens at the user's local position.
 			Book.CurrentChapter = existingBook.CurrentChapter;
 			Book.CurrentPage = existingBook.CurrentPage;
@@ -39,13 +39,13 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			await RestoreProgressAsync(existingBook);
 
 			StreamExtensions.Instance?.SetBook(Book);
-        }
-    }
+		}
+	}
 
-    [RelayCommand]
-    public async Task ReadAsync()
-    {
-        	try
+	[RelayCommand]
+	public async Task ReadAsync()
+	{
+		try
 		{
 			var navigationParams = new Dictionary<string, object>
 			{
@@ -59,9 +59,9 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			Logger.Error($"Error navigating to book page: {ex.Message}");
 			await ShowErrorToastAsync("Error opening book. Please try again.");
 		}
-    }
+	}
 
-    async Task RestoreProgressAsync(Book existingBook)
+	async Task RestoreProgressAsync(Book existingBook)
 	{
 		var token = CancellationTokenSource.Token;
 		var syncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, token);
