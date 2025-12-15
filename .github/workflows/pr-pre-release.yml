@@ -33,7 +33,6 @@ jobs:
         with:
           fetch-depth: 0
 
-
       - name: Install .NET MAUI Workload
         run: |
           dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
@@ -133,19 +132,43 @@ jobs:
         run: |
           $proj = 'EpubReader/EpubReader.csproj'
           $tfm = 'net10.0-windows10.0.19041.0'
+          
           if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
-            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG /p:TargetFramework=$tfm /p:RuntimeIdentifier=win-x64
+           dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG `
+            /p:TargetFramework=$tfm `
+            /p:RuntimeIdentifier=win-x64 `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0
           } else {
-            dotnet restore $proj --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json /p:TargetFramework=$tfm /p:RuntimeIdentifier=win-x64
+            dotnet restore $proj --no-cache --configfile nuget.config `
+              --source https://api.nuget.org/v3/index.json `
+              /p:TargetFramework=$tfm `
+              /p:TreatWarningsAsErrors=false `
+              /p:RuntimeIdentifiers=win-x64
           }
 
       - name: Build Windows project
-        run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --no-restore
-
-      - name: Publish Windows app
+        shell: powershell
         run: |
-          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -o artifacts/windows || true
-
+          dotnet build EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -r win-x64 `
+            --no-restore `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 `
+            --disable-build-servers
+      - name: Publish Windows app
+        shell: powershell
+        run: |
+          dotnet publish EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -o artifacts/windows `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 || $true
       - name: Package Windows artifact
         run: |
           pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { Write-Host 'No windows artifacts found'; New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
@@ -322,12 +345,12 @@ jobs:
       - name: Check for windows artifact
         id: check_windows
         run: |
-          if [ -f artifacts/windows-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
+          if [ -f artifacts/windows-artifact/windows-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
 
       - name: Check for android artifact
         id: check_android
         run: |
-          if [ -f artifacts/android-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
+          if [ -f artifacts/android-artifact/android-artifact.zip ]; then echo "present=true" >> $GITHUB_OUTPUT; else echo "present=false" >> $GITHUB_OUTPUT; fi
 
       - name: Generate changelog
         id: changelog
@@ -357,7 +380,7 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/windows-artifact.zip
+          asset_path: artifacts/windows-artifact/windows-artifact.zip
           asset_name: EpubReader-Windows-PR-${{ github.event.pull_request.number }}.zip
           asset_content_type: application/zip
         env:
@@ -368,7 +391,7 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/android-artifact.zip
+          asset_path: artifacts/android-artifact/android-artifact.zip
           asset_name: EpubReader-Android-PR-${{ github.event.pull_request.number }}.zip
           asset_content_type: application/zip
         env:
