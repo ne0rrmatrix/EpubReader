@@ -326,3 +326,6 @@ FIREBASE_SETUP.md
 /build-secrets/google-services.json
 /build-secrets/android/strings.secrets.xml
 /EpubReader/Resources/google-services.json
+EpubReader/PLAY_CONSOLE_COPY.md
+EpubReader/PRIVACY_POLICY_DRAFTS.md
+EpubReader/PRIVACY_PR_NOTES.md
