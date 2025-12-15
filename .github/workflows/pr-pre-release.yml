@@ -240,7 +240,7 @@ jobs:
 
       - name: Install .NET MAUI Workload
         run: |
-          dotnet workload install maui `
+          dotnet workload install maui \
             --source https://api.nuget.org/v3/index.json || true
           dotnet workload update || true
 
@@ -358,9 +358,9 @@ jobs:
       - name: Build project (Android)
         if: matrix.platform == 'Android'
         run: |
-          dotnet build EpubReader/EpubReader.csproj `
-            -c Release `
-            -f ${{ matrix.tfm }} `
+          dotnet build EpubReader/EpubReader.csproj \
+            -c Release \
+            -f ${{ matrix.tfm }} \
             --no-restore
 
       - name: Publish Windows app
