@@ -136,7 +136,7 @@ jobs:
           if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG `
             /p:TargetFramework=$tfm `
-            /p:RuntimeIdentifier=win-x64 `
+            /p:RuntimeIdentifiers=win-x64 `
             /p:TreatWarningsAsErrors=false `
             /p:WarningLevel=0
           } else {
