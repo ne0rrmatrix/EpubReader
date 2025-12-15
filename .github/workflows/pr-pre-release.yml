@@ -286,19 +286,23 @@ jobs:
             Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
           }
 
-      - name: Restore
+      - name: Restore (Android project only)
         shell: pwsh
         run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-android'
           if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
             Write-Host "Using ephemeral NuGet config for restore: $env:NUGET_CONFIG"
-            dotnet restore EpubReader.slnx --no-cache --configfile $env:NUGET_CONFIG
+            dotnet restore $proj --framework $tfm --no-cache --configfile $env:NUGET_CONFIG
           } else {
             Write-Host "Using repository nuget.config with explicit nuget.org source"
-            dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
+            dotnet restore $proj --framework $tfm --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
           }
 
-      - name: Build
-        run: dotnet build EpubReader.slnx -c Release --no-restore || true
+      - name: Build (Android project only)
+        shell: pwsh
+        run: |
+          dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore
       - name: Publish Android app
         run: |
           dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
