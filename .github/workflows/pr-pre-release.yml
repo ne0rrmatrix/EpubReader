@@ -118,7 +118,7 @@ jobs:
             Write-Host "Source 'CommunityToolkit' not present in repo nuget.config; continuing"
           }
 
-          $tempConfig = "${{ runner.temp }}\nuget.temp.config"
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
           if ("${{ env.NUGET_SECRET }}") {
             Write-Host "Creating ephemeral NuGet config at $tempConfig and adding CommunityToolkit with credentials"
             $dir = Split-Path $tempConfig
@@ -269,7 +269,7 @@ jobs:
             Write-Host "Source 'CommunityToolkit' not present in repo nuget.config; continuing"
           }
 
-          $tempConfig = "${{ runner.temp }}\nuget.temp.config"
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
           if ("${{ env.NUGET_SECRET }}") {
             Write-Host "Creating ephemeral NuGet config at $tempConfig and adding CommunityToolkit with credentials"
             $dir = Split-Path $tempConfig
