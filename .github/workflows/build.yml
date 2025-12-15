@@ -31,8 +31,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          architecture: 'x64'
-          cache: 'gradle'
 
       - name: Install .NET MAUI Workload
         run: |

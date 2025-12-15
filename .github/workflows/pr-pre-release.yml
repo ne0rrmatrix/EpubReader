@@ -21,7 +21,8 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'ga'
 
-      - uses: actions/setup-java@v5
+      - name: Setup Java
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -174,7 +175,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           architecture: 'x64'
-          cache: 'gradle'
 
       - name: Verify Java
         run: |
