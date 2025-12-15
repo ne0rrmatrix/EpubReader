@@ -248,7 +248,51 @@ jobs:
           if [ -d artifacts/android ]; then zip -r android-artifact.zip artifacts/android || true; else touch android-artifact.zip; fi
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: android-artifact
           path: android-artifact.zip
+
+  create-release:
+    name: Create Release and Attach Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-android]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          tag_ref=${GITHUB_REF##*/}
+          echo "Generating changelog for $tag_ref"
+          git fetch --no-tags --prune --unshallow || true
+          git log --pretty=format:"- %s (%an)" -n 200 $GITHUB_SHA > release-changelog.txt || true
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat release-changelog.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Write release body file
+        run: |
+          echo "# Release ${GITHUB_REF##*/}" > body.md
+          echo "" >> body.md
+          cat release-changelog.txt >> body.md || true
+
+      - name: Create release and upload assets
+        uses: ncipollo/release-action@5f55df31e10e67a2ef62ea8f3fa1b926cee6f8b1
+        with:
+          tag: ${GITHUB_REF##*/}
+          name: "Release ${GITHUB_REF##*/}"
+          bodyFile: body.md
+          draft: false
+          prerelease: false
+          artifacts: "artifacts/windows-artifact/windows-artifact.zip,artifacts/android-artifact/android-artifact.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

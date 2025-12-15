@@ -346,7 +346,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
@@ -368,7 +368,7 @@ jobs:
           echo "${{ steps.changelog.outputs.changelog }}" >> body.md
 
       - name: Create release and upload assets
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@5f55df31e10e67a2ef62ea8f3fa1b926cee6f8b1
         with:
           tag: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           name: "PR #${{ github.event.pull_request.number }} release"
