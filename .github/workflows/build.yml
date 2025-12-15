@@ -13,7 +13,7 @@ jobs:
     name: Decode Google JSON (if provided)
     runs-on: ubuntu-latest
     env:
-      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET_B64 }}
     outputs:
       firebase_api_key: ${{ steps.parse.outputs.firebase_api_key }}
       firebase_database_url: ${{ steps.parse.outputs.firebase_database_url }}
