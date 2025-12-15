@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 
 namespace EpubReader.Views;
 
@@ -16,6 +17,7 @@ public partial class SettingsPage : Popup<bool>
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
+	const string deleteLocalDataTitle = "Delete Local Data";
 
 
 	/// <summary>
@@ -111,7 +113,8 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		if (e?.CurrentSelection?.AsEnumerable() is not ColorScheme selected || settings.ColorScheme == selected.Name)
+		var selected = e?.CurrentSelection?.FirstOrDefault() as ColorScheme;
+		if (selected is null || settings.ColorScheme == selected.Name)
 		{
 			return;
 		}
@@ -240,5 +243,71 @@ public partial class SettingsPage : Popup<bool>
 	{
 		Trace.TraceInformation("SettingsPage.OnCloseClicked: Close button pressed");
 		await this.CloseAsync();
+	}
+
+	async void OnPrivacyClicked(object? sender, EventArgs? e)
+	{
+		// Close settings popup then navigate to the in-app privacy page
+		try
+		{
+			await this.CloseAsync();
+			await Shell.Current.GoToAsync("privacy");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"SettingsPage.OnPrivacyClicked: navigation failed: {ex}");
+		}
+	}
+
+	async void OnExportDataClicked(object? sender, EventArgs? e)
+	{
+		try
+		{
+			await this.CloseAsync();
+			if (db is null)
+			{
+				await Shell.Current.DisplayAlertAsync("Export Data", "Database not available.", "OK");
+				return;
+			}
+			var export = new
+			{
+				Settings = await db.GetSettings(),
+				Books = await db.GetAllBooks()
+			};
+			var json = System.Text.Json.JsonSerializer.Serialize(export, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+			var path = Path.Combine(FileSystem.AppDataDirectory, "epubreader_export.json");
+			await File.WriteAllTextAsync(path, json);
+			await Shell.Current.DisplayAlertAsync("Export Data", $"Export saved to {path}", "OK");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Export failed: {ex}");
+			await Shell.Current.DisplayAlertAsync("Export Data", "Export failed", "OK");
+		}
+	}
+
+	async void OnDeleteLocalDataClicked(object? sender, EventArgs? e)
+	{
+			var ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
+		if (!ok)
+		{
+			return;
+		}
+		try
+		{
+			if (db is null)
+			{
+				await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Database not available.", "OK");
+				return;
+			}
+			await db.RemoveAllBooks();
+			await db.RemoveAllSettings();
+			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Local data deleted.", "OK");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Delete local data failed: {ex}");
+			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Delete failed", "OK");
+		}
 	}
 }

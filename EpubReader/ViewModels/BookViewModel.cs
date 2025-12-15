@@ -22,6 +22,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	/// <summary>
+	/// Gets or sets the title of the book.
+	/// </summary>
+	[ObservableProperty]
+	public partial string BookTitle { get; set; } = string.Empty;
+
+	/// <summary>
 	/// Gets or sets the source of the web view content.
 	/// </summary>
 	[ObservableProperty]
@@ -91,6 +97,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
+			BookTitle = book.Title;
 			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
 		}

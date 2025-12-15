@@ -128,6 +128,7 @@ public static partial class WebViewExtensions
 			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
 			return;
 		}
+		// Include caching header to allow webview to reuse preloaded resources
 		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
 		cancellationTokenSource.Dispose();
 	}
@@ -141,7 +142,9 @@ public static partial class WebViewExtensions
 	{
 		const string baseHeaders = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
 		string contentTypeHeader = $"Content-Type: {contentType}";
-		string completeHeaders = $"{baseHeaders}\r\n{contentTypeHeader}";
+		// Allow caching so platform can reuse preloaded chapter resources
+		string cacheHeader = "Cache-Control: public, max-age=86400";
+		string completeHeaders = $"{baseHeaders}\r\n{cacheHeader}\r\n{contentTypeHeader}";
 		return completeHeaders;
 	}
 

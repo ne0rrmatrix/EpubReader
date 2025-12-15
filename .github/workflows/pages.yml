@@ -1,0 +1,26 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [ dotnet10 ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./docs
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1

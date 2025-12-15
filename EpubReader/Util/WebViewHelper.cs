@@ -64,7 +64,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	public async Task LoadPageAsync(Label label, Book book)
 	{
 #if ANDROID || WINDOWS
-        var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
+		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #elif IOS || MACCATALYST
 		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #endif

@@ -44,6 +44,17 @@
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#121212</Color>
 
+    <!-- Overlay colors used by native loading overlay -->
+    <Color x:Key="OverlayDarkColor">#CC000000</Color>
+    <Color x:Key="OverlayLightColor">#CCFFFFFF</Color>
+
+    <!-- Slider / control specific colors referenced from pages -->
+    <Color x:Key="SliderMaximumTrackDarkColor">#444444</Color>
+    <Color x:Key="SliderMaximumTrackLightColor">#CCCCCC</Color>
+
+    <!-- Additional blue shade used on some controls -->
+    <Color x:Key="Blue600">#1E88E5</Color>
+
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}" />
     <SolidColorBrush x:Key="OnPrimaryBrush" Color="{StaticResource OnPrimaryColor}" />
     <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}" />

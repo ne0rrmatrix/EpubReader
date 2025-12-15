@@ -43,6 +43,18 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
 		handler.PlatformView.AddJavascriptInterface(new JSBridge(), "jsBridge");
+		handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
+#pragma warning disable CA1422  // Type or member is obsolete
+		handler.PlatformView.Settings.SetAppCacheEnabled(true);
+		var absolutePath = Platform.AppContext.CacheDir?.AbsolutePath ?? throw new InvalidOperationException();
+		handler.PlatformView.Settings.SetAppCachePath(absolutePath);
+		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
+#pragma warning disable CS0618  // Type or member is obsolete
+		handler.PlatformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
+		handler.PlatformView.Settings.CacheMode = CacheModes.Default;
+#pragma warning restore CS0618  // Type or member is obsolete
+#pragma warning restore CA1422  // Type or member is obsolete
 	}
 
 	/// <summary>
@@ -72,7 +84,12 @@ class CustomWebViewClient : WebViewClient
 		{
 			return base.ShouldInterceptRequest(view, request);
 		}
-		return WebResourceResponseHelper.CreateFromHtmlString(getData.Result, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
+		// Ensure caching headers are present in the response so the WebView can store resources
+		var additionalHeaders = new Dictionary<string, string>
+		{
+			{ "Cache-Control", "public, max-age=86400" }
+		};
+		return WebResourceResponseHelper.CreateFromHtmlString(getData.Result, mimeType, 200, "OK", additionalHeaders) ?? base.ShouldInterceptRequest(view, request);
 	}
 
 	/// <summary>
@@ -119,7 +136,7 @@ class CustomWebViewClient : WebViewClient
 	/// <remarks>This method raises the <c>Navigating</c> event for the associated <see
 	/// cref="Microsoft.Maui.Controls.WebView"/> when a new page starts loading, unless the URL is null or contains the
 	/// string "csharp".</remarks>
-	/// <param name="view">The <see cref="Android.Webkit.WebView"/> that is initiating the callback.</param>
+	/// <param name="view">The <see cref="global::Android.Webkit.WebView"/> that is initiating the callback.</param>
 	/// <param name="url">The URL of the page being loaded. Cannot be null or contain the string "csharp".</param>
 	/// <param name="favicon">The favicon for the page, if available.</param>
 	public override void OnPageStarted(global::Android.Webkit.WebView? view, string? url, Bitmap? favicon)

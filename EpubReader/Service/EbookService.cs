@@ -110,6 +110,7 @@ public static partial class EbookService
 			Author = Authors[0],
 			Title = book.Title,
 			FilePath = path,
+			Description = ProcessDescription(book.Description),
 			CoverImage = coverImage,
 		};
 	}

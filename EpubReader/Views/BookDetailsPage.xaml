@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.BookDetailsPage"
+    xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:DataType="viewmodels:BookDetailsViewModel"
+    xmlns:viewmodels="clr-namespace:EpubReader.ViewModels"
+    Padding="12">
+        <Grid   HorizontalOptions="Center" 
+                VerticalOptions="Center">
+                <ScrollView>
+                    <!-- Container that holds both Phone-only single-column layout and the two-column layout for Tablet/Desktop -->
+                    <Grid Padding="6" HorizontalOptions="Center">
+
+                        <!-- Phone single-column layout: Title, Image, Button, Description -->
+                        <VerticalStackLayout Spacing="10" Padding="0" IsVisible="{OnIdiom Phone=true, Tablet=false, Desktop=false}">
+                            <Label Text="{Binding Book.Title}" FontAttributes="Bold"
+                                   FontSize="{OnIdiom Phone=20, Tablet=24, Desktop=28}"
+                                   LineBreakMode="TailTruncation" />
+
+                            <ffimageloading:CachedImage
+                                Aspect="AspectFit"
+                                Source="{Binding CoverImage}"
+                                HorizontalOptions="Center"
+                                HeightRequest="{OnIdiom Phone=260, Tablet=340, Desktop=420}"
+                                WidthRequest="{OnIdiom Phone=160, Tablet=220, Desktop=300}" />
+
+                            <Button Text="Read" Command="{Binding ReadCommand}" HorizontalOptions="Center"
+                                    FontSize="{OnIdiom Phone=14, Tablet=16, Desktop=16}" />
+
+                            <Label Text="Description" FontAttributes="Bold" FontSize="{OnIdiom Phone=16, Tablet=18, Desktop=20}" />
+                            <Label Text="{Binding Book.Description}" TextType="Html" LineBreakMode="WordWrap" FontSize="{OnIdiom Phone=14, Tablet=16, Desktop=18}" />
+                        </VerticalStackLayout>
+
+                        <!-- Two-column layout for Tablet and Desktop -->
+                        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" ColumnSpacing="20"
+                              IsVisible="{OnIdiom Phone=false, Tablet=true, Desktop=true}">
+
+                            <!-- Cover image column -->
+                            <Frame
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Padding="6"
+                                HasShadow="False"
+                                BorderColor="Transparent"
+                                VerticalOptions="Start">
+                                <ffimageloading:CachedImage
+                                    Aspect="AspectFit"
+                                    Source="{Binding CoverImage}"
+                                    HorizontalOptions="Center"
+                                    VerticalOptions="Start"
+                                    HeightRequest="{OnIdiom Phone=260, Tablet=340, Desktop=420}"
+                                    WidthRequest="{OnIdiom Phone=160, Tablet=220, Desktop=300}" />
+                            </Frame>
+
+                            <!-- Details column -->
+                            <Grid Grid.Row="1" Grid.Column="1">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <VerticalStackLayout Spacing="6" Padding="0,4,0,8">
+                                    <Label Text="{Binding Book.Title}" FontAttributes="Bold"
+                                           FontSize="{OnIdiom Phone=20, Tablet=24, Desktop=28}"
+                                           LineBreakMode="TailTruncation" />
+
+                                    <HorizontalStackLayout Spacing="10">
+                                        <Label Text="{Binding Book.Author}" FontSize="{OnIdiom Phone=13, Tablet=15, Desktop=17}" TextColor="Gray" />
+                                        <Label Text="•" TextColor="Gray" />
+                                        <Label Text="{Binding Book.Date}" FontSize="{OnIdiom Phone=12, Tablet=14, Desktop=16}" TextColor="Gray" />
+                                    </HorizontalStackLayout>
+
+                                    <Button Text="Read" Command="{Binding ReadCommand}" HorizontalOptions="Start"
+                                            FontSize="{OnIdiom Phone=14, Tablet=16, Desktop=16}" />
+                                </VerticalStackLayout>
+
+                                <StackLayout Grid.Row="1" Padding="0,6,0,0">
+                                    <Label Text="Description" FontAttributes="Bold" FontSize="{OnIdiom Phone=16, Tablet=18, Desktop=20}" />
+                                    <Label Text="{Binding Book.Description}" TextType="Html" LineBreakMode="WordWrap" FontSize="{OnIdiom Phone=14, Tablet=16, Desktop=18}" />
+                                </StackLayout>
+                            </Grid>
+                        </Grid>
+
+                    </Grid>
+                </ScrollView>
+        </Grid>
+</ContentPage>

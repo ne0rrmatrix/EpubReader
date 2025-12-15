@@ -50,6 +50,8 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 - **🔁 Offline Queueing:** Progress updates queue locally and reconcile on reconnect
 - **🔒 Local-Only Mode:** Use the app without authentication for complete privacy
 
+- **🔐 Privacy:** An in-app privacy policy is available under Settings → Privacy Policy. Cloud sync is optional and must be enabled by the user.
+
 ### 🔗 Calibre Integration
 - **🔍 Discovery:** Connect to Calibre Server using **Bonjour** auto-discovery
 - **🌐 Manual Connection:** Set Calibre Server URL directly

@@ -141,7 +141,7 @@
                                         </FlyoutBase.ContextFlyout>
 
                                         <ffimageloading:CachedImage.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding GotoBookPageCommand, x:DataType=LibraryViewModel, Source={RelativeSource AncestorType={x:Type LibraryViewModel}}}" CommandParameter="{Binding .}" />
+                                            <TapGestureRecognizer Command="{Binding GotoBookDetailsCommand, x:DataType=LibraryViewModel, Source={RelativeSource AncestorType={x:Type LibraryViewModel}}}" CommandParameter="{Binding .}" />
                                         </ffimageloading:CachedImage.GestureRecognizers>
                                     </ffimageloading:CachedImage>
 

@@ -17,31 +17,14 @@
                                Default=450}"
     Loaded="CurrentPage_Loaded"
     Unloaded="CurrentPage_Unloaded"
-    WidthRequest="300">
+     WidthRequest="330">
 
-    <ScrollView x:Name="ScrollView" VerticalScrollBarVisibility="Never" HorizontalScrollBarVisibility="Never">
-        <Grid
-            x:Name="grid"
-            Padding="0"
-            ColumnSpacing="2"
-            RowSpacing="20">
-
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <ScrollView x:Name="ScrollView" VerticalScrollBarVisibility="Never" HorizontalScrollBarVisibility="Never" >
+        <Border Style="{StaticResource BorderGalleryCard}" Margin="5" Padding="5">
+            <VerticalStackLayout
+                x:Name="grid"
+                Padding="0"
+                Spacing="20">
 
         <!--  Font Size Section  -->
         <Label
@@ -101,23 +84,17 @@
                 ItemsLayout="HorizontalList">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:ColorScheme">
-                        <Frame Padding="6" HasShadow="False" Margin="6" CornerRadius="6" BackgroundColor="{Binding BackgroundColor}">
+                        <Border Padding="6" Margin="6" StrokeShape="RoundRectangle 6" BackgroundColor="{Binding BackgroundColor}" Stroke="Transparent">
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="Aa" FontSize="20" TextColor="{Binding TextColor}" HorizontalOptions="Center" />
                                 <Label Text="{Binding Name}" FontSize="11" TextColor="{StaticResource Gray600}" HorizontalOptions="Center" />
                             </VerticalStackLayout>
-                        </Frame>
+                        </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
         </StackLayout>
 
-        <Button
-            Grid.Row="5"
-            Clicked="RemoveAllSettings"
-            HeightRequest="45"
-            Text="Reset"
-            WidthRequest="120" />
 
         <HorizontalStackLayout
             x:Name="stackLayout"
@@ -172,7 +149,8 @@
                 HorizontalOptions="Center"
                 IsVisible="{Binding IsNotAuthenticated}"
                 Text="Sign In"
-                WidthRequest="200" />
+                BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
+                TextColor="{StaticResource NormalButtonTextColor}" />
 
             <!--  Sign Out Button (visible when authenticated)  -->
             <Button
@@ -181,7 +159,9 @@
                 HorizontalOptions="Center"
                 IsVisible="{Binding IsAuthenticated}"
                 Text="Sign Out"
-                WidthRequest="200" />
+                WidthRequest="200"
+                BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
+                TextColor="{StaticResource NormalButtonTextColor}" />
 
             <!--  Delete Cloud Data (visible when authenticated)  -->
             <Button
@@ -198,13 +178,43 @@
             <Button
                 HeightRequest="40"
                 HorizontalOptions="Center"
-                Text="Close"
-                Clicked="OnCloseClicked"
-                WidthRequest="200" />
+                Text="Delete Local Data"
+                Clicked="OnDeleteLocalDataClicked"
+                WidthRequest="200"
+                BackgroundColor="{StaticResource Reset}"
+                TextColor="{StaticResource White}"
+                BorderColor="{StaticResource Reset-Dark}" />
+
+            <Button
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                Text="Export Data"
+                Clicked="OnExportDataClicked"
+                WidthRequest="200"
+                BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
+                TextColor="{StaticResource NormalButtonTextColor}" />
+            <Button
+                Grid.Row="5"
+                Clicked="RemoveAllSettings"
+                HeightRequest="45"
+                    Text="Restore Default Settings"
+                WidthRequest="200"
+                BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
+                TextColor="{StaticResource NormalButtonTextColor}" />
+            <Button
+                Grid.Row="9"
+                HeightRequest="40"
+                HorizontalOptions="Center"
+                Text="Privacy Policy"
+                Clicked="OnPrivacyClicked"
+                WidthRequest="200"
+                BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
+                TextColor="{StaticResource NormalButtonTextColor}" />
 
         </VerticalStackLayout>
 
-        </Grid>
+            </VerticalStackLayout>
+        </Border>
     </ScrollView>
 
 </toolkit:Popup>
