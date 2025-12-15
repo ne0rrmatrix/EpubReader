@@ -8,38 +8,37 @@ on:
 env:
   LATEST_NET_VERSION: '10.0.x'
 
-permissions:
-  contents: write
-
 jobs:
-  build:
-    name: Build (${{ matrix.platform }})
-    runs-on: ${{ matrix.runs-on }}
-    strategy:
-      matrix:
-        include:
-          - platform: Windows
-            runs-on: windows-latest
-            tfm: net10.0-windows10.0.19041.0
-            rid: win-x64
-          - platform: Android
-            runs-on: ubuntu-latest
-            tfm: net10.0-android
-            rid: ''
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
     env:
       NUGET_SECRET: ${{ secrets.NUGETS }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET_B64 }}
-      ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'microsoft'
+          java-version: '21'
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Decode Google secrets (Windows)
-        if: matrix.platform == 'Windows' && env.GOOGLE_SECRET_B64 != ''
+      - name: Install .NET MAUI Workload
+        run: |
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload update || true
+
+      - name: Expose Google JSON to environment (no file)
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
         shell: powershell
         run: |
           if (-not $env:GOOGLE_SECRET_B64) {
@@ -47,21 +46,20 @@ jobs:
             exit 1
           }
           try {
-            $decoded = [System.Text.Encoding]::UTF8.GetString(
-              [System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64)
-            )
+            $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
           } catch {
-            Write-Error 'Failed to decode GOOGLE_SECRET_B64'
+            Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
             exit 1
           }
-          Add-Content -Path $env:GITHUB_ENV `
-            -Value "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
-          Write-Host 'Google JSON decoded successfully'
+
+          $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+          Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
 
           try {
             $json = $decoded | ConvertFrom-Json -ErrorAction Stop
           } catch {
-            Write-Warning 'Decoded content is not valid JSON'
+            Write-Warning 'Decoded content is not valid JSON; skipping FIREBASE_* exports'
             exit 0
           }
 
@@ -73,12 +71,10 @@ jobs:
 
           if ($json.client -and $json.client.Count -ge 1) {
             $client0 = $json.client[0]
-            if ($client0.client_info -and 
-                $client0.client_info.mobilesdk_app_id) {
+            if ($client0.client_info -and $client0.client_info.mobilesdk_app_id) {
               $firebaseAppId = $client0.client_info.mobilesdk_app_id
             }
-            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and 
-                $client0.api_key[0].current_key) {
+            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and $client0.api_key[0].current_key) {
               $firebaseApiKey = $client0.api_key[0].current_key
             }
             if ($client0.oauth_client) {
@@ -96,200 +92,164 @@ jobs:
               $firebaseDatabaseUrl = $json.project_info.firebase_url
             }
             if ($json.project_info.project_id) {
-              $firebaseAuthDomain = 
-                "$($json.project_info.project_id).firebaseapp.com"
+              $firebaseAuthDomain = "$($json.project_info.project_id).firebaseapp.com"
             }
           }
 
           $envEntries = @()
-          if ($firebaseAppId) { 
-            $envEntries += "FIREBASE_APP_ID=$firebaseAppId" 
-          }
-          if ($firebaseApiKey) { 
-            $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" 
-          }
-          if ($firebaseDatabaseUrl) { 
-            $envEntries += 
-              "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" 
-          }
-          if ($firebaseAuthDomain) { 
-            $envEntries += 
-              "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" 
-          }
-          if ($firebaseWebClientId) { 
-            $envEntries += 
-              "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" 
-          }
+          if ($firebaseAppId)    { $envEntries += "FIREBASE_APP_ID=$firebaseAppId" }
+          if ($firebaseApiKey)   { $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" }
+          if ($firebaseDatabaseUrl) { $envEntries += "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" }
+          if ($firebaseAuthDomain)  { $envEntries += "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" }
+          if ($firebaseWebClientId) { $envEntries += "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" }
 
           if ($envEntries.Count -gt 0) {
             foreach ($e in $envEntries) {
-              Add-Content -Path $env:GITHUB_ENV -Value $e
+              Add-Content -Path $env:GITHUB_ENV -Value $e -Encoding utf8
             }
-            Write-Host 'FIREBASE_* variables exported'
+            Write-Host 'FIREBASE_* environment variables exported'
           } else {
-            Write-Host 'No FIREBASE_* values found'
+            Write-Host 'No FIREBASE_* values were found in google-services.json'
           }
 
+      - name: Configure ephemeral NuGet (optional)
+        shell: powershell
+        run: |
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
+          if ("${{ env.NUGET_SECRET }}") {
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Restore Windows project
+        shell: powershell
+        run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-windows10.0.19041.0'
+          
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+           dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG `
+            /p:TargetFramework=$tfm `
+            /p:RuntimeIdentifiers=win-x64 `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0
+          } else {
+            dotnet restore $proj --no-cache --configfile nuget.config `
+              --source https://api.nuget.org/v3/index.json `
+              /p:TargetFramework=$tfm `
+              /p:TreatWarningsAsErrors=false `
+              /p:RuntimeIdentifiers=win-x64
+          }
+      - name: Clean build artifacts
+        shell: pwsh
+        run: |
+         $objPath = "EpubReader/obj"
+         # Ensure the directory structure exists
+         New-Item -ItemType Directory -Path "$objPath/GeneratedFiles" -Force | Out-Null
+      
+      - name: Build Windows project
+        shell: powershell
+        run: |
+          dotnet build EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -r win-x64 `
+            --no-restore `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 `
+
+      - name: Publish Windows app
+        shell: powershell
+        run: |
+          dotnet publish EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -o artifacts/windows `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 `
+      - name: Package Windows artifact
+        run: |
+          pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { Write-Host 'No windows artifacts found'; New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-artifact
+          path: windows-artifact.zip
+
+  build-android:
+    name: Build (Android)
+    runs-on: ubuntu-latest
+    env:
+      NUGET_SECRET: ${{ secrets.NUGETS }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
           dotnet-quality: 'ga'
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: 'microsoft'
           java-version: '21'
-          architecture: ${{ matrix.platform == 'Android' && 'x64' || '' }}
 
-      - name: Install .NET MAUI Workload
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install workloads
         run: |
-          dotnet workload install maui \
-            --source https://api.nuget.org/v3/index.json || true
-          dotnet workload update || true
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload restore || true
 
-      - name: Configure ephemeral NuGet (Windows)
-        if: matrix.platform == 'Windows'
-        shell: powershell
-        run: |
-          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.config'
-          if ("${{ env.NUGET_SECRET }}") {
-            New-Item -Path (Split-Path $tempConfig) `
-              -ItemType Directory -Force | Out-Null
-            Set-Content -Path $tempConfig `
-              -Value '<configuration></configuration>'
-            dotnet nuget add source `
-              "https://nuget.pkg.github.com/CommunityToolkit/index.json" `
-              --name CommunityToolkit `
-              --username "${{ github.actor }}" `
-              --password "${{ env.NUGET_SECRET }}" `
-              --store-password-in-clear-text `
-              --configfile $tempConfig
-            dotnet nuget add source `
-              "https://api.nuget.org/v3/index.json" `
-              --name nuget.org `
-              --configfile $tempConfig | Out-Null
-            Add-Content -Path $env:GITHUB_ENV `
-              -Value "NUGET_CONFIG=$tempConfig"
-          } else {
-            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG="
-          }
-
-      - name: Configure ephemeral NuGet (Android)
-        if: matrix.platform == 'Android'
+      - name: Configure ephemeral NuGet (optional)
         shell: pwsh
         run: |
-          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.config'
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
           if ("${{ env.NUGET_SECRET }}") {
-            New-Item -Path (Split-Path $tempConfig) `
-              -ItemType Directory -Force | Out-Null
-            Set-Content -Path $tempConfig `
-              -Value '<configuration></configuration>'
-            dotnet nuget add source `
-              "https://nuget.pkg.github.com/CommunityToolkit/index.json" `
-              --name CommunityToolkit `
-              --username "${{ github.actor }}" `
-              --password "${{ env.NUGET_SECRET }}" `
-              --store-password-in-clear-text `
-              --configfile $tempConfig
-            dotnet nuget add source `
-              "https://api.nuget.org/v3/index.json" `
-              --name nuget.org `
-              --configfile $tempConfig | Out-Null
-            Add-Content -Path $env:GITHUB_ENV `
-              -Value "NUGET_CONFIG=$tempConfig"
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
           } else {
-            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG="
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
           }
 
-      - name: Restore project (Windows)
-        if: matrix.platform == 'Windows'
-        shell: powershell
-        run: |
-          $proj = 'EpubReader/EpubReader.csproj'
-          $tfm = '${{ matrix.tfm }}'
-          $configArg = if ($env:NUGET_CONFIG -and 
-            (Test-Path $env:NUGET_CONFIG)) { 
-            "--configfile $env:NUGET_CONFIG" 
-          } else { 
-            "--configfile nuget.config --source https://api.nuget.org/v3/index.json" 
-          }
-          
-          dotnet restore $proj --no-cache $configArg `
-            /p:TargetFramework=$tfm `
-            /p:RuntimeIdentifiers=${{ matrix.rid }} `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
-
-      - name: Restore project (Android)
-        if: matrix.platform == 'Android'
+      - name: Restore (Android project only)
         shell: pwsh
         run: |
           $proj = 'EpubReader/EpubReader.csproj'
-          $tfm = '${{ matrix.tfm }}'
-          $configArg = if ($env:NUGET_CONFIG -and 
-            (Test-Path $env:NUGET_CONFIG)) { 
-            "--configfile $env:NUGET_CONFIG" 
-          } else { 
-            "--configfile nuget.config --source https://api.nuget.org/v3/index.json" 
+          $tfm = 'net10.0-android'
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG /p:TargetFramework=$tfm
+          } else {
+            dotnet restore $proj --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json /p:TargetFramework=$tfm
           }
-          
-          dotnet restore $proj --no-cache $configArg `
-            /p:TargetFramework=$tfm `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
 
-      - name: Clean build artifacts
-        if: matrix.platform == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory `
-            -Path "EpubReader/obj/GeneratedFiles" -Force | Out-Null
+      - name: Build (Android project only)
+        run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore
 
-      - name: Build project (Windows)
-        if: matrix.platform == 'Windows'
-        shell: powershell
-        run: |
-          dotnet build EpubReader/EpubReader.csproj `
-            -c Release `
-            -f ${{ matrix.tfm }} `
-            -r ${{ matrix.rid }} `
-            --no-restore `
-            --self-contained `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
-
-      - name: Build project (Android)
-        if: matrix.platform == 'Android'
-        run: |
-          dotnet build EpubReader/EpubReader.csproj \
-            -c Release \
-            -f ${{ matrix.tfm }} \
-            --no-restore
-
-      - name: Publish Windows app
-        if: matrix.platform == 'Windows'
-        shell: powershell
-        run: |
-          dotnet publish EpubReader/EpubReader.csproj `
-            -c Release `
-            -f ${{ matrix.tfm }} `
-            -o artifacts/windows `
-            --self-contained `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
-
-      - name: Publish Android app
-        if: matrix.platform == 'Android'
+      - name: Restore Android keystore and publish (signed if env present)
         run: |
           if [ -n "$ANDROID_KEYSTORE_B64" ]; then
             echo "Decoding Android keystore from env"
             mkdir -p EpubReader
-            printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode \
-              > EpubReader/EpubReader.keystore
-            dotnet publish EpubReader/EpubReader.csproj \
-              -c Release -f ${{ matrix.tfm }} --no-restore \
-              -o artifacts/android \
+            printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode > EpubReader/EpubReader.keystore
+            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore -o artifacts/android \
               /p:AndroidKeyStore=true \
               /p:AndroidSigningKeyStore="$(pwd)/EpubReader/EpubReader.keystore" \
               /p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
@@ -297,42 +257,15 @@ jobs:
               /p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD" || true
             rm -f EpubReader/EpubReader.keystore || true
           else
-            echo "Publishing unsigned APK/AAB"
-            dotnet publish EpubReader/EpubReader.csproj \
-              -c Release -f ${{ matrix.tfm }} \
-              -o artifacts/android || true
+            echo "No ANDROID_KEYSTORE_B64 env found — publishing unsigned APK/AAB"
+            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
           fi
 
-      - name: Package Windows artifact
-        if: matrix.platform == 'Windows'
-        shell: powershell
+      - name: Archive Android artifact
         run: |
-          if (Test-Path artifacts/windows) { 
-            Compress-Archive -Path "artifacts/windows/*" `
-              -DestinationPath "windows-artifact.zip" -Force 
-          } else { 
-            Write-Host "No artifacts found"
-            New-Item -ItemType File -Path "windows-artifact.zip" -Force | Out-Null 
-          }
-
-      - name: Package Android artifact
-        if: matrix.platform == 'Android'
-        run: |
-          if [ -d artifacts/android ]; then 
-            zip -r android-artifact.zip artifacts/android || true
-          else 
-            touch android-artifact.zip
-          fi
-
-      - name: Upload Windows artifact
-        if: matrix.platform == 'Windows'
-        uses: actions/upload-artifact@v6
-        with:
-          name: windows-artifact
-          path: windows-artifact.zip
+          if [ -d artifacts/android ]; then zip -r android-artifact.zip artifacts/android || true; else touch android-artifact.zip; fi
 
       - name: Upload Android artifact
-        if: matrix.platform == 'Android'
         uses: actions/upload-artifact@v6
         with:
           name: android-artifact
@@ -341,12 +274,13 @@ jobs:
   create-release:
     name: Create Release and Attach Artifacts
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build-windows, build-android]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
       - name: Download artifacts
         uses: actions/download-artifact@v7
         with:
@@ -357,18 +291,15 @@ jobs:
           tag_ref=${GITHUB_REF##*/}
           echo "Generating changelog for $tag_ref"
           git fetch --no-tags --prune --unshallow || true
-          git log --pretty=format:"- %s (%an)" -n 200 \
-            $GITHUB_SHA > release-changelog.txt || true
-          {
-            printf "# Release %s\n\n" "$tag_ref"
-            cat release-changelog.txt || true
-          } > body.md
+          git log --pretty=format:"- %s (%an)" -n 200 $GITHUB_SHA > release-changelog.txt || true
+          printf "# Release %s\n\n" "$tag_ref" > body.md
+          cat release-changelog.txt >> body.md || true
 
       - name: Create release and upload assets
         uses: ncipollo/release-action@5f55df31e10e67a2ef62ea8f3fa1b926cee6f8b1
         with:
-          tag: ${{ github.ref_name }}
-          name: "Release ${{ github.ref_name }}"
+          tag: ${GITHUB_REF##*/}
+          name: "Release ${GITHUB_REF##*/}"
           bodyFile: body.md
           draft: false
           prerelease: false
