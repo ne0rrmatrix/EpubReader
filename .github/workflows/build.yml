@@ -190,6 +190,10 @@ jobs:
     env:
       NUGET_SECRET: ${{ secrets.NUGETS }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/setup-dotnet@v5
         with:
@@ -239,9 +243,23 @@ jobs:
       - name: Build (Android project only)
         run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore
 
-      - name: Publish Android app
+      - name: Restore Android keystore and publish (signed if secret present)
         run: |
-          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
+          if [ -n "${{ secrets.ANDROID_KEYSTORE }}" ]; then
+            echo "Decoding Android keystore from secret"
+            mkdir -p EpubReader
+            echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode > EpubReader/EpubReader.keystore
+            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android \
+              /p:AndroidKeyStore=true \
+              /p:AndroidSigningKeyStore="$(pwd)/EpubReader/EpubReader.keystore" \
+              /p:AndroidSigningStorePass="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+              /p:AndroidSigningKeyAlias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+              /p:AndroidSigningKeyPass="${{ secrets.ANDROID_KEY_PASSWORD }}" || true
+            rm -f EpubReader/EpubReader.keystore || true
+          else
+            echo "No ANDROID_KEYSTORE_B64 secret found — publishing unsigned APK/AAB"
+            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
+          fi
 
       - name: Archive Android artifact
         run: |

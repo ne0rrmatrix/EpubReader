@@ -329,3 +329,5 @@ FIREBASE_SETUP.md
 EpubReader/PLAY_CONSOLE_COPY.md
 EpubReader/PRIVACY_POLICY_DRAFTS.md
 EpubReader/PRIVACY_PR_NOTES.md
+EpubReader/publishAndroid.ps1
+EpubReader/android.keystore.b64
