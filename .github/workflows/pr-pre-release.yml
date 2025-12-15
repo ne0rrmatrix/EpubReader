@@ -146,7 +146,17 @@ jobs:
               /p:TreatWarningsAsErrors=false `
               /p:RuntimeIdentifiers=win-x64
           }
-
+      
+      - name: Clean build artifacts
+        shell: pwsh
+        run: |
+         $objPath = "EpubReader/obj"
+         if (Test-Path $objPath) {
+         Remove-Item -Recurse -Force $objPath
+         }
+         # Ensure the directory structure exists
+         New-Item -ItemType Directory -Path "$objPath/GeneratedFiles" -Force | Out-Null
+      
       - name: Build Windows project
         shell: powershell
         run: |
@@ -158,7 +168,7 @@ jobs:
             --self-contained `
             /p:TreatWarningsAsErrors=false `
             /p:WarningLevel=0 `
-            --disable-build-servers
+            
       - name: Publish Windows app
         shell: powershell
         run: |
