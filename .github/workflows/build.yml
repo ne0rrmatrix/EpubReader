@@ -86,20 +86,20 @@ jobs:
       NUGET_SECRET: ${{ secrets.NUGETS }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
-          fetch-depth: 0
-      
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
       - uses: actions/setup-java@v5
         with:
-          distribution: 'temurin' # See 'Supported distributions' for available options
+          distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          dotnet-version: ${{ env.LATEST_NET_VERSION }}
-          dotnet-quality: 'ga'
+          fetch-depth: 0
 
       - name: Install workloads
         run: |
