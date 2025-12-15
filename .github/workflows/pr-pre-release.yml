@@ -304,18 +304,23 @@ jobs:
         run: |
           $proj = 'EpubReader/EpubReader.csproj'
           $tfm = '${{ matrix.tfm }}'
-          $configArg = if ($env:NUGET_CONFIG -and 
-            (Test-Path $env:NUGET_CONFIG)) { 
-            "--configfile $env:NUGET_CONFIG" 
-          } else { 
-            "--configfile nuget.config --source https://api.nuget.org/v3/index.json" 
-          }
           
-          dotnet restore $proj --no-cache $configArg `
-            /p:TargetFramework=$tfm `
-            /p:RuntimeIdentifiers=${{ matrix.rid }} `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore $proj --no-cache `
+              --configfile $env:NUGET_CONFIG `
+              /p:TargetFramework=$tfm `
+              /p:RuntimeIdentifiers=${{ matrix.rid }} `
+              /p:TreatWarningsAsErrors=false `
+              /p:WarningLevel=0
+          } else {
+            dotnet restore $proj --no-cache `
+              --configfile nuget.config `
+              --source https://api.nuget.org/v3/index.json `
+              /p:TargetFramework=$tfm `
+              /p:RuntimeIdentifiers=${{ matrix.rid }} `
+              /p:TreatWarningsAsErrors=false `
+              /p:WarningLevel=0
+          }
 
       - name: Restore project (Android)
         if: matrix.platform == 'Android'
@@ -323,17 +328,21 @@ jobs:
         run: |
           $proj = 'EpubReader/EpubReader.csproj'
           $tfm = '${{ matrix.tfm }}'
-          $configArg = if ($env:NUGET_CONFIG -and 
-            (Test-Path $env:NUGET_CONFIG)) { 
-            "--configfile $env:NUGET_CONFIG" 
-          } else { 
-            "--configfile nuget.config --source https://api.nuget.org/v3/index.json" 
-          }
           
-          dotnet restore $proj --no-cache $configArg `
-            /p:TargetFramework=$tfm `
-            /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore $proj --no-cache `
+              --configfile $env:NUGET_CONFIG `
+              /p:TargetFramework=$tfm `
+              /p:TreatWarningsAsErrors=false `
+              /p:WarningLevel=0
+          } else {
+            dotnet restore $proj --no-cache `
+              --configfile nuget.config `
+              --source https://api.nuget.org/v3/index.json `
+              /p:TargetFramework=$tfm `
+              /p:TreatWarningsAsErrors=false `
+              /p:WarningLevel=0
+          }
 
       - name: Clean build artifacts
         if: matrix.platform == 'Windows'
