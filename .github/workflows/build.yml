@@ -149,9 +149,6 @@ jobs:
         shell: pwsh
         run: |
          $objPath = "EpubReader/obj"
-         if (Test-Path $objPath) {
-         Remove-Item -Recurse -Force $objPath
-         }
          # Ensure the directory structure exists
          New-Item -ItemType Directory -Path "$objPath/GeneratedFiles" -Force | Out-Null
       
@@ -166,7 +163,7 @@ jobs:
             --self-contained `
             /p:TreatWarningsAsErrors=false `
             /p:WarningLevel=0 `
-            
+
       - name: Publish Windows app
         shell: powershell
         run: |
