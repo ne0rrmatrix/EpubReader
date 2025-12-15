@@ -268,21 +268,13 @@ jobs:
         with:
           path: artifacts
 
-      - name: Generate changelog
-        id: changelog
+      - name: Generate changelog and write body file
         run: |
           tag_ref=${GITHUB_REF##*/}
           echo "Generating changelog for $tag_ref"
           git fetch --no-tags --prune --unshallow || true
           git log --pretty=format:"- %s (%an)" -n 200 $GITHUB_SHA > release-changelog.txt || true
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat release-changelog.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Write release body file
-        run: |
-          echo "# Release ${GITHUB_REF##*/}" > body.md
-          echo "" >> body.md
+          printf "# Release %s\n\n" "$tag_ref" > body.md
           cat release-changelog.txt >> body.md || true
 
       - name: Create release and upload assets
