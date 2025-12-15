@@ -5,6 +5,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Privacy Policy">
 
-    <WebView x:Name="PolicyWebView" BackgroundColor="Transparent" HorizontalOptions="Fill" VerticalOptions="Fill" />
+    <WebView x:Name="PolicyWebView" Source="https://ne0rrmatrix.github.io/EpubReader/index.html" BackgroundColor="Transparent" HorizontalOptions="Fill" VerticalOptions="Fill" />
 
 </ContentPage>

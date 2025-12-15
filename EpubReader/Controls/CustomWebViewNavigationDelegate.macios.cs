@@ -46,6 +46,13 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
 	{
 		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
+
+		// Allow the GitHub Pages site to load normally without interception
+		if (path.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
+			return;
+		}
 		var url = path.Split('?');
 
 		if (url.Length > 1 || path.Contains("https://runcsharp"))

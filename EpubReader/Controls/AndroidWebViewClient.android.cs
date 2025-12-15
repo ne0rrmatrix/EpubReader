@@ -70,6 +70,12 @@ class CustomWebViewClient : WebViewClient
 	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
+
+		// Allow the GitHub Pages site to load normally without interception
+		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			return base.ShouldInterceptRequest(view, request);
+		}
 		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
 		{
 			return base.ShouldInterceptRequest(view, request);

@@ -114,6 +114,13 @@ public static partial class WebViewExtensions
 		var url = e.Request.Uri ?? string.Empty;
 		var filename = Path.GetFileName(url);
 
+		// Allow the GitHub Pages site to load normally without interception
+		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			// Do not set e.Response so the WebView will perform the default navigation
+			return;
+		}
+
 		if (url.Contains("https://runcsharp"))
 		{
 			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
