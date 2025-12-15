@@ -9,6 +9,55 @@ env:
   LATEST_NET_VERSION: '10.0.x'
 
 jobs:
+  decode-google-json:
+    name: Decode Google JSON (if provided)
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+    outputs:
+      firebase_api_key: ${{ steps.parse.outputs.firebase_api_key }}
+      firebase_database_url: ${{ steps.parse.outputs.firebase_database_url }}
+      firebase_auth_domain: ${{ steps.parse.outputs.firebase_auth_domain }}
+      firebase_app_id: ${{ steps.parse.outputs.firebase_app_id }}
+      firebase_web_client_id: ${{ steps.parse.outputs.firebase_web_client_id }}
+    steps:
+      - name: Check for secret
+        id: check
+        run: |
+          if [ -z "$GOOGLE_SECRET_B64" ]; then
+            echo "no_secret=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "no_secret=false" >> $GITHUB_OUTPUT
+
+      - name: Decode and save google-services.json
+        id: decode
+        if: steps.check.outputs.no_secret == 'false'
+        run: |
+          echo "$GOOGLE_SECRET_B64" | base64 --decode > google-services.json
+
+      - name: Parse FIREBASE_* values
+        id: parse
+        if: steps.check.outputs.no_secret == 'false'
+        run: |
+          firebase_api_key=$(jq -r '.client[0].api_key[0].current_key // empty' google-services.json)
+          firebase_database_url=$(jq -r '.project_info.firebase_url // empty' google-services.json)
+          firebase_app_id=$(jq -r '.client[0].client_info.mobilesdk_app_id // empty' google-services.json)
+          firebase_auth_domain=$(jq -r 'if .project_info.project_id then (.project_info.project_id + ".firebaseapp.com") else "" end' google-services.json)
+          firebase_web_client_id=$(jq -r '.client[0].oauth_client[0].client_id // empty' google-services.json)
+          echo "firebase_api_key=$firebase_api_key" >> $GITHUB_OUTPUT
+          echo "firebase_database_url=$firebase_database_url" >> $GITHUB_OUTPUT
+          echo "firebase_app_id=$firebase_app_id" >> $GITHUB_OUTPUT
+          echo "firebase_auth_domain=$firebase_auth_domain" >> $GITHUB_OUTPUT
+          echo "firebase_web_client_id=$firebase_web_client_id" >> $GITHUB_OUTPUT
+
+      - name: Upload decoded google-services.json
+        if: steps.check.outputs.no_secret == 'false'
+        uses: actions/upload-artifact@v6
+        with:
+          name: google-services-json
+          path: google-services.json
+
   build-windows:
     name: Build (Windows)
     runs-on: windows-latest
@@ -37,79 +86,23 @@ jobs:
           dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
           dotnet workload update || true
 
-      - name: Expose Google JSON to environment (no file)
-        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+      - name: Download decoded google-services.json (if produced)
+        uses: actions/download-artifact@v7
+        with:
+          name: google-services-json
+          path: decoded-google
+
+      - name: Import GOOGLE_APPLICATION_CREDENTIALS_JSON (if artifact present)
         shell: powershell
         run: |
-          if (-not $env:GOOGLE_SECRET_B64) {
-            Write-Error 'Environment variable GOOGLE_SECRET_B64 is empty'
-            exit 1
-          }
-          try {
-            $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
-          } catch {
-            Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
-            exit 1
-          }
-
-          $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
-          Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
-          Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
-
-          try {
-            $json = $decoded | ConvertFrom-Json -ErrorAction Stop
-          } catch {
-            Write-Warning 'Decoded content is not valid JSON; skipping FIREBASE_* exports'
-            exit 0
-          }
-
-          $firebaseAppId = $null
-          $firebaseApiKey = $null
-          $firebaseDatabaseUrl = $null
-          $firebaseAuthDomain = $null
-          $firebaseWebClientId = $null
-
-          if ($json.client -and $json.client.Count -ge 1) {
-            $client0 = $json.client[0]
-            if ($client0.client_info -and $client0.client_info.mobilesdk_app_id) {
-              $firebaseAppId = $client0.client_info.mobilesdk_app_id
-            }
-            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and $client0.api_key[0].current_key) {
-              $firebaseApiKey = $client0.api_key[0].current_key
-            }
-            if ($client0.oauth_client) {
-              foreach ($oc in $client0.oauth_client) {
-                if (-not $firebaseWebClientId -and $oc.client_id) {
-                  $firebaseWebClientId = $oc.client_id
-                  break
-                }
-              }
-            }
-          }
-
-          if ($json.project_info) {
-            if ($json.project_info.firebase_url) {
-              $firebaseDatabaseUrl = $json.project_info.firebase_url
-            }
-            if ($json.project_info.project_id) {
-              $firebaseAuthDomain = "$($json.project_info.project_id).firebaseapp.com"
-            }
-          }
-
-          $envEntries = @()
-          if ($firebaseAppId)    { $envEntries += "FIREBASE_APP_ID=$firebaseAppId" }
-          if ($firebaseApiKey)   { $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" }
-          if ($firebaseDatabaseUrl) { $envEntries += "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" }
-          if ($firebaseAuthDomain)  { $envEntries += "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" }
-          if ($firebaseWebClientId) { $envEntries += "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" }
-
-          if ($envEntries.Count -gt 0) {
-            foreach ($e in $envEntries) {
-              Add-Content -Path $env:GITHUB_ENV -Value $e -Encoding utf8
-            }
-            Write-Host 'FIREBASE_* environment variables exported'
+          $p = 'decoded-google/google-services.json'
+          if (Test-Path $p) {
+            $decoded = Get-Content -Raw -Path $p
+            $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+            Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+            Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
           } else {
-            Write-Host 'No FIREBASE_* values were found in google-services.json'
+            Write-Host 'No decoded google-services.json artifact found; skipping import'
           }
 
       - name: Configure ephemeral NuGet (optional)
@@ -186,14 +179,19 @@ jobs:
 
   build-android:
     name: Build (Android)
+    needs: decode-google-json
     runs-on: ubuntu-latest
     env:
       NUGET_SECRET: ${{ secrets.NUGETS }}
-      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
       ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      FIREBASE_API_KEY: ${{ needs.decode-google-json.outputs.firebase_api_key }}
+      FIREBASE_DATABASE_URL: ${{ needs.decode-google-json.outputs.firebase_database_url }}
+      FIREBASE_AUTH_DOMAIN: ${{ needs.decode-google-json.outputs.firebase_auth_domain }}
+      FIREBASE_APP_ID: ${{ needs.decode-google-json.outputs.firebase_app_id }}
+      FIREBASE_WEB_CLIENT_ID: ${{ needs.decode-google-json.outputs.firebase_web_client_id }}
     steps:
       - uses: actions/setup-dotnet@v5
         with:
@@ -214,6 +212,25 @@ jobs:
         run: |
           dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
           dotnet workload restore || true
+
+      - name: Download decoded google-services.json (if produced)
+        uses: actions/download-artifact@v7
+        with:
+          name: google-services-json
+          path: decoded-google
+
+      - name: Import GOOGLE_APPLICATION_CREDENTIALS_JSON (if artifact present)
+        shell: pwsh
+        run: |
+          $p = 'decoded-google/google-services.json'
+          if (Test-Path $p) {
+            $decoded = Get-Content -Raw -Path $p
+            $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+            Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+            Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
+          } else {
+            Write-Host 'No decoded google-services.json artifact found; skipping import'
+          }
 
       - name: Configure ephemeral NuGet (optional)
         shell: pwsh
