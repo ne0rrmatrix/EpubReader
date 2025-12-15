@@ -141,3 +141,25 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Build succeeded." -ForegroundColor Green
+
+# If Android target was requested, produce a publish output and sign it when keystore env vars are present
+if ($Android) {
+    $projPath = Join-Path $RepoRoot 'EpubReader\EpubReader.csproj'
+    $outDir = Join-Path $RepoRoot 'artifacts\android'
+
+    if ($env:ANDROID_KEYSTORE -and (Test-Path $env:ANDROID_KEYSTORE)) {
+        Write-Host "Publishing signed Android artifact to $outDir"
+        & dotnet publish $projPath -c $Configuration -f net10.0-android -o $outDir `
+            /p:AndroidKeyStore=true `
+            /p:AndroidSigningKeyStore="$env:ANDROID_KEYSTORE" `
+            /p:AndroidSigningStorePass="$env:ANDROID_KEYSTORE_PASSWORD" `
+            /p:AndroidSigningKeyAlias="$env:ANDROID_KEYSTORE_ALIAS" `
+            /p:AndroidSigningKeyPass="$env:ANDROID_KEY_PASSWORD"
+    } else {
+        Write-Host "Publishing unsigned Android artifact to $outDir"
+        & dotnet publish $projPath -c $Configuration -f net10.0-android -o $outDir
+    }
+
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+    Write-Host "Android publish completed." -ForegroundColor Green
+}

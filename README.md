@@ -538,6 +538,47 @@ EpubReader/
 The file contains essential Firebase configuration:
 - **project_info**: Firebase project ID and database URL
 - **client_info**: Your app's package name and app ID
+
+#### Android Signing and Release
+
+To produce signed Android artifacts (APK/AAB) for release, set up your keystore and provide signing credentials via environment variables or a local `.env.local` (gitignored). The build scripts will never print secret values.
+
+Required environment variables (local or CI):
+
+- `ANDROID_KEYSTORE` — absolute path to your keystore file (e.g. `C:\Users\you\keys\release.keystore`)
+- `ANDROID_KEYSTORE_PASSWORD` — keystore store password
+- `ANDROID_KEYSTORE_ALIAS` — key alias inside the keystore
+- `ANDROID_KEY_PASSWORD` — password for the key alias
+
+Local development (recommended): add these to `.env.local` in the repo root (this file is gitignored). Example:
+
+```ini
+ANDROID_KEYSTORE=C:\Users\james\source\repos\EpubReader\EpubReader\epubreader.keystore
+ANDROID_KEYSTORE_PASSWORD=your-store-pass
+ANDROID_KEYSTORE_ALIAS=YourAlias
+ANDROID_KEY_PASSWORD=your-key-pass
+```
+
+CI / GitHub Actions: store the keystore as a secret (base64 encoded) and the passwords as secrets. Use the included script `scripts/export-keystore-base64.ps1` to create a base64 string suitable for a GitHub secret. In your workflow expose the secrets as environment variables with the same names (or decode the base64 into a file and set `ANDROID_KEYSTORE` to the file path).
+
+Usage with the repository build scripts:
+
+- Build and sign (local):
+  ```powershell
+  # Ensures env vars (or .env.local) are present
+  .\build.ps1 -Android -ReleaseBuild
+  ```
+
+- The `build.ps1` script will publish an Android artifact to `artifacts\android`. If `ANDROID_KEYSTORE` points to a valid file the artifact will be signed with the provided credentials; otherwise an unsigned artifact is produced.
+
+- A convenience publish script `EpubReader\publishAndroid.ps1` also reads the same environment variables and will sign when the keystore exists. It purposely avoids printing secret values.
+
+Security notes:
+
+- Never commit your keystore or `.env.local` to the repository.
+- Add your keystore pattern to `.gitignore` (the repo already ignores `**/epubreader.keystore`).
+- Use CI secrets in GitHub Actions or an external secret manager for team builds.
+
 - **api_key**: API key for Firebase services
 - **oauth_client**: Web client ID for Google Sign-In
 
