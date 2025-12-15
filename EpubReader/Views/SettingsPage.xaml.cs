@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace EpubReader.Views;
 
@@ -14,6 +15,7 @@ namespace EpubReader.Views;
 /// when settings are changed.</remarks>
 public partial class SettingsPage : Popup<bool>
 {
+	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
@@ -113,8 +115,11 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selected = e?.CurrentSelection?.FirstOrDefault() as ColorScheme;
-		if (selected is null || settings.ColorScheme == selected.Name)
+		if (e?.CurrentSelection is null || e.CurrentSelection.Count == 0)
+		{
+			return;
+		}
+		if (e.CurrentSelection[0] is not ColorScheme selected || settings.ColorScheme == selected.Name)
 		{
 			return;
 		}
@@ -274,7 +279,7 @@ public partial class SettingsPage : Popup<bool>
 				Settings = await db.GetSettings(),
 				Books = await db.GetAllBooks()
 			};
-			var json = System.Text.Json.JsonSerializer.Serialize(export, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+			var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
 			var path = Path.Combine(FileSystem.AppDataDirectory, "epubreader_export.json");
 			await File.WriteAllTextAsync(path, json);
 			await Shell.Current.DisplayAlertAsync("Export Data", $"Export saved to {path}", "OK");
