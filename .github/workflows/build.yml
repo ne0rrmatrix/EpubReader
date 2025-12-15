@@ -1,0 +1,152 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ '*' ]
+
+env:
+  LATEST_NET_VERSION: '10.0.x'
+
+jobs:
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    env:
+      NUGET_SECRET: ${{ secrets.NUGETS }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.LATEST_NET_VERSION }}
+          dotnet-quality: 'ga'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          architecture: 'x64'
+          cache: 'gradle'
+
+      - name: Install .NET MAUI Workload
+        run: |
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload update || true
+
+      - name: Configure ephemeral NuGet (optional)
+        shell: powershell
+        run: |
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
+          if ("${{ env.NUGET_SECRET }}") {
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Restore solution
+        shell: powershell
+        run: |
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore EpubReader.slnx --no-cache --configfile $env:NUGET_CONFIG
+          } else {
+            dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
+          }
+
+      - name: Build solution
+        run: dotnet build EpubReader.slnx -c Release --no-restore
+
+      - name: Publish Windows app
+        run: |
+          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows || true
+
+      - name: Archive Windows artifact
+        run: |
+          pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: windows-artifact.zip
+
+  build-android:
+    name: Build (Android)
+    runs-on: ubuntu-latest
+    env:
+      NUGET_SECRET: ${{ secrets.NUGETS }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.LATEST_NET_VERSION }}
+          dotnet-quality: 'ga'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          architecture: 'x64'
+          cache: 'gradle'
+
+      - name: Install workloads
+        run: |
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload restore || true
+
+      - name: Configure ephemeral NuGet (optional)
+        shell: pwsh
+        run: |
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
+          if ("${{ env.NUGET_SECRET }}") {
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Restore (Android project only)
+        shell: pwsh
+        run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-android'
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG /p:TargetFramework=$tfm
+          } else {
+            dotnet restore $proj --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json /p:TargetFramework=$tfm
+          }
+
+      - name: Build (Android project only)
+        run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore
+
+      - name: Publish Android app
+        run: |
+          dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
+
+      - name: Archive Android artifact
+        run: |
+          if [ -d artifacts/android ]; then zip -r android-artifact.zip artifacts/android || true; else touch android-artifact.zip; fi
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifact
+          path: android-artifact.zip
