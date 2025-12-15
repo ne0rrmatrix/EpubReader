@@ -24,11 +24,11 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: 'microsoft'
           java-version: '21'
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -173,13 +173,13 @@ jobs:
             -o artifacts/windows `
             --self-contained `
             /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0 || $true
+            /p:WarningLevel=0 `
       - name: Package Windows artifact
         run: |
           pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { Write-Host 'No windows artifacts found'; New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-artifact
           path: windows-artifact.zip
@@ -198,11 +198,11 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: 'microsoft'
           java-version: '21'
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

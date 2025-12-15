@@ -25,11 +25,11 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: 'microsoft'
           java-version: '21'
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -175,13 +175,14 @@ jobs:
             -o artifacts/windows `
             --self-contained `
             /p:TreatWarningsAsErrors=false `
-            /p:WarningLevel=0 || $true
+            /p:WarningLevel=0 `
+            
       - name: Package Windows artifact
         run: |
           pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { Write-Host 'No windows artifacts found'; New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-artifact
           path: windows-artifact.zip
@@ -193,7 +194,7 @@ jobs:
       NUGET_SECRET: ${{ secrets.NUGETS }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -205,7 +206,7 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: 'microsoft'
           java-version: '21'
           architecture: 'x64'
 
@@ -331,7 +332,7 @@ jobs:
           if [ -d artifacts/android ]; then zip -r android-artifact.zip artifacts/android || true; else touch android-artifact.zip; fi
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: android-artifact
           path: android-artifact.zip
@@ -341,7 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-windows, build-android]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Download artifacts
@@ -370,36 +371,28 @@ jobs:
           cat pr-changelog.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create pre-release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Prepare release assets list
+        id: prepare_assets
+        run: |
+          files=""
+          if [ "${{ steps.check_windows.outputs.present }}" = "true" ]; then
+            files="$files artifacts/windows-artifact.zip"
+          fi
+          if [ "${{ steps.check_android.outputs.present }}" = "true" ]; then
+            files="$files artifacts/android-artifact.zip"
+          fi
+          # trim leading whitespace
+          files="$(echo "$files" | sed -e 's/^ *//')"
+          echo "files=$files" >> $GITHUB_OUTPUT
+
+      - name: Create release and upload assets
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          release_name: "PR #${{ github.event.pull_request.number }} release"
+          tag: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: "PR #${{ github.event.pull_request.number }} release"
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: ${{ github.event.pull_request.merged != true }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows asset to release
-        if: steps.check_windows.outputs.present == 'true'
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/windows-artifact/windows-artifact.zip
-          asset_name: EpubReader-Windows-PR-${{ github.event.pull_request.number }}.zip
-          asset_content_type: application/zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Android asset to release
-        if: steps.check_android.outputs.present == 'true'
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/android-artifact/android-artifact.zip
-          asset_name: EpubReader-Android-PR-${{ github.event.pull_request.number }}.zip
-          asset_content_type: application/zip
+          files: ${{ steps.prepare_assets.outputs.files }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
