@@ -43,11 +43,13 @@
     <Compile Remove="**\net\**\*.cs" />
     <None Include="**\net\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
   </ItemGroup>
-  <!-- Optional per-developer secrets file (project root). Keep for teams that prefer MSBuild props. -->
-  <Import Project="$(MSBuildThisFileDirectory)firebase.secrets.props" Condition="Exists('$(MSBuildThisFileDirectory)firebase.secrets.props')" />
- <Target Name="GenerateFirebaseSecrets" BeforeTargets="CoreCompile">
-  <Error Condition="'$(FirebaseApiKey)' == ''" Text="FirebaseApiKey is not set. Set FIREBASE_API_KEY or pass /p:FirebaseApiKey=..." />
-  <Error Condition="'$(FirebaseAuthDomain)' == ''" Text="FirebaseAuthDomain is not set. Set FIREBASE_AUTH_DOMAIN or pass /p:FirebaseAuthDomain=..." />
-  <Error Condition="'$(FirebaseDatabaseUrl)' == ''" Text="FirebaseDatabaseUrl is not set. Set FIREBASE_DATABASE_URL or pass /p:FirebaseDatabaseUrl=..." />
+  <!-- Project requires a single canonical build-secrets/google-services.json; fail early if required values are not provided by the build script. -->
+ <!-- Only enforce presence of Firebase secrets at publish time. Running/debugging locally
+   should not require secrets; the repository build script (`build.ps1`) will set the
+   properties before publishing. -->
+ <Target Name="GenerateFirebaseSecrets" BeforeTargets="Publish">
+  <Error Condition="'$(FirebaseApiKey)' == ''" Text="FirebaseApiKey is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
+  <Error Condition="'$(FirebaseAuthDomain)' == ''" Text="FirebaseAuthDomain is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
+  <Error Condition="'$(FirebaseDatabaseUrl)' == ''" Text="FirebaseDatabaseUrl is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
  </Target>
 </Project>

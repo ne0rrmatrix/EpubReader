@@ -1,5 +1,6 @@
 ﻿#if ANDROID
 using System.Text.Json;
+using System.IO;
 
 namespace EpubReader.Platforms.Android;
 
@@ -18,66 +19,20 @@ public static class FirebaseConfigLoader
 	{
 		try
 		{
-			// Step 1: Try environment variables (CI/CD priority)
-			if (TryLoadFromEnvironmentVariables())
+			// Next try Resources/raw (packaged resource) - supports older layout where google-services.json was placed in Resources/Raw
+			if (TryLoadFromRawResource())
 			{
-				System.Diagnostics.Debug.WriteLine("✓ Firebase secrets loaded from environment variables");
+				System.Diagnostics.Debug.WriteLine("✓ Firebase secrets loaded from Resources/raw google-services.json");
 				return;
 			}
 
-			// Step 2: Try google-services.json asset (local dev)
-			if (TryLoadFromAsset())
-			{
-				System.Diagnostics.Debug.WriteLine("✓ Firebase secrets loaded from google-services.json asset");
-				return;
-			}
-
-			// Step 3: Fall back to Android resources (legacy, will use placeholders if not injected)
-			System.Diagnostics.Debug.WriteLine("⚠ Firebase secrets not found in environment or assets. Using Android resources (may contain placeholders).");
+			System.Diagnostics.Debug.WriteLine("✗ google-services.json not found in resources, assets, or app files. Sign-in may not work until google-services.json (build-secrets) is provided at build or runtime.");
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"✗ Failed to load Firebase secrets: {ex.Message}");
-			// Do not throw here to avoid crashing app initialization; caller can validate via IsConfigValid()
+			System.Diagnostics.Debug.WriteLine($"✗ Failed to load Firebase secrets from asset: {ex.Message}");
+			throw;
 		}
-	}
-
-	static bool TryLoadFromEnvironmentVariables()
-	{
-		var appId = Environment.GetEnvironmentVariable("FIREBASE_APP_ID");
-		var apiKey = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
-		var databaseUrl = Environment.GetEnvironmentVariable("FIREBASE_DATABASE_URL");
-		var authDomain = Environment.GetEnvironmentVariable("FIREBASE_AUTH_DOMAIN");
-		var webClientId = Environment.GetEnvironmentVariable("FIREBASE_WEB_CLIENT_ID");
-
-		// Only succeed if at least the critical app ID is provided
-		if (string.IsNullOrWhiteSpace(appId))
-		{
-			return false;
-		}
-
-		Preferences.Set(googleAppIdKey, appId);
-		if (!string.IsNullOrWhiteSpace(apiKey))
-		{
-			Preferences.Set(googleApiKeyKey, apiKey);
-		}
-
-		if (!string.IsNullOrWhiteSpace(databaseUrl))
-		{
-			Preferences.Set(firebaseDatabaseUrlKey, databaseUrl);
-		}
-
-		if (!string.IsNullOrWhiteSpace(authDomain))
-		{
-			Preferences.Set(firebaseAuthDomainKey, authDomain);
-		}
-
-		if (!string.IsNullOrWhiteSpace(webClientId))
-		{
-			Preferences.Set(defaultWebClientIdKey, webClientId);
-		}
-
-		return true;
 	}
 
 	static bool TryLoadFromAsset()
@@ -96,13 +51,18 @@ public static class FirebaseConfigLoader
 				return false;
 			}
 
-			var assetNames = assets.List("") ?? [];
-			if (!assetNames.Contains("google-services.json"))
+			var assetNames = assets.List("") ?? Array.Empty<string>();
+			// Support either a top-level asset or a build-secrets subpath (we set a distinct LogicalName
+			// for the canonical secrets file to avoid publish collisions). Look for either location.
+			var assetName = assetNames.Contains("google-services.json") ? "google-services.json" :
+							(assetNames.Contains("build-secrets") && (assets.List("build-secrets") ?? []).Contains("google-services.json") ? "build-secrets/google-services.json" : null);
+
+			if (assetName is null)
 			{
 				return false;
 			}
 
-			using var assetStream = assets.Open("google-services.json");
+			using var assetStream = assets.Open(assetName);
 			using var reader = new StreamReader(assetStream);
 			var json = reader.ReadToEnd();
 
@@ -110,32 +70,6 @@ public static class FirebaseConfigLoader
 			var root = doc.RootElement;
 
 			var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
-
-			// Store in preferences
-			if (!string.IsNullOrWhiteSpace(apiKey))
-			{
-				Preferences.Set(googleApiKeyKey, apiKey);
-			}
-
-			if (!string.IsNullOrWhiteSpace(appId))
-			{
-				Preferences.Set(googleAppIdKey, appId);
-			}
-
-			if (!string.IsNullOrWhiteSpace(firebaseUrl))
-			{
-				Preferences.Set(firebaseDatabaseUrlKey, firebaseUrl);
-			}
-
-			if (!string.IsNullOrWhiteSpace(authDomain))
-			{
-				Preferences.Set(firebaseAuthDomainKey, authDomain);
-			}
-
-			if (!string.IsNullOrWhiteSpace(webClientId))
-			{
-				Preferences.Set(defaultWebClientIdKey, webClientId);
-			}
 
 			return !string.IsNullOrWhiteSpace(appId);
 		}
@@ -145,6 +79,87 @@ public static class FirebaseConfigLoader
 			return false;
 		}
 	}
+
+	static bool TryLoadFromRawResource()
+	{
+		try
+		{
+			var context = global::Android.App.Application.Context;
+			if (context is null)
+			{
+				return false;
+			}
+
+			// Candidates: resource names derived from possible file names
+			var resources = context.Resources;
+			if (resources is null)
+			{
+				return false;
+			}
+			var candidates = new[] { "google_services", "google_service", "google_services_json", "google_service_json" };
+			foreach (var name in candidates)
+			{
+				var id = resources.GetIdentifier(name, "raw", context.PackageName);
+				if (id != 0)
+				{
+					using var stream = resources.OpenRawResource(id);
+					using var reader = new StreamReader(stream);
+					var json = reader.ReadToEnd();
+					var doc = JsonDocument.Parse(json);
+					var root = doc.RootElement;
+					var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
+
+
+					return !string.IsNullOrWhiteSpace(appId);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"⚠ Failed to load google-services.json from Resources/raw: {ex.Message}");
+		}
+		return false;
+	}
+
+	static bool TryLoadFromFilesDir()
+	{
+		try
+		{
+			var context = global::Android.App.Application.Context;
+			if (context is null)
+			{
+				return false;
+			}
+			var filesDir = context.FilesDir?.AbsolutePath ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(filesDir))
+			{
+				return false;
+			}
+			var candidates = new[] {
+				Path.Combine(filesDir, "build-secrets", "google-services.json"),
+				Path.Combine(filesDir, "google-services.json")
+			};
+			foreach (var p in candidates)
+			{
+				if (File.Exists(p))
+				{
+					var json = File.ReadAllText(p);
+					var doc = JsonDocument.Parse(json);
+					var root = doc.RootElement;
+					var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
+
+
+					return !string.IsNullOrWhiteSpace(appId);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"⚠ Failed to load google-services.json from files dir: {ex.Message}");
+		}
+		return false;
+	}
+
 
 	static (string? appId, string? apiKey, string? firebaseUrl, string? authDomain, string? webClientId) ExtractFirebaseConfig(JsonElement root)
 	{
@@ -209,7 +224,98 @@ public static class FirebaseConfigLoader
 
 	public static string GetConfigValue(string key, string defaultValue = "")
 	{
-		return Preferences.Get(key, defaultValue);
+		try
+		{
+			var context = global::Android.App.Application.Context;
+			if (context is null)
+			{
+				return defaultValue;
+			}
+
+			// 1) Resources/raw
+			var resources = context.Resources;
+			if (resources is not null)
+			{
+				var rawCandidates = new[] { "google_services", "google_service", "google_services_json", "google_service_json" };
+				foreach (var name in rawCandidates)
+				{
+					var id = resources.GetIdentifier(name, "raw", context.PackageName);
+					if (id != 0)
+					{
+						using var stream = resources.OpenRawResource(id);
+						using var reader = new StreamReader(stream);
+						var json = reader.ReadToEnd();
+						var root = JsonDocument.Parse(json).RootElement;
+						var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
+						return key switch
+						{
+							var k when k == googleApiKeyKey => apiKey ?? defaultValue,
+							var k when k == googleAppIdKey => appId ?? defaultValue,
+							var k when k == firebaseDatabaseUrlKey => firebaseUrl ?? defaultValue,
+							var k when k == firebaseAuthDomainKey => authDomain ?? defaultValue,
+							var k when k == defaultWebClientIdKey => webClientId ?? defaultValue,
+							_ => defaultValue
+						};
+					}
+				}
+			}
+
+			// 2) Assets
+			var assets = context.Assets;
+			if (assets is not null)
+			{
+				var assetNames = assets.List("") ?? Array.Empty<string>();
+				var assetName = assetNames.Contains("google-services.json") ? "google-services.json" :
+								(assetNames.Contains("build-secrets") && (assets.List("build-secrets") ?? Array.Empty<string>()).Contains("google-services.json") ? "build-secrets/google-services.json" : null);
+				if (assetName is not null)
+				{
+					using var assetStream = assets.Open(assetName);
+					using var reader = new StreamReader(assetStream);
+					var json = reader.ReadToEnd();
+					var root = JsonDocument.Parse(json).RootElement;
+					var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
+					return key switch
+					{
+						var k when k == googleApiKeyKey => apiKey ?? defaultValue,
+						var k when k == googleAppIdKey => appId ?? defaultValue,
+						var k when k == firebaseDatabaseUrlKey => firebaseUrl ?? defaultValue,
+						var k when k == firebaseAuthDomainKey => authDomain ?? defaultValue,
+						var k when k == defaultWebClientIdKey => webClientId ?? defaultValue,
+						_ => defaultValue
+					};
+				}
+			}
+
+			// 3) Files dir
+			var filesDir = context.FilesDir?.AbsolutePath ?? string.Empty;
+			if (!string.IsNullOrWhiteSpace(filesDir))
+			{
+				var candidates = new[] { Path.Combine(filesDir, "build-secrets", "google-services.json"), Path.Combine(filesDir, "google-services.json") };
+				foreach (var p in candidates)
+				{
+					if (File.Exists(p))
+					{
+						var json = File.ReadAllText(p);
+						var root = JsonDocument.Parse(json).RootElement;
+						var (appId, apiKey, firebaseUrl, authDomain, webClientId) = ExtractFirebaseConfig(root);
+						return key switch
+						{
+							var k when k == googleApiKeyKey => apiKey ?? defaultValue,
+							var k when k == googleAppIdKey => appId ?? defaultValue,
+							var k when k == firebaseDatabaseUrlKey => firebaseUrl ?? defaultValue,
+							var k when k == firebaseAuthDomainKey => authDomain ?? defaultValue,
+							var k when k == defaultWebClientIdKey => webClientId ?? defaultValue,
+							_ => defaultValue
+						};
+					}
+				}
+			}
+		}
+		catch
+		{
+			// ignore and fallthrough to default
+		}
+		return defaultValue;
 	}
 
 	public static bool IsConfigValid()

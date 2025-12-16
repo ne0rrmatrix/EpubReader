@@ -49,6 +49,20 @@ public partial class AuthenticationService
 		var clientIdResId = activity.Resources?.GetIdentifier("default_web_client_id", "string", activity.PackageName) ?? 0;
 		var serverClientId = clientIdResId != 0 ? activity.GetString(clientIdResId) : string.Empty;
 
+		// Fallback: if resource is not present (we may package google-services.json under a different
+		// logical name), attempt to read the value from the injected FirebaseConfigLoader preferences.
+		if (string.IsNullOrEmpty(serverClientId))
+		{
+			try
+			{
+				serverClientId = EpubReader.Platforms.Android.FirebaseConfigLoader.GetConfigValue("default_web_client_id", string.Empty) ?? string.Empty;
+			}
+			catch
+			{
+				// ignore - leave serverClientId empty
+			}
+		}
+
 		// Build Google GetGoogleIdOption (requests a Google ID token via Credential Manager)
 		var googleOptionBuilder = new GetGoogleIdOption.Builder();
 		googleOptionBuilder.SetFilterByAuthorizedAccounts(false);

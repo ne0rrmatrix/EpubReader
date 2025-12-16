@@ -331,3 +331,10 @@ EpubReader/PRIVACY_POLICY_DRAFTS.md
 EpubReader/PRIVACY_PR_NOTES.md
 EpubReader/publishAndroid.ps1
 EpubReader/android.keystore.b64
+build-secrets/firebase.secrets.props
+build-secrets/secrets.b64
+.gitignore
+build-secrets/SigningCode.txt
+build-secrets/android/google-services.json
+.gitignore
+build-secrets/android.keystore.b64

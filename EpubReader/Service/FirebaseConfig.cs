@@ -18,15 +18,14 @@ static class FirebaseConfig
 	static string? cachedAuthDomain;
 	static string? cachedDatabaseUrl;
 
-	public static string ApiKey => EnsureValue(GetOrLoad(ref cachedApiKey, FirebaseSecrets.ApiKey), nameof(ApiKey));
-	public static string AuthDomain => EnsureValue(GetOrLoad(ref cachedAuthDomain, FirebaseSecrets.AuthDomain), nameof(AuthDomain));
-	public static string DatabaseUrl => EnsureValue(GetOrLoad(ref cachedDatabaseUrl, FirebaseSecrets.DatabaseUrl), nameof(DatabaseUrl));
+	public static string ApiKey => EnsureValue(GetOrLoad(ref cachedApiKey), nameof(ApiKey));
+	public static string AuthDomain => EnsureValue(GetOrLoad(ref cachedAuthDomain), nameof(AuthDomain));
+	public static string DatabaseUrl => EnsureValue(GetOrLoad(ref cachedDatabaseUrl), nameof(DatabaseUrl));
 
-	static string GetOrLoad(ref string? cached, string fallback)
+	static string GetOrLoad(ref string? cached)
 	{
 		TryLoadFromGoogleServicesJson();
-		cached = !string.IsNullOrWhiteSpace(cached) ? cached : fallback;
-		return cached;
+		return cached ?? string.Empty;
 	}
 
 	static void TryLoadFromGoogleServicesJson()
@@ -40,11 +39,10 @@ static class FirebaseConfig
 
 		try
 		{
-			using var stream = OpenGoogleServicesStream();
+			using var stream = FileSystem.OpenAppPackageFileAsync(googleServicesFileName).GetAwaiter().GetResult();
 			if (stream is null)
 			{
-				Trace.TraceWarning("Firebase config: google-services.json not found in app package; falling back to secrets/env.");
-				return;
+				throw new InvalidOperationException($"Required file '{googleServicesFileName}' not found in app package. This application requires build-secrets/{googleServicesFileName} to be present and packaged.");
 			}
 
 			using var document = JsonDocument.Parse(stream);
@@ -71,36 +69,8 @@ static class FirebaseConfig
 		}
 		catch (Exception ex)
 		{
-			Trace.TraceWarning($"Firebase config: failed to read google-services.json - {ex.Message}");
-		}
-	}
-
-	static Stream? OpenGoogleServicesStream()
-	{
-		try
-		{
-			return FileSystem.OpenAppPackageFileAsync(googleServicesFileName).GetAwaiter().GetResult();
-		}
-		catch
-		{
-			// Ignore and attempt filesystem fallback.
-		}
-
-		try
-		{
-			var baseDir = AppContext.BaseDirectory;
-			var candidatePaths = new[]
-			{
-				Path.Combine(baseDir, googleServicesFileName),
-				Path.Combine(baseDir, "Resources", googleServicesFileName)
-			};
-
-			var filePath = candidatePaths.FirstOrDefault(File.Exists);
-			return filePath is not null ? File.OpenRead(filePath) : null;
-		}
-		catch
-		{
-			return null;
+			Trace.TraceError($"Firebase config: failed to read google-services.json - {ex.Message}");
+			throw;
 		}
 	}
 
@@ -108,8 +78,7 @@ static class FirebaseConfig
 	{
 		if (string.IsNullOrWhiteSpace(value))
 		{
-			Trace.TraceWarning($"Firebase configuration '{name}' is missing. Set FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_DATABASE_URL or include google-services.json.");
-			return string.Empty;
+			throw new InvalidOperationException($"Firebase configuration '{name}' is missing. Ensure build-secrets/google-services.json is present and contains the required values.");
 		}
 
 		return value;

@@ -113,6 +113,18 @@ jobs:
             Write-Host 'No FIREBASE_* values were found in google-services.json'
           }
 
+      - name: Write canonical google-services.json to workspace
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) { Write-Error 'GOOGLE_SECRET_B64 empty'; exit 1 }
+          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          $outDir = Join-Path $GITHUB_WORKSPACE 'build-secrets'
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $outPath = Join-Path $outDir 'google-services.json'
+          Set-Content -Path $outPath -Value $decoded -Encoding utf8 -Force
+          Write-Host "Wrote google-services.json to $outPath"
+
       - name: Configure ephemeral NuGet (optional)
         shell: powershell
         run: |

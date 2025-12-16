@@ -66,15 +66,6 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
-		
-		<!-- Firebase Google Services Configuration for Android (optional - add when configured) -->
-		<GoogleServicesJson Include="Resources\google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Resources\google-services.json')" />
-    <!-- Ensure google-services.json is packaged so runtime FirebaseConfig can read it -->
-    <MauiAsset Include="Resources\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Resources\google-services.json')" />
-    <MauiAsset Include="Resources\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND Exists('Resources\google-services.json')" />
-    <!-- Also include Platforms/Android/google-services.json if present (injected at build time) -->
-    <MauiAsset Include="Platforms\Android\google-services.json" LogicalName="google-services.json" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND Exists('Platforms\Android\google-services.json')" />
-    <EmbeddedResource Include="firebase.secrets.props" Condition="Exists('firebase.secrets.props')" />
 	</ItemGroup>
 
   <PropertyGroup>
@@ -89,28 +80,8 @@
   <PropertyGroup>
     <LocalSecretsRoot>$(MSBuildProjectDirectory)\build-secrets</LocalSecretsRoot>
     <AndroidSecretsJson>$(LocalSecretsRoot)\google-services.json</AndroidSecretsJson>
-    <AndroidSecretsXml>$(LocalSecretsRoot)\android\strings.secrets.xml</AndroidSecretsXml>
   </PropertyGroup>
-
-  <!-- Copy or generate android strings.xml if local secrets exist -->
-  <Target Name="InjectAndroidSecrets" BeforeTargets="PrepareResourceNames;PrepareForBuild">
-    <Message Importance="high" Text="InjectAndroidSecrets: checking for $(AndroidSecretsXml) and $(AndroidSecretsJson)" />
-
-    <!-- If a pre-generated strings.secrets.xml exists, copy it over -->
-    <Copy Condition="Exists('$(AndroidSecretsXml)')" SourceFiles="$(AndroidSecretsXml)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
-
-    <!-- If google-services.json exists, copy it into Platforms/Android and also attempt to generate strings.xml by invoking the PowerShell script on Windows or bash on Unix -->
-    <Copy Condition="Exists('$(AndroidSecretsJson)')" SourceFiles="$(AndroidSecretsJson)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\google-services.json" />
-
-    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) == 'true'" Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\gen-android-strings.ps1&quot; -GoogleServicesJson '$(AndroidSecretsJson)' -OutFile '$(AndroidSecretsXml)'" />
-
-    <Exec Condition="Exists('$(AndroidSecretsJson)') and $([MSBuild]::IsOSPlatform(&quot;windows&quot;)) != 'true'" Command="bash '$(MSBuildProjectDirectory)/scripts/gen-android-strings.sh' '$(AndroidSecretsJson)' '$(AndroidSecretsXml)'" />
-
-    <!-- After generating strings.secrets.xml, copy to the android resources file so build picks it up -->
-    <Copy Condition="Exists('$(AndroidSecretsXml)')" SourceFiles="$(AndroidSecretsXml)" DestinationFiles="$(MSBuildProjectDirectory)\Platforms\Android\Resources\values\strings.xml" />
-
-  </Target>
-
+  
   <ItemGroup>
     <PackageReference Include="AsyncAwaitBestPractices" Version="10.0.0" />
     <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
@@ -178,4 +149,53 @@
 			<Registrar>static</Registrar>
 		</PropertyGroup>
 	</Target>
+
+  <!-- Ensure the compiler-generated files output directory exists to avoid CS0016 write errors
+       when source generators attempt to write files. This proactively creates the directory
+       (e.g. obj\GeneratedFiles) before compilation. -->
+  <Target Name="EnsureCompilerGeneratedFilesOutputPath" BeforeTargets="CoreCompile;GenerateResource;GenerateNativeImage;Compile">
+    <MakeDir Directories="$(CompilerGeneratedFilesOutputPath)" Condition="'$(CompilerGeneratedFilesOutputPath)' != '' and !Exists('$(CompilerGeneratedFilesOutputPath)')" />
+  </Target>
+
+  <!-- Provision canonical build-secrets/google-services.json into Resources/Raw for the build
+       if present in the repository (copy from ../build-secrets or ./build-secrets). The file
+       will be removed after Build/Publish if it was provisioned by this MSBuild target.
+       This avoids requiring external build scripts to stage the runtime resource. -->
+  <Target Name="ProvisionGoogleServicesJson" BeforeTargets="CoreCompile;GenerateResource;Compile;Publish">
+    <PropertyGroup>
+      <_GoogleServicesSource1>$(MSBuildProjectDirectory)\..\build-secrets\google-services.json</_GoogleServicesSource1>
+      <_GoogleServicesSource2>$(MSBuildProjectDirectory)\build-secrets\google-services.json</_GoogleServicesSource2>
+      <_GoogleServicesDest>$(MSBuildProjectDirectory)\Resources\Raw\google-services.json</_GoogleServicesDest>
+       <!-- Use a TFM-specific provision marker so cleanup only removes the file for the TFM
+         that created it (prevents an earlier Publish for another TFM from deleting the
+         resource before Android packaging runs). -->
+       <_ProvisionMarker>$(IntermediateOutputPath)google_services_provisioned_$(TargetFramework).txt</_ProvisionMarker>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_GoogleSource Include="$([System.IO.Path]::GetFullPath('$(_GoogleServicesSource1)'))" Condition="Exists('$(_GoogleServicesSource1)')" />
+      <_GoogleSource Include="$([System.IO.Path]::GetFullPath('$(_GoogleServicesSource2)'))" Condition="Exists('$(_GoogleServicesSource2)')" />
+    </ItemGroup>
+
+    <Message Text="Provisioning google-services.json from %(_GoogleSource.Identity) to $(_GoogleServicesDest)" Importance="Normal" Condition=" '@(_GoogleSource)' != '' " />
+    <MakeDir Directories="$(MSBuildProjectDirectory)\Resources\Raw" Condition="'@(_GoogleSource)' != '' and !Exists('$(MSBuildProjectDirectory)\Resources\Raw')" />
+    <Copy SourceFiles="@(_GoogleSource)" DestinationFiles="$(_GoogleServicesDest)" SkipUnchangedFiles="true" Condition="'@(_GoogleSource)' != ''" />
+    <WriteLinesToFile File="$(_ProvisionMarker)" Lines="%(_GoogleSource.Identity)" Overwrite="true" Condition="'@(_GoogleSource)' != ''" />
+  </Target>
+
+  <!-- Cleanup the provisioned runtime resource after packaging. Only remove the file if the
+       provision marker was created by this target. Runs after Publish/Pack to avoid removing
+       the resource between multi-target builds. -->
+  <Target Name="CleanupProvisionedGoogleServicesJson" AfterTargets="Publish;Pack">
+    <PropertyGroup>
+      <_ProvisionMarkerFile>$(IntermediateOutputPath)google_services_provisioned.txt</_ProvisionMarkerFile>
+      <_GoogleServicesDest>$(MSBuildProjectDirectory)\Resources\Raw\google-services.json</_GoogleServicesDest>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ProvisionMarker Include="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" />
+    </ItemGroup>
+    <Message Text="Cleaning up provisioned google-services.json for $(TargetFramework) (if any)" Importance="Normal" Condition="Exists('$(_ProvisionMarkerFile)')" />
+    <Delete Files="$(_GoogleServicesDest)" Condition="Exists('$(_ProvisionMarkerFile)') and Exists('$(_GoogleServicesDest)')" ContinueOnError="true" />
+    <Delete Files="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" ContinueOnError="true" />
+  </Target>
 </Project>
