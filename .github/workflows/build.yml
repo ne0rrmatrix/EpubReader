@@ -198,7 +198,7 @@ jobs:
 
   build-android:
     name: Build (Android)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       NUGET_SECRET: ${{ secrets.NUGETS }}
       GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
@@ -223,6 +223,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install workloads
+        shell: pwsh
         run: |
           dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
           dotnet workload restore || true
@@ -253,29 +254,37 @@ jobs:
           }
 
       - name: Build (Android project only)
-        run: dotnet build EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore
+        shell: pwsh
+        run: |
+          dotnet build EpubReader\EpubReader.csproj -c Release -f net10.0-android --no-restore
 
       - name: Restore Android keystore and publish (signed if env present)
+        shell: pwsh
         run: |
-          if [ -n "$ANDROID_KEYSTORE_B64" ]; then
-            echo "Decoding Android keystore from env"
-            mkdir -p EpubReader
-            printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode > EpubReader/EpubReader.keystore
-            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android --no-restore -o artifacts/android \
-              /p:AndroidKeyStore=true \
-              /p:AndroidSigningKeyStore="$(pwd)/EpubReader/EpubReader.keystore" \
-              /p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
-              /p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
-              /p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD" || true
-            rm -f EpubReader/EpubReader.keystore || true
-          else
-            echo "No ANDROID_KEYSTORE_B64 env found — publishing unsigned APK/AAB"
-            dotnet publish EpubReader/EpubReader.csproj -c Release -f net10.0-android -o artifacts/android || true
-          fi
+          if ($env:ANDROID_KEYSTORE_B64) {
+            Write-Host "Decoding Android keystore from env"
+            New-Item -ItemType Directory -Path 'EpubReader' -Force | Out-Null
+            [System.IO.File]::WriteAllBytes('EpubReader\EpubReader.keystore', [System.Convert]::FromBase64String($env:ANDROID_KEYSTORE_B64))
+            dotnet publish EpubReader\EpubReader.csproj -c Release -f net10.0-android --no-restore -o artifacts\android `
+              /p:AndroidKeyStore=true `
+              /p:AndroidSigningKeyStore="$(Resolve-Path 'EpubReader\EpubReader.keystore')" `
+              /p:AndroidSigningStorePass="$env:ANDROID_KEYSTORE_PASSWORD" `
+              /p:AndroidSigningKeyAlias="$env:ANDROID_KEY_ALIAS" `
+              /p:AndroidSigningKeyPass="$env:ANDROID_KEY_PASSWORD" || true
+            Remove-Item -Path 'EpubReader\EpubReader.keystore' -Force -ErrorAction SilentlyContinue
+          } else {
+            Write-Host "No ANDROID_KEYSTORE_B64 env found — publishing unsigned APK/AAB"
+            dotnet publish EpubReader\EpubReader.csproj -c Release -f net10.0-android -o artifacts\android || true
+          }
 
       - name: Archive Android artifact
+        shell: pwsh
         run: |
-          if [ -d artifacts/android ]; then zip -r android-artifact.zip artifacts/android || true; else touch android-artifact.zip; fi
+          if (Test-Path artifacts/android) {
+            Compress-Archive -Path 'artifacts/android/*' -DestinationPath 'android-artifact.zip' -Force
+          } else {
+            New-Item -ItemType File -Path 'android-artifact.zip' -Force | Out-Null
+          }
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v6
