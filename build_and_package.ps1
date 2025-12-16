@@ -117,7 +117,7 @@ if ($code -ne 0) {
 $publishWinArgs = @(
     'publish', $solutionProj,
     '-c','Release',
-    
+    '-f','net10.0-windows10.0.19041.0',
     '-o',$windowsOut,
     '/p:TreatWarningsAsErrors=false',
     '/p:WarningLevel=0'

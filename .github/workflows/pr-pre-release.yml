@@ -1,9 +1,7 @@
 name: PR Build and Pre-release
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: write

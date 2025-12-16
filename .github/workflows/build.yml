@@ -1,9 +1,7 @@
 name: Build
 
 on:
-  push:
-    branches: [ master ]
-    tags: [ '*' ]
+  workflow_dispatch: {}
 
 env:
   LATEST_NET_VERSION: '10.0.x'
