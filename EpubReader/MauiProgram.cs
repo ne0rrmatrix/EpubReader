@@ -63,12 +63,7 @@ public static class MauiProgram
 		});
 #if ANDROID
 		// Load Firebase config early on Android
-		FirebaseConfigLoader.InjectFirebaseSecrets();
-		// Validate configuration and log helpful diagnostic if invalid
-		if (!FirebaseConfigLoader.IsConfigValid())
-		{
-			System.Diagnostics.Trace.TraceWarning("WARNING: Firebase configuration not found via env vars or assets. Android resources may still contain placeholders.");
-		}
+		FirebaseConfig.TryLoadFromGoogleServicesJson();
 
 		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Android.Webkit.WebView.WebViewClient),
@@ -182,12 +177,11 @@ public static class MauiProgram
 		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
 		try
 		{
-			FirebaseConfigLoader.InjectFirebaseSecrets();
 
 			// Build FirebaseOptions from loaded configuration
-			var appId = FirebaseConfigLoader.GetConfigValue("google_app_id");
-			var apiKey = FirebaseConfigLoader.GetConfigValue("google_api_key");
-			var databaseUrl = FirebaseConfigLoader.GetConfigValue("firebase_database_url");
+			var appId = FirebaseConfig.AppId;
+			var apiKey = FirebaseConfig.ApiKey;
+			var databaseUrl = FirebaseConfig.DatabaseUrl;
 
 			if (!string.IsNullOrWhiteSpace(appId))
 			{

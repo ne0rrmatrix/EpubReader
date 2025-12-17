@@ -6,7 +6,6 @@ using System.Reactive.Subjects;
 using Firebase.Database;
 using Firebase.Database.Query;
 using SQLite;
-using SQLitePCL;
 
 namespace EpubReader.Service;
 

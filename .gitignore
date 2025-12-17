@@ -338,3 +338,5 @@ build-secrets/SigningCode.txt
 build-secrets/android/google-services.json
 .gitignore
 build-secrets/android.keystore.b64
+EpubReader/Platforms/Android/google-services.json
+EpubReader/Platforms/Android/Resources/values/google-services.xml
