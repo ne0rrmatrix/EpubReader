@@ -31,9 +31,6 @@
 
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
    
-    <!-- Remove this NoWarn once XamlTypeInfo Generator (owned by .NET MAUI Engineering Team) implements a partial class-->
-    <NoWarn>CsWinRT1028</NoWarn>
-    
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
 	</PropertyGroup>
@@ -133,6 +130,12 @@
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core">
       <Version>2.10.0</Version>
     </PackageReference>
+    <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
+    <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
+    <PackageReference Update="Xamarin.AndroidX.Fragment" Version="1.8.9" />
+    <PackageReference Update="Xamarin.AndroidX.Activity" Version="1.12.0" />
+    <PackageReference Update="Xamarin.AndroidX.SavedState" Version="1.4.0" />
+    <!-- If additional NU1608 warnings appear, add Update entries here for the offending packages only -->
   </ItemGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">

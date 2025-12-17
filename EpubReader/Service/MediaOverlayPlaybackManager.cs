@@ -9,7 +9,7 @@ namespace EpubReader.Service;
 /// <summary>
 /// Coordinates media overlay playback, highlighting, and UI updates for the reader surface.
 /// </summary>
-public sealed class MediaOverlayPlaybackManager : IDisposable
+public partial class MediaOverlayPlaybackManager : IDisposable
 {
 	readonly BookViewModel viewModel;
 	Book book;
@@ -504,17 +504,24 @@ public sealed class MediaOverlayPlaybackManager : IDisposable
 
 	public void Dispose()
 	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
 		if (disposed)
 		{
 			return;
 		}
-
+		if (disposing)
+		{
+			StopPlaybackInternal();
+			clipTimer = null;
+			audioPlaybackService.Dispose();
+		}
 		disposed = true;
-		StopPlaybackInternal();
-		clipTimer = null;
-		audioPlaybackService.Dispose();
 	}
-
 	async Task UpdateChapterContextAsync(int chapterIndex)
 	{
 		currentChapterIndex = chapterIndex;

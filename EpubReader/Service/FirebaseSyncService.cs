@@ -12,7 +12,7 @@ namespace EpubReader.Service;
 /// <summary>
 /// Firebase-based sync implementation with real-time updates and offline queue management.
 /// </summary>
-public sealed class FirebaseSyncService : ISyncService, IDisposable
+public partial class FirebaseSyncService : ISyncService, IDisposable
 {
 	const string deviceIdKey = "Sync.DeviceId";
 	const string dbUrlKey = "Firebase.DatabaseUrl";
@@ -575,14 +575,21 @@ public sealed class FirebaseSyncService : ISyncService, IDisposable
 
 	public void Dispose()
 	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
 		if (disposed)
 		{
 			return;
 		}
-
+		if (disposing)
+		{
+			subscriptions.Dispose();
+			saveSubject.Dispose();
+		}
 		disposed = true;
-		subscriptions.Dispose();
-		saveSubject.Dispose();
-		GC.SuppressFinalize(this);
 	}
 }

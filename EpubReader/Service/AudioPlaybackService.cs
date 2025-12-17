@@ -6,16 +6,12 @@ namespace EpubReader.Service;
 /// Encapsulates audio playback session management so callers don't need
 /// to manage player streams and events directly.
 /// </summary>
-public sealed class AudioPlaybackService : IDisposable
+public partial class AudioPlaybackService(IAudioManager audioManager) : IDisposable
 {
-	readonly IAudioManager audioManager;
+	bool disposed = false;
+	readonly IAudioManager audioManager = audioManager ?? throw new ArgumentNullException(nameof(audioManager));
 	IAudioPlayer? player;
 	Stream? stream;
-
-	public AudioPlaybackService(IAudioManager audioManager)
-	{
-		this.audioManager = audioManager ?? throw new ArgumentNullException(nameof(audioManager));
-	}
 
 	public bool HasSession => player is not null;
 	public string? CurrentResourceId { get; private set; }
@@ -109,9 +105,22 @@ public sealed class AudioPlaybackService : IDisposable
 		DisposeStream();
 		CurrentResourceId = null;
 	}
-
 	public void Dispose()
 	{
-		DisposeSession();
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (disposed)
+		{
+			return;
+		}
+		if (disposing)
+		{
+			DisposeSession();
+		}
+		disposed = true;
 	}
 }

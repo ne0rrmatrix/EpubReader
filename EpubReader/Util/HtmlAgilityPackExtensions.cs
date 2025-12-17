@@ -310,7 +310,7 @@ public static partial class HtmlAgilityPackExtensions
 	public static string RemoveKoboScriptLinks(string htmlContent)
 	{
 		// Regular expression to match <script> tags with src containing "kobo.js"
-		string koboScriptPattern = @"<script\s+[^>]*src=[""'][^""']*kobo\.js[""'][^>]*/?>|<script\s+[^>]*src=[""'][^""']*kobo\.js[""'][^>]*></script>";
+		string koboScriptPattern = @"<script\s+[^>]*src=[""'][^""']*kobo\.js[""'][^>]*></script>";
 		// Remove all matches from the HTML content
 		string cleanedHtml = Regex.Replace(htmlContent, koboScriptPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return RemoveEmptyLines(cleanedHtml);
