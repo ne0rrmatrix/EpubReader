@@ -3,23 +3,15 @@ namespace EpubReader.Models.MediaOverlays;
 /// <summary>
 /// Represents a parsed SMIL media overlay document.
 /// </summary>
-public sealed class MediaOverlayDocument
+public sealed class MediaOverlayDocument(string id, string href, MediaOverlaySequence body, IReadOnlyList<MediaOverlayParallel> flattenedNodes)
 {
-	public MediaOverlayDocument(string id, string href, MediaOverlaySequence body, IReadOnlyList<MediaOverlayParallel> flattenedNodes)
-	{
-		Id = id;
-		Href = href;
-		Body = body;
-		FlattenedNodes = flattenedNodes;
-	}
+	public string Id { get; } = id;
 
-	public string Id { get; }
+	public string Href { get; } = href;
 
-	public string Href { get; }
+	public MediaOverlaySequence Body { get; } = body;
 
-	public MediaOverlaySequence Body { get; }
-
-	public IReadOnlyList<MediaOverlayParallel> FlattenedNodes { get; }
+	public IReadOnlyList<MediaOverlayParallel> FlattenedNodes { get; } = flattenedNodes;
 
 	public List<string> AssociatedContentDocuments { get; } = [];
 
