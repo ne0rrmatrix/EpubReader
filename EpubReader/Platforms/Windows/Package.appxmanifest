@@ -8,7 +8,7 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap rescap com desktop">
 
-  <Identity Name="10308AHDFTech.EpubReaderForWindows" Publisher="CN=42FEAAAA-0C11-4CEA-A522-2EB887E2DE06" Version="1.1.5.0" />
+  <Identity Name="10308AHDFTech.EpubReaderForWindows" Publisher="CN=42FEAAAA-0C11-4CEA-A522-2EB887E2DE06" Version="1.1.4.0" />
 
   <mp:PhoneIdentity PhoneProductId="a7c49dde-9973-49c9-b6a4-551cc0b750a7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -19,8 +19,8 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
   <Resources>

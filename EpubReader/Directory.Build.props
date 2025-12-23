@@ -2,7 +2,8 @@
 <Project>
   <PropertyGroup>
     <Nullable>enable</Nullable>
-    <NoWarn>NETSDK1023</NoWarn>
+    <!-- Remove MCTEXP001 once the BindablePropertySourceGenerator is Released and no longer in Experimental -->
+    <NoWarn>NETSDK1023,MCTEXP001</NoWarn>
     <NetVersion>net10.0</NetVersion>
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -210,13 +211,6 @@
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <FirebaseApiKey Condition="'$(FirebaseApiKey)' == ''">$(FIREBASE_API_KEY)</FirebaseApiKey>
-    <FirebaseAuthDomain Condition="'$(FirebaseAuthDomain)' == ''">$(FIREBASE_AUTH_DOMAIN)</FirebaseAuthDomain>
-    <FirebaseDatabaseUrl Condition="'$(FirebaseDatabaseUrl)' == ''">$(FIREBASE_DATABASE_URL)</FirebaseDatabaseUrl>
-    <FirebaseSecretsGeneratedDirectory>$(IntermediateOutputPath)Generated</FirebaseSecretsGeneratedDirectory>
-    <FirebaseSecretsGeneratedFile>$(FirebaseSecretsGeneratedDirectory)\FirebaseSecrets.g.cs</FirebaseSecretsGeneratedFile>
-  </PropertyGroup>
 
   <!-- Required for NuGet Source Link -->
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">
@@ -231,10 +225,5 @@
 
     <!-- Embed symbols containing Source Link in the main file (exe/dll) -->
     <DebugType>embedded</DebugType>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="('$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true') and $([MSBuild]::IsOSPlatform('windows')) == 'true'">
-    <!-- Re-enable Tizen once it includes support for .NET 10 -->
-    <IncludeTizenTargetFrameworks>false</IncludeTizenTargetFrameworks>
   </PropertyGroup>
 </Project>

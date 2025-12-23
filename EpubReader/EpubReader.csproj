@@ -7,9 +7,9 @@
 		<RootNamespace>EpubReader</RootNamespace>
 		<UseMaui>true</UseMaui>
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
-		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 		<SingleProject>true</SingleProject>
     <DefaultLanguage>en-us</DefaultLanguage>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
 
     <!-- Display name -->
 		<ApplicationTitle>EpubReader</ApplicationTitle>
@@ -21,18 +21,13 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>8</ApplicationVersion>
 
-		<!--
-		Uncomment the line below if you need to debug the SG code
-		If you see any LongPath issue on Windows, check this doc
-		https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd#enable-long-paths-in-windows-10-version-1607-and-later
-		-->
-		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)\GeneratedFiles</CompilerGeneratedFilesOutputPath>
 
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
    
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>MSIX</WindowsPackageType>
+
+    <NoWarn>IL2026</NoWarn>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
@@ -74,7 +69,7 @@
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
@@ -104,11 +99,11 @@
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.4" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.1" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview980" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview980" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.20" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="*" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview1703" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview1703" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.8" />
@@ -160,14 +155,14 @@
 		<RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
 	</PropertyGroup>
   
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
     <AndroidPackageFormat>aab</AndroidPackageFormat>
     <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
   </PropertyGroup>
   
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
     <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
@@ -214,19 +209,4 @@
     <WriteLinesToFile File="$(_ProvisionMarker)" Lines="%(_GoogleSource.Identity)" Overwrite="true" Condition="'@(_GoogleSource)' != ''" />
   </Target>
 
-  <!-- Cleanup the provisioned runtime resource after packaging. Only remove the file if the
-       provision marker was created by this target. Runs after Publish/Pack to avoid removing
-       the resource between multi-target builds. -->
-  <Target Name="CleanupProvisionedGoogleServicesJson" AfterTargets="Publish;Pack">
-    <PropertyGroup>
-      <_ProvisionMarkerFile>$(IntermediateOutputPath)google_services_provisioned.txt</_ProvisionMarkerFile>
-      <_GoogleServicesDest>$(MSBuildProjectDirectory)\Resources\Raw\google-services.json</_GoogleServicesDest>
-    </PropertyGroup>
-    <ItemGroup>
-      <_ProvisionMarker Include="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" />
-    </ItemGroup>
-    <Message Text="Cleaning up provisioned google-services.json for $(TargetFramework) (if any)" Importance="Normal" Condition="Exists('$(_ProvisionMarkerFile)')" />
-    <Delete Files="$(_GoogleServicesDest)" Condition="Exists('$(_ProvisionMarkerFile)') and Exists('$(_GoogleServicesDest)')" ContinueOnError="true" />
-    <Delete Files="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" ContinueOnError="true" />
-  </Target>
 </Project>
