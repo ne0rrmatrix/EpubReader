@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A versatile and user-friendly EPUB reader/viewer for Windows, Android, iOS, and macOS**
+***A versatile and user-friendly EPUB reader/viewer for Windows, Android, iOS, and macOS***
 
 *Enjoy your favorite ebooks with extensive customization options and robust support for various EPUB formats*
 

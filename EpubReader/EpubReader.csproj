@@ -87,6 +87,12 @@
     <AndroidSecretsJson>$(LocalSecretsRoot)\google-services.json</AndroidSecretsJson>
   </PropertyGroup>
   
+  <!-- Local secrets file paths (can be overridden by Directory.Build.props or environment) -->
+  <PropertyGroup>
+    <LocalSecretsRoot>$(MSBuildProjectDirectory)\build-secrets</LocalSecretsRoot>
+    <AndroidSecretsJson>$(LocalSecretsRoot)\google-services.json</AndroidSecretsJson>
+  </PropertyGroup>
+  
   <ItemGroup>
     <PackageReference Include="AsyncAwaitBestPractices" Version="10.0.0" />
     <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
