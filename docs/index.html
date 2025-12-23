@@ -299,7 +299,7 @@ The scripts will sign artifacts when `ANDROID_KEYSTORE` points to a valid file.
   </script>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
-      const md = document.getElementById('md').value.replace(/\u001F/g,'');
+      const md = document.getElementById('md').value;
       const content = document.getElementById('content');
       try {
         content.innerHTML = marked.parse(md);
