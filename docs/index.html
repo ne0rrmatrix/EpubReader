@@ -4,11 +4,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>index.md — rendered</title>
+  <meta name="theme-color" content="#f8f9fb" id="theme-color-meta">
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: 2rem; background:#f8f9fb; color:#111; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 2rem; box-shadow: 0 6px 20px rgba(15,23,42,0.08); border-radius: 8px; }
-    pre { background:#0b1220; color:#d6deeb; padding:12px; overflow:auto; border-radius:6px }
+    :root{
+      --bg: #f8f9fb;
+      --card-bg: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --code-bg: #0b1220;
+      --code-color: #d6deeb;
+      --shadow: 0 6px 20px rgba(15,23,42,0.08);
+      --radius: 8px;
+      --padding: 2rem;
+      --max-width: 900px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root{
+        --bg: #071025;
+        --card-bg: #071124;
+        --text: #e6eef8;
+        --muted: #9aa6b2;
+        --code-bg: #021026;
+        --code-color: #cfe6ff;
+        --shadow: 0 6px 20px rgba(0,0,0,0.6);
+      }
+    }
+
+    html,body{height:100%;}
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: var(--padding); background: var(--bg); color: var(--text); }
+    .container { max-width: var(--max-width); margin: 0 auto; background: var(--card-bg); padding: var(--padding); box-shadow: var(--shadow); border-radius: var(--radius); }
+    pre { background: var(--code-bg); color: var(--code-color); padding:12px; overflow:auto; border-radius:6px }
     img { max-width:100%; height:auto }
+    a { color: inherit; }
   </style>
 </head>
 <body>
@@ -67,7 +95,7 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 - **🔁 Offline Queueing:** Progress updates queue locally and reconcile on reconnect
 - **🔒 Local-Only Mode:** Use the app without authentication for complete privacy
 
-- **🔐 Privacy:** An in-app privacy policy is available under Settings → Privacy Policy. Cloud sync is optional and must be enabled by the user.
+- **🔐 Privacy:** An in-app privacy policy is available under Settings → Privacy Policy or online: [Privacy Policy](https://ne0rrmatrix.github.io/EpubReader/privacy.html). Cloud sync is optional and must be enabled by the user.
 
 ### 🔗 Calibre Integration
 - **🔍 Discovery:** Connect to Calibre Server using **Bonjour** auto-discovery
@@ -163,11 +191,14 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 
 ### Download Now
 
-| Platform | Download Link |
-|----------|---------------|
-| **Android** | [<img src="assets/android.png" />](https://play.google.com/store/apps/details?id=com.companyname.epubreader) |
-| **Windows** | [<img src="assets/windows.png" />](https://apps.microsoft.com/detail/9n3t9qnkk7vx?hl=en-GB&gl=CA) |
-
+<div style="display:flex;gap:1rem;justify-content:center;align-items:center;margin:1rem 0;">
+  <a href="https://play.google.com/store/apps/details?id=com.companyname.epubreader" title="Android">
+    <img src="assets/android.png" alt="Android" width="160" />
+  </a>
+  <a href="https://apps.microsoft.com/detail/9n3t9qnkk7vx?hl=en-GB&gl=CA" title="Windows">
+    <img src="assets/windows.png" alt="Windows" width="160" />
+  </a>
+</div>
 
 </div>
 
@@ -175,10 +206,92 @@ Available on **Windows**, **Android**, **iOS**, and **macOS** with native perfor
 
 ## 🛠️ Building from Source
 
-... (content truncated for brevity in editor) ...
+### Prerequisites
+
+- Visual Studio 2022/2026 or later with .NET MAUI workload (or the .NET SDK + workloads via CLI)
+- .NET 10.0 SDK or later
+- Platform SDKs: Android SDK (API 34+), Windows App SDK, Xcode (macOS only) for iOS/macOS
+
+### Clone the repository
+
+```bash
+git clone https://github.com/ne0rrmatrix/EpubReader.git
+cd EpubReader
+```
+
+### Restore & build (CLI)
+
+Restore packages and build for a specific target framework (example: Android):
+
+```bash
+dotnet restore EpubReader/EpubReader.csproj
+dotnet build EpubReader/EpubReader.csproj -f net10.0-android -c Debug
+```
+
+For Windows debug build:
+
+```bash
+dotnet build EpubReader/EpubReader.csproj -f net10.0-windows10.0.19041.0 -c Debug
+```
+
+### PowerShell build scripts
+
+The repository includes helper PowerShell scripts to make builds and signing easier:
+
+- `build.ps1` — main build script that supports `-Android`, `-Windows`, `-DebugBuild`, `-ReleaseBuild` and accepts Firebase secrets via parameters, env vars, or `build-secrets` folder.
+- `build-from-env.ps1` — loads secrets from `.env`/.env.local and runs the build.
+- `gen-android-strings.ps1` — converts `google-services.json` to Android XML resource strings for signing and embedding.
+
+Example: build Android Debug using local json
+
+```powershell
+.\build.ps1 -Android -GoogleJsonPath "build-secrets/google-services.json" -DebugBuild
+```
+
+### Using .env files
+
+Create a `.env` or `.env.local` with your Firebase and signing values (gitignored) and run:
+
+```powershell
+.\.vscode\build-from-env.ps1
+```
+
+### Android signing (release)
+
+Set these environment variables (or add to `.env.local`):
+
+- `ANDROID_KEYSTORE` — path to keystore
+- `ANDROID_KEYSTORE_PASSWORD` — keystore password
+- `ANDROID_KEYSTORE_ALIAS` — alias
+- `ANDROID_KEY_PASSWORD` — key password
+
+The scripts will sign artifacts when `ANDROID_KEYSTORE` points to a valid file.
+
+### Troubleshooting
+
+- If `google-services.json` is not found, place it under `build-secrets/google-services.json` or pass `-GoogleJsonPath` to `build.ps1`.
+- For package name or SHA mismatches, verify `ApplicationId` in `EpubReader.csproj` and AndroidManifest package attribute match the Firebase app.
+- Use `dotnet workload install maui,android,ios,windows` to ensure required workloads are installed.
+
+---
 </textarea>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    (function(){
+      const meta = document.getElementById('theme-color-meta');
+      function updateThemeColor(){
+        const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if(meta) meta.setAttribute('content', dark ? '#071025' : '#f8f9fb');
+      }
+      updateThemeColor();
+      if(window.matchMedia){
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if(mq.addEventListener) mq.addEventListener('change', updateThemeColor);
+        else if(mq.addListener) mq.addListener(updateThemeColor);
+      }
+    })();
+  </script>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
       const md = document.getElementById('md').value.replace(/\u001F/g,'');
