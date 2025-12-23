@@ -189,5 +189,5 @@ jobs:
             dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
           }
 
-          dotnet build EpubReader.slnx -c:Debug
+          dotnet build EpubReader.slnx -c:Release
           & $scanner end /d:sonar.token="$env:SECRET"
