@@ -1,8 +1,6 @@
 ﻿using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
-using EpubReader.Models;
-using MetroLog;
 
 namespace EpubReader.ODPS;
 

@@ -5,14 +5,22 @@ using Android.OS;
 using Android.Views;
 using Android.Views.InputMethods;
 using Android.Widget;
-using EpubReader.Interfaces;
-using EpubReader.Service;
+using Plugin.Firebase.Auth.Google;
 
 namespace EpubReader;
 
-[Activity(Theme = "@style/Maui.SplashTheme", ResizeableActivity = true, MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density )]
+[Activity(Theme = "@style/Maui.SplashTheme", ResizeableActivity = true, MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
+[IntentFilter(
+	[Intent.ActionView],
+	Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+	DataScheme = "https",
+	DataHost = "epubreader-a03f6.firebaseapp.com",
+	DataPathPrefix = "/__/auth")]
+
 public class MainActivity : MauiAppCompatActivity
 {
+	public static event Action<int, Result, Intent?>? ActivityResult;
+
 	protected override void OnCreate(Bundle? savedInstanceState)
 	{
 		base.OnCreate(savedInstanceState);
@@ -25,6 +33,29 @@ public class MainActivity : MauiAppCompatActivity
 		var serviceProvider = IPlatformApplication.Current?.Services ?? throw new InvalidOperationException("Unable to retrieve service provider");
 		var folderPickerService = serviceProvider.GetService<IFolderPicker>() as FolderPicker;
 		folderPickerService?.OnActivityResult(requestCode, resultCode, data);
+
+		// Only forward to the Google plugin when the requestCode matches the Google Sign-In flow.
+		// Default Google Sign-In request code is typically 9001, but confirm in your sign-in starter.
+		const int GoogleSignInRequestCode = 9001;
+		if (requestCode == GoogleSignInRequestCode)
+		{
+			try
+			{
+				FirebaseAuthGoogleImplementation.HandleActivityResultAsync(requestCode, resultCode, data);
+			}
+			catch (Exception ex)
+			{
+				// Prevent plugin null-ref or config errors from crashing the app; log for diagnostics.
+				System.Diagnostics.Trace.TraceWarning($"Firebase Google HandleActivityResultAsync ignored: {ex.GetType().Name}: {ex.Message}");
+			}
+		}
+		else
+		{
+			// Optional: helpful telemetry during debugging
+			System.Diagnostics.Trace.TraceWarning($"OnActivityResult: Ignored by Google plugin. requestCode={requestCode}, resultCode={resultCode}");
+		}
+
+		ActivityResult?.Invoke(requestCode, resultCode, data);
 	}
 
 	public override bool DispatchTouchEvent(MotionEvent? e)
@@ -50,5 +81,14 @@ public class MainActivity : MauiAppCompatActivity
 			}
 		}
 		return base.DispatchTouchEvent(e);
+	}
+
+	public override void OnRequestPermissionsResult(
+	   int requestCode,
+	   string[] permissions,
+	   Permission[] grantResults)
+	{
+		Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+		base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
 	}
 }

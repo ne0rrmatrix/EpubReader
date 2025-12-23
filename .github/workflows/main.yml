@@ -8,22 +8,126 @@ on:
 jobs:
   build:
     name: Build and analyze
+    env:
+      SECRET: ${{ secrets.SONAR_TOKEN }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      NUGET_SECRET: ${{ secrets.NUGETS }}
     runs-on: windows-latest
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-dotnet@v5
         with:
-          java-version: 17
-          distribution: 'zulu' # Alternative distribution options are available.
-      - uses: actions/checkout@v4
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
+      - uses: actions/setup-java@v5
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install .NET MAUI Workload
+        run: |
+          dotnet workload install maui
+          dotnet workload update
+
+      - name: Expose Google JSON to environment (no file)
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) {
+            Write-Error 'Environment variable GOOGLE_SECRET_B64 is empty'
+            exit 1
+          }
+          try {
+            $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          } catch {
+            Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
+            exit 1
+          }
+
+          $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+          Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
+
+          try {
+            $json = $decoded | ConvertFrom-Json -ErrorAction Stop
+          } catch {
+            Write-Warning 'Decoded content is not valid JSON; skipping FIREBASE_* exports'
+            exit 0
+          }
+
+          $firebaseAppId = $null
+          $firebaseApiKey = $null
+          $firebaseDatabaseUrl = $null
+          $firebaseAuthDomain = $null
+          $firebaseWebClientId = $null
+
+          if ($json.client -and $json.client.Count -ge 1) {
+            $client0 = $json.client[0]
+            if ($client0.client_info -and $client0.client_info.mobilesdk_app_id) {
+              $firebaseAppId = $client0.client_info.mobilesdk_app_id
+            }
+            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and $client0.api_key[0].current_key) {
+              $firebaseApiKey = $client0.api_key[0].current_key
+            }
+            if ($client0.oauth_client) {
+              foreach ($oc in $client0.oauth_client) {
+                if (-not $firebaseWebClientId -and $oc.client_id) {
+                  $firebaseWebClientId = $oc.client_id
+                  break
+                }
+              }
+            }
+          }
+
+          if ($json.project_info) {
+            if ($json.project_info.firebase_url) {
+              $firebaseDatabaseUrl = $json.project_info.firebase_url
+            }
+            if ($json.project_info.project_id) {
+              $firebaseAuthDomain = "$($json.project_info.project_id).firebaseapp.com"
+            }
+          }
+
+          $envEntries = @()
+          if ($firebaseAppId)    { $envEntries += "FIREBASE_APP_ID=$firebaseAppId" }
+          if ($firebaseApiKey)   { $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" }
+          if ($firebaseDatabaseUrl) { $envEntries += "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" }
+          if ($firebaseAuthDomain)  { $envEntries += "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" }
+          if ($firebaseWebClientId) { $envEntries += "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" }
+
+          if ($envEntries.Count -gt 0) {
+            foreach ($e in $envEntries) {
+              Add-Content -Path $env:GITHUB_ENV -Value $e -Encoding utf8
+            }
+            Write-Host 'FIREBASE_* environment variables exported'
+          } else {
+            Write-Host 'No FIREBASE_* values were found in google-services.json'
+          }
+
+      - name: Write canonical google-services.json to workspace
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) { Write-Error 'GOOGLE_SECRET_B64 empty'; exit 1 }
+          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          $outDir = Join-Path $env:GITHUB_WORKSPACE 'build-secrets'
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $outPath = Join-Path $outDir 'google-services.json'
+          Set-Content -Path $outPath -Value $decoded -Encoding utf8 -Force
+          Write-Host "Wrote google-services.json to $outPath"
+
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v4
         with:
           path: ~\sonar\cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
+
       - name: Cache SonarQube Cloud scanner
         id: cache-sonar-scanner
         uses: actions/cache@v4
@@ -31,19 +135,59 @@ jobs:
           path: ${{ runner.temp }}\scanner
           key: ${{ runner.os }}-sonar-scanner
           restore-keys: ${{ runner.os }}-sonar-scanner
+
       - name: Install SonarQube Cloud scanner
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
         shell: powershell
         run: |
           New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
-      - name: Build and analyze
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Configure CommunityToolkit GitHub Packages source (NuGet)
         shell: powershell
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SONAR_TOKEN"
+          $sourceUrl = "https://nuget.pkg.github.com/CommunityToolkit/index.json"
+          Write-Host "Ensuring NuGet source 'CommunityToolkit' is not present in repo nuget.config"
+          try {
+            dotnet nuget remove source CommunityToolkit --configfile nuget.config | Out-Null
+          } catch {
+            Write-Host "Source 'CommunityToolkit' not present in repo nuget.config; continuing"
+          }
+
+          $tempConfig = "${{ runner.temp }}\nuget.temp.config"
+          if ("${{ env.NUGET_SECRET }}") {
+            Write-Host "Creating ephemeral NuGet config at $tempConfig and adding CommunityToolkit with credentials"
+            $dir = Split-Path $tempConfig
+            New-Item -Path $dir -ItemType Directory -Force | Out-Null
+
+            # create a minimal nuget.config file so dotnet nuget add source can operate reliably
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+
+            dotnet nuget add source $sourceUrl --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+            Write-Host "Ephemeral NuGet config created and exported via NUGET_CONFIG env var"
+          } else {
+            Write-Host "NUGET_SECRET not provided; will use NuGet.org only"
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Build and analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: powershell
+        run: |
+          $scanner = "${{ runner.temp }}\scanner\dotnet-sonarscanner"
+          & $scanner begin /k:"ne0rrmatrix_EpubReader" /o:"ne0rrmatrix" /d:sonar.token="$env:SECRET" /d:sonar.host.url="https://sonarcloud.io"
           dotnet workload install maui --source https://api.nuget.org/v3/index.json
-          dotnet restore EpubReader/EpubReader.csproj
-          dotnet build EpubReader/EpubReader.csproj -c:Debug
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            Write-Host "Using ephemeral NuGet config for restore: $env:NUGET_CONFIG"
+            dotnet restore EpubReader.slnx --no-cache --configfile $env:NUGET_CONFIG
+          } else {
+            Write-Host "Using repository nuget.config with explicit nuget.org source"
+            dotnet restore EpubReader.slnx --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json
+          }
+
+          dotnet build EpubReader.slnx -c:Debug
+          & $scanner end /d:sonar.token="$env:SECRET"

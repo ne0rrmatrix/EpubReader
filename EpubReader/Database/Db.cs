@@ -1,8 +1,4 @@
-﻿using System.Threading.Tasks;
-using EpubReader.Interfaces;
-using EpubReader.Models;
-using MetroLog;
-using SQLite;
+﻿using SQLite;
 
 namespace EpubReader.Database;
 
@@ -36,7 +32,7 @@ public partial class Db : IDb
 	/// connection. It creates the "Settings" and "Book" tables if they do not already exist.</remarks>
 	public Db()
 	{
-		if(!Directory.Exists(Util.FileService.SaveDirectory))
+		if (!Directory.Exists(Util.FileService.SaveDirectory))
 		{
 			Directory.CreateDirectory(Util.FileService.SaveDirectory);
 		}
@@ -54,8 +50,50 @@ public partial class Db : IDb
 		logger.Info("Settings Table created");
 		await conn.CreateTableAsync<Book>().WaitAsync(cancellationToken);
 		logger.Info("Book Table created");
+		await EnsureSyncIdColumnAsync(cancellationToken);
+		await BackfillBookSyncIdsAsync(cancellationToken);
+		await EnsureBookMediaOverlayColumnsAsync(conn, cancellationToken);
 		isInitialized = true;
 	}
+
+	static async Task EnsureBookMediaOverlayColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		// Keep schema in sync with Models/Book.cs optional MediaOverlay fields.
+		await EnsureColumnsAsync(
+			connection,
+			"Book",
+			[
+				("MediaOverlayEnabled", "INTEGER"),
+				("MediaOverlayChapter", "INTEGER"),
+				("MediaOverlaySegmentIndex", "INTEGER"),
+				("MediaOverlayPositionSeconds", "REAL"),
+				("MediaOverlayFragmentId", "TEXT")
+			],
+			cancellationToken);
+	}
+
+	static async Task EnsureColumnsAsync(
+		SQLiteAsyncConnection connection,
+		string tableName,
+		IReadOnlyList<(string ColumnName, string SqlType)> columns,
+		CancellationToken cancellationToken)
+	{
+		var tableInfo = await connection.GetTableInfoAsync(tableName).WaitAsync(cancellationToken);
+		var existing = tableInfo.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+		foreach (var (columnName, sqlType) in columns)
+		{
+			if (existing.Contains(columnName))
+			{
+				continue;
+			}
+
+			await connection
+				.ExecuteAsync($"ALTER TABLE {tableName} ADD COLUMN {columnName} {sqlType}")
+				.WaitAsync(cancellationToken);
+		}
+	}
+
 	/// <summary>
 	/// Retrieves the current application settings from the database.
 	/// </summary>
@@ -85,8 +123,12 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		var results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken);
-		return results ?? [];
+		var results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
+		foreach (var result in results)
+		{
+			await EnsureBookSyncIdAsync(result, cancellationToken);
+		}
+		return results;
 	}
 
 	/// <summary>
@@ -103,6 +145,10 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 		var result = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
+		if (result is not null)
+		{
+			await EnsureBookSyncIdAsync(result, cancellationToken);
+		}
 		return result;
 	}
 
@@ -115,12 +161,11 @@ public partial class Db : IDb
 	public async Task SaveSettings(Settings settings, CancellationToken cancellationToken = default)
 	{
 		await InitializeAsync(cancellationToken);
-		if (conn is null) 
+		if (conn is null)
 		{
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		
 		logger.Info("Inserting or updating settings");
 		await conn.InsertOrReplaceAsync(settings).WaitAsync(cancellationToken);
 	}
@@ -141,6 +186,8 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 
+		book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
+
 		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		if (item is null)
 		{
@@ -153,12 +200,9 @@ public partial class Db : IDb
 	}
 
 	/// <summary>
-	/// Updates the bookmark for a specified book in the database.
+	/// Updates only the CurrentChapter and CurrentPage columns for the specified book.
 	/// </summary>
-	/// <remarks>If the book does not exist in the database, it will be inserted as a new entry. Otherwise, the
-	/// existing book's bookmark will be updated.</remarks>
-	/// <param name="book">The book object containing the updated bookmark information. The book must have a valid <see cref="Book.Id"/>.</param>
-	public async Task UpdateBookMark(Book book, CancellationToken cancellationToken = default)
+	public async Task UpdateBookProgress(Guid bookId, int currentChapter, int currentPage, CancellationToken cancellationToken = default)
 	{
 		await InitializeAsync(cancellationToken);
 		if (conn is null)
@@ -167,17 +211,40 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 
-		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
-		if (item is null)
+		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
+		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
+		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
+	}
+
+	public async Task UpdateBookMediaOverlayProgress(
+		Guid bookId,
+		bool? enabled,
+		int? chapterIndex,
+		int? segmentIndex,
+		double? positionSeconds,
+		string? fragmentId,
+		CancellationToken cancellationToken = default)
+	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
 		{
-			await conn.InsertAsync(book).WaitAsync(cancellationToken);
-			logger.Info("Inserting book");
-			return;
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
 		}
-		item.CurrentChapter = book.CurrentChapter;
-		item.CurrentPage = book.CurrentPage;
-		await conn.UpdateAsync(item).WaitAsync(cancellationToken);
-		logger.Info($"Updating bookmark for book: {book.Title}, Chapter: {book.CurrentChapter}, Page: {book.CurrentPage}");
+
+		const string sql = @"
+			UPDATE Book
+			SET
+				MediaOverlayEnabled = ?,
+				MediaOverlayChapter = ?,
+				MediaOverlaySegmentIndex = ?,
+				MediaOverlayPositionSeconds = ?,
+				MediaOverlayFragmentId = ?
+			WHERE Id = ?";
+
+		await conn
+			.ExecuteAsync(sql, enabled, chapterIndex, segmentIndex, positionSeconds, fragmentId, bookId)
+			.WaitAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -230,5 +297,58 @@ public partial class Db : IDb
 		}
 		logger.Info("Removing all books");
 		await conn.DeleteAllAsync<Book>().WaitAsync(cancellationToken);
+	}
+
+	async Task EnsureSyncIdColumnAsync(CancellationToken cancellationToken)
+	{
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		var tableInfo = await conn.GetTableInfoAsync(nameof(Book)).WaitAsync(cancellationToken) ?? [];
+		var hasSyncId = tableInfo.Any(column => column.Name.Equals("SyncId", StringComparison.OrdinalIgnoreCase));
+		if (!hasSyncId)
+		{
+			await conn.ExecuteAsync("ALTER TABLE Book ADD COLUMN SyncId TEXT").WaitAsync(cancellationToken);
+			logger.Info("SyncId column added to Book table");
+		}
+	}
+
+	async Task BackfillBookSyncIdsAsync(CancellationToken cancellationToken)
+	{
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		var books = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
+		foreach (var book in books)
+		{
+			if (!string.IsNullOrWhiteSpace(book.SyncId))
+			{
+				continue;
+			}
+
+			book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
+			await conn.UpdateAsync(book).WaitAsync(cancellationToken);
+		}
+	}
+
+	async Task EnsureBookSyncIdAsync(Book book, CancellationToken cancellationToken)
+	{
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		if (string.IsNullOrWhiteSpace(book.SyncId))
+		{
+			book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
+			await conn.UpdateAsync(book).WaitAsync(cancellationToken);
+		}
 	}
 }

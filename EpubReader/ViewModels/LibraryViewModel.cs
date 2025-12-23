@@ -1,15 +1,6 @@
 using System.Collections.ObjectModel;
-using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
-using CommunityToolkit.Maui.Views;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.Service;
-using EpubReader.Util;
-using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
@@ -38,13 +29,14 @@ public partial class LibraryViewModel : BaseViewModel
 	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
 	/// thrown.</remarks>
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	
+	readonly ISyncService syncService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ISyncService>() ?? throw new InvalidOperationException();
+
 	/// <summary>
 	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
 	public partial ObservableCollection<Book> Books { get; set; }
-	
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
 	/// </summary>
@@ -90,40 +82,22 @@ public partial class LibraryViewModel : BaseViewModel
 	#region Commands
 
 	/// <summary>
-	/// Navigates to the book page asynchronously, opening the specified book and setting its current state.
+	/// Navigate to the book details page for the specified book.
 	/// </summary>
-	/// <param name="book">The book to open and navigate to. Must not be <see langword="null"/>.</param>
-	/// <returns>A task that represents the asynchronous operation.</returns>
-	/// <exception cref="InvalidOperationException">Thrown if there is an error opening the ebook.</exception>
 	[RelayCommand]
-	public async Task GotoBookPageAsync(Book book)
+	public async Task GotoBookDetailsAsync(Book book)
 	{
 		try
 		{
-			var existingBook = await db.GetBook(book);
-			ArgumentNullException.ThrowIfNull(existingBook);
-
-			Book = await EbookService.OpenEbookAsync(book.FilePath).ConfigureAwait(true)
-				?? throw new InvalidOperationException("Error opening ebook");
-
-			// Restore reading position
-			Book.CurrentChapter = existingBook.CurrentChapter;
-			Book.CurrentPage = existingBook.CurrentPage;
-			Book.Id = existingBook.Id;
-
-			StreamExtensions.Instance?.SetBook(Book);
-
 			var navigationParams = new Dictionary<string, object>
 			{
-				{ "Book", Book }
+				{ "Book", book }
 			};
-
-			await Shell.Current.GoToAsync("BookPage", navigationParams);
+			await Shell.Current.GoToAsync("BookDetailsPage", navigationParams);
 		}
 		catch (Exception ex)
 		{
-			Logger.Error($"Error navigating to book page: {ex.Message}");
-			await ShowErrorToastAsync("Error opening book. Please try again.");
+			Logger.Error($"Error navigating to book details: {ex.Message}");
 		}
 	}
 
@@ -132,7 +106,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	/// <param name="book">The book to be removed.</param>
 	[RelayCommand]
-	public void RemoveBook(Book book)
+	public async Task RemoveBook(Book book)
 	{
 		try
 		{
@@ -145,7 +119,7 @@ public partial class LibraryViewModel : BaseViewModel
 				Directory.Delete(directory, true);
 			}
 
-			db.RemoveBook(book);
+			await db.RemoveBook(book, CancellationTokenSource.Token);
 			Books.Remove(book);
 
 			Logger.Info("Book removed from library");
@@ -155,7 +129,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Error($"Error removing book: {ex.Message}");
 		}
 	}
-	
+
 	/// <summary>
 	/// Sorts the collection of books in alphabetical order by the first author's name.
 	/// </summary>
@@ -188,7 +162,7 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	async Task Calibre()
 	{
-		if(CancellationTokenSource.IsCancellationRequested)
+		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
 		}
@@ -225,8 +199,8 @@ public partial class LibraryViewModel : BaseViewModel
 		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
-		
-		if(CancellationTokenSource.Token.IsCancellationRequested)
+
+		if (CancellationTokenSource.Token.IsCancellationRequested)
 		{
 			Logger.Info("Operation cancelled by user.");
 			await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
@@ -303,6 +277,30 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 	}
 	#endregion
-	
-}
 
+	[RelayCommand]
+	async Task Settings(CancellationToken cancellation = default)
+	{
+		try
+		{
+			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
+			var authenticationService = services.GetRequiredService<AuthenticationService>();
+			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
+			var settingsOptions = new PopupOptions
+			{
+				CanBeDismissedByTappingOutsideOfPopup = true,
+			};
+
+			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+			if (result.WasDismissedByTappingOutsideOfPopup)
+			{
+				Logger.Info("Settings popup dismissed by tapping outside.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.Error($"Error showing settings popup: {ex.Message}");
+		}
+	}
+
+}

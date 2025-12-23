@@ -1,7 +1,5 @@
 using System.Text;
-using EpubReader.Models;
-using EpubReader.Util;
-using MetroLog;
+using EpubReader.Models.MediaOverlays;
 using Microsoft.Maui.Graphics.Skia;
 using SixLabors.ImageSharp;
 using VersOne.Epub;
@@ -38,6 +36,16 @@ public static partial class EbookService
 		"favicon.ico",
 		"EpubText.css",
 		"EpubText.js",
+		"OpenDyslexic3-Regular.ttf",
+		"arial.ttf",
+		"times.ttf",
+		"comic.ttf",
+		"georgia.ttf",
+		"cour.ttf",
+		"trebuc.ttf",
+		"Helvetica.ttf",
+		"verdana.ttf",
+		"tahoma.ttf"
 	];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
@@ -102,6 +110,7 @@ public static partial class EbookService
 			Author = Authors[0],
 			Title = book.Title,
 			FilePath = path,
+			Description = ProcessDescription(book.Description),
 			CoverImage = coverImage,
 		};
 	}
@@ -116,7 +125,18 @@ public static partial class EbookService
 		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
 		var images = await ExtractImages(book);
 		var authors = ExtractAuthors(book);
-		
+		var mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
+		var mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
+		var additionalFonts = sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
+														  f.FileName.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase) ?
+														  new[] { new EpubFonts
+														  {
+															  Content = f.Content ?? [],
+															  FileName = f.FileName,
+															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
+														  } } : []).ToList();
+		fonts.AddRange(additionalFonts);
+		fonts.ForEach(f => logger.Info($"Font extracted: {f.FontFamily} from {f.FileName} ({f.Content.Length} bytes)"));
 		return new Book
 		{
 			Title = book.Title.Trim(),
@@ -129,6 +149,12 @@ public static partial class EbookService
 			Chapters = chapters,
 			Images = images,
 			Css = cssFiles,
+			MediaOverlays = [.. mediaOverlayResult.Documents],
+			MediaOverlayAudio = mediaOverlayAudio,
+			MediaOverlayActiveClass = mediaOverlayResult.ActiveClass,
+			MediaOverlayPlaybackActiveClass = mediaOverlayResult.PlaybackActiveClass,
+			MediaOverlayNarrator = mediaOverlayResult.Narrator,
+			MediaOverlayDuration = mediaOverlayResult.Duration,
 		};
 	}
 
@@ -292,27 +318,153 @@ public static partial class EbookService
 	}
 
 	static async Task<List<Models.Image>> ExtractImages(EpubBookRef book)
-    {
-        var images = new List<Models.Image>();
+	{
+		var images = new List<Models.Image>();
 
-        foreach (var image in book.Content.Images.Local)
-        {
-            var img = new Models.Image
-            {
-                FileName = Path.GetFileName(image.FilePath),
-                Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
-            };
-            images.Add(img);
-        }
+		foreach (var image in book.Content.Images.Local)
+		{
+			var img = new Models.Image
+			{
+				FileName = Path.GetFileName(image.FilePath),
+				Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
+			};
+			images.Add(img);
+		}
 
-        return images;
-    }
+		return images;
+	}
+
+	static async Task<List<MediaOverlayAudioResource>> ExtractMediaOverlayAudioAsync(EpubBookRef book, IReadOnlyList<MediaOverlayDocument> documents)
+	{
+		var resources = new List<MediaOverlayAudioResource>();
+		if (documents.Count == 0)
+		{
+			return resources;
+		}
+
+		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+		foreach (var document in documents)
+		{
+			foreach (var source in document.FlattenedNodes
+												.Select(node => node.Audio?.Source)
+												.Where(src => !string.IsNullOrWhiteSpace(src)))
+			{
+				var normalized = NormalizeMediaOverlayAudioPath(document, source!);
+				if (string.IsNullOrEmpty(normalized) || !seen.Add(normalized))
+				{
+					continue;
+				}
+
+				var file = FindLocalContentFile(book, normalized);
+				if (file is null)
+				{
+					logger.Warn($"Missing media overlay audio resource: {source}");
+					continue;
+				}
+				try
+				{
+					var bytes = await file.ReadContentAsBytesAsync().ConfigureAwait(false);
+					resources.Add(new MediaOverlayAudioResource
+					{
+						RelativePath = source!,
+						NormalizedPath = normalized,
+						Content = bytes,
+						ContentType = StreamExtensions.GetMimeType(source!)
+					});
+				}
+				catch (Exception ex)
+				{
+					logger.Warn($"Failed reading media overlay audio '{source}': {ex.Message}");
+				}
+			}
+		}
+
+		return resources;
+	}
 
 	static List<string> ExtractAuthors(EpubBookRef book)
 	{
 		return [.. book.Schema.Package.Metadata.Creators
 			.Where(author => !string.IsNullOrEmpty(author.Creator))
 			.Select(author =>   author.Creator )];
+	}
+
+	static EpubLocalContentFileRef? FindLocalContentFile(EpubBookRef book, string normalizedPath)
+	{
+		return book.Content.AllFiles.Local
+			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedPath));
+	}
+
+	static string NormalizeMediaOverlayAudioPath(MediaOverlayDocument document, string source)
+	{
+		var normalizedSource = MediaOverlayPathHelper.Normalize(source);
+		if (string.IsNullOrEmpty(normalizedSource))
+		{
+			System.Diagnostics.Debug.WriteLine("NormalizeMediaOverlayAudioPath called with null or empty source.");
+			return string.Empty;
+		}
+
+		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
+		if (string.IsNullOrEmpty(normalizedDocumentHref))
+		{
+			System.Diagnostics.Debug.WriteLine("Document href is null or empty; returning normalized source as is.");
+			return normalizedSource;
+		}
+
+		var directory = ExtractDirectory(normalizedDocumentHref);
+		if (string.IsNullOrEmpty(directory))
+		{
+			System.Diagnostics.Debug.WriteLine("Document href has no directory; returning normalized source as is.");
+			return normalizedSource;
+		}
+
+		if (normalizedSource.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
+		{
+			System.Diagnostics.Debug.WriteLine("Source already contains document directory; returning normalized source as is.");
+			return CollapseRelativeSegments(normalizedSource);
+		}
+
+		var combined = $"{directory}{normalizedSource}";
+		return CollapseRelativeSegments(combined);
+	}
+
+	static string ExtractDirectory(string normalizedPath)
+	{
+		var lastSlash = normalizedPath.LastIndexOf('/') + 1;
+		return lastSlash <= 0 ? string.Empty : normalizedPath[..lastSlash];
+	}
+
+	static string CollapseRelativeSegments(string normalizedPath)
+	{
+		if (string.IsNullOrEmpty(normalizedPath))
+		{
+			return string.Empty;
+		}
+
+		var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		var stack = new Stack<string>();
+
+		foreach (var segment in segments)
+		{
+			if (segment == ".")
+			{
+				continue;
+			}
+
+			if (segment == "..")
+			{
+				if (stack.Count > 0)
+				{
+					stack.Pop();
+				}
+				continue;
+			}
+
+			stack.Push(segment);
+		}
+
+		return string.Join('/', stack.Reverse());
 	}
 
 	#endregion
@@ -323,11 +475,10 @@ public static partial class EbookService
 	{
 		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
 		var chaptersRef = readingOrder.ToList();
-
 		return await GetChapters(chaptersRef, book);
 	}
 
-	static async  Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
+	static async Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
 		var chapters = new List<Chapter>();
 
@@ -360,31 +511,31 @@ public static partial class EbookService
 		return chaptersRef.Count(item => !item.FilePath.Contains("_split_")) < 3;
 	}
 
-    static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
-    {
-        var split000Chapters = chaptersRef
-            .Where(x => x is not null && x.FilePath.Contains("_split_000"));
+	static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
+	{
+		var split000Chapters = chaptersRef
+			.Where(x => x is not null && x.FilePath.Contains("_split_000"));
 
-        foreach (var item in split000Chapters)
-        {
-            var replacementChapter = FindReplacementChapter(chaptersRef, item);
-            var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
+		foreach (var item in split000Chapters)
+		{
+			var replacementChapter = FindReplacementChapter(chaptersRef, item);
+			var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
 
-            if (string.IsNullOrEmpty(htmlContent))
-            {
-                continue;
-            }
+			if (string.IsNullOrEmpty(htmlContent))
+			{
+				continue;
+			}
 
-            var chapter = CreateChapter(book, htmlContent, item);
-            if (string.IsNullOrEmpty(chapter.Title))
-            {
-                chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
-            }
-            chapters.Add(chapter);
-        }
-    }
+			var chapter = CreateChapter(book, htmlContent, item);
+			if (string.IsNullOrEmpty(chapter.Title))
+			{
+				chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
+			}
+			chapters.Add(chapter);
+		}
+	}
 
- 
+
 	static async Task ProcessAllChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		foreach (var item in chaptersRef)
@@ -397,7 +548,11 @@ public static partial class EbookService
 	static async Task ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
-
+		if (nonSplitChapters.Count() != chaptersRef.Count)
+		{
+			System.Diagnostics.Debug.WriteLine("Warning: Chapter count mismatch after sorting.");
+			nonSplitChapters = chaptersRef;
+		}
 		foreach (var item in nonSplitChapters)
 		{
 			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
@@ -506,6 +661,7 @@ public static partial class EbookService
 	static string ProcessHtml(string htmlFile)
 	{
 		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
+
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
@@ -522,6 +678,7 @@ public static partial class EbookService
 		htmlFile = FilePathExtensions.UpdateSvgLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.EnsureXmlLang(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.EnsureXhtml1TransitionalDoctype(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.RemoveKoboScriptLinks(htmlFile);
 		return htmlFile;
 	}
 

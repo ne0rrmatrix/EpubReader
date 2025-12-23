@@ -1,7 +1,3 @@
-using EpubReader.Interfaces;
-using EpubReader.ViewModels;
-using MetroLog;
-
 namespace EpubReader.Views;
 
 /// <summary>
@@ -34,7 +30,7 @@ public partial class LibraryPage : ContentPage
 	{
 		base.OnNavigatedTo(args);
 		Shell.SetNavBarIsVisible(this, true);
-		
+
 		if (viewModel.Books is not null && viewModel.Books.Count > 0)
 		{
 			logger.Info("Books already loaded, skipping database fetch");
@@ -45,7 +41,7 @@ public partial class LibraryPage : ContentPage
 		viewModel.Books = [.. temp];
 		viewModel.AlphabeticalTitleSort();
 	}
-	
+
 	/// <summary>
 	/// Handles the text changed event for the search bar, updating the displayed list of books based on the search query.
 	/// </summary>
@@ -54,8 +50,13 @@ public partial class LibraryPage : ContentPage
 	/// results are logged for informational purposes.</remarks>
 	/// <param name="sender">The source of the event, typically the search bar control.</param>
 	/// <param name="e">The <see cref="TextChangedEventArgs"/> containing the event data, including the new text value.</param>
-	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs e)
+	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
+		if (e is null)
+		{
+			logger.Warn("TextChangedEventArgs is null, cannot process search.");
+			return;
+		}
 		var books = viewModel.Books;
 		var results = e.NewTextValue;
 		var allBooks = await db.GetAllBooks();
@@ -63,7 +64,7 @@ public partial class LibraryPage : ContentPage
 		if (string.IsNullOrWhiteSpace(results))
 		{
 			books.Clear();
-			if(allBooks.Count == books.Count)
+			if (allBooks.Count == books.Count)
 			{
 				logger.Info("Search text is empty, showing all books");
 				return; // No need to update if already showing all books

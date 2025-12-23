@@ -1,4 +1,4 @@
-﻿using EpubReader.Util;
+﻿using EpubReader.Converter;
 using Microsoft.Maui.Handlers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -13,7 +13,7 @@ namespace EpubReader.Controls;
 /// conjunction with the <see cref="IWebViewHandler"/> interface.</remarks>
 public static partial class WebViewExtensions
 {
-	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	static readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	static IWebViewHandler? webViewHandler;
 
 	/// <summary>
@@ -41,6 +41,19 @@ public static partial class WebViewExtensions
 		webViewHandler.PlatformView.CoreWebView2Initialized -= WebView2_CoreWebView2Initialized;
 		webViewHandler.PlatformView.CoreWebView2.WebResourceRequested -= CoreWebView2_WebResourceRequested;
 		webViewHandler.PlatformView.CoreWebView2.DownloadStarting -= CoreWebView2_DownloadStarting;
+		webViewHandler.PlatformView.CoreWebView2.WebMessageReceived -= MessageReceived;
+	}
+
+	static void MessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+	{
+		var rawString = args.TryGetWebMessageAsString();
+		var json = Base64Decoder.DecodeFromBase64(rawString);
+		if (json is null)
+		{
+			System.Diagnostics.Trace.TraceWarning("WebView2 MessageReceived failed to decode base64 message");
+			return;
+		}
+		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
 	}
 
 	/// <summary>
@@ -57,6 +70,7 @@ public static partial class WebViewExtensions
 		var coreWebView = webViewHandler.PlatformView.CoreWebView2;
 #if DEBUG
 		settings.AreDevToolsEnabled = true;
+		coreWebView.OpenDevToolsWindow();
 #endif
 #if RELEASE
 		settings.AreDevToolsEnabled = false;
@@ -67,6 +81,7 @@ public static partial class WebViewExtensions
 		settings.AreHostObjectsAllowed = true;
 		settings.IsWebMessageEnabled = true;
 		settings.IsScriptEnabled = true;
+		webViewHandler.PlatformView.CoreWebView2.WebMessageReceived += MessageReceived;
 		coreWebView.DownloadStarting += CoreWebView2_DownloadStarting;
 		coreWebView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
 		coreWebView.WebResourceRequested += CoreWebView2_WebResourceRequested;
@@ -99,6 +114,13 @@ public static partial class WebViewExtensions
 		var url = e.Request.Uri ?? string.Empty;
 		var filename = Path.GetFileName(url);
 
+		// Allow the GitHub Pages site to load normally without interception
+		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			// Do not set e.Response so the WebView will perform the default navigation
+			return;
+		}
+
 		if (url.Contains("https://runcsharp"))
 		{
 			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
@@ -113,7 +135,8 @@ public static partial class WebViewExtensions
 			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
 			return;
 		}
-        e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
+		// Include caching header to allow webview to reuse preloaded resources
+		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
 		cancellationTokenSource.Dispose();
 	}
 
@@ -126,7 +149,9 @@ public static partial class WebViewExtensions
 	{
 		const string baseHeaders = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization";
 		string contentTypeHeader = $"Content-Type: {contentType}";
-		string completeHeaders = $"{baseHeaders}\r\n{contentTypeHeader}";
+		// Allow caching so platform can reuse preloaded chapter resources
+		string cacheHeader = "Cache-Control: public, max-age=86400";
+		string completeHeaders = $"{baseHeaders}\r\n{cacheHeader}\r\n{contentTypeHeader}";
 		return completeHeaders;
 	}
 

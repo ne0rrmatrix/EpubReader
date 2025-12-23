@@ -1,7 +1,6 @@
 ﻿using Android.App;
 using Android.Content;
 using AndroidX.DocumentFile.Provider;
-using EpubReader.Interfaces;
 using ILogger = MetroLog.ILogger;
 using LoggerFactory = MetroLog.LoggerFactory;
 using Uri = Android.Net.Uri;
@@ -33,7 +32,7 @@ public partial class FolderPicker : IFolderPicker
 	public Task<List<string>> EnumerateEpubFilesInFolderAsync(string? folderUri, CancellationToken cancellationToken = default)
 	{
 		List<string> epubFiles = [];
-		
+
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			logger.Info("No folder URI provided.");
@@ -54,7 +53,7 @@ public partial class FolderPicker : IFolderPicker
 		{
 			logger.Info($"Error enumerating files: {ex.Message}");
 		}
-		
+
 		return Task.FromResult(epubFiles);
 	}
 
@@ -243,4 +242,3 @@ public partial class FolderPicker : IFolderPicker
 		}
 	}
 }
-

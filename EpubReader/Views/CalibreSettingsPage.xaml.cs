@@ -1,7 +1,3 @@
-using CommunityToolkit.Maui.Views;
-using EpubReader.Interfaces;
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 public partial class CalibreSettingsPage : Popup
@@ -15,7 +11,7 @@ public partial class CalibreSettingsPage : Popup
 		BindingContext = viewModel;
 	}
 
-	async void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		if (viewModel.db is null)
 		{
@@ -23,7 +19,7 @@ public partial class CalibreSettingsPage : Popup
 			return;
 		}
 		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
-		if(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+		if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
 		{
 			logger.Info("CalibreSettingsPage loaded on Windows or macOS, setting EntryText to visible.");
 			switchController.IsToggled = settings.CalibreAutoDiscovery;
@@ -33,12 +29,12 @@ public partial class CalibreSettingsPage : Popup
 			logger.Info("CalibreSettingsPage loaded on Android or iOS, setting EntryText to not visible.");
 			switchController.IsToggled = false;
 		}
-		
+
 		EntryText.Text = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
 		logger.Info("CalibreSettingsPage loaded.");
 	}
 
-	async void Switch_Toggled(object? sender, ToggledEventArgs e)
+	async void Switch_Toggled(object? sender, ToggledEventArgs? e)
 	{
 		if (sender is null)
 		{
@@ -58,7 +54,7 @@ public partial class CalibreSettingsPage : Popup
 		logger.Info("Settings saved successfully.");
 	}
 
-	void CurrentPage_Unloaded(object sender, EventArgs e)
+	void CurrentPage_Unloaded(object? sender, EventArgs? e)
 	{
 		horizontalStacklayout.Remove(switchController);
 		switchController.Toggled -= Switch_Toggled;
@@ -66,9 +62,9 @@ public partial class CalibreSettingsPage : Popup
 		EntryText.Completed -= Entry_Completed;
 	}
 
-	async void Entry_Completed(object? sender, EventArgs e)
+	async void Entry_Completed(object? sender, EventArgs? e)
 	{
-		if(sender is null)
+		if (sender is null)
 		{
 			logger.Warn("Sender is null, cannot process completed event.");
 			return;
@@ -80,7 +76,7 @@ public partial class CalibreSettingsPage : Popup
 		}
 		logger.Info("Entry completed event triggered.");
 		var text = entry.Text;
-		
+
 		if (string.IsNullOrWhiteSpace(text))
 		{
 			logger.Warn("URL is empty or whitespace. Please enter a valid URL.");

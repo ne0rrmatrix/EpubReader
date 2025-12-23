@@ -1,6 +1,4 @@
-﻿using EpubReader.Models;
-
-namespace EpubReader.Interfaces;
+﻿namespace EpubReader.Interfaces;
 
 /// <summary>
 /// Defines methods for managing books and settings in a database.
@@ -38,6 +36,26 @@ public interface IDb
 	Task SaveBookData(Book book, CancellationToken cancellationToken = default);
 
 	/// <summary>
+	/// Updates only the reading progress fields for a book in the database.
+	/// </summary>
+	/// <param name="bookId">The Id of the book to update.</param>
+	/// <param name="currentChapter">The current chapter index.</param>
+	/// <param name="currentPage">The current page index.</param>
+	Task UpdateBookProgress(Guid bookId, int currentChapter, int currentPage, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Updates only the media overlay playback progress fields for a book in the database.
+	/// </summary>
+	Task UpdateBookMediaOverlayProgress(
+		Guid bookId,
+		bool? enabled,
+		int? chapterIndex,
+		int? segmentIndex,
+		double? positionSeconds,
+		string? fragmentId,
+		CancellationToken cancellationToken = default);
+
+	/// <summary>
 	/// Saves the specified settings to the persistent storage.
 	/// </summary>
 	/// <param name="settings">The settings to be saved. Cannot be null.</param>
@@ -65,9 +83,4 @@ public interface IDb
 	/// <param name="book">The book to be removed. Cannot be null.</param>
 	Task RemoveBook(Book book, CancellationToken cancellationToken = default);
 
-	/// <summary>
-	/// Updates the bookmark for the specified book.
-	/// </summary>
-	/// <param name="book">The book for which the bookmark is to be updated. Cannot be null.</param>
-	Task UpdateBookMark(Book book, CancellationToken cancellationToken = default);
 }

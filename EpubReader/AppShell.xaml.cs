@@ -1,11 +1,9 @@
-﻿using EpubReader.Views;
-
-namespace EpubReader;
+﻿namespace EpubReader;
 
 public partial class AppShell : Shell
 {
-    public AppShell()
-    {
-        InitializeComponent();
-    }
+	public AppShell()
+	{
+		InitializeComponent();
+	}
 }

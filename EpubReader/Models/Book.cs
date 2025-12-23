@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using EpubReader.Models.MediaOverlays;
 using SQLite;
 
 namespace EpubReader.Models;
@@ -43,11 +43,33 @@ public partial class Book : ObservableObject
 	[Column("CurrentPage")]
 	public int CurrentPage { get; set; } = 0;
 
+	// --- Media Overlay playback (local persistence; optional) ---
+	[Column("MediaOverlayEnabled")]
+	public bool? MediaOverlayEnabled { get; set; }
+
+	[Column("MediaOverlayChapter")]
+	public int? MediaOverlayChapter { get; set; }
+
+	[Column("MediaOverlaySegmentIndex")]
+	public int? MediaOverlaySegmentIndex { get; set; }
+
+	[Column("MediaOverlayPositionSeconds")]
+	public double? MediaOverlayPositionSeconds { get; set; }
+
+	[Column("MediaOverlayFragmentId")]
+	public string? MediaOverlayFragmentId { get; set; }
+
 	/// <summary>
 	/// Gets or sets the file path to the cover image.
 	/// </summary>
 	[Column("CoverImagePath")]
 	public string CoverImagePath { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the deterministic identifier used for cross-device sync.
+	/// </summary>
+	[Column("SyncId")]
+	public string SyncId { get; set; } = string.Empty;
 
 	/// <summary>
 	/// Gets or sets the list of shared EPUB files.
@@ -93,6 +115,45 @@ public partial class Book : ObservableObject
 	/// </summary>
 	[Ignore]
 	public List<Image> Images { get; set; } = [];
+
+	[Ignore]
+	public List<MediaOverlayDocument> MediaOverlays { get; set; } = [];
+
+	[Ignore]
+	public List<MediaOverlayAudioResource> MediaOverlayAudio { get; set; } = [];
+
+	[Ignore]
+	public string? MediaOverlayActiveClass { get; set; }
+
+	[Ignore]
+	public string? MediaOverlayPlaybackActiveClass { get; set; }
+
+	[Ignore]
+	public string? MediaOverlayNarrator { get; set; }
+
+	[Ignore]
+	public TimeSpan? MediaOverlayDuration { get; set; }
+
+	[Ignore]
+	public bool HasMediaOverlays => MediaOverlays.Count > 0;
+
+	[Ignore]
+	public bool HasNarratedMedia => HasMediaOverlays && MediaOverlayAudio.Count > 0;
+
+	public MediaOverlayAudioResource? FindMediaOverlayAudio(string? path)
+	{
+		if (!HasNarratedMedia || string.IsNullOrWhiteSpace(path))
+		{
+			return null;
+		}
+
+		var normalized = MediaOverlayPathHelper.Normalize(path);
+		var fileName = MediaOverlayPathHelper.ExtractFileName(path);
+
+		return MediaOverlayAudio.FirstOrDefault(resource =>
+			string.Equals(resource.NormalizedPath, normalized, StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(MediaOverlayPathHelper.ExtractFileName(resource.NormalizedPath), fileName, StringComparison.OrdinalIgnoreCase));
+	}
 
 	/// <summary>
 	/// Gets or sets the description text.

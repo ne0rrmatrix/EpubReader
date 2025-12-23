@@ -1,5 +1,4 @@
 ﻿using CoreGraphics;
-using EpubReader.Util;
 using Foundation;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
@@ -34,6 +33,12 @@ public class CustomMauiWKWebView(CGRect frame, WebViewHandler handler, WKWebView
 	public override WKNavigation? LoadRequest(NSUrlRequest request)
 	{
 		var url = request.Url.AbsoluteString ?? throw new InvalidOperationException("url is null");
+
+		// Allow the GitHub Pages site to load normally without interception
+		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			return base.LoadRequest(request);
+		}
 		var baseUrl = NSUrl.FromString("app://demo/") ?? throw new InvalidOperationException("baseUrl is null");
 		var filename = Path.GetFileName(url) ?? throw new InvalidOperationException("fileName is null");
 		var mimeType = FileService.GetMimeType(filename);

@@ -1,10 +1,8 @@
-using CommunityToolkit.Maui.Views;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Interfaces;
-using EpubReader.Messages;
-using EpubReader.Models;
-using EpubReader.ViewModels;
-using MetroLog;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 
 namespace EpubReader.Views;
 
@@ -17,9 +15,13 @@ namespace EpubReader.Views;
 /// when settings are changed.</remarks>
 public partial class SettingsPage : Popup<bool>
 {
+	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
+	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	Settings? settings;
+	const string deleteLocalDataTitle = "Delete Local Data";
+	const string exportDataTitle = "Export Data";
 
 
 	/// <summary>
@@ -41,9 +43,14 @@ public partial class SettingsPage : Popup<bool>
 	/// of the update.</remarks>
 	/// <param name="sender">The source of the event, typically the slider control.</param>
 	/// <param name="e">The <see cref="ValueChangedEventArgs"/> containing the old and new values of the slider.</param>
-	async void OnFontSizeSliderChanged(object sender, ValueChangedEventArgs e)
+	async void OnFontSizeSliderChanged(object? sender, ValueChangedEventArgs? e)
 	{
-		if((int)e.NewValue == 0 || settings is null)
+		if (e is null)
+		{
+			logger.Warn("ValueChangedEventArgs is null, cannot change font size.");
+			return;
+		}
+		if ((int)e.NewValue == 0 || settings is null)
 		{
 			return;
 		}
@@ -60,7 +67,7 @@ public partial class SettingsPage : Popup<bool>
 	/// have been reset.</remarks>
 	/// <param name="sender">The source of the event that triggered the method.</param>
 	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
-	async void RemoveAllSettings(object sender, EventArgs e)
+	async void RemoveAllSettings(object? sender, EventArgs? e)
 	{
 		await db.RemoveAllSettings();
 		settings = new Settings();
@@ -81,9 +88,9 @@ public partial class SettingsPage : Popup<bool>
 	/// to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">The event data.</param>
-	async void ThemePicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void ThemePicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
-		if(settings is null)
+		if (settings is null)
 		{
 			logger.Warn("Settings are null, cannot change theme.");
 			return;
@@ -93,13 +100,35 @@ public partial class SettingsPage : Popup<bool>
 		{
 			return;
 		}
-		
+
 		settings.BackgroundColor = scheme.BackgroundColor;
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
 		logger.Info($"Changing color scheme to: {scheme.Name}");
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+	}
+
+	async void ThemePreview_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change theme from preview.");
+			return;
+		}
+
+		if (e?.CurrentSelection is null || e.CurrentSelection.Count == 0)
+		{
+			return;
+		}
+		if (e.CurrentSelection[0] is not ColorScheme selected || settings.ColorScheme == selected.Name)
+		{
+			return;
+		}
+
+		// Mirror selection to the picker and reuse existing handler
+		ThemePicker.SelectedItem = selected;
+		ThemePicker_SelectedIndexChanged(ThemePicker, EventArgs.Empty);
 	}
 
 	/// <summary>
@@ -109,9 +138,9 @@ public partial class SettingsPage : Popup<bool>
 	/// updated settings to the database, and notifies other components of the change.</remarks>
 	/// <param name="sender">The source of the event, typically the font picker control.</param>
 	/// <param name="e">The event data associated with the selection change.</param>
-	async void FontPicker_SelectedIndexChanged(object sender, EventArgs e)
+	async void FontPicker_SelectedIndexChanged(object? sender, EventArgs? e)
 	{
-		if(settings is null)
+		if (settings is null)
 		{
 			logger.Warn("Settings are null, cannot change font.");
 			return;
@@ -122,17 +151,28 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		settings.FontFamily = font.FontFamily;
-		logger.Info($"Chaging Font to: {font.FontFamily}");
+		var family = SanitizeFontFamily(font.FontFamily);
+		settings.FontFamily = family;
+		logger.Info($"Chaging Font to: {family}");
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+
+		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
+		{
+			FontPreview.FontFamily = family;
+		}
+		else
+		{
+			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
+		}
 	}
 
-	void CurrentPage_Unloaded(object sender, EventArgs e)
+#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
+	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
-		System.Diagnostics.Debug.WriteLine("Unloaded event fired");
 		stackLayout.Remove(switchControl);
 	}
+#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
 
 	/// <summary>
 	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
@@ -142,9 +182,9 @@ public partial class SettingsPage : Popup<bool>
 	/// updating the settings, it saves the changes to the database and sends a message indicating the update.</remarks>
 	/// <param name="sender">The source of the event, typically the switch control.</param>
 	/// <param name="e">The event data containing the toggle state.</param>
-	async void switchControl_Toggled(object? sender, ToggledEventArgs e)
+	async void switchControl_Toggled(object? sender, ToggledEventArgs? e)
 	{
-		if(sender is null)
+		if (sender is null)
 		{
 			logger.Warn("Sender is null, cannot toggle multiple columns.");
 			return;
@@ -164,12 +204,134 @@ public partial class SettingsPage : Popup<bool>
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
 	}
 
-	async void CurrentPage_Loaded(object sender, EventArgs e)
+	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		settings = await db.GetSettings() ?? new();
 		FontSizeSlider.Value = settings.FontSize;
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
-		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		ThemePicker.SelectedItem = scheme;
+		if (ThemePreview is not null && scheme is not null)
+		{
+			ThemePreview.SelectedItem = scheme;
+		}
+
+		if (FontPreview is not null && FontPicker.SelectedItem is EpubFonts selectedFont)
+		{
+			FontPreview.FontFamily = SanitizeFontFamily(selectedFont.FontFamily);
+		}
+
+		if (BindingContext is SettingsPageViewModel viewModel)
+		{
+			await viewModel.LoadAuthStatusAsync();
+		}
+	}
+
+	static string SanitizeFontFamily(string? family)
+	{
+		if (string.IsNullOrEmpty(family))
+		{
+			return string.Empty;
+		}
+
+		var name = family;
+		if (name.Contains('/') || name.Contains('\\'))
+		{
+			name = Path.GetFileName(name);
+		}
+		if (name.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) || name.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase))
+		{
+			name = Path.GetFileNameWithoutExtension(name);
+		}
+		return name;
+	}
+
+	async void OnCloseClicked(object? sender, EventArgs? e)
+	{
+		Trace.TraceInformation("SettingsPage.OnCloseClicked: Close button pressed");
+		await this.CloseAsync();
+	}
+
+	async void OnPrivacyClicked(object? sender, EventArgs? e)
+	{
+		// Close settings popup then navigate to the in-app privacy page
+		try
+		{
+			await this.CloseAsync();
+			await Shell.Current.GoToAsync("privacy");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"SettingsPage.OnPrivacyClicked: navigation failed: {ex}");
+		}
+	}
+
+	async void OnExportDataClicked(object? sender, EventArgs? e)
+	{
+		try
+		{
+			await this.CloseAsync();
+			if (db is null)
+			{
+				await Shell.Current.DisplayAlertAsync(exportDataTitle, "Database not available.", "OK");
+				return;
+			}
+			var export = new
+			{
+				Settings = await db.GetSettings(),
+				Books = await db.GetAllBooks()
+			};
+			var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
+
+			// Prompt user to choose a folder to save the export
+
+			string path;
+			if (folderPicker is null)
+			{
+				await Shell.Current.DisplayAlertAsync(exportDataTitle, "Export Failed.", "OK");
+				return;
+			}
+
+			var folder = await folderPicker.PickFolderAsync();
+			if (string.IsNullOrEmpty(folder))
+			{
+				// User cancelled folder selection
+				return;
+			}
+			path = Path.Combine(folder, "epubreader_export.json");
+			await File.WriteAllTextAsync(path, json);
+			await Shell.Current.DisplayAlertAsync(exportDataTitle, $"Export saved to {path}", "OK");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Export failed: {ex}");
+			await Shell.Current.DisplayAlertAsync(exportDataTitle, "Export failed", "OK");
+		}
+	}
+
+	async void OnDeleteLocalDataClicked(object? sender, EventArgs? e)
+	{
+		var ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
+		if (!ok)
+		{
+			return;
+		}
+		try
+		{
+			if (db is null)
+			{
+				await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Database not available.", "OK");
+				return;
+			}
+			await db.RemoveAllBooks();
+			await db.RemoveAllSettings();
+			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Local data deleted.", "OK");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceError($"Delete local data failed: {ex}");
+			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Delete failed", "OK");
+		}
 	}
 }

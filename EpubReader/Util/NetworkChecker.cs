@@ -2,7 +2,6 @@
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
-using MetroLog;
 
 namespace EpubReader.Util;
 
@@ -242,7 +241,7 @@ public class NetworkChecker
 		{
 			return true;
 		}
-		if(localIpRanges.Any(rangeCidr => CheckIPBytes(ipBytes, rangeCidr)))
+		if (localIpRanges.Any(rangeCidr => CheckIPBytes(ipBytes, rangeCidr)))
 		{
 			return true; // If it matches any private range, return true.
 		}
