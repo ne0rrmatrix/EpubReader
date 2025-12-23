@@ -101,9 +101,9 @@ document.addEventListener('touchend', function (event) {
 });
 
 // Click event handler for non-touch devices
-window.addEventListener('click', function (event) {
+globalThis.addEventListener('click', function (event) {
     // Skip if this is a touch device to avoid double events
-    if ('ontouchstart' in window) {
+    if ('ontouchstart' in globalThis) {
         console.log('iframe window event listener clicked');
         return;
     }
@@ -129,7 +129,7 @@ window.addEventListener('click', function (event) {
 });
 
 // Keyboard navigation handler
-window.addEventListener("keydown", function (event) {
+globalThis.addEventListener("keydown", function (event) {
     if (event.key === "ArrowRight") {
         sendMessageToParent("next");
     } else if (event.key === "ArrowLeft") {

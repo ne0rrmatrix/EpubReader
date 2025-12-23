@@ -43,4 +43,13 @@
     <Compile Remove="**\net\**\*.cs" />
     <None Include="**\net\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
   </ItemGroup>
+  <!-- Project requires a single canonical build-secrets/google-services.json; fail early if required values are not provided by the build script. -->
+ <!-- Only enforce presence of Firebase secrets at publish time. Running/debugging locally
+   should not require secrets; the repository build script (`build.ps1`) will set the
+   properties before publishing. -->
+ <Target Name="GenerateFirebaseSecrets" BeforeTargets="Publish">
+  <Error Condition="'$(FirebaseApiKey)' == ''" Text="FirebaseApiKey is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
+  <Error Condition="'$(FirebaseAuthDomain)' == ''" Text="FirebaseAuthDomain is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
+  <Error Condition="'$(FirebaseDatabaseUrl)' == ''" Text="FirebaseDatabaseUrl is not set. Ensure build-secrets\google-services.json is present and contains the required values; use the repository build script to provide it." />
+ </Target>
 </Project>

@@ -1,11 +1,5 @@
-﻿using CommunityToolkit.Maui;
-using CommunityToolkit.Maui.Core;
+﻿using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using EpubReader.Models;
-using EpubReader.Util;
-using EpubReader.Views;
 
 namespace EpubReader.ViewModels;
 
@@ -24,8 +18,14 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	const string url = "app://demo/index.html";
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
-
+	readonly AuthenticationService authenticationService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+
+	/// <summary>
+	/// Gets or sets the title of the book.
+	/// </summary>
+	[ObservableProperty]
+	public partial string BookTitle { get; set; } = string.Empty;
 
 	/// <summary>
 	/// Gets or sets the source of the web view content.
@@ -61,11 +61,24 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	public partial bool IsNavMenuVisible { get; set; } = true;
 
 	/// <summary>
+	/// Gets or sets a value indicating whether reader mode is enabled (UI hidden).
+	/// </summary>
+	[ObservableProperty]
+	public partial bool IsReaderModeEnabled { get; set; } = false;
+
+	/// <summary>
+	/// Gets or sets the toolbar text for the reader mode toggle.
+	/// </summary>
+	[ObservableProperty]
+	public partial string ReaderModeToolbarText { get; set; } = "Hide Interface";
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel()
+	public BookViewModel(AuthenticationService authenticationService)
 	{
+		this.authenticationService = authenticationService;
 		Press();
 	}
 
@@ -84,6 +97,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
+			BookTitle = book.Title;
 			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
 		}
@@ -99,12 +113,14 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var popup = new SettingsPage(new SettingsPageViewModel());
+		var services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
+		var syncService = services.GetRequiredService<ISyncService>();
+		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = true,
 		};
-		
+
 		IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(popup, options, cancellation);
 		if (result.WasDismissedByTappingOutsideOfPopup)
 		{
@@ -130,6 +146,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
 		IsNavMenuVisible = !IsNavMenuVisible;
-		Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		Dispatcher.Dispatch(() => Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible));
 	}
 }

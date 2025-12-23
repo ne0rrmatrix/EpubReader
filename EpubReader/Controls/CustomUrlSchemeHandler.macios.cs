@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using System.Runtime.Versioning;
-using EpubReader.Util;
 using Foundation;
 using WebKit;
 
@@ -15,7 +14,7 @@ namespace EpubReader.Controls;
 class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	
+
 	/// <summary>
 	/// Handles the start of a custom URL scheme task in a <see cref="WKWebView"/>.
 	/// </summary>
@@ -30,7 +29,7 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 	public async void StartUrlSchemeTask(WKWebView webView, IWKUrlSchemeTask urlSchemeTask)
 	{
 		var url = urlSchemeTask.Request.Url.AbsoluteString ?? "";
-		if(!url.StartsWith("app://demo/"))
+		if (!url.StartsWith("app://demo/"))
 		{
 			urlSchemeTask.DidFailWithError(new NSError(new NSString("com.apple.webkit.error"), 0, new NSDictionary<NSString, NSString>()));
 			return;
@@ -43,8 +42,8 @@ class CustomUrlSchemeHandler : NSObject, IWKUrlSchemeHandler
 		using var dic = new NSMutableDictionary<NSString, NSString>
 		{
 			[(NSString)"Content-Type"] = (NSString)mimeType,
-			// Disable local caching which would otherwise prevent user scripts from executing correctly.
-			[(NSString)"Cache-Control"] = (NSString)"no-cache, max-age=0, must-revalidate, no-store",
+			// Allow caching so the WebView can reuse chapter resources when preloading/seek occurs.
+			[(NSString)"Cache-Control"] = (NSString)"public, max-age=86400",
 			[(NSString)"Content-Length"] = (NSString)data.Length.ToString(CultureInfo.InvariantCulture)
 		};
 

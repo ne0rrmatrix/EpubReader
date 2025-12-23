@@ -1,0 +1,16 @@
+global using CommunityToolkit.Maui;
+global using CommunityToolkit.Maui.Views;
+global using CommunityToolkit.Mvvm.ComponentModel;
+global using CommunityToolkit.Mvvm.Input;
+global using CommunityToolkit.Mvvm.Messaging;
+global using EpubReader.Controls;
+global using EpubReader.Database;
+global using EpubReader.Interfaces;
+global using EpubReader.Messages;
+global using EpubReader.Models;
+global using EpubReader.Service;
+global using EpubReader.Util;
+global using EpubReader.ViewModels;
+global using EpubReader.Views;
+global using MetroLog;
+global using Microsoft.Maui;

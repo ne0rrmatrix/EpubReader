@@ -9,15 +9,79 @@ let currentPage = 0;
 let frame = null;
 let colCount = 1;
 
+const mediaOverlayUi = {
+    root: null,
+    container: null,
+    eyebrow: null,
+    title: null,
+    narrator: null,
+    duration: null,
+    status: null,
+    toggleButton: null,
+    minimizeButton: null,
+    playButton: null,
+    prevButton: null,
+    nextButton: null,
+    minimized: false,
+    state: {
+        supported: false,
+        enabled: false,
+        playing: false,
+        narrator: '',
+        durationSeconds: null,
+        chapterTitle: '',
+        segmentIndex: 0,
+        segmentCount: 0,
+        positionSeconds: null,
+        seeking: false
+    }
+};
+
+const mediaOverlayHighlight = {
+    activeClass: null,
+    playbackClass: null,
+    elements: []
+};
+
+const mediaOverlayThemeDefaults = {
+    highlightBackground: 'rgba(79, 224, 181, 0.28)',
+    highlightText: '#041b15',
+    highlightOutline: 'rgba(79, 224, 181, 0.65)'
+};
+
+const mediaOverlayThemeState = { ...mediaOverlayThemeDefaults };
+let highlightThemeDirty = true;
+
+function logMediaOverlay(eventName, details) {
+    const entry = {
+        event: eventName || 'unknown',
+        details: details ?? null,
+        timestamp: new Date().toISOString()
+    };
+    console.log('[MediaOverlay]', entry);
+    try {
+        sendToNativeMessage({ action: 'mediaoverlaylog', message: JSON.stringify(entry) });
+    } catch (error) {
+        console.warn('Failed to forward media overlay log to native layer', error);
+    }
+}
+
 // New: navigation state to prevent interrupted smooth scrolling
 const navigationState = {
     isAnimating: false,
     pending: null // 'next' | 'prev' | null
 };
 
-document.addEventListener('selectstart', function (e) {
-    e.preventDefault();
-});
+// Rate limit media-overlay navigation to avoid thrashing during smooth scrolls
+const mediaOverlayNavigationDebounceMs = 600;
+let mediaOverlayNavigationCooldownUntil = 0;
+const mediaOverlayAutoAdvanceCooldownMs = 1500;
+let mediaOverlayAutoAdvanceCooldownUntil = 0;
+
+function isUserNavigationLocked() {
+    return mediaOverlayUi.state.enabled && mediaOverlayUi.state.playing;
+}
+
 
 /**
  * DOM and Platform Utilities
@@ -74,6 +138,57 @@ const domUtils = {
     },
 };
 
+function requestMediaOverlayHighlightThemeRefresh() {
+    highlightThemeDirty = true;
+    applyMediaOverlayHighlightTheme();
+}
+
+function applyMediaOverlayHighlightTheme() {
+    if (!highlightThemeDirty) {
+        return;
+    }
+
+    const doc = domUtils.getIframeDocument();
+    if (!doc?.head) {
+        return;
+    }
+
+    highlightThemeDirty = false;
+
+    const styleId = 'mediaOverlayHighlightTheme';
+    let styleNode = doc.getElementById(styleId);
+    if (!styleNode) {
+        styleNode = doc.createElement('style');
+        styleNode.id = styleId;
+        styleNode.dataset.generatedBy = 'media-overlay';
+        doc.head.appendChild(styleNode);
+    }
+
+    const activeSelector = buildClassSelector(mediaOverlayHighlight.activeClass || '-epub-media-overlay-active');
+    const playbackSelector = buildClassSelector(mediaOverlayHighlight.playbackClass || '-epub-media-overlay-playing');
+
+    const highlightBackground = mediaOverlayThemeState.highlightBackground || mediaOverlayThemeDefaults.highlightBackground;
+    const highlightText = mediaOverlayThemeState.highlightText || mediaOverlayThemeDefaults.highlightText;
+    const highlightOutline = mediaOverlayThemeState.highlightOutline || mediaOverlayThemeDefaults.highlightOutline;
+
+    const rules = [];
+    if (activeSelector) {
+        rules.push(`${activeSelector} {
+    background-color: ${highlightBackground};
+    color: ${highlightText};
+    transition: background-color 0.18s ease, color 0.18s ease;
+}`);
+    }
+
+    if (playbackSelector) {
+        rules.push(`${playbackSelector} {
+    box-shadow: 0 0 0 2px ${highlightOutline};
+}`);
+    }
+
+    styleNode.textContent = rules.join('\n');
+}
+
 /**
  * Sets whether user interaction (scrolling, clicking) is enabled on the iframe
  * @param {any} enabled
@@ -125,7 +240,7 @@ const navigationUtils = {
      */
     animateTo(contentWindow, targetLeft, platform) {
         const target = Math.round(targetLeft);
-     
+
         return new Promise((resolve) => {
             let done = false;
             const epsilon = 2; // px tolerance
@@ -155,12 +270,19 @@ const navigationUtils = {
                 contentWindow.scrollTo(target, 0);
                 cleanup();
             }, 800);
-
-            contentWindow.scrollTo({
-                left: target,
-                top: 0,
-                behavior: 'smooth'
-            });
+            if (platform.isWindows) {
+                // Windows Edge has issues with smooth scrolling; use instant
+                contentWindow.scrollTo(target, 0);
+            } else if (mediaOverlayUi.state?.enabled) {
+                // During media overlay playback, use instant scrolling to avoid disrupting narration timing
+                contentWindow.scrollTo(target, 0);
+            } else {
+                contentWindow.scrollTo({
+                    left: target,
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
         });
     },
 
@@ -255,15 +377,17 @@ const navigationUtils = {
      */
     scrollToPage(page) {
         const contentWindow = domUtils.getContentWindow();
-        if (!contentWindow) return;
-        for (let i = 0; i < page; i++) {
-            if (this.isHorizontallyScrolledToEnd()) {
-                console.warn("Already at the last page, cannot scroll further.");
-                return;
-            }
-            const scrollAmount = this.calculateScrollAmount(contentWindow);
-            contentWindow.scrollTo(contentWindow.scrollX + scrollAmount, 0);
+        const contentDoc = domUtils.getIframeDocument();
+        if (!contentWindow || !contentDoc) {
+            console.warn("Cannot scroll to page - iframe not ready.");
+            return;
         }
+
+        const scrollAmount = this.calculateScrollAmount(contentWindow);
+        const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
+        const target = Math.min(maxScrollLeft, Math.max(0, Math.round(page * scrollAmount)));
+
+        contentWindow.scrollTo(target, 0);
     },
 
     /**
@@ -272,8 +396,8 @@ const navigationUtils = {
      * @returns {number} The scroll amount in pixels
      */
     calculateScrollAmount(contentWindow) {
-        const gap = parseInt(
-            window.getComputedStyle(contentWindow.document.documentElement)
+        const gap = Number.parseInt(
+            globalThis.getComputedStyle(contentWindow.document.documentElement)
                 .getPropertyValue("column-gap")
         ) || 0;
 
@@ -290,7 +414,7 @@ const navigationUtils = {
         }
 
         // Check if contentWindow and document are ready
-        if (frame.contentWindow && frame.contentWindow.document.readyState === 'complete') {
+        if (frame.contentWindow?.document.readyState === 'complete') {
             const contentDoc = frame.contentDocument || frame.contentWindow.document;
             const maxScrollLeft = contentDoc.documentElement.scrollWidth - contentDoc.documentElement.clientWidth;
             console.log("Scrolling to end of container.");
@@ -380,13 +504,13 @@ const columnUtils = {
         const columnWidth = computedStyle.getPropertyValue('column-width');
 
         if (columnCount && columnCount !== 'auto') {
-            return parseInt(columnCount, 10);
+            return Number.parseInt(columnCount, 10);
         }
 
         if (columnWidth && columnWidth !== 'auto') {
-            const width = parseFloat(columnWidth);
+            const width = Number.parseFloat(columnWidth);
             const containerWidth = contentWindow.innerWidth;
-            const gap = parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
+            const gap = Number.parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
             return Math.floor((containerWidth + gap) / (width + gap));
         }
 
@@ -406,10 +530,10 @@ const columnUtils = {
         }
 
         // Get the computed style height or use scrollHeight as fallback
-        const computedStyle = window.getComputedStyle(documentElement);
-        const height = parseFloat(computedStyle.height);
+        const computedStyle = globalThis.getComputedStyle(documentElement);
+        const height = Number.parseFloat(computedStyle.height);
 
-        return isNaN(height) ? documentElement.scrollHeight : height;
+        return Number.isNaN(height) ? documentElement.scrollHeight : height;
     },
 
     /**
@@ -601,22 +725,966 @@ function handleMessage(event, platform) {
     if (data.startsWith("jump.")) {
         const href = data.substring(5);
         console.log("Jumping to:", href);
-        window.location.href = `https://runcsharp.jump?${href}`;
+        sendToNativeMessage({ action: 'jump', href: href });
     } else if (data === "next") {
+        if (mediaOverlayUi.state.seeking) {
+            logMediaOverlay('Ignoring next command while user is seeking');
+            return;
+        }
+        if (isUserNavigationLocked()) {
+            logMediaOverlay('User navigation blocked during playback', { action: 'next' });
+            return;
+        }
         handleNextCommand();
     } else if (data === "prev") {
+        if (mediaOverlayUi.state.seeking) {
+            logMediaOverlay('Ignoring prev command while user is seeking');
+            return;
+        }
+        if (isUserNavigationLocked()) {
+            logMediaOverlay('User navigation blocked during playback', { action: 'prev' });
+            return;
+        }
         handlePrevCommand();
     } else if (data === "menu") {
         console.log("Received menu command.");
-        window.location.href = 'https://runcsharp.menu?true';
+        sendToNativeMessage({ action: 'menu' });
     }
+}
+
+function encodeForCSharp(str) {
+    // Convert to UTF-8 bytes, then to base64
+    const utf8Bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (const byte of utf8Bytes) {
+        binary += String.fromCodePoint(byte);
+    }
+    return btoa(binary);
+}
+
+// Helper: send to native bridge on Android using base64-encoded JSON, fallback to location.href scheme
+function sendToNativeMessage(obj) {
+    try {
+        const payload = (typeof obj === 'string') ? { action: obj } : obj;
+        const json = JSON.stringify(payload);
+        const platform = domUtils.detectPlatform();
+        const base64Json = encodeForCSharp(json);
+        console.log('Prepared native message payload:', base64Json);
+        
+        if (globalThis.jsBridge && platform.isAndroid) {
+            console.info('Sending message to native bridge via window.NativeBridge.InvokeAction:', json);
+            globalThis.jsBridge.sendMessageToCSharp(base64Json);
+            return;
+        }
+        if(platform.isWindows){
+            console.info('Sending message to native bridge via chrome.webview.postMessage:', json);
+            globalThis.chrome.webview.postMessage(base64Json);
+            return;
+        }
+        if(platform.isIOS || platform.isMac){
+            console.info('Sending message to native bridge via window.webkit.messageHandlers.webwindowinterop.postMessage:', json);
+            globalThis.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
+            return;
+        }
+        // If we reach here, bridge not found or calls failed. Use fallback URL scheme for compatibility.
+        console.info('Using fallback URL scheme for native message:', json);
+    } catch (ex) {
+        console.error('sendToNativeMessage failed', ex);
+    }
+}
+
+function ensureMediaOverlayRoot() {
+    if (!mediaOverlayUi.root) {
+        mediaOverlayUi.root = document.getElementById('mediaOverlayPlayerRoot');
+        logMediaOverlay('Cached root element', { found: Boolean(mediaOverlayUi.root) });
+    }
+    return mediaOverlayUi.root;
+}
+
+function resetMediaOverlayDom() {
+    logMediaOverlay('Resetting UI element references');
+    mediaOverlayUi.container = null;
+    mediaOverlayUi.eyebrow = null;
+    mediaOverlayUi.title = null;
+    mediaOverlayUi.narrator = null;
+    mediaOverlayUi.duration = null;
+    mediaOverlayUi.status = null;
+    mediaOverlayUi.toggleButton = null;
+    mediaOverlayUi.minimizeButton = null;
+    if (mediaOverlayUi.dockButton) {
+        mediaOverlayUi.dockButton.remove();
+    }
+    mediaOverlayUi.dockButton = null;
+    mediaOverlayUi.playButton = null;
+    mediaOverlayUi.prevButton = null;
+    mediaOverlayUi.nextButton = null;
+    mediaOverlayUi.minimized = false;
+    // Clear seek-related references and state to avoid stale references when UI is rebuilt
+    mediaOverlayUi.seekInput = null;
+    mediaOverlayUi.timeLabel = null;
+    if (mediaOverlayUi.state) {
+        mediaOverlayUi.state.seeking = false;
+    }
+}
+
+function ensureMediaOverlayUi() {
+    const root = ensureMediaOverlayRoot();
+    if (!root || !mediaOverlayUi.state.supported) {
+        logMediaOverlay('Skipping UI creation', { hasRoot: Boolean(root), supported: mediaOverlayUi.state.supported });
+        return null;
+    }
+
+    if (!mediaOverlayUi.container) {
+        logMediaOverlay('Building media overlay UI container');
+        buildMediaOverlayUi(root);
+    }
+
+    return mediaOverlayUi.container;
+}
+
+function buildMediaOverlayUi(root) {
+    logMediaOverlay('Constructing DOM nodes');
+    root.innerHTML = '';
+    const container = document.createElement('section');
+    container.className = 'media-overlay-player media-overlay-player--disabled';
+
+    const header = document.createElement('div');
+    header.className = 'media-overlay-player__header';
+
+    const titleWrap = document.createElement('div');
+
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'media-overlay-player__eyebrow';
+    eyebrow.textContent = 'Media Overlay';
+
+    const title = document.createElement('p');
+    title.className = 'media-overlay-player__title';
+    title.textContent = '';
+
+    titleWrap.append(eyebrow, title);
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'media-overlay-player__toggle';
+    toggleButton.setAttribute('aria-pressed', 'false');
+    toggleButton.textContent = 'Playback Disabled';
+    toggleButton.addEventListener('click', handleMediaOverlayToggleClick);
+
+    // Minimize/restore button
+    const minimizeButton = document.createElement('button');
+    minimizeButton.type = 'button';
+    minimizeButton.className = 'media-overlay-player__minimize';
+    minimizeButton.setAttribute('aria-label', 'Minimize media overlay');
+    minimizeButton.textContent = '\u2013'; // en dash as minimize glyph
+    minimizeButton.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        handleMediaOverlayMinimizeClick();
+    });
+
+    // Append minimize button near toggle for easy access
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.gap = '0.5rem';
+    headerRight.append(minimizeButton, toggleButton);
+
+    header.append(titleWrap, headerRight);
+
+    const meta = document.createElement('div');
+    meta.className = 'media-overlay-player__meta';
+    // Use flex layout so the progress bar can expand and replace the
+    // previously duplicated duration element that appeared near the center.
+    meta.style.display = 'flex';
+    meta.style.alignItems = 'center';
+    meta.style.gap = '0.75rem';
+    meta.style.width = '100%';
+
+    const narrator = document.createElement('span');
+    narrator.className = 'media-overlay-player__narrator';
+    narrator.textContent = 'Narrator unavailable';
+    narrator.style.flex = '0 0 auto';
+
+    // Progress / seek bar
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'media-overlay-player__progress';
+
+    const seekInput = document.createElement('input');
+    seekInput.type = 'range';
+    seekInput.className = 'media-overlay-player__seek';
+    seekInput.min = '0';
+    seekInput.max = '1';
+    // Use finer granularity for smoother seeking & more accurate time label
+    seekInput.step = '0.01';
+    seekInput.value = '0';
+    seekInput.disabled = true;
+
+    const timeLabel = document.createElement('span');
+    timeLabel.className = 'media-overlay-player__time';
+    timeLabel.textContent = '';
+
+    // Seek interactions: set seeking flag while user drags; only send on change (release)
+    // Helper: update the time label and in-memory position
+    function _updateSeekPreviewTime(ratio) {
+        const secs = mediaOverlayUi.state.durationSeconds ? (ratio * mediaOverlayUi.state.durationSeconds) : null;
+        timeLabel.textContent = (secs == null ? '0:00' : formatDuration(secs)) + (mediaOverlayUi.state.durationSeconds ? ' / ' + formatDuration(mediaOverlayUi.state.durationSeconds) : '');
+        if (secs != null) {
+            mediaOverlayUi.state.positionSeconds = secs;
+        }
+    }
+
+    // Helper: update highlight near viewport center
+    function _applyPreviewHighlight(doc, contentWindow) {
+        try {
+            const cx = Math.floor(contentWindow.innerWidth / 2);
+            const el = doc.elementFromPoint(cx, Math.floor(contentWindow.innerHeight / 2));
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+
+            clearMediaOverlayHighlight();
+            if (mediaOverlayHighlight.activeClass) el.classList.add(mediaOverlayHighlight.activeClass);
+            if (mediaOverlayHighlight.playbackClass && mediaOverlayUi.state.playing) el.classList.add(mediaOverlayHighlight.playbackClass);
+            mediaOverlayHighlight.elements = [el];
+        } catch (e) {
+            console.warn('Preview highlight failed', e);
+        }
+    }
+
+    // Helper: perform live preview scroll and page snapping
+    function _performLivePreviewScroll(ratio) {
+        try {
+            const contentWindow = domUtils.getContentWindow();
+            const doc = domUtils.getIframeDocument();
+            if (!contentWindow || !doc) return;
+
+            const scrollElem = doc.scrollingElement || doc.documentElement;
+            const maxScrollLeft = Math.max(0, scrollElem.scrollWidth - contentWindow.innerWidth);
+            const scrollAmount = navigationUtils.calculateScrollAmount(contentWindow) || contentWindow.innerWidth;
+
+            let desiredLeft = Math.round(ratio * maxScrollLeft);
+            if (scrollAmount > 0) {
+                const pageIndex = Math.round(desiredLeft / scrollAmount);
+                const maxPageIndex = Math.max(0, Math.floor(maxScrollLeft / scrollAmount));
+                const clampedIndex = Math.min(maxPageIndex, Math.max(0, pageIndex));
+                desiredLeft = Math.round(clampedIndex * scrollAmount);
+                currentPage = clampedIndex;
+            }
+
+            const platform = domUtils.detectPlatform();
+            if (!navigationState.isAnimating) {
+                navigationUtils.animateTo(contentWindow, desiredLeft, platform).catch(() => { });
+            }
+
+            _applyPreviewHighlight(doc, contentWindow);
+        } catch (e) {
+            console.warn('Live preview scroll failed', e);
+        }
+    }
+
+    seekInput.addEventListener('input', function () {
+        const ratio = Number(seekInput.value) || 0;
+        _updateSeekPreviewTime(ratio);
+        _performLivePreviewScroll(ratio);
+    });
+    seekInput.addEventListener('change', function () {
+        if (!mediaOverlayUi.state.durationSeconds) return;
+        const secs = Number(seekInput.value) * mediaOverlayUi.state.durationSeconds;
+        // Mark seeking false now so incoming UI updates are applied immediately
+        try { mediaOverlayUi.state.seeking = false; } catch (e) {
+            console.warn('Failed to clear seeking state on change', e);
+         }
+        // send seek command only when the user releases the thumb
+        sendMediaOverlayCommand('mediaoverlayseek', { seconds: secs });
+    });
+
+    // Pointer/touch handlers to mark seeking state so native UI updates are deferred
+    seekInput.addEventListener('pointerdown', function () {
+       sendMediaOverlayCommand('mediaoverlaypause');
+    });
+    seekInput.addEventListener('touchstart', function () {
+        sendMediaOverlayCommand('mediaoverlaypause');
+    }, { passive: true });
+
+    // Make the progress wrapper expand to use available horizontal space.
+    progressWrap.style.display = 'flex';
+    progressWrap.style.alignItems = 'center';
+    progressWrap.style.gap = '0.5rem';
+    progressWrap.style.flex = '1';
+
+    // Let the range input grow to fill the wrapper and keep the time label compact.
+    seekInput.style.flex = '1';
+    seekInput.style.minWidth = '0';
+    seekInput.style.width = '100%';
+    timeLabel.style.whiteSpace = 'nowrap';
+    timeLabel.style.flex = '0 0 auto';
+
+    progressWrap.append(seekInput, timeLabel);
+    // Append narrator and the expanded progress area to the meta row.
+    meta.append(narrator, progressWrap);
+
+    const controls = document.createElement('div');
+    controls.className = 'media-overlay-player__controls';
+
+    const status = document.createElement('span');
+    status.className = 'media-overlay-player__status';
+    status.textContent = 'Media overlay disabled';
+
+    const buttonsWrapper = document.createElement('div');
+    buttonsWrapper.className = 'media-overlay-player__buttons';
+
+    const prevButton = document.createElement('button');
+    prevButton.type = 'button';
+    prevButton.textContent = '<<';
+    prevButton.setAttribute('aria-label', 'Previous passage');
+    prevButton.addEventListener('click', handleMediaOverlayPrevClick);
+
+    const playButton = document.createElement('button');
+    playButton.type = 'button';
+    playButton.textContent = '>';
+    playButton.setAttribute('aria-label', 'Play narration');
+    playButton.addEventListener('click', handleMediaOverlayPlayClick);
+
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.textContent = '>>';
+    nextButton.setAttribute('aria-label', 'Next passage');
+    nextButton.addEventListener('click', handleMediaOverlayNextClick);
+
+    buttonsWrapper.append(prevButton, playButton, nextButton);
+    controls.append(status, buttonsWrapper);
+
+    container.append(header, meta, controls);
+    root.appendChild(container);
+
+    // Create a small docked restore button that is shown when minimized
+    const dockButton = document.createElement('button');
+    dockButton.type = 'button';
+    dockButton.className = 'media-overlay-player__dock';
+    dockButton.setAttribute('aria-label', 'Restore media overlay');
+    dockButton.textContent = '\u25A3'; // square glyph as restore icon
+    dockButton.style.display = 'none';
+    dockButton.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        setMediaOverlayMinimized(false);
+    });
+    root.appendChild(dockButton);
+
+    mediaOverlayUi.container = container;
+    mediaOverlayUi.eyebrow = eyebrow;
+    mediaOverlayUi.title = title;
+    mediaOverlayUi.narrator = narrator;
+    mediaOverlayUi.status = status;
+    mediaOverlayUi.toggleButton = toggleButton;
+    mediaOverlayUi.minimizeButton = minimizeButton;
+    mediaOverlayUi.dockButton = dockButton;
+    mediaOverlayUi.prevButton = prevButton;
+    mediaOverlayUi.playButton = playButton;
+    mediaOverlayUi.nextButton = nextButton;
+    mediaOverlayUi.seekInput = seekInput;
+    mediaOverlayUi.timeLabel = timeLabel;
+
+    // container click restores when minimized (tap-to-restore)
+    container.addEventListener('click', function (ev) {
+        if (mediaOverlayUi.minimized) {
+            ev.stopPropagation();
+            setMediaOverlayMinimized(false);
+        }
+    });
+
+    // Prevent underlying content from receiving taps when overlay is present
+    root.style.pointerEvents = 'auto';
+}
+
+function setMediaOverlayMinimized(minimized) {
+    const root = ensureMediaOverlayRoot();
+    mediaOverlayUi.minimized = Boolean(minimized);
+    if (root) {
+        root.dataset.minimized = mediaOverlayUi.minimized ? 'true' : 'false';
+    }
+    // When minimized, visually hide the overlay container but keep it in
+    // memory so state is preserved. The CSS handles the visual hiding
+    // using the root[data-minimized] selector; we just make the dock
+    // (restore) button visible so the user can restore the overlay.
+    if (mediaOverlayUi.minimized) {
+        if (mediaOverlayUi.dockButton) {
+            mediaOverlayUi.dockButton.style.display = 'flex';
+        }
+
+        // Ensure root is visible so the dock button can be interacted with
+        if (root) {
+            root.dataset.visible = 'true';
+            root.style.pointerEvents = 'auto';
+        }
+    } else {
+        // Restoring: hide dock and recreate the full overlay UI
+        if (mediaOverlayUi.dockButton) {
+            mediaOverlayUi.dockButton.style.display = 'none';
+        }
+        // Rebuild container if needed
+        ensureMediaOverlayUi();
+        // Refresh the rebuilt UI from the in-memory state so metadata is shown
+        try {
+            updateMediaOverlayPlaybackState(mediaOverlayUi.state);
+        } catch (e) {
+            console.warn('Failed to refresh media overlay UI on restore', e);
+        }
+        if (root) {
+            root.dataset.visible = 'true';
+            root.style.pointerEvents = 'auto';
+        }
+    }
+
+    logMediaOverlay('Minimized state changed', { minimized: mediaOverlayUi.minimized });
+}
+
+function handleMediaOverlayMinimizeClick() {
+    setMediaOverlayMinimized(!mediaOverlayUi.minimized);
+}
+
+function sendMediaOverlayCommand(action, payload) {
+    if (!action) {
+        logMediaOverlay('Ignoring empty command request');
+        return;
+    }
+    const message = { action: action };
+    if (payload && typeof payload === 'object') {
+        Object.assign(message, payload);
+    }
+    logMediaOverlay('Dispatching command', message);
+    sendToNativeMessage(message);
+}
+
+function handleMediaOverlayToggleClick() {
+    if (!mediaOverlayUi.state.supported) {
+        logMediaOverlay('Toggle ignored, not supported');
+        return;
+    }
+    const nextValue = !mediaOverlayUi.state.enabled;
+    logMediaOverlay('Toggle pressed', { nextEnabled: nextValue });
+    sendMediaOverlayCommand('mediaoverlaytoggle', { enabled: nextValue });
+}
+
+function handleMediaOverlayPlayClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Play/pause ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    const action = mediaOverlayUi.state.playing ? 'mediaoverlaypause' : 'mediaoverlayplay';
+    logMediaOverlay('Play button pressed', { action: action });
+    sendMediaOverlayCommand(action);
+}
+
+function getActiveMediaOverlayHighlightElement(doc) {
+    const connectedHighlight = mediaOverlayHighlight.elements.find(element => element?.isConnected);
+    if (connectedHighlight) {
+        return connectedHighlight;
+    }
+
+    const selector = buildClassSelector(mediaOverlayHighlight.activeClass);
+    if (selector && doc) {
+        return doc.querySelector(selector);
+    }
+
+    return null;
+}
+
+function maybeNavigateToPreviousPageFromHighlightTop() {
+    const doc = domUtils.getIframeDocument();
+    if (!doc) {
+        return;
+    }
+
+    const highlightElement = getActiveMediaOverlayHighlightElement(doc);
+    if (!highlightElement) {
+        return;
+    }
+
+    const rect = highlightElement.getBoundingClientRect();
+    const topThresholdPx = 6;
+
+    if (rect.top <= topThresholdPx) {
+        logMediaOverlay('Highlight at top of page, paging previous', { top: rect.top });
+        handlePrevCommand();
+    }
+}
+
+function handleMediaOverlayPrevClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Prev ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    maybeNavigateToPreviousPageFromHighlightTop();
+    logMediaOverlay('Prev requested');
+    sendMediaOverlayCommand('mediaoverlayprev');
+}
+
+function handleMediaOverlayNextClick() {
+    if (!mediaOverlayUi.state.supported || !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0) {
+        logMediaOverlay('Next ignored', {
+            supported: mediaOverlayUi.state.supported,
+            enabled: mediaOverlayUi.state.enabled,
+            segments: mediaOverlayUi.state.segmentCount
+        });
+        return;
+    }
+    logMediaOverlay('Next requested');
+    sendMediaOverlayCommand('mediaoverlaynext');
+}
+
+function setMediaOverlayVisibility(isSupported) {
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    const visible = Boolean(isSupported);
+    logMediaOverlay('Visibility updated', { supported: visible });
+    mediaOverlayUi.state.supported = visible;
+    root.dataset.visible = visible ? 'true' : 'false';
+
+    if (!visible) {
+        mediaOverlayUi.state.enabled = false;
+        mediaOverlayUi.state.playing = false;
+        mediaOverlayUi.state.segmentCount = 0;
+        mediaOverlayUi.state.segmentIndex = 0;
+        clearMediaOverlayHighlight();
+        // clear minimized state when hiding
+        root.dataset.minimized = 'false';
+        mediaOverlayUi.minimized = false;
+        root.innerHTML = '';
+        resetMediaOverlayDom();
+        return;
+    }
+
+    ensureMediaOverlayUi();
+}
+
+function setMediaOverlayReaderModeHidden(isHidden) {
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    const hidden = Boolean(isHidden);
+    root.dataset.readerModeHidden = hidden ? 'true' : 'false';
+    logMediaOverlay('Reader mode chrome visibility updated', { hidden });
+
+    if (!hidden && mediaOverlayUi.state.supported) {
+        ensureMediaOverlayUi();
+    }
+}
+
+function initializeMediaOverlayUi(config) {
+    const normalized = config || {};
+    logMediaOverlay('Initializing UI state', normalized);
+    const root = ensureMediaOverlayRoot();
+    if (!root) {
+        return;
+    }
+
+    if (typeof normalized.segmentCount === 'number') {
+        mediaOverlayUi.state.segmentCount = Math.max(0, Math.floor(normalized.segmentCount));
+    }
+    if (typeof normalized.enabled === 'boolean') {
+        mediaOverlayUi.state.enabled = normalized.enabled;
+    }
+    mediaOverlayUi.state.narrator = normalized.narrator || '';
+    mediaOverlayUi.state.durationSeconds = typeof normalized.durationSeconds === 'number' ? normalized.durationSeconds : null;
+    mediaOverlayUi.state.chapterTitle = normalized.chapterTitle || mediaOverlayUi.state.chapterTitle;
+
+    const container = ensureMediaOverlayUi();
+    if (!container) {
+        return;
+    }
+
+    if (mediaOverlayUi.title) {
+        mediaOverlayUi.title.textContent = mediaOverlayUi.state.chapterTitle || 'Narrated Section';
+    }
+
+    if (mediaOverlayUi.narrator) {
+        mediaOverlayUi.narrator.textContent = mediaOverlayUi.state.narrator
+            ? 'Narrated by ' + mediaOverlayUi.state.narrator
+            : 'Narrator unavailable';
+    }
+
+    if (mediaOverlayUi.duration) {
+        const formatted = formatDuration(mediaOverlayUi.state.durationSeconds);
+        mediaOverlayUi.duration.textContent = formatted ? 'Duration ' + formatted : '';
+    }
+
+    if (mediaOverlayUi.state.segmentCount === 0) {
+        mediaOverlayUi.state.segmentIndex = 0;
+    } else if (mediaOverlayUi.state.segmentIndex === 0) {
+        mediaOverlayUi.state.segmentIndex = 1;
+    }
+
+    updateMediaOverlayPlaybackState({
+        enabled: mediaOverlayUi.state.enabled,
+        playing: false,
+        segmentIndex: mediaOverlayUi.state.segmentIndex,
+        segmentCount: mediaOverlayUi.state.segmentCount,
+        chapterTitle: mediaOverlayUi.state.chapterTitle
+    });
+}
+
+function updateMediaOverlayPlaybackState(state) {
+
+    if (state) {
+        updateUiStateFromPayload(state);
+    }
+
+    const container = ensureMediaOverlayUi();
+    if (!container) return;
+
+    updateUiTitle();
+    updateUiToggleButton();
+    updateUiNarrator();
+    updateUiDuration();
+    updateUiProgress();
+    const disableControls = !mediaOverlayUi.state.enabled || mediaOverlayUi.state.segmentCount === 0;
+    updateUiControls(disableControls);
+    updateUiPlayButton();
+    updateUiStatus();
+    updateUiContainerClass(disableControls);
+    applyPlaybackClassToHighlight();
+}
+
+function updateUiStateFromPayload(state) {
+    if (!state) return;
+
+    const s = mediaOverlayUi.state;
+
+    // Helper: safely set a boolean property from payload
+    const setBool = (prop) => {
+        if (typeof state[prop] === 'boolean') s[prop] = state[prop];
+    };
+
+    // Helper: safely set an integer >= 0
+    const setNonNegInt = (prop, target) => {
+        if (typeof state[prop] === 'number') {
+            s[target || prop] = Math.max(0, Math.floor(state[prop]));
+        }
+    };
+
+    // Helper: set numeric-or-null fields when explicitly present in payload
+    const setMaybeNumber = (prop, target) => {
+        if (Object.hasOwn(state, prop)) {
+            const v = state[prop];
+            s[target || prop] = typeof v === 'number' ? v : null;
+        }
+    };
+
+    setBool('enabled');
+    setBool('playing');
+
+    // Segment index: avoid overwriting while user is seeking
+    if (typeof state.segmentIndex === 'number') {
+        if (s.seeking) {
+            logMediaOverlay('Skipping segmentIndex update while seeking', { incoming: state.segmentIndex });
+        } else {
+            s.segmentIndex = Math.max(0, Math.floor(state.segmentIndex));
+        }
+    }
+
+    setNonNegInt('segmentCount');
+
+    if (typeof state.chapterTitle === 'string' && state.chapterTitle.length > 0) {
+        s.chapterTitle = state.chapterTitle;
+    }
+
+    setMaybeNumber('durationSeconds');
+
+    if (Object.hasOwn(state, 'positionSeconds')) {
+        if (s.seeking) {
+            logMediaOverlay('Skipping positionSeconds update while seeking', { incoming: state.positionSeconds });
+        } else {
+            const v = state.positionSeconds;
+            s.positionSeconds = typeof v === 'number' ? v : null;
+        }
+    }
+
+    if (!s.playing) {
+        mediaOverlayNavigationCooldownUntil = 0;
+        mediaOverlayAutoAdvanceCooldownUntil = 0;
+    }
+}
+
+function updateUiTitle() {
+    if (mediaOverlayUi.title && mediaOverlayUi.state.chapterTitle) {
+        mediaOverlayUi.title.textContent = mediaOverlayUi.state.chapterTitle;
+    }
+}
+
+function updateUiToggleButton() {
+    if (mediaOverlayUi.toggleButton) {
+        mediaOverlayUi.toggleButton.setAttribute('aria-pressed', mediaOverlayUi.state.enabled ? 'true' : 'false');
+        mediaOverlayUi.toggleButton.textContent = mediaOverlayUi.state.enabled ? 'Playable' : 'Playback Disabled';
+    }
+}
+
+function updateUiNarrator() {
+    if (mediaOverlayUi.narrator) {
+        mediaOverlayUi.narrator.textContent = mediaOverlayUi.state.narrator
+            ? 'Narrated by ' + mediaOverlayUi.state.narrator
+            : 'Narrator unavailable';
+    }
+}
+
+function updateUiDuration() {
+    if (mediaOverlayUi.duration) {
+        const formattedDuration = formatDuration(mediaOverlayUi.state.durationSeconds);
+        mediaOverlayUi.duration.textContent = formattedDuration ? 'Duration ' + formattedDuration : '';
+    }
+}
+
+function updateUiProgress() {
+    // Simplified control flow: early returns and small helpers keep complexity low
+    if (!mediaOverlayUi.seekInput) return;
+    const input = mediaOverlayUi.seekInput;
+    const label = mediaOverlayUi.timeLabel;
+    const dur = mediaOverlayUi.state.durationSeconds;
+    const pos = mediaOverlayUi.state.positionSeconds;
+    const seeking = Boolean(mediaOverlayUi.state.seeking);
+
+    const hasDuration = typeof dur === 'number' && !Number.isNaN(dur) && dur > 0;
+
+    if (!hasDuration) {
+        if (!seeking) {
+            input.disabled = true;
+            input.value = '0';
+        }
+        if (label) {
+            label.textContent = dur ? formatDuration(dur) : '';
+        }
+        return;
+    }
+
+    input.disabled = false;
+    if (!seeking) {
+        input.value = String(computeProgressRatio(pos, dur));
+    }
+    if (label) {
+        label.textContent = computeProgressLabel(pos, dur);
+    }
+}
+
+/**
+ * Helper: compute ratio (0..1) for given position/duration
+ */
+function computeProgressRatio(pos, dur) {
+    if (typeof pos === 'number' && !Number.isNaN(pos) && typeof dur === 'number' && dur > 0) {
+        return Math.max(0, Math.min(1, pos / dur));
+    }
+    return 0;
+}
+
+/**
+ * Helper: build progress label text like "M:SS / M:SS"
+ */
+function computeProgressLabel(pos, dur) {
+    const posText = (typeof pos === 'number' && !Number.isNaN(pos)) ? formatDuration(pos) : '0:00';
+    return posText + ' / ' + formatDuration(dur);
+}
+
+function updateUiControls(disableControls) {
+    [mediaOverlayUi.prevButton, mediaOverlayUi.playButton, mediaOverlayUi.nextButton].forEach(button => {
+        if (button) {
+            button.disabled = disableControls;
+        }
+    });
+}
+
+function updateUiPlayButton() {
+    if (mediaOverlayUi.playButton) {
+        mediaOverlayUi.playButton.textContent = mediaOverlayUi.state.playing ? '||' : '>';
+        mediaOverlayUi.playButton.setAttribute('aria-label', mediaOverlayUi.state.playing ? 'Pause narration' : 'Play narration');
+    }
+}
+
+function updateUiStatus() {
+    if (mediaOverlayUi.status) {
+        if (mediaOverlayUi.state.segmentCount === 0) {
+            mediaOverlayUi.status.textContent = mediaOverlayUi.state.enabled
+                ? 'Audio not available for this section'
+                : 'Media overlay disabled';
+        } else {
+            const index = mediaOverlayUi.state.segmentIndex > 0 ? mediaOverlayUi.state.segmentIndex : 1;
+            mediaOverlayUi.status.textContent = 'Segment ' + index + ' of ' + mediaOverlayUi.state.segmentCount;
+        }
+    }
+}
+
+function updateUiContainerClass(disableControls) {
+    if (mediaOverlayUi.container) {
+        mediaOverlayUi.container.classList.toggle('media-overlay-player--disabled', disableControls);
+    }
+}
+
+function highlightMediaOverlayFragment(fragmentId, activeClass, playbackClass) {
+    let selectorsChanged = false;
+    if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
+        mediaOverlayHighlight.activeClass = activeClass;
+        selectorsChanged = true;
+    }
+    if (playbackClass && mediaOverlayHighlight.playbackClass !== playbackClass) {
+        mediaOverlayHighlight.playbackClass = playbackClass;
+        selectorsChanged = true;
+    }
+    if (selectorsChanged) {
+        requestMediaOverlayHighlightThemeRefresh();
+    }
+
+    const doc = domUtils.getIframeDocument();
+    if (!doc || !fragmentId) {
+        return;
+    }
+
+    clearMediaOverlayHighlight(activeClass, playbackClass);
+
+    const target = doc.getElementById(fragmentId);
+    if (!target) {
+        console.warn('Media overlay fragment not found:', fragmentId);
+        return;
+    }
+
+    if (mediaOverlayHighlight.activeClass) {
+        target.classList.add(mediaOverlayHighlight.activeClass);
+    }
+    if (mediaOverlayHighlight.playbackClass && mediaOverlayUi.state.playing) {
+        target.classList.add(mediaOverlayHighlight.playbackClass);
+    }
+
+    mediaOverlayHighlight.elements = [target];
+
+    // Page advancement is handled by C# MediaOverlayPlaybackManager
+    // to prevent race conditions and duplicate page navigation.
+    // The C# code calls handleNextCommand() when needed before highlighting.
+}
+
+function clearMediaOverlayHighlight(activeClass, playbackClass) {
+
+    let selectorsChanged = false;
+    if (activeClass && mediaOverlayHighlight.activeClass !== activeClass) {
+        mediaOverlayHighlight.activeClass = activeClass;
+        selectorsChanged = true;
+    }
+    if (playbackClass && mediaOverlayHighlight.playbackClass !== playbackClass) {
+        mediaOverlayHighlight.playbackClass = playbackClass;
+        selectorsChanged = true;
+    }
+    if (selectorsChanged) {
+        requestMediaOverlayHighlightThemeRefresh();
+    }
+
+    const doc = domUtils.getIframeDocument();
+    const active = mediaOverlayHighlight.activeClass;
+    const playback = mediaOverlayHighlight.playbackClass;
+
+    mediaOverlayHighlight.elements.forEach(element => {
+        if (!element) {
+            return;
+        }
+        if (active) {
+            element.classList.remove(active);
+        }
+        if (playback) {
+            element.classList.remove(playback);
+        }
+    });
+
+    mediaOverlayHighlight.elements = [];
+
+    if (!doc) {
+        return;
+    }
+
+    [active, playback]
+        .filter(Boolean)
+        .map(buildClassSelector)
+        .filter(Boolean)
+        .forEach(selector => {
+            doc.querySelectorAll(selector).forEach(node => {
+                if (active) {
+                    node.classList.remove(active);
+                }
+                if (playback) {
+                    node.classList.remove(playback);
+                }
+            });
+        });
+}
+
+function applyPlaybackClassToHighlight() {
+    if (!mediaOverlayHighlight.playbackClass || mediaOverlayHighlight.elements.length === 0) {
+        logMediaOverlay('No elements to update for playback class');
+        return;
+    }
+
+    mediaOverlayHighlight.elements = mediaOverlayHighlight.elements.filter(element => element?.isConnected);
+    mediaOverlayHighlight.elements.forEach(element => {
+        if (!element) {
+            return;
+        }
+        if (mediaOverlayUi.state.playing) {
+            element.classList.add(mediaOverlayHighlight.playbackClass);
+        } else {
+            element.classList.remove(mediaOverlayHighlight.playbackClass);
+        }
+    });
+}
+
+function buildClassSelector(className) {
+    if (!className) {
+        return null;
+    }
+
+    if (globalThis.CSS && typeof globalThis.CSS.escape === 'function') {
+        return '.' + globalThis.CSS.escape(className);
+    }
+
+    // Use String.raw to avoid escaping backslashes
+    return '.' + className.replaceAll(/([^a-zA-Z0-9_-])/g, String.raw`\$1`);
+}
+
+function formatDuration(seconds) {
+    if (seconds == null) {
+        return '';
+    }
+
+    const totalSeconds = Math.max(0, Math.floor(Number(seconds)));
+    if (Number.isNaN(totalSeconds)) {
+        return '';
+    }
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+
+    const twoDigit = value => (value < 10 ? '0' + value : String(value));
+    if (hours > 0) {
+        return hours + ':' + twoDigit(minutes) + ':' + twoDigit(remainingSeconds);
+    }
+    return minutes + ':' + twoDigit(remainingSeconds);
 }
 
 /**
  * Handles the "next" command
  */
 function handleNextCommand() {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay('handleNextCommand ignored while seeking');
+        return;
+    }
     const platform = domUtils.detectPlatform();
+
+      if (mediaOverlayUi.state.playing) {
+       // return;
+    }
 
     // If animation in progress, coalesce to a single pending "next"
     if (navigationState.isAnimating) {
@@ -626,7 +1694,7 @@ function handleNextCommand() {
 
     if (navigationUtils.isHorizontallyScrolledToEnd()) {
         console.log("Reached end of current content, requesting next page.");
-        window.location.href = 'https://runcsharp.next?true';
+        sendToNativeMessage({ action: 'next' });
     } else {
         navigationUtils.scrollRight(platform);
     }
@@ -636,6 +1704,10 @@ function handleNextCommand() {
  * Handles the "prev" command
  */
 function handlePrevCommand() {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay('handlePrevCommand ignored while seeking');
+        return;
+    }
     const platform = domUtils.detectPlatform();
 
     // If animation in progress, coalesce to a single pending "prev"
@@ -646,7 +1718,7 @@ function handlePrevCommand() {
 
     if (navigationUtils.isHorizontalScrollAtStart()) {
         console.log("Reached start of current content, requesting previous page.");
-        window.location.href = 'https://runcsharp.prev?true';
+        sendToNativeMessage({ action: 'prev' });
     } else {
         navigationUtils.scrollLeft(platform);
     }
@@ -708,7 +1780,7 @@ function extractTextFromDocument(doc) {
         let textContent = doc.body.textContent || doc.body.innerText || "";
 
         // Normalize whitespace while preserving paragraph breaks
-        textContent = textContent.replace(/\s+/g, " ").trim();
+        textContent = textContent.replaceAll(/\s+/g, " ").trim();
 
         return textContent;
     } catch (error) {
@@ -725,7 +1797,7 @@ function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
     console.log(`Updating character position: ${characterPosition}`);
     // Notify C# code about the character position change
-    window.location.href = `https://runcsharp.characterposition?${characterPosition}`;
+    sendToNativeMessage({ action: 'characterposition', position: characterPosition });
 }
 
 
@@ -738,6 +1810,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const body = document.getElementById("body");
     const root = document.documentElement;
     const platform = domUtils.detectPlatform();
+
+    mediaOverlayUi.root = document.getElementById('mediaOverlayPlayerRoot');
+    if (mediaOverlayUi.root) {
+        mediaOverlayUi.root.dataset.visible = 'false';
+        mediaOverlayUi.root.dataset.minimized = 'false';
+        mediaOverlayUi.root.setAttribute('aria-live', 'polite');
+        // Prevent the overlay from being dragged or moving the underlying content
+        try {
+            mediaOverlayUi.root.style.touchAction = 'none';
+            mediaOverlayUi.root.style.userSelect = 'none';
+            mediaOverlayUi.root.style.webkitUserSelect = 'none';
+        } catch (e) {
+            console.warn('Failed to apply touch/user-select styles to media overlay root', e);
+        }
+    }
 
     if (!frame || !body) {
         console.error("Required DOM elements (iframe with id 'page' or body with id 'body') not found.");
@@ -773,7 +1860,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 100); // Small delay to ensure content is fully rendered
             }
 
-            window.location.href = 'https://runcsharp.pageLoad?true';
+            requestMediaOverlayHighlightThemeRefresh();
+            sendToNativeMessage({ action: 'pageload', value: true });
         } catch (error) {
             console.error("Error during iframe onload:", error);
         }
@@ -782,7 +1870,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Listen for messages from the parent window
     window.addEventListener("message", event => handleMessage(event, platform));
     if (platform.isIOS) {
-        window.addEventListener('touchstart', {});
+        globalThis.addEventListener('touchstart', {});
     }
 });
 
@@ -887,7 +1975,10 @@ function gotoPage(page) {
     setTimeout(() => {
         navigationUtils.scrollToPage(page);
         isPreviousPage = false;
-        currentPage = getPageCount();
+        // Track the page we navigated to so persistence matches navigation
+        const maxPage = getPageCount();
+        const clampedPage = Math.min(page, maxPage);
+        currentPage = clampedPage;
         updateCharacterPosition();
     }, 200);
 }
@@ -929,4 +2020,124 @@ function setBackgroundColor(color) {
  */
 function unsetBackgroundColor() {
     styleUtils.unsetBackgroundColor();
+}
+
+function setMediaOverlayTheme(theme) {
+    const values = (theme && typeof theme === 'object') ? theme : null;
+    const source = values ?? mediaOverlayThemeDefaults;
+
+    mediaOverlayThemeState.highlightBackground = source.highlightBackground || mediaOverlayThemeDefaults.highlightBackground;
+    mediaOverlayThemeState.highlightText = source.highlightText || mediaOverlayThemeDefaults.highlightText;
+    mediaOverlayThemeState.highlightOutline = source.highlightOutline || mediaOverlayThemeDefaults.highlightOutline;
+
+    requestMediaOverlayHighlightThemeRefresh();
+}
+
+/**
+ * Return the 0-based index of `fragmentId` within the list of currently visible
+ * segments on the active page, and the total count of visible segments.
+ *
+ * Usage from native: getVisibleSegmentPosition(fragmentId, ["f1","f2",...])
+ * Returns: { index: number, count: number }
+ */
+function getVisibleSegmentPosition(fragmentId, segmentList) {
+    try {
+        const doc = domUtils.getIframeDocument();
+        const win = domUtils.getContentWindow();
+        if (!doc || !win) {
+            return JSON.stringify({ index: -1, count: 0 });
+        }
+
+        let ids = [];
+        if (Array.isArray(segmentList)) {
+            ids = segmentList;
+        } else if (segmentList) {
+            ids = JSON.parse(segmentList);
+        }
+        const visible = [];
+        for (const id of ids) {
+            const el = doc.getElementById(id);
+            if (!el) continue;
+            const rect = el.getBoundingClientRect();
+            // Visible if any part intersects the viewport horizontally
+            if (rect.right >= 0 && rect.left <= win.innerWidth) {
+                visible.push(id);
+            }
+        }
+
+        const idx = visible.indexOf(fragmentId);
+        return JSON.stringify({ index: idx, count: visible.length });
+    } catch(e) {
+        console.error('getVisibleSegmentPosition failed', e);
+        return JSON.stringify({ index: -1, count: 0 });
+    }
+}
+
+
+/**
+ * Ensure the specified fragment is visible within the iframe viewport.
+ * If the fragment lies beyond the current visible area, use the existing
+ * pagination handlers so the host app can either scroll or ask native to
+ * advance pages. This mirrors the expectation from the C# side which calls
+ * this function before highlighting a fragment.
+ * @param {string} fragmentId The ID of the element to check.
+ * @param {'prev' | 'next'} direction The user's intended navigation direction.
+ */
+function ensureFragmentVisibleUsingNext(fragmentId, direction) {
+  try {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win || !fragmentId) {
+      return;
+    }
+
+    const intent = direction === "prev" ? "prev" : "next";
+    const seekMode = !!mediaOverlayUi?.state?.seeking;
+
+    // Helper to execute the correct navigation command based on the mode.
+    const executeNavigation = (action) => {
+      if (seekMode) {
+        sendToNativeMessage({ action });
+      } else if (action === "next") {
+        handleNextCommand();
+      } else {
+        handlePrevCommand();
+      }
+    };
+
+    const el = doc.getElementById(fragmentId);
+    if (!el) {
+      console.warn(
+        "ensureFragmentVisible: fragment not found, falling back to default navigation.",
+        fragmentId,
+      );
+      // If the element doesn't exist, just perform the intended action.
+      executeNavigation(intent);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const isVisible = rect.right >= 0 && rect.left <= win.innerWidth;
+
+    if (isVisible) {
+      return; // Element is already visible, no action needed.
+    }
+
+    // Determine the required action based on the element's position.
+    let requiredAction;
+    if (rect.left >= win.innerWidth) {
+      // Element is entirely to the right of the viewport.
+      requiredAction = "next";
+    } else if (rect.right <= 0) {
+      // Element is entirely to the left of the viewport.
+      requiredAction = "prev";
+    } else {
+      // Element is partially visible or in an unknown state; trust the original intent.
+      requiredAction = intent;
+    }
+
+    executeNavigation(requiredAction);
+  } catch (e) {
+    console.error("ensureFragmentVisible failed", e);
+  }
 }

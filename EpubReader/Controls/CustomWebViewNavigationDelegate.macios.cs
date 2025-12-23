@@ -1,5 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
+﻿using System.Text;
+using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 
@@ -44,10 +44,17 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// cref="WKWebpagePreferences"/> as parameters, used to specify the navigation policy.</param>
 	/// <exception cref="InvalidOperationException">Thrown if the URL of the navigation request is null.</exception>
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
-	{	
+	{
 		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
+
+		// Allow the GitHub Pages site to load normally without interception
+		if (path.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
+			return;
+		}
 		var url = path.Split('?');
-		
+
 		if (url.Length > 1 || path.Contains("https://runcsharp"))
 		{
 			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
@@ -84,5 +91,29 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
 	{
 		decisionHandler(WKNavigationActionPolicy.Allow);
+	}
+}
+
+public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
+{
+	public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
+	{
+		// 'message.Body' contains the data sent from JavaScript
+		if (message.Name == "webwindowinterop")
+		{
+			Console.WriteLine($"Received message from WKWebView: {message.Body}");
+			if (string.IsNullOrEmpty(message.Body?.ToString()))
+			{
+				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
+				return;
+			}
+			var bytes = Convert.FromBase64String(message.Body.ToString());
+			var json = Encoding.UTF8.GetString(bytes);
+			System.Diagnostics.Trace.TraceInformation($"Decoded message: {json}");
+			Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() =>
+			{
+				WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json));
+			});
+		}
 	}
 }

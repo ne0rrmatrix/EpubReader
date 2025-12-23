@@ -1,0 +1,327 @@
+name: Build
+
+on:
+  workflow_dispatch: {}
+
+env:
+  LATEST_NET_VERSION: '10.0.x'
+
+jobs:
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    env:
+      NUGET_SECRET: ${{ secrets.NUGETS }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET_B64 }}
+    steps:
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'microsoft'
+          java-version: '21'
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install .NET MAUI Workload
+        run: |
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload update || true
+
+      - name: Expose Google JSON to environment (no file)
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) {
+            Write-Error 'Environment variable GOOGLE_SECRET_B64 is empty'
+            exit 1
+          }
+          try {
+            $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          } catch {
+            Write-Error 'Failed to decode base64 from environment variable GOOGLE_SECRET_B64'
+            exit 1
+          }
+
+          $entry = "GOOGLE_APPLICATION_CREDENTIALS_JSON<<EOF`n$decoded`nEOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $entry -Encoding utf8
+          Write-Host 'Google JSON decoded into environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON'
+
+          try {
+            $json = $decoded | ConvertFrom-Json -ErrorAction Stop
+          } catch {
+            Write-Warning 'Decoded content is not valid JSON; skipping FIREBASE_* exports'
+            exit 0
+          }
+
+          $firebaseAppId = $null
+          $firebaseApiKey = $null
+          $firebaseDatabaseUrl = $null
+          $firebaseAuthDomain = $null
+          $firebaseWebClientId = $null
+
+          if ($json.client -and $json.client.Count -ge 1) {
+            $client0 = $json.client[0]
+            if ($client0.client_info -and $client0.client_info.mobilesdk_app_id) {
+              $firebaseAppId = $client0.client_info.mobilesdk_app_id
+            }
+            if ($client0.api_key -and $client0.api_key.Count -ge 1 -and $client0.api_key[0].current_key) {
+              $firebaseApiKey = $client0.api_key[0].current_key
+            }
+            if ($client0.oauth_client) {
+              foreach ($oc in $client0.oauth_client) {
+                if (-not $firebaseWebClientId -and $oc.client_id) {
+                  $firebaseWebClientId = $oc.client_id
+                  break
+                }
+              }
+            }
+          }
+
+          if ($json.project_info) {
+            if ($json.project_info.firebase_url) {
+              $firebaseDatabaseUrl = $json.project_info.firebase_url
+            }
+            if ($json.project_info.project_id) {
+              $firebaseAuthDomain = "$($json.project_info.project_id).firebaseapp.com"
+            }
+          }
+
+          $envEntries = @()
+          if ($firebaseAppId)    { $envEntries += "FIREBASE_APP_ID=$firebaseAppId" }
+          if ($firebaseApiKey)   { $envEntries += "FIREBASE_API_KEY=$firebaseApiKey" }
+          if ($firebaseDatabaseUrl) { $envEntries += "FIREBASE_DATABASE_URL=$firebaseDatabaseUrl" }
+          if ($firebaseAuthDomain)  { $envEntries += "FIREBASE_AUTH_DOMAIN=$firebaseAuthDomain" }
+          if ($firebaseWebClientId) { $envEntries += "FIREBASE_WEB_CLIENT_ID=$firebaseWebClientId" }
+
+          if ($envEntries.Count -gt 0) {
+            foreach ($e in $envEntries) {
+              Add-Content -Path $env:GITHUB_ENV -Value $e -Encoding utf8
+            }
+            Write-Host 'FIREBASE_* environment variables exported'
+          } else {
+            Write-Host 'No FIREBASE_* values were found in google-services.json'
+          }
+
+      - name: Write canonical google-services.json to workspace
+        if: ${{ env.GOOGLE_SECRET_B64 != '' }}
+        shell: powershell
+        run: |
+          if (-not $env:GOOGLE_SECRET_B64) { Write-Error 'GOOGLE_SECRET_B64 empty'; exit 1 }
+          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:GOOGLE_SECRET_B64))
+          $outDir = Join-Path $env:GITHUB_WORKSPACE 'build-secrets'
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $outPath = Join-Path $outDir 'google-services.json'
+          Set-Content -Path $outPath -Value $decoded -Encoding utf8 -Force
+          Write-Host "Wrote google-services.json to $outPath"
+
+      - name: Configure ephemeral NuGet (optional)
+        shell: powershell
+        run: |
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
+          if ("${{ env.NUGET_SECRET }}") {
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Restore Windows project
+        shell: powershell
+        run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-windows10.0.19041.0'
+          
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+           dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG `
+            /p:TargetFramework=$tfm `
+            /p:RuntimeIdentifiers=win-x64 `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0
+          } else {
+            dotnet restore $proj --no-cache --configfile nuget.config `
+              --source https://api.nuget.org/v3/index.json `
+              /p:TargetFramework=$tfm `
+              /p:TreatWarningsAsErrors=false `
+              /p:RuntimeIdentifiers=win-x64
+          }
+      - name: Clean build artifacts
+        shell: pwsh
+        run: |
+         $objPath = "EpubReader/obj"
+         # Ensure the directory structure exists
+         New-Item -ItemType Directory -Path "$objPath/GeneratedFiles" -Force | Out-Null
+      
+      - name: Build Windows project
+        shell: powershell
+        run: |
+          dotnet build EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -r win-x64 `
+            --no-restore `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 `
+
+      - name: Publish Windows app
+        shell: powershell
+        run: |
+          dotnet publish EpubReader/EpubReader.csproj `
+            -c Release `
+            -f net10.0-windows10.0.19041.0 `
+            -o artifacts/windows `
+            --self-contained `
+            /p:TreatWarningsAsErrors=false `
+            /p:WarningLevel=0 `
+      - name: Package Windows artifact
+        run: |
+          pwsh -Command "if (Test-Path artifacts/windows) { Compress-Archive -Path 'artifacts/windows/*' -DestinationPath 'windows-artifact.zip' -Force } else { Write-Host 'No windows artifacts found'; New-Item -ItemType File -Path 'windows-artifact.zip' -Force | Out-Null }"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-artifact
+          path: windows-artifact.zip
+
+  build-android:
+    name: Build (Android)
+    runs-on: windows-latest
+    env:
+      NUGET_SECRET: ${{ secrets.NUGETS }}
+      GOOGLE_SECRET_B64: ${{ secrets.GOOGLE_SECRET }}
+      ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'microsoft'
+          java-version: '21'
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install workloads
+        shell: pwsh
+        run: |
+          dotnet workload install maui --source https://api.nuget.org/v3/index.json || true
+          dotnet workload restore || true
+
+      - name: Configure ephemeral NuGet (optional)
+        shell: pwsh
+        run: |
+          $tempConfig = Join-Path $env:RUNNER_TEMP 'nuget.temp.config'
+          if ("${{ env.NUGET_SECRET }}") {
+            New-Item -Path (Split-Path $tempConfig) -ItemType Directory -Force | Out-Null
+            Set-Content -Path $tempConfig -Value '<configuration></configuration>' -Encoding utf8 -Force
+            dotnet nuget add source "https://nuget.pkg.github.com/CommunityToolkit/index.json" --name CommunityToolkit --username "${{ github.actor }}" --password "${{ env.NUGET_SECRET }}" --store-password-in-clear-text --configfile $tempConfig
+            dotnet nuget add source "https://api.nuget.org/v3/index.json" --name nuget.org --configfile $tempConfig | Out-Null
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=$tempConfig" -Encoding utf8
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "NUGET_CONFIG=" -Encoding utf8
+          }
+
+      - name: Restore (Android project only)
+        shell: pwsh
+        run: |
+          $proj = 'EpubReader/EpubReader.csproj'
+          $tfm = 'net10.0-android'
+          if ($env:NUGET_CONFIG -and (Test-Path $env:NUGET_CONFIG)) {
+            dotnet restore $proj --no-cache --configfile $env:NUGET_CONFIG /p:TargetFramework=$tfm
+          } else {
+            dotnet restore $proj --no-cache --configfile nuget.config --source https://api.nuget.org/v3/index.json /p:TargetFramework=$tfm
+          }
+
+      - name: Build (Android project only)
+        shell: pwsh
+        run: |
+          dotnet build EpubReader\EpubReader.csproj -c Release -f net10.0-android --no-restore
+
+      - name: Restore Android keystore and publish (signed if env present)
+        shell: pwsh
+        run: |
+          if ($env:ANDROID_KEYSTORE_B64) {
+            Write-Host "Decoding Android keystore from env"
+            New-Item -ItemType Directory -Path 'EpubReader' -Force | Out-Null
+            [System.IO.File]::WriteAllBytes('EpubReader\EpubReader.keystore', [System.Convert]::FromBase64String($env:ANDROID_KEYSTORE_B64))
+            dotnet publish EpubReader\EpubReader.csproj -c Release -f net10.0-android --no-restore -o artifacts\android `
+              /p:AndroidKeyStore=true `
+              /p:AndroidSigningKeyStore="$(Resolve-Path 'EpubReader\EpubReader.keystore')" `
+              /p:AndroidSigningStorePass="$env:ANDROID_KEYSTORE_PASSWORD" `
+              /p:AndroidSigningKeyAlias="$env:ANDROID_KEY_ALIAS" `
+              /p:AndroidSigningKeyPass="$env:ANDROID_KEY_PASSWORD" || true
+            Remove-Item -Path 'EpubReader\EpubReader.keystore' -Force -ErrorAction SilentlyContinue
+          } else {
+            Write-Host "No ANDROID_KEYSTORE_B64 env found — publishing unsigned APK/AAB"
+            dotnet publish EpubReader\EpubReader.csproj -c Release -f net10.0-android -o artifacts\android || true
+          }
+
+      - name: Archive Android artifact
+        shell: pwsh
+        run: |
+          if (Test-Path artifacts/android) {
+            Compress-Archive -Path 'artifacts/android/*' -DestinationPath 'android-artifact.zip' -Force
+          } else {
+            New-Item -ItemType File -Path 'android-artifact.zip' -Force | Out-Null
+          }
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-artifact
+          path: android-artifact.zip
+
+  create-release:
+    name: Create Release and Attach Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-android]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Generate changelog and write body file
+        run: |
+          tag_ref=${GITHUB_REF##*/}
+          echo "Generating changelog for $tag_ref"
+          git fetch --no-tags --prune --unshallow || true
+          git log --pretty=format:"- %s (%an)" -n 200 $GITHUB_SHA > release-changelog.txt || true
+          printf "# Release %s\n\n" "$tag_ref" > body.md
+          cat release-changelog.txt >> body.md || true
+
+      - name: Create release and upload assets
+        uses: ncipollo/release-action@5f55df31e10e67a2ef62ea8f3fa1b926cee6f8b1
+        with:
+          tag: ${GITHUB_REF##*/}
+          name: "Release ${GITHUB_REF##*/}"
+          bodyFile: body.md
+          draft: false
+          prerelease: false
+          artifacts: "artifacts/windows-artifact/windows-artifact.zip,artifacts/android-artifact/android-artifact.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

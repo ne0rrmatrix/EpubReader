@@ -1,8 +1,5 @@
 ﻿using Android.Graphics;
 using Android.Webkit;
-using CommunityToolkit.Mvvm.Messaging;
-using EpubReader.Messages;
-using EpubReader.Util;
 using Microsoft.Maui.Handlers;
 
 namespace EpubReader.Controls;
@@ -18,10 +15,10 @@ class CustomWebViewClient : WebViewClient
 {
 	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
-	
+
 	readonly CancellationTokenSource cancellationTokenSource = new();
 	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CustomWebViewClient"/> class with the specified web view handler.
 	/// </summary>
@@ -45,6 +42,19 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.TextZoom = 100;
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
+		handler.PlatformView.AddJavascriptInterface(new JSBridge(), "jsBridge");
+		handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
+#pragma warning disable CA1422  // Type or member is obsolete
+		handler.PlatformView.Settings.SetAppCacheEnabled(true);
+		var absolutePath = Platform.AppContext.CacheDir?.AbsolutePath ?? throw new InvalidOperationException();
+		handler.PlatformView.Settings.SetAppCachePath(absolutePath);
+		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
+#pragma warning disable CS0618  // Type or member is obsolete
+		handler.PlatformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
+		handler.PlatformView.Settings.CacheMode = CacheModes.Default;
+#pragma warning restore CS0618  // Type or member is obsolete
+#pragma warning restore CA1422  // Type or member is obsolete
 	}
 
 	/// <summary>
@@ -60,6 +70,12 @@ class CustomWebViewClient : WebViewClient
 	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
 		var url = request?.Url?.ToString() ?? string.Empty;
+
+		// Allow the GitHub Pages site to load normally without interception
+		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
+		{
+			return base.ShouldInterceptRequest(view, request);
+		}
 		if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
 		{
 			return base.ShouldInterceptRequest(view, request);
@@ -67,14 +83,19 @@ class CustomWebViewClient : WebViewClient
 
 		var filename = System.IO.Path.GetFileName(url);
 		var mimeType = FileService.GetMimeType(filename);
-		
+
 		var getData = StreamAsync(url, cancellationTokenSource.Token);
-		
+
 		if (getData.IsFaulted || getData.IsCanceled)
 		{
 			return base.ShouldInterceptRequest(view, request);
 		}
-		return WebResourceResponseHelper.CreateFromHtmlString(getData.Result, mimeType, 200, "OK") ?? base.ShouldInterceptRequest(view, request);
+		// Ensure caching headers are present in the response so the WebView can store resources
+		var additionalHeaders = new Dictionary<string, string>
+		{
+			{ "Cache-Control", "public, max-age=86400" }
+		};
+		return WebResourceResponseHelper.CreateFromHtmlString(getData.Result, mimeType, 200, "OK", additionalHeaders) ?? base.ShouldInterceptRequest(view, request);
 	}
 
 	/// <summary>
@@ -107,7 +128,7 @@ class CustomWebViewClient : WebViewClient
 		{
 			return true;
 		}
-		if(url.Length > 1 || path.Contains(csharp))
+		if (url.Length > 1 || path.Contains(csharp))
 		{
 			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
 			return true;
@@ -121,7 +142,7 @@ class CustomWebViewClient : WebViewClient
 	/// <remarks>This method raises the <c>Navigating</c> event for the associated <see
 	/// cref="Microsoft.Maui.Controls.WebView"/> when a new page starts loading, unless the URL is null or contains the
 	/// string "csharp".</remarks>
-	/// <param name="view">The <see cref="Android.Webkit.WebView"/> that is initiating the callback.</param>
+	/// <param name="view">The <see cref="global::Android.Webkit.WebView"/> that is initiating the callback.</param>
 	/// <param name="url">The URL of the page being loaded. Cannot be null or contain the string "csharp".</param>
 	/// <param name="favicon">The favicon for the page, if available.</param>
 	public override void OnPageStarted(global::Android.Webkit.WebView? view, string? url, Bitmap? favicon)

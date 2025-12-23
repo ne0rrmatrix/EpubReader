@@ -1,6 +1,3 @@
-using CommunityToolkit.Maui.Views;
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 /// <summary>
@@ -19,7 +16,7 @@ public partial class FolderDialogePage : Popup
 		BindingContext = viewModel;
 	}
 
-	void CurrentPage_Unloaded(object sender, EventArgs e)
+	void CurrentPage_Unloaded(object? sender, EventArgs? e)
 	{
 		ViewModel?.OnClose();
 	}

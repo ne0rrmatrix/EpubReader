@@ -1,24 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.CalibrePage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
-    xmlns:models="clr-namespace:EpubReader.Models;assembly=EpubReader"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
-    xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
-    x:DataType="viewModels:CalibrePageViewModel"
+    x:DataType="CalibrePageViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
     <ContentPage.ToolbarItems>
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=LoadBooksCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=LoadBooksCommand}"
             IconImageSource="sync_24dp.png"
             Order="Primary" />
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SettingsCommand}"
+            Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=SettingsCommand}"
             IconImageSource="settings_lightmode.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
@@ -43,7 +38,7 @@
             </Grid.ColumnDefinitions>
             <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
                 <ImageButton
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -62,7 +57,7 @@
 
                 <ImageButton
                     Margin="10,10,0,0"
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=AlphabeticalTitleSortCommand}"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=AlphabeticalTitleSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -72,7 +67,7 @@
                                            Default=40}" />
                 <ImageButton
                     Margin="10,10,0,0"
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}, Path=SortByDateCommand}"
+                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=SortByDateCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -111,7 +106,7 @@
                     <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:Book">
+                    <DataTemplate x:DataType="Book">
                         <Grid
                             Margin="8"
                             Padding="8"
@@ -132,7 +127,7 @@
 
                                     <Button
                                         Grid.Row="1"
-                                        Command="{Binding AddBookCommand, x:DataType=viewModels:CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type viewModels:CalibrePageViewModel}}}"
+                                        Command="{Binding AddBookCommand, x:DataType=CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}}"
                                         CommandParameter="{Binding .}"
                                         HeightRequest="40"
                                         IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"

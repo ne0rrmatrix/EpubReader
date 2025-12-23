@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.BookPage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
-    xmlns:local="clr-namespace:EpubReader.Views"
-    xmlns:shimmer="clr-namespace:Syncfusion.Maui.Toolkit.Shimmer;assembly=Syncfusion.Maui.Toolkit"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
-    xmlns:views="clr-namespace:EpubReader.Views"
     x:Name="CurrentPage"
-    x:DataType="viewModels:BookViewModel"
+    x:DataType="BookViewModel"
     Loaded="CurrentPage_Loaded"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
-                                            Light={OnPlatform WinUI=White,
+                                            Light={OnPlatform WinUI={StaticResource White},
                                                               Default={StaticResource Blue200Accent}}}">
     <ContentPage.ToolbarItems>
         <ToolbarItem
@@ -24,118 +18,188 @@
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
     </ContentPage.ToolbarItems>
-    <shimmer:SfShimmer
-        x:Name="Shimmer"
-        AnimationDuration="3000"
-        IsActive="{Binding IsActive}">
-        <shimmer:SfShimmer.Content>
-            <Grid IgnoreSafeArea="{OnPlatform Android=True, iOS=True}">
-                <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
-                    <ScrollView.GestureRecognizers>
-                        <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenuAsync" />
-                    </ScrollView.GestureRecognizers>
-                    <Grid x:Name="menu" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}">
 
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+   
+    <Grid IgnoreSafeArea="{OnPlatform Android=False, iOS=True}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-                        <ImageButton
-                            x:Name="BackButton"
-                            Grid.Row="0"
-                            Margin="0,10,10,0"
-                            Clicked="CloseMenuAsync"
-                            HeightRequest="45"
-                            HorizontalOptions="{OnPlatform WinUI=End,
-                                                           MacCatalyst=End,
-                                                           Default=Start}"
-                            Source="close.png"
-                            VerticalOptions="Start"
-                            WidthRequest="45" />
-                        <VerticalStackLayout Grid.Row="0" HorizontalOptions="Center">
-                            <Label
-                                FontAttributes="Bold"
-                                FontSize="Header"
-                                HorizontalTextAlignment="{OnIdiom Phone=Center,
-                                                                  Tablet=Center}"
-                                Text="{Binding Book.Title}"
-                                TextColor="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor},
-                                                            Light={StaticResource AppBackgroundDarkColor}}"
-                                VerticalOptions="Start">
-                                <Label.Margin>
-                                    <OnPlatform x:TypeArguments="Thickness">
-                                        <On Platform="iOS" Value="50,10,10,0" />
-                                        <On Platform="Android" Value="50,10,0,0" />
-                                        <On Platform="WinUI" Value="400,10,60,0" />
-                                        <On Platform="MacCatalyst" Value="400,10,60,0" />
-                                    </OnPlatform>
-                                </Label.Margin>
-                            </Label>
-                            <Image
-                                Aspect="AspectFit"
-                                HeightRequest="{StaticResource CardHeight}"
-                                Source="{Binding CoverImage}"
-                                VerticalOptions="End">
-                                <Image.Margin>
-                                    <OnPlatform x:TypeArguments="Thickness">
-                                        <On Platform="iOS" Value="0,10,10,0" />
-                                        <On Platform="Android" Value="0,10,10,0" />
-                                        <On Platform="WinUI" Value="400,10,10,0" />
-                                        <On Platform="MacCatalyst" Value="400,10,10,0" />
-                                    </OnPlatform>
-                                </Image.Margin>
-                            </Image>
+        <!-- Overlay/menu (remains in content row so it can overlay the WebView if needed) -->
+        <ScrollView Grid.Row="0" HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
+            <ScrollView.GestureRecognizers>
+                <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenuAsync" />
+            </ScrollView.GestureRecognizers>
+            <Grid x:Name="menu" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
 
-                            <Label
-                                FontSize="Body"
-                                Text="{Binding Book.Description}"
-                                TextColor="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor},
-                                                            Light={StaticResource AppBackgroundDarkColor}}"
-                                TextType="Html"
-                                VerticalOptions="End"
-                                WidthRequest="280">
-                                <Label.Margin>
-                                    <OnPlatform x:TypeArguments="Thickness">
-                                        <On Platform="iOS" Value="0,10,10,0" />
-                                        <On Platform="Android" Value="0,10,10,0" />
-                                        <On Platform="WinUI" Value="400,10,10,0" />
-                                        <On Platform="MacCatalyst" Value="400,10,10,0" />
-                                    </OnPlatform>
-                                </Label.Margin>
-                            </Label>
-                        </VerticalStackLayout>
-                    </Grid>
-                </ScrollView>
-                <Grid x:Name="grid" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light=White}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="40" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <WebView
-                        x:Name="webView"
-                        Grid.Row="0"
-                        Navigated="webView_Navigated"
-                        Navigating="webView_Navigating"
-                        Scale="1"
-                        Source="{Binding Source}" />
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                    <Label
-                        x:Name="pageLabel"
-                        Grid.Row="1"
-                        FontSize="{OnPlatform Android=16,
-                                              iOS=16,
-                                              WinUI=20,
-                                              MacCatalyst=20}"
-                        HeightRequest="30"
-                        HorizontalOptions="Center" />
-                </Grid>
+                <ImageButton
+                    x:Name="BackButton"
+                    Grid.Row="0"
+                    Margin="0,10,10,0"
+                    Clicked="CloseMenuAsync"
+                    HeightRequest="45"
+                    HorizontalOptions="{OnPlatform WinUI=End,
+                                                   MacCatalyst=End,
+                                                   Default=Start}"
+                    Source="close.png"
+                    VerticalOptions="Start"
+                    WidthRequest="45" />
+                <Label
+                    x:Name="BookTitle"
+                    Grid.Row="0"
+                    FontAttributes="Bold"
+                    FontSize="{OnPlatform Android=20,
+                                          iOS=20,
+                                          WinUI=24,
+                                          MacCatalyst=24}"
+                    HorizontalOptions="Center"
+                    Margin="0,10,0,0"
+                    Text="{Binding BookTitle}"
+                    TextColor="{AppThemeBinding Dark={StaticResource White},
+                                                Light={StaticResource Black}}" />
             </Grid>
-        </shimmer:SfShimmer.Content>
-    </shimmer:SfShimmer>
+        </ScrollView>
+
+        <!-- Main content grid holding WebView and loading overlay -->
+        <Grid x:Name="grid" Grid.Row="0" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="40" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <WebView
+                x:Name="webView"
+                Grid.Row="0"
+                Navigated="webView_Navigated"
+                Navigating="webView_Navigating"
+                Scale="1"
+                Source="{Binding Source}" />
+
+            <Label
+                x:Name="pageLabel"
+                Grid.Row="2"
+                FontSize="{OnPlatform Android=16,
+                                      iOS=16,
+                                      WinUI=20,
+                                      MacCatalyst=20}"
+                HeightRequest="30"
+                HorizontalOptions="Center">
+                <Label.Triggers>
+                    <DataTrigger
+                        Binding="{Binding Path=BindingContext.IsReaderModeEnabled, Source={x:Reference CurrentPage}}"
+                        TargetType="Label"
+                        Value="True">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <!--  Native loading overlay shown while chapter renders and native settings apply  -->
+            <Grid
+                x:Name="NativeLoadingOverlay"
+                Grid.RowSpan="3"
+                BackgroundColor="{AppThemeBinding Dark={StaticResource OverlayDarkColor},
+                                                  Light={StaticResource OverlayLightColor}}"
+                HorizontalOptions="Fill"
+                IsVisible="False"
+                VerticalOptions="Fill">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0.6*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!--  Cover area: occupies ~60% of overlay height and centers the image  -->
+                <Grid
+                    Grid.Row="0"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center">
+                    <Image
+                        Aspect="AspectFit"
+                        HorizontalOptions="Center"
+                        Source="{Binding CoverImage}"
+                        VerticalOptions="Center" />
+                </Grid>
+
+                <!--  Activity indicator centered below the cover  -->
+                <HorizontalStackLayout
+                    Grid.Row="1"
+                    Padding="0,10,0,0"
+                    HorizontalOptions="Center"
+                    Spacing="8"
+                    VerticalOptions="Center">
+                    <ActivityIndicator
+                        HeightRequest="40"
+                        IsRunning="True"
+                        WidthRequest="40"
+                        Color="{AppThemeBinding Dark={StaticResource White},
+                                                Light={StaticResource Black}}" />
+                </HorizontalStackLayout>
+
+                <!--  Loading text  -->
+                <Label
+                    Grid.Row="2"
+                    Margin="0,6,0,0"
+                    FontAttributes="Bold"
+                    HorizontalOptions="Center"
+                    Text="Loading chapter..."
+                    TextColor="{AppThemeBinding Dark={StaticResource White},
+                                                Light={StaticResource Black}}"
+                    VerticalOptions="Start" />
+            </Grid>
+        </Grid>
+
+        <!-- Slider container moved OUTSIDE the WebView grid and placed in its own Auto row
+             This ensures the slider is a separate visual element below the page (not on top of it). -->
+        <VerticalStackLayout
+            x:Name="sliderContainer"
+            Grid.Row="1"
+            Padding="12,8"
+            BackgroundColor="Transparent"
+            HorizontalOptions="Fill"
+            IsVisible="False"
+            Spacing="8"
+            VerticalOptions="Center">
+
+            <Slider
+                x:Name="pageSlider"
+                DragCompleted="PageSlider_DragCompleted"
+                DragStarted="PageSlider_DragStarted"
+                HeightRequest="36"
+                Maximum="1"
+                MaximumTrackColor="{AppThemeBinding Dark={StaticResource SliderMaximumTrackDarkColor},
+                                                    Light={StaticResource SliderMaximumTrackLightColor}}"
+                Minimum="0"
+                MinimumTrackColor="{AppThemeBinding Dark={StaticResource Blue200Accent},
+                                                    Light={StaticResource Blue600}}"
+                ThumbColor="{AppThemeBinding Dark={StaticResource White},
+                                             Light={StaticResource Blue600}}"
+                ValueChanged="PageSlider_ValueChanged"
+                Value="0" />
+            <Label
+                x:Name="sliderPageLabel"
+                TextColor="{AppThemeBinding Dark={StaticResource White},
+                            Light={StaticResource Black}}"
+                IsVisible="{Binding isMenuOpen}"
+     Grid.Row="2"
+     FontSize="{OnPlatform Android=16,
+                           iOS=16,
+                           WinUI=20,
+                           MacCatalyst=20}"
+     HeightRequest="30"
+     HorizontalOptions="Center"/>
+        </VerticalStackLayout>
+    </Grid>
 </ContentPage>

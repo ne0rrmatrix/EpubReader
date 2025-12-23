@@ -2,33 +2,61 @@
 <?xaml-comp compile="true" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <Color x:Key="AppBackgroundLightColor">#FFFBF5</Color>
+    <!-- Material-inspired semantic colors -->
+    <Color x:Key="AppBackgroundLightColor">#FFFFFF</Color>
     <Color x:Key="AppBackgroundDarkColor">#121212</Color>
-    <Color x:Key="PrimaryColor">#FAFAFA</Color>
-    <Color x:Key="NavigationBarTextColor">#5D5D5D</Color>
+
+    <Color x:Key="SurfaceLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceDark">#121212</Color>
+
+    <Color x:Key="PrimaryColor">#1976D2</Color>
+    <Color x:Key="OnPrimaryColor">#FFFFFF</Color>
+    <Color x:Key="SecondaryColor">#03DAC6</Color>
+    <Color x:Key="OnSecondaryColor">#000000</Color>
+
+    <Color x:Key="BackgroundLight">#FFFFFF</Color>
+    <Color x:Key="BackgroundDark">#121212</Color>
+
+    <Color x:Key="TextPrimaryLight">#212121</Color>
+    <Color x:Key="TextSecondaryLight">#616161</Color>
+    <Color x:Key="TextPrimaryDark">#FFFFFF</Color>
+    <Color x:Key="TextSecondaryDark">#BDBDBD</Color>
+
     <Color x:Key="NormalButtonBackgroundColor">#1976D2</Color>
     <Color x:Key="NormalButtonTextColor">#FFFFFF</Color>
-    <Color x:Key="HeadingLabelTextColor">#5D5D5D</Color>
-    <Color x:Key="NormalLabelTextColor">#888888</Color>
-    <Color x:Key="DarkLabelTextColor">#000000</Color>
-    <Color x:Key="DarkLabelPlaceholderColor">#333d47</Color>
-    <Color x:Key="SoftBorderBackgroundColor">#ecf0f9</Color>
+    <Color x:Key="HeadingLabelTextColor">#212121</Color>
+    <Color x:Key="NormalLabelTextColor">#616161</Color>
+
+    <Color x:Key="SoftBorderBackgroundColor">#F5F5F5</Color>
     <Color x:Key="StatusbarColor">#1976D2</Color>
     <Color x:Key="NavBarColor">#1976D2</Color>
 
-    <Color x:Key="Pink">Pink</Color>
-    <Color x:Key="White">White</Color>
-    <Color x:Key="Black">Black</Color>
-    <Color x:Key="Gray100">#E1E1E1</Color>
-    <Color x:Key="Gray200">#C8C8C8</Color>
-    <Color x:Key="Gray300">#ACACAC</Color>
-    <Color x:Key="Gray400">#919191</Color>
-    <Color x:Key="Gray500">#6E6E6E</Color>
-    <Color x:Key="Gray600">#404040</Color>
+    <Color x:Key="Pink">#E91E63</Color>
+    <Color x:Key="White">#FFFFFF</Color>
+    <Color x:Key="Black">#000000</Color>
+    <Color x:Key="Gray100">#F5F5F5</Color>
+    <Color x:Key="Gray200">#EEEEEE</Color>
+    <Color x:Key="Gray300">#E0E0E0</Color>
+    <Color x:Key="Gray400">#BDBDBD</Color>
+    <Color x:Key="Gray500">#9E9E9E</Color>
+    <Color x:Key="Gray600">#757575</Color>
+    <Color x:Key="Gray700">#616161</Color>
     <Color x:Key="Gray900">#212121</Color>
-    <Color x:Key="Gray950">#141414</Color>
+    <Color x:Key="Gray950">#121212</Color>
+
+    <!-- Overlay colors used by native loading overlay -->
+    <Color x:Key="OverlayDarkColor">#CC000000</Color>
+    <Color x:Key="OverlayLightColor">#CCFFFFFF</Color>
+
+    <!-- Slider / control specific colors referenced from pages -->
+    <Color x:Key="SliderMaximumTrackDarkColor">#444444</Color>
+    <Color x:Key="SliderMaximumTrackLightColor">#CCCCCC</Color>
+
+    <!-- Additional blue shade used on some controls -->
+    <Color x:Key="Blue600">#1E88E5</Color>
 
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}" />
+    <SolidColorBrush x:Key="OnPrimaryBrush" Color="{StaticResource OnPrimaryColor}" />
     <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}" />
     <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}" />
     <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}" />
