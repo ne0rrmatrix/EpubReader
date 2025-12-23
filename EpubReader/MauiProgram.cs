@@ -46,12 +46,22 @@ public static class MauiProgram
 			fonts.AddFont("verdana.ttf", "Verdana");
 			fonts.AddFont("tahoma.ttf", "Tahoma");
 		})
-		.UseMauiCommunityToolkit(static options =>
-		{
-			options.SetShouldEnableSnackbarOnWindows(true);
-			options.SetPopupDefaults(new DefaultPopupSettings());
-			options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
-		})
+#if DEBUG
+								.UseMauiCommunityToolkit(static options =>
+								{
+									options.SetShouldEnableSnackbarOnWindows(true);
+									options.SetPopupDefaults(new DefaultPopupSettings());
+									options.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings());
+								})
+#else
+								.UseMauiCommunityToolkit(static options =>
+								{
+									options.SetShouldEnableSnackbarOnWindows(true);
+									options.SetShouldSuppressExceptionsInConverters(true);
+									options.SetShouldSuppressExceptionsInBehaviors(true);
+									options.SetShouldSuppressExceptionsInAnimations(true);
+								})
+#endif
 		.ConfigureSyncfusionToolkit()
 		.UseFFImageLoading()
 		.RegisterFirebaseServices()

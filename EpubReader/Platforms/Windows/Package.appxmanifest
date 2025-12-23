@@ -4,21 +4,23 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap com desktop">
 
-  <Identity Name="EpubReader" Publisher="CN=User Name" Version="0.0.4.0" />
+  <Identity Name="10308AHDFTech.EpubReaderForWindows" Publisher="CN=42FEAAAA-0C11-4CEA-A522-2EB887E2DE06" Version="1.1.4.0" />
 
-  <mp:PhoneIdentity PhoneProductId="1D9209E3-4521-4BF2-9117-0D531E14C1E6" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="a7c49dde-9973-49c9-b6a4-551cc0b750a7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>EpubReader</DisplayName>
-    <PublisherDisplayName>EpubReader</PublisherDisplayName>
+    <DisplayName>EpubReader For Windows</DisplayName>
+    <PublisherDisplayName>AHDF Tech</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
   <Resources>
@@ -36,6 +38,23 @@
         <uap:DefaultTile Square71x71Logo="$placeholder$.png" Wide310x150Logo="$placeholder$.png" Square310x310Logo="$placeholder$.png" />
         <uap:SplashScreen Image="$placeholder$.png" />
       </uap:VisualElements>
+
+        <Extensions>
+
+            <desktop:Extension Category="windows.toastNotificationActivation">
+                <desktop:ToastNotificationActivation ToastActivatorCLSID="75ae042c-2737-4d9f-8df1-019273e1be72" />
+            </desktop:Extension>
+
+            <com:Extension Category="windows.comServer">
+                <com:ComServer>
+                    <com:ExeServer Executable="EpubReader\EpubReader.exe" DisplayName="$targetnametoken$" Arguments="----AppNotificationActivated:">
+                        <!-- Example path to executable: CommunityToolkit.Maui.Sample\CommunityToolkit.Maui.Sample.exe -->
+                        <com:Class Id="75ae042c-2737-4d9f-8df1-019273e1be72" />
+                    </com:ExeServer>
+                </com:ComServer>
+            </com:Extension>
+
+        </Extensions>
     </Application>
   </Applications>
 

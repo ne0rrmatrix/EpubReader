@@ -281,8 +281,7 @@ The scripts will sign artifacts when `ANDROID_KEYSTORE` points to a valid file.
 
 ---
 </textarea>
-
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
   <script>
     (function(){
       const meta = document.getElementById('theme-color-meta');
@@ -300,7 +299,7 @@ The scripts will sign artifacts when `ANDROID_KEYSTORE` points to a valid file.
   </script>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
-      const md = document.getElementById('md').value.replace(/\u001F/g,'');
+      const md = document.getElementById('md').value;
       const content = document.getElementById('content');
       try {
         content.innerHTML = marked.parse(md);
