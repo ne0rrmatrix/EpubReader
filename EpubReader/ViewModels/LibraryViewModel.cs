@@ -290,8 +290,16 @@ public partial class LibraryViewModel : BaseViewModel
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};
-
+			settingsPopup.Closed += async (s, e) =>
+			{
+				Logger.Info("Settings popup closed.");
+				var temp = await db.GetAllBooks();
+				temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
+				Books = [.. temp];
+				AlphabeticalTitleSort();
+			};
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+			
 			if (result.WasDismissedByTappingOutsideOfPopup)
 			{
 				Logger.Info("Settings popup dismissed by tapping outside.");

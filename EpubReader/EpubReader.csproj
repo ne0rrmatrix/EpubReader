@@ -34,11 +34,6 @@
     <TrimMode>partial</TrimMode>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);MauiAllowImplicitXmlnsDeclaration</DefineConstants>
-    <EnablePreviewFeatures>true</EnablePreviewFeatures>
-  </PropertyGroup>
-
   <ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" BaseSize="128,128" />
@@ -113,21 +108,15 @@
     <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.3" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.11" />
     <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
-    
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
-    <PackageReference Include="Xamarin.Build.Download" Version="0.11.4" />
-   
-  </ItemGroup>
-  
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0"/>
     <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
     <PackageReference Update="Xamarin.AndroidX.Fragment" Version="1.8.9" />
     <PackageReference Update="Xamarin.AndroidX.Activity" Version="1.12.0" />
     <PackageReference Update="Xamarin.AndroidX.SavedState" Version="1.4.0" />
-    <!-- If additional NU1608 warnings appear, add Update entries here for the offending packages only -->
+    <PackageReference Include="Xamarin.Build.Download" Version="0.11.4" />
   </ItemGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">

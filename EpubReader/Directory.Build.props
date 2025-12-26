@@ -27,6 +27,9 @@
     <StripSymbols>false</StripSymbols>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
 
+    <DefineConstants>$(DefineConstants);MauiAllowImplicitXmlnsDeclaration</DefineConstants>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+
     <!-- WarningsAsErrors
      CS0419: Ambiguous reference in cref attribute 
      CS1570: XML comment has badly formed XML 'Expected an end tag for element [parameter] 
