@@ -2,6 +2,7 @@
 <Project>
   <PropertyGroup>
     <Nullable>enable</Nullable>
+    <!-- Remove MCTEXP001 once the BindablePropertySourceGenerator is Released and no longer in Experimental -->
     <NoWarn>NETSDK1023,MCTEXP001</NoWarn>
     <NetVersion>net10.0</NetVersion>
     <LangVersion>preview</LangVersion>
@@ -209,6 +210,7 @@
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
+
 
   <!-- Required for NuGet Source Link -->
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">
