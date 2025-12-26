@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -8,7 +8,7 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap rescap com desktop">
 
-  <Identity Name="10308AHDFTech.EpubReaderForWindows" Publisher="CN=42FEAAAA-0C11-4CEA-A522-2EB887E2DE06" Version="1.1.4.0" />
+  <Identity Name="10308AHDFTech.EpubReaderForWindows" Publisher="CN=42FEAAAA-0C11-4CEA-A522-2EB887E2DE06" Version="1.1.5.0" />
 
   <mp:PhoneIdentity PhoneProductId="a7c49dde-9973-49c9-b6a4-551cc0b750a7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
