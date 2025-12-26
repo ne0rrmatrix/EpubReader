@@ -2,7 +2,7 @@
 <Project>
   <PropertyGroup>
     <Nullable>enable</Nullable>
-    <NoWarn>NETSDK1023</NoWarn>
+    <NoWarn>NETSDK1023,MCTEXP001</NoWarn>
     <NetVersion>net10.0</NetVersion>
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -223,10 +223,5 @@
 
     <!-- Embed symbols containing Source Link in the main file (exe/dll) -->
     <DebugType>embedded</DebugType>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="('$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true') and $([MSBuild]::IsOSPlatform('windows')) == 'true'">
-    <!-- Re-enable Tizen once it includes support for .NET 10 -->
-    <IncludeTizenTargetFrameworks>false</IncludeTizenTargetFrameworks>
   </PropertyGroup>
 </Project>
