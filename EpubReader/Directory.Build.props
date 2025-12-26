@@ -210,14 +210,6 @@
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <FirebaseApiKey Condition="'$(FirebaseApiKey)' == ''">$(FIREBASE_API_KEY)</FirebaseApiKey>
-    <FirebaseAuthDomain Condition="'$(FirebaseAuthDomain)' == ''">$(FIREBASE_AUTH_DOMAIN)</FirebaseAuthDomain>
-    <FirebaseDatabaseUrl Condition="'$(FirebaseDatabaseUrl)' == ''">$(FIREBASE_DATABASE_URL)</FirebaseDatabaseUrl>
-    <FirebaseSecretsGeneratedDirectory>$(IntermediateOutputPath)Generated</FirebaseSecretsGeneratedDirectory>
-    <FirebaseSecretsGeneratedFile>$(FirebaseSecretsGeneratedDirectory)\FirebaseSecrets.g.cs</FirebaseSecretsGeneratedFile>
-  </PropertyGroup>
-
   <!-- Required for NuGet Source Link -->
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true' OR '$(GITHUB_ACTIONS)' == 'true'">
     <!--  Ensure deterministic build when using Azure Pipelines or GitHub Actions-->

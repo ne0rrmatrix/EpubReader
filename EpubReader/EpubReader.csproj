@@ -18,8 +18,8 @@
 		<ApplicationId>com.companyname.epubreader</ApplicationId>
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>8</ApplicationVersion>
+		<ApplicationDisplayVersion>1.01</ApplicationDisplayVersion>
+		<ApplicationVersion>9</ApplicationVersion>
 
 		<!--
 		Uncomment the line below if you need to debug the SG code
@@ -74,17 +74,11 @@
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-  </PropertyGroup>
-  
-  <!-- Local secrets file paths (can be overridden by Directory.Build.props or environment) -->
-  <PropertyGroup>
-    <LocalSecretsRoot>$(MSBuildProjectDirectory)\build-secrets</LocalSecretsRoot>
-    <AndroidSecretsJson>$(LocalSecretsRoot)\google-services.json</AndroidSecretsJson>
   </PropertyGroup>
   
   <!-- Local secrets file paths (can be overridden by Directory.Build.props or environment) -->
@@ -180,53 +174,4 @@
 			<Registrar>static</Registrar>
 		</PropertyGroup>
 	</Target>
-
-  <!-- Ensure the compiler-generated files output directory exists to avoid CS0016 write errors
-       when source generators attempt to write files. This proactively creates the directory
-       (e.g. obj\GeneratedFiles) before compilation. -->
-  <Target Name="EnsureCompilerGeneratedFilesOutputPath" BeforeTargets="CoreCompile;GenerateResource;GenerateNativeImage;Compile">
-    <MakeDir Directories="$(CompilerGeneratedFilesOutputPath)" Condition="'$(CompilerGeneratedFilesOutputPath)' != '' and !Exists('$(CompilerGeneratedFilesOutputPath)')" />
-  </Target>
-
-  <!-- Provision canonical build-secrets/google-services.json into Resources/Raw for the build
-       if present in the repository (copy from ../build-secrets or ./build-secrets). The file
-       will be removed after Build/Publish if it was provisioned by this MSBuild target.
-       This avoids requiring external build scripts to stage the runtime resource. -->
-  <Target Name="ProvisionGoogleServicesJson" BeforeTargets="CoreCompile;GenerateResource;Compile;Publish">
-    <PropertyGroup>
-      <_GoogleServicesSource1>$(MSBuildProjectDirectory)\..\build-secrets\google-services.json</_GoogleServicesSource1>
-      <_GoogleServicesSource2>$(MSBuildProjectDirectory)\build-secrets\google-services.json</_GoogleServicesSource2>
-      <_GoogleServicesDest>$(MSBuildProjectDirectory)\Resources\Raw\google-services.json</_GoogleServicesDest>
-       <!-- Use a TFM-specific provision marker so cleanup only removes the file for the TFM
-         that created it (prevents an earlier Publish for another TFM from deleting the
-         resource before Android packaging runs). -->
-       <_ProvisionMarker>$(IntermediateOutputPath)google_services_provisioned_$(TargetFramework).txt</_ProvisionMarker>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <_GoogleSource Include="$([System.IO.Path]::GetFullPath('$(_GoogleServicesSource1)'))" Condition="Exists('$(_GoogleServicesSource1)')" />
-      <_GoogleSource Include="$([System.IO.Path]::GetFullPath('$(_GoogleServicesSource2)'))" Condition="Exists('$(_GoogleServicesSource2)')" />
-    </ItemGroup>
-
-    <Message Text="Provisioning google-services.json from %(_GoogleSource.Identity) to $(_GoogleServicesDest)" Importance="Normal" Condition=" '@(_GoogleSource)' != '' " />
-    <MakeDir Directories="$(MSBuildProjectDirectory)\Resources\Raw" Condition="'@(_GoogleSource)' != '' and !Exists('$(MSBuildProjectDirectory)\Resources\Raw')" />
-    <Copy SourceFiles="@(_GoogleSource)" DestinationFiles="$(_GoogleServicesDest)" SkipUnchangedFiles="true" Condition="'@(_GoogleSource)' != ''" />
-    <WriteLinesToFile File="$(_ProvisionMarker)" Lines="%(_GoogleSource.Identity)" Overwrite="true" Condition="'@(_GoogleSource)' != ''" />
-  </Target>
-
-  <!-- Cleanup the provisioned runtime resource after packaging. Only remove the file if the
-       provision marker was created by this target. Runs after Publish/Pack to avoid removing
-       the resource between multi-target builds. -->
-  <Target Name="CleanupProvisionedGoogleServicesJson" AfterTargets="Publish;Pack">
-    <PropertyGroup>
-      <_ProvisionMarkerFile>$(IntermediateOutputPath)google_services_provisioned.txt</_ProvisionMarkerFile>
-      <_GoogleServicesDest>$(MSBuildProjectDirectory)\Resources\Raw\google-services.json</_GoogleServicesDest>
-    </PropertyGroup>
-    <ItemGroup>
-      <_ProvisionMarker Include="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" />
-    </ItemGroup>
-    <Message Text="Cleaning up provisioned google-services.json for $(TargetFramework) (if any)" Importance="Normal" Condition="Exists('$(_ProvisionMarkerFile)')" />
-    <Delete Files="$(_GoogleServicesDest)" Condition="Exists('$(_ProvisionMarkerFile)') and Exists('$(_GoogleServicesDest)')" ContinueOnError="true" />
-    <Delete Files="$(_ProvisionMarkerFile)" Condition="Exists('$(_ProvisionMarkerFile)')" ContinueOnError="true" />
-  </Target>
 </Project>
