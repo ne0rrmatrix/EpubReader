@@ -8,15 +8,40 @@
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
     Unloaded="CurrentPage_Unloaded">
-    <VerticalStackLayout Spacing="10" WidthRequest="225">
+    <Grid WidthRequest="225" RowSpacing="10"  RowDefinitions="Auto,Auto,Auto,Auto,Auto">
         <Label
+            Grid.Row="0"
+            HeightRequest="75"
             HorizontalOptions="Center"
             Text="{Binding Text}"
+            VerticalOptions="Start" />
+
+        <Label
+            Grid.Row="1"
+            HorizontalOptions="Center"
+            Text="{Binding CounterText}"
             VerticalOptions="Center" />
+
+        <ProgressBar
+            Grid.Row="2"
+            Margin="12,8"
+            Progress="{Binding Progress}"
+            HorizontalOptions="FillAndExpand"
+            VerticalOptions="Center"
+            BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
+            />
+
+        <Label
+            Grid.Row="3"
+            HorizontalOptions="Center"
+            Text="{Binding ProgressPercent, StringFormat='{}{0}%'}"
+            VerticalOptions="Center" />
+
         <Button
+            Grid.Row="4"
             Command="{Binding Source={RelativeSource AncestorType={x:Type FolderDialogPageViewModel}}, Path=CancelCommand}"
             HorizontalOptions="Center"
             Text="Cancel"
             VerticalOptions="End" />
-    </VerticalStackLayout>
+    </Grid>
 </toolkit:Popup>
