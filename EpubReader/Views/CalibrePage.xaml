@@ -101,6 +101,7 @@
                 HorizontalScrollBarVisibility="Never"
                 ItemsSource="{Binding Books}"
                 SelectionMode="None"
+                ItemsUpdatingScrollMode="KeepScrollOffset"
                 VerticalScrollBarVisibility="Never">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />

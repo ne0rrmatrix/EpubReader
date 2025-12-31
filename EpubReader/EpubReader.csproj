@@ -111,7 +111,7 @@
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
-    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0"/>
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0" />
     <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
     <PackageReference Update="Xamarin.AndroidX.Fragment" Version="1.8.9" />
     <PackageReference Update="Xamarin.AndroidX.Activity" Version="1.12.0" />
