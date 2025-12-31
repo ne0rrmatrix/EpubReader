@@ -3,10 +3,6 @@
 /// <summary>
 /// Provides functionality to process EPUB files, including selecting, validating, and saving them to a library.
 /// </summary>
-/// <remarks>This class is responsible for handling EPUB files by allowing users to select files, process them
-/// asynchronously, and save them to a library. It supports operations such as checking if a book is already in the
-/// library and validating the saved files. The class uses platform-specific file type configurations for EPUB files and
-/// integrates with services for file operations and messaging.</remarks>
 public partial class ProcessEpubFiles : BaseViewModel
 {
 	static readonly string[] epubExtensions = [".epub"];
@@ -96,7 +92,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file {filePath}: {ex.Message}");
-			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}");
+			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}").ConfigureAwait(false);
 		}
 	}
 
@@ -112,9 +108,10 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			var fileNameOnly = Path.GetFileName(filePath);
-			ebook.FilePath = await FileService.SaveFileAsync(stream, fileNameOnly, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(fileNameOnly, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
+			// Prefer a human-friendly title as the saved filename when available (sanitized inside FileService).
+			var bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, bookName, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 			if (ValidateBookFiles(ebook))
@@ -230,8 +227,13 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
+			// Use ebook.Title when available — it is more stable than FileResult.FileName across platforms.
+			var bookName = !string.IsNullOrWhiteSpace(ebook.Title)
+				? ebook.Title
+				: Path.GetFileNameWithoutExtension(fileResult.FileName);
+
+			ebook.FilePath = await FileService.SaveFileAsync(fileResult, bookName, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
 			{

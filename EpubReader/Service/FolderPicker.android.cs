@@ -75,7 +75,7 @@ public partial class FolderPicker : IFolderPicker
 
 		try
 		{
-			return await OpenEpubStreamAsync(epubFilePath);
+			return await OpenEpubStreamAsync(epubFilePath).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -167,7 +167,7 @@ public partial class FolderPicker : IFolderPicker
 		}
 
 		var stream = new MemoryStream();
-		await inputStream.CopyToAsync(stream);
+		await inputStream.CopyToAsync(stream).ConfigureAwait(false);
 		stream.Position = 0; // Reset position to the beginning of the stream
 		return stream;
 	}

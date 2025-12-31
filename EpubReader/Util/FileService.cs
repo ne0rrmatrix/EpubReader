@@ -3,10 +3,6 @@
 /// <summary>
 /// Provides static methods for file and directory operations, including deletion and saving of files and images.
 /// </summary>
-/// <remarks>The <see cref="FileService"/> class offers utility methods to manage files and directories, such as
-/// deleting directories and files, and saving images and files asynchronously. It logs informational and error messages
-/// during operations to assist with monitoring and debugging. The class is designed to work with a specific save
-/// directory, which is determined by the application's local data folder.</remarks>
 public static partial class FileService
 {
 	#region Constants and Static Fields
@@ -165,9 +161,15 @@ public static partial class FileService
 			}
 
 			var fileName = GenerateEpubFileName(bookName, directoryPath);
-			var fileBytes = await ReadStreamToBytesAsync(stream, cancellation).ConfigureAwait(false);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes, cancellation).ConfigureAwait(false);
+			// Stream directly to the target file to avoid buffering entire file in memory.
+			using var outStream = File.Create(fileName);
+			if (stream.CanSeek)
+			{
+				stream.Position = 0;
+			}
+			await stream.CopyToAsync(outStream, cancellation).ConfigureAwait(false);
+
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
@@ -213,9 +215,9 @@ public static partial class FileService
 			var fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
 
 			using var fileStream = await result.OpenReadAsync().ConfigureAwait(false);
-			var fileBytes = await ReadStreamToBytesAsync(fileStream, cancellationToken).ConfigureAwait(false);
+			using var outStream = File.Create(fileName);
+			await fileStream.CopyToAsync(outStream, cancellationToken).ConfigureAwait(false);
 
-			await File.WriteAllBytesAsync(fileName, fileBytes, cancellationToken).ConfigureAwait(false);
 			logger.Info($"File saved: {fileName}");
 			return fileName;
 		}
