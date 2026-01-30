@@ -181,7 +181,7 @@ public partial class LibraryViewModel : BaseViewModel
 			CancellationTokenSource = new CancellationTokenSource();
 		}
 
-		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			Logger.Info("No folder selected");
@@ -194,7 +194,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Info("File dialog popup closed.");
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		};
-		LoadPopup();
+		await Dispatcher.DispatchAsync(LoadPopup).ConfigureAwait(false);
 
 		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 

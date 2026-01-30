@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
     <TargetFrameworks>$(NetVersion)-ios;$(NetVersion)-android;$(NetVersion)-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);$(NetVersion)-windows10.0.19041.0</TargetFrameworks>
@@ -78,16 +78,16 @@
     <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
-    <PackageReference Include="VersOne.Epub" Version="3.3.4" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.1" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview980" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview980" />
+    <PackageReference Include="VersOne.Epub" Version="3.3.5" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="14.0.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.0.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.8" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.1" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.2" />
     <PackageReference Include="Plugin.Firebase" Version="3.1.1" />
     <PackageReference Include="Plugin.Firebase.Auth" Version="3.1.0" />
     <PackageReference Include="Plugin.Firebase.Auth.Google" Version="3.1.0" />

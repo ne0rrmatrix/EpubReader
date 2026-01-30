@@ -50,8 +50,6 @@ public static partial class EbookService
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
 
-	static readonly EpubReaderOptions options = CreateEpubReaderOptions();
-
 	const int coverImageWidth = 200;
 	const int coverImageHeight = 400;
 
@@ -166,8 +164,7 @@ public static partial class EbookService
 	{
 		try
 		{
-			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(path, options).ConfigureAwait(false);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(path, EpubReaderOptionsPreset.IGNORE_ALL_ERRORS).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -180,36 +177,13 @@ public static partial class EbookService
 	{
 		try
 		{
-			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, options).ConfigureAwait(false);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, EpubReaderOptionsPreset.IGNORE_ALL_ERRORS).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Get Listing Error: {ex.Message}");
 			return null;
 		}
-	}
-
-
-	static void ConfigureContentFileMissingHandler()
-	{
-		options.ContentReaderOptions.ContentFileMissing += (sender, e) =>
-		{
-			logger.Warn($"Content file missing: {e.FileKey}. Exception suppressed.");
-			e.SuppressException = true;
-		};
-	}
-
-	static EpubReaderOptions CreateEpubReaderOptions()
-	{
-		return new EpubReaderOptions
-		{
-			BookCoverReaderOptions = new() { Epub2MetadataIgnoreMissingManifestItem = true },
-			Epub2NcxReaderOptions = new() { IgnoreMissingContentForNavigationPoints = true },
-			PackageReaderOptions = new() { IgnoreMissingToc = true },
-			SpineReaderOptions = new() { IgnoreMissingManifestItems = true },
-			XmlReaderOptions = new() { SkipXmlHeaders = true },
-		};
 	}
 
 	#endregion

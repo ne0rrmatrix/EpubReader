@@ -10,12 +10,11 @@ public partial class ProcessEpubFiles : BaseViewModel
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(ProcessEpubFiles));
-	public readonly IFolderPicker FolderPicker;
-	public readonly FilePickerFileType CustomFileType;
+	public readonly IFolderPicker FolderPicker = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
+			?? throw new InvalidOperationException("IFolderPicker service not available");
+	public readonly FilePickerFileType CustomFileType = CreateCustomFileType();
 	public ProcessEpubFiles()
 	{
-		FolderPicker = GetFolderPickerService();
-		CustomFileType = CreateCustomFileType();
 	}
 
 	/// <summary>
@@ -48,7 +47,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// <param name="filePath">The path to the EPUB file.</param>
 	/// <param name="cancellationToken">Cancellation token for the operation.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ProcessSingleEpubFileAsync(string filePath, int maxCount, int count, CancellationToken cancellationToken)
+	public async Task ProcessSingleEpubFileAsync(string filePath, int? maxCount, int count, CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -81,12 +80,12 @@ public partial class ProcessEpubFiles : BaseViewModel
 				WeakReferenceMessenger.Default.Send(new FolderMessage(new FolderInfo
 				{
 					Title = ebook.Title,
-					MaxCount = maxCount,
+					MaxCount = maxCount ?? 0,
 					Count = count,
 				}));
 				logger.Info($"Processing file {Path.GetFileName(filePath)} ({count}/{maxCount})");
 				stream.Seek(0, SeekOrigin.Begin);
-				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken);
+				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (Exception ex)
@@ -162,17 +161,6 @@ public partial class ProcessEpubFiles : BaseViewModel
 		}
 	}
 	#region Private Helper Methods
-
-	/// <summary>
-	/// Gets the folder picker service from the application's service container.
-	/// </summary>
-	/// <returns>The folder picker service instance.</returns>
-	/// <exception cref="InvalidOperationException">Thrown if the service cannot be resolved.</exception>
-	static IFolderPicker GetFolderPickerService()
-	{
-		return Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
-			?? throw new InvalidOperationException("IFolderPicker service not available");
-	}
 
 	/// <summary>
 	/// Creates the custom file type configuration for EPUB files across different platforms.

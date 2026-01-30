@@ -38,12 +38,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial double Progress { get; set; } = 0.0;
 
-	/// <summary>
-	/// Gets or sets a value indicating whether the element should be visible.
-	/// </summary>
-	[ObservableProperty]
-	public partial bool ShouldBeVisible { get; set; } = false;
-
 	public FolderDialogPageViewModel()
 	{
 		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => {
@@ -52,7 +46,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 			CounterText = $"{info.Count}/{info.MaxCount}";
 			Count = info.Count;
 			MaxCount = info.MaxCount;
-			ShouldBeVisible = true;
 		});
 	}
 
@@ -111,7 +104,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	void Cancel()
 	{
 		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
-		ShouldBeVisible = false;
 	}
 
 	/// <summary>
@@ -122,7 +114,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	/// proper cleanup.</remarks>
 	public void OnClose()
 	{
-		ShouldBeVisible = false;
 		WeakReferenceMessenger.Default.UnregisterAll(this);
 	}
 }
