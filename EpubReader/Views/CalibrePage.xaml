@@ -2,7 +2,6 @@
 <ContentPage
     x:Class="EpubReader.Views.CalibrePage"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
-    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Name="CurrentPage"
     x:DataType="CalibrePageViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
@@ -101,6 +100,7 @@
                 HorizontalScrollBarVisibility="Never"
                 ItemsSource="{Binding Books}"
                 SelectionMode="None"
+                ItemsUpdatingScrollMode="KeepScrollOffset"
                 VerticalScrollBarVisibility="Never">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />

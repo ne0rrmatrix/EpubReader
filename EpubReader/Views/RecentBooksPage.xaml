@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.RecentBooksPage"
+    xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    x:DataType="RecentBooksViewModel"
+    Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                            Light={StaticResource Blue200Accent}}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}, Path=CalibreCommand}"
+            IconImageSource="globe_book_24dp.png"
+            Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}, Path=SettingsCommand}"
+            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
+                                                                Default=settings_lightmode.png},
+                                              Dark=settings_lightmode.png}"
+            Order="Primary" />
+    </ContentPage.ToolbarItems>
+    <Grid>
+        <!--  Empty State  -->
+        <VerticalStackLayout
+            x:Name="EmptyStateContainer"
+            HorizontalOptions="Center"
+            IsVisible="{Binding IsEmpty}"
+            Spacing="16"
+            VerticalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                FontSize="24"
+                HorizontalOptions="Center"
+                Text="No Recent Books"
+                TextColor="{AppThemeBinding Light={StaticResource Black},
+                                            Dark={StaticResource White}}" />
+            <Label
+                FontSize="14"
+                HorizontalOptions="Center"
+                Text="Books you open will appear here"
+                TextColor="{AppThemeBinding Light=#666666,
+                                            Dark=#CCCCCC}" />
+        </VerticalStackLayout>
+
+        <!--  Recent Books Grid  -->
+        <CollectionView
+            Margin="{StaticResource CollectionMargin}"
+            HorizontalScrollBarVisibility="Never"
+            IsVisible="{Binding IsEmpty, Converter={toolkit:InvertedBoolConverter}}"
+            ItemsSource="{Binding RecentBooks}"
+            ItemsUpdatingScrollMode="KeepScrollOffset"
+            SelectionMode="None"
+            VerticalScrollBarVisibility="Never">
+
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
+            </CollectionView.ItemsLayout>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="Book">
+                    <Grid Margin="4" Padding="4">
+                        <Border Style="{x:StaticResource EbookCardStyle}">
+                            <VerticalStackLayout
+                                Margin="4"
+                                Padding="4"
+                                HorizontalOptions="Center">
+                                <ffimageloading:CachedImage
+                                    Aspect="AspectFit"
+                                    HeightRequest="250"
+                                    Source="{Binding CoverImagePath}">
+                                    <ffimageloading:CachedImage.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding GotoBookDetailsCommand, x:DataType=RecentBooksViewModel, Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}}" CommandParameter="{Binding .}" />
+                                    </ffimageloading:CachedImage.GestureRecognizers>
+                                </ffimageloading:CachedImage>
+
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

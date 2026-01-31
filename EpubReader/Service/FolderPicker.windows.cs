@@ -100,7 +100,7 @@ public partial class FolderPicker : IFolderPicker
 		var file = await StorageFile.GetFileFromPathAsync(epubFilePath);
 		if (file is not null)
 		{
-			return await file.OpenStreamForReadAsync();
+			return await file.OpenStreamForReadAsync().ConfigureAwait(false);
 
 		}
 		return Stream.Null; // Return an empty stream if the file is not found or cannot be opened

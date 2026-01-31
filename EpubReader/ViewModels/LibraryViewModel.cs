@@ -155,21 +155,6 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// Initiates the Calibre integration process asynchronously.
-	/// </summary>
-	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
-	/// placeholder for future implementation.</returns>
-	[RelayCommand]
-	async Task Calibre()
-	{
-		if (CancellationTokenSource.IsCancellationRequested)
-		{
-			CancellationTokenSource = new CancellationTokenSource();
-		}
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
-	}
-
-	/// <summary>
 	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
@@ -181,7 +166,7 @@ public partial class LibraryViewModel : BaseViewModel
 			CancellationTokenSource = new CancellationTokenSource();
 		}
 
-		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			Logger.Info("No folder selected");
@@ -194,7 +179,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Info("File dialog popup closed.");
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		};
-		LoadPopup();
+		await Dispatcher.DispatchAsync(LoadPopup).ConfigureAwait(false);
 
 		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 
@@ -290,8 +275,16 @@ public partial class LibraryViewModel : BaseViewModel
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};
-
+			settingsPopup.Closed += async (s, e) =>
+			{
+				Logger.Info("Settings popup closed.");
+				var temp = await db.GetAllBooks();
+				temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
+				Books = [.. temp];
+				AlphabeticalTitleSort();
+			};
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+			
 			if (result.WasDismissedByTappingOutsideOfPopup)
 			{
 				Logger.Info("Settings popup dismissed by tapping outside.");

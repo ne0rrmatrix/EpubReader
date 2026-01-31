@@ -6,7 +6,7 @@ namespace EpubReader.Models;
 /// Represents per-book reading progress used for local persistence and cloud sync.
 /// </summary>
 [Table("ReadingProgress")]
-public class ReadingProgress
+public class ReadingProgress : Shared
 {
 	[PrimaryKey]
 	[Column("BookId")]

@@ -53,7 +53,17 @@ public partial class Db : IDb
 		await EnsureSyncIdColumnAsync(cancellationToken);
 		await BackfillBookSyncIdsAsync(cancellationToken);
 		await EnsureBookMediaOverlayColumnsAsync(conn, cancellationToken);
+		await EnsureLastOpenedDateColumnAsync(conn, cancellationToken);
 		isInitialized = true;
+	}
+
+	static async Task EnsureLastOpenedDateColumnAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		await EnsureColumnsAsync(
+			connection,
+			"Book",
+			[("LastOpenedDate", "DATETIME")],
+			cancellationToken);
 	}
 
 	static async Task EnsureBookMediaOverlayColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
@@ -214,6 +224,22 @@ public partial class Db : IDb
 		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
 		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
 		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
+	}
+
+	/// <summary>
+	/// Updates only the last opened date column for the specified book.
+	/// </summary>
+	public async Task UpdateBookLastOpenedDate(Guid bookId, DateTime lastOpenedDate, CancellationToken cancellationToken = default)
+	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		var sql = "UPDATE Book SET LastOpenedDate = ? WHERE Id = ?";
+		await conn.ExecuteAsync(sql, lastOpenedDate, bookId).WaitAsync(cancellationToken);
 	}
 
 	public async Task UpdateBookMediaOverlayProgress(
