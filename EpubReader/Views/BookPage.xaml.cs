@@ -13,6 +13,7 @@ using EpubReader.Extensions;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
+using Microsoft.Maui.Dispatching;
 using Plugin.Maui.Audio;
 
 /// <summary>
@@ -1151,6 +1152,17 @@ public partial class BookPage : ContentPage, IDisposable
 			Trace.TraceWarning($"Failed updating local book progress in DB: {ex.Message}");
 		}
 
+		// Update the book's LastOpenedDate to track recent reads
+		try
+		{
+			book.LastOpenedDate = DateTime.UtcNow;
+			await db.SaveBookData(book, token);
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed updating book LastOpenedDate: {ex.Message}");
+		}
+
 		// Persist Media Overlay playback state to the main Book DB for local-only users.
 		try
 		{
@@ -1188,6 +1200,8 @@ public partial class BookPage : ContentPage, IDisposable
 			DeviceId = string.Empty,
 			DeviceName = string.Empty,
 			IsSynced = false,
+			DateAdded = book.DateAdded.ToString("o"),
+			LastOpenedDate = book.LastOpenedDate?.ToString("o")
 		};
 
 		// Include Media Overlay playback state when available.
@@ -1349,7 +1363,32 @@ public partial class BookPage : ContentPage, IDisposable
 			? parsed
 			: DateTimeOffset.MinValue;
 	}
+	/*
+	/// <summary>
+	/// Handles the back button press event, navigating to the home page instead of using default back navigation.
+	/// </summary>
+	/// <returns>True to indicate the back button press was handled.</returns>
+	protected override bool OnBackButtonPressed()
+	{
+		Dispatcher.Dispatch(async () =>
+		{
+			try
+			{
+				while (Navigation.NavigationStack.Count > 1)
+				{
+					Navigation.RemovePage(Navigation.NavigationStack[1]);
+				}
 
+				await Dispatcher.DispatchAsync(() => Shell.Current.GoToAsync(".."));
+			}
+			catch (Exception ex)
+			{
+				Trace.TraceError($"Failed to navigate to home page: {ex.Message}");
+			}
+		});
+		return true;
+	}
+	*/
 	bool disposedValue = false; // To detect redundant calls
 
 	/// <summary>

@@ -155,21 +155,6 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// Initiates the Calibre integration process asynchronously.
-	/// </summary>
-	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
-	/// placeholder for future implementation.</returns>
-	[RelayCommand]
-	async Task Calibre()
-	{
-		if (CancellationTokenSource.IsCancellationRequested)
-		{
-			CancellationTokenSource = new CancellationTokenSource();
-		}
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
-	}
-
-	/// <summary>
 	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>

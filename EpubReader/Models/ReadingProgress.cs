@@ -55,6 +55,18 @@ public class ReadingProgress
 	[Column("MediaOverlayFragmentId")]
 	public string? MediaOverlayFragmentId { get; set; }
 
+	/// <summary>
+	/// ISO 8601 UTC timestamp of when the book was added to the library (synced metadata).
+	/// </summary>
+	[Column("DateAdded")]
+	public string? DateAdded { get; set; }
+
+	/// <summary>
+	/// ISO 8601 UTC timestamp of when the book was last opened (synced metadata).
+	/// </summary>
+	[Column("LastOpenedDate")]
+	public string? LastOpenedDate { get; set; }
+
 	public override string ToString()
 		=> $"{BookId}: chapter {CurrentChapter}, page {CurrentPage} at {LastUpdated} on {DeviceId} (MO: {MediaOverlayChapter}/{MediaOverlaySegmentIndex}@{MediaOverlayPositionSeconds})";
 }

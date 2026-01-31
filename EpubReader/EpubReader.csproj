@@ -20,11 +20,13 @@
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.01</ApplicationDisplayVersion>
 		<ApplicationVersion>9</ApplicationVersion>
-
+	
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
    
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>MSIX</WindowsPackageType>
+    <NoWarn>MCTEXP001</NoWarn>
+    <Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
@@ -107,7 +109,7 @@
     <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.3" />
     <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.3" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.11" />
-    <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
+    <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->  
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
@@ -126,14 +128,14 @@
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst' and $(Configuration) == 'Debug'">
 		<RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
 	</PropertyGroup>
-  
+
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
     <AndroidPackageFormat>aab</AndroidPackageFormat>
     <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
   </PropertyGroup>
-  
+
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
     <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
