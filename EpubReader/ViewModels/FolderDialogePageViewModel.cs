@@ -101,7 +101,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	/// cref="CancellationTokenSource"/>. After cancellation, it sets the visibility state to indicate that the operation
 	/// is no longer active.</remarks>
 	[RelayCommand]
-	void Cancel()
+	static void Cancel()
 	{
 		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
 	}

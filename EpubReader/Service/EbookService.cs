@@ -375,27 +375,23 @@ public static partial class EbookService
 		var normalizedSource = MediaOverlayPathHelper.Normalize(source);
 		if (string.IsNullOrEmpty(normalizedSource))
 		{
-			System.Diagnostics.Debug.WriteLine("NormalizeMediaOverlayAudioPath called with null or empty source.");
 			return string.Empty;
 		}
 
 		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
 		if (string.IsNullOrEmpty(normalizedDocumentHref))
 		{
-			System.Diagnostics.Debug.WriteLine("Document href is null or empty; returning normalized source as is.");
 			return normalizedSource;
 		}
 
 		var directory = ExtractDirectory(normalizedDocumentHref);
 		if (string.IsNullOrEmpty(directory))
 		{
-			System.Diagnostics.Debug.WriteLine("Document href has no directory; returning normalized source as is.");
 			return normalizedSource;
 		}
 
 		if (normalizedSource.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
 		{
-			System.Diagnostics.Debug.WriteLine("Source already contains document directory; returning normalized source as is.");
 			return CollapseRelativeSegments(normalizedSource);
 		}
 
@@ -524,7 +520,6 @@ public static partial class EbookService
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
 		if (nonSplitChapters.Count() != chaptersRef.Count)
 		{
-			System.Diagnostics.Debug.WriteLine("Warning: Chapter count mismatch after sorting.");
 			nonSplitChapters = chaptersRef;
 		}
 		foreach (var item in nonSplitChapters)
@@ -538,7 +533,8 @@ public static partial class EbookService
 	{
 		var processedHtml = ProcessHtml(htmlContent);
 		var fileName = Path.GetFileName(item.FilePath);
-		var title = GetTitle(book, item) ?? string.Empty;
+		fileName = fileName.Replace(" ", "_");
+		var title = GetTitle(book, item) ?? fileName;
 
 		return new Chapter
 		{

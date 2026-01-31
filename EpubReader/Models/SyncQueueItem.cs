@@ -6,7 +6,7 @@ namespace EpubReader.Models;
 /// Represents a pending cloud sync operation stored locally for retry.
 /// </summary>
 [Table("SyncQueue")]
-public class SyncQueueItem
+public class SyncQueueItem : Shared
 {
 	[PrimaryKey, AutoIncrement]
 	[Column("Id")]
@@ -45,16 +45,4 @@ public class SyncQueueItem
 
 	[Column("MediaOverlayFragmentId")]
 	public string? MediaOverlayFragmentId { get; set; }
-
-	/// <summary>
-	/// ISO 8601 UTC timestamp of when the book was added to the library (if syncing metadata).
-	/// </summary>
-	[Column("DateAdded")]
-	public string? DateAdded { get; set; }
-
-	/// <summary>
-	/// ISO 8601 UTC timestamp of when the book was last opened (if syncing metadata).
-	/// </summary>
-	[Column("LastOpenedDate")]
-	public string? LastOpenedDate { get; set; }
 }

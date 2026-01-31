@@ -25,6 +25,7 @@ using Plugin.Maui.Audio;
 /// respectively.</remarks>
 public partial class BookPage : ContentPage, IDisposable
 {
+	bool disposedValue = false;
 	bool isMenuOpen = false;
 	const string externalLinkPrefix = "https://runcsharp.jump?";
 	const uint animationDuration = 200u;
@@ -222,7 +223,6 @@ public partial class BookPage : ContentPage, IDisposable
 					return;
 				}
 				var filename = Path.GetFileName(chapterFileName) ?? chapterFileName;
-				System.Diagnostics.Trace.TraceInformation($"Preloading chapter resource: {filename}");
 #if ANDROID || WINDOWS
 				var url = $"https://demo/{filename}";
 #else
@@ -1363,33 +1363,6 @@ public partial class BookPage : ContentPage, IDisposable
 			? parsed
 			: DateTimeOffset.MinValue;
 	}
-	/*
-	/// <summary>
-	/// Handles the back button press event, navigating to the home page instead of using default back navigation.
-	/// </summary>
-	/// <returns>True to indicate the back button press was handled.</returns>
-	protected override bool OnBackButtonPressed()
-	{
-		Dispatcher.Dispatch(async () =>
-		{
-			try
-			{
-				while (Navigation.NavigationStack.Count > 1)
-				{
-					Navigation.RemovePage(Navigation.NavigationStack[1]);
-				}
-
-				await Dispatcher.DispatchAsync(() => Shell.Current.GoToAsync(".."));
-			}
-			catch (Exception ex)
-			{
-				Trace.TraceError($"Failed to navigate to home page: {ex.Message}");
-			}
-		});
-		return true;
-	}
-	*/
-	bool disposedValue = false; // To detect redundant calls
 
 	/// <summary>
 	/// Dispose pattern implementation. Releases managed resources when disposing is true.
