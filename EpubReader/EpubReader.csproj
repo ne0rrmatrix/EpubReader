@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
     <TargetFrameworks>$(NetVersion)-ios;$(NetVersion)-android;$(NetVersion)-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);$(NetVersion)-windows10.0.19041.0</TargetFrameworks>
@@ -18,13 +18,15 @@
 		<ApplicationId>com.companyname.epubreader</ApplicationId>
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.01</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1</ApplicationDisplayVersion>
 		<ApplicationVersion>9</ApplicationVersion>
-
+	
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
    
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>MSIX</WindowsPackageType>
+    <NoWarn>MCTEXP001</NoWarn>
+    <Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">
@@ -32,11 +34,6 @@
     <PublishAot>false</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);MauiAllowImplicitXmlnsDeclaration</DefineConstants>
-    <EnablePreviewFeatures>true</EnablePreviewFeatures>
   </PropertyGroup>
 
   <ItemGroup>
@@ -80,19 +77,19 @@
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.11" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
-    <PackageReference Include="VersOne.Epub" Version="3.3.4" />
+    <PackageReference Include="VersOne.Epub" Version="3.3.5" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11" />
     <PackageReference Include="Microsoft.Maui.Core" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
     <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview980" />
     <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview980" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.8" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.1" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.2" />
     <PackageReference Include="Plugin.Firebase" Version="3.1.1" />
     <PackageReference Include="Plugin.Firebase.Auth" Version="3.1.0" />
     <PackageReference Include="Plugin.Firebase.Auth.Google" Version="3.1.0" />
@@ -112,22 +109,16 @@
     <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.3" />
     <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.3" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.11" />
-    <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
-    
+    <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->  
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.9.5" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.9.5" ExcludeAssets="all" />
-    <PackageReference Include="Xamarin.Build.Download" Version="0.11.4" />
-   
-  </ItemGroup>
-  
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
-    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0"/>
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0" />
     <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
     <PackageReference Update="Xamarin.AndroidX.Fragment" Version="1.8.9" />
     <PackageReference Update="Xamarin.AndroidX.Activity" Version="1.12.0" />
     <PackageReference Update="Xamarin.AndroidX.SavedState" Version="1.4.0" />
-    <!-- If additional NU1608 warnings appear, add Update entries here for the offending packages only -->
+    <PackageReference Include="Xamarin.Build.Download" Version="0.11.4" />
   </ItemGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='windows' and $(Configuration) == 'Release'">
@@ -137,19 +128,32 @@
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst' and $(Configuration) == 'Debug'">
 		<RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
 	</PropertyGroup>
-  
+
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
-    <AndroidPackageFormat>aab</AndroidPackageFormat>
-    <AndroidKeyStore>False</AndroidKeyStore>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidKeyStore>True</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+    <AndroidKeyStore>True</AndroidKeyStore>
+    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
+    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
+    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
   </PropertyGroup>
-  
+
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
-    <AndroidKeyStore>False</AndroidKeyStore>
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
-    <AndroidPackageFormat>aab</AndroidPackageFormat>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidKeyStore>True</AndroidKeyStore>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|x64'">
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|x64'">
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
 
 	<!-- Fixes Static Registrar causing Linker error: https://github.com/xamarin/xamarin-macios/blob/main/docs/managed-static-registrar.md -->

@@ -6,7 +6,7 @@ namespace EpubReader.Models;
 /// Represents a pending cloud sync operation stored locally for retry.
 /// </summary>
 [Table("SyncQueue")]
-public class SyncQueueItem
+public class SyncQueueItem : Shared
 {
 	[PrimaryKey, AutoIncrement]
 	[Column("Id")]

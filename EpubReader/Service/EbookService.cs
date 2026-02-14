@@ -50,8 +50,6 @@ public static partial class EbookService
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
 
-	static readonly EpubReaderOptions options = CreateEpubReaderOptions();
-
 	const int coverImageWidth = 200;
 	const int coverImageHeight = 400;
 
@@ -166,8 +164,7 @@ public static partial class EbookService
 	{
 		try
 		{
-			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(path, options).ConfigureAwait(false);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(path, EpubReaderOptionsPreset.IGNORE_ALL_ERRORS).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -180,36 +177,13 @@ public static partial class EbookService
 	{
 		try
 		{
-			ConfigureContentFileMissingHandler();
-			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, options).ConfigureAwait(false);
+			return await VersOne.Epub.EpubReader.OpenBookAsync(stream, EpubReaderOptionsPreset.IGNORE_ALL_ERRORS).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Get Listing Error: {ex.Message}");
 			return null;
 		}
-	}
-
-
-	static void ConfigureContentFileMissingHandler()
-	{
-		options.ContentReaderOptions.ContentFileMissing += (sender, e) =>
-		{
-			logger.Warn($"Content file missing: {e.FileKey}. Exception suppressed.");
-			e.SuppressException = true;
-		};
-	}
-
-	static EpubReaderOptions CreateEpubReaderOptions()
-	{
-		return new EpubReaderOptions
-		{
-			BookCoverReaderOptions = new() { Epub2MetadataIgnoreMissingManifestItem = true },
-			Epub2NcxReaderOptions = new() { IgnoreMissingContentForNavigationPoints = true },
-			PackageReaderOptions = new() { IgnoreMissingToc = true },
-			SpineReaderOptions = new() { IgnoreMissingManifestItems = true },
-			XmlReaderOptions = new() { SkipXmlHeaders = true },
-		};
 	}
 
 	#endregion
@@ -401,27 +375,23 @@ public static partial class EbookService
 		var normalizedSource = MediaOverlayPathHelper.Normalize(source);
 		if (string.IsNullOrEmpty(normalizedSource))
 		{
-			System.Diagnostics.Debug.WriteLine("NormalizeMediaOverlayAudioPath called with null or empty source.");
 			return string.Empty;
 		}
 
 		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
 		if (string.IsNullOrEmpty(normalizedDocumentHref))
 		{
-			System.Diagnostics.Debug.WriteLine("Document href is null or empty; returning normalized source as is.");
 			return normalizedSource;
 		}
 
 		var directory = ExtractDirectory(normalizedDocumentHref);
 		if (string.IsNullOrEmpty(directory))
 		{
-			System.Diagnostics.Debug.WriteLine("Document href has no directory; returning normalized source as is.");
 			return normalizedSource;
 		}
 
 		if (normalizedSource.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
 		{
-			System.Diagnostics.Debug.WriteLine("Source already contains document directory; returning normalized source as is.");
 			return CollapseRelativeSegments(normalizedSource);
 		}
 
@@ -550,7 +520,6 @@ public static partial class EbookService
 		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
 		if (nonSplitChapters.Count() != chaptersRef.Count)
 		{
-			System.Diagnostics.Debug.WriteLine("Warning: Chapter count mismatch after sorting.");
 			nonSplitChapters = chaptersRef;
 		}
 		foreach (var item in nonSplitChapters)
@@ -564,7 +533,7 @@ public static partial class EbookService
 	{
 		var processedHtml = ProcessHtml(htmlContent);
 		var fileName = Path.GetFileName(item.FilePath);
-		var title = GetTitle(book, item) ?? string.Empty;
+		var title = GetTitle(book, item) ?? fileName;
 
 		return new Chapter
 		{

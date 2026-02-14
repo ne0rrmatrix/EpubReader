@@ -393,6 +393,14 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		}
 
 		var dbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
+		
+		// Ensure the directory exists before creating the database
+		var directory = Path.GetDirectoryName(dbPath);
+		if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+		{
+			Directory.CreateDirectory(directory);
+		}
+		
 		localDb = new SQLiteAsyncConnection(dbPath, flags);
 		await localDb.CreateTableAsync<ReadingProgress>().WaitAsync(token);
 		await localDb.CreateTableAsync<SyncQueueItem>().WaitAsync(token);
@@ -410,7 +418,9 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			["MediaOverlayChapter"] = sqlInteger,
 			["MediaOverlaySegmentIndex"] = sqlInteger,
 			["MediaOverlayPositionSeconds"] = "REAL",
-			["MediaOverlayFragmentId"] = "TEXT"
+			["MediaOverlayFragmentId"] = "TEXT",
+			["DateAdded"] = "TEXT",
+			["LastOpenedDate"] = "TEXT"
 		}, token).ConfigureAwait(false);
 
 		await EnsureColumnsAsync(db, "SyncQueue", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -419,7 +429,9 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			["MediaOverlayChapter"] = sqlInteger,
 			["MediaOverlaySegmentIndex"] = sqlInteger,
 			["MediaOverlayPositionSeconds"] = "REAL",
-			["MediaOverlayFragmentId"] = "TEXT"
+			["MediaOverlayFragmentId"] = "TEXT",
+			["DateAdded"] = "TEXT",
+			["LastOpenedDate"] = "TEXT"
 		}, token).ConfigureAwait(false);
 	}
 
@@ -534,6 +546,28 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			progress.DeviceName = string.IsNullOrWhiteSpace(progress.DeviceName) ? deviceName : progress.DeviceName;
 			progress.LastUpdated = string.IsNullOrWhiteSpace(progress.LastUpdated) ? DateTimeOffset.UtcNow.ToString("o") : progress.LastUpdated;
 
+			// Fetch current cloud version to apply latest-timestamp-wins conflict resolution
+			ReadingProgress? cloudProgress = null;
+			try
+			{
+				cloudProgress = await firebaseClient
+					.Child(usersNode)
+					.Child(userId!)
+					.Child(booksNode)
+					.Child(progress.BookId)
+					.OnceSingleAsync<ReadingProgress>();
+			}
+			catch
+			{
+				// Cloud entry may not exist; proceed with push
+			}
+
+			// Apply latest-timestamp-wins for date fields
+			if (cloudProgress is not null)
+			{
+				progress = ReconcileDateFields(progress, cloudProgress);
+			}
+
 			await firebaseClient
 				.Child(usersNode)
 				.Child(userId!)
@@ -551,6 +585,43 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			Trace.TraceError($"Cloud sync failed for {progress.BookId}: {ex.Message}");
 			await QueueProgressAsync(progress, token);
 		}
+	}
+
+	static ReadingProgress ReconcileDateFields(ReadingProgress local, ReadingProgress cloud)
+	{
+		// Latest-timestamp-wins conflict resolution for DateAdded and LastOpenedDate
+		// Keep the value with the more recent timestamp, or local if timestamps are equal
+		
+		local.DateAdded = GetNewerDateString(cloud.DateAdded, local.DateAdded);
+		local.LastOpenedDate = GetNewerDateString(cloud.LastOpenedDate, local.LastOpenedDate);
+
+		return local;
+	}
+
+	static string? GetNewerDateString(string? first, string? second)
+	{
+		if (string.IsNullOrWhiteSpace(first) && string.IsNullOrWhiteSpace(second))
+		{
+			return second;
+		}
+
+		if (string.IsNullOrWhiteSpace(first))
+		{
+			return second;
+		}
+
+		if (string.IsNullOrWhiteSpace(second))
+		{
+			return first;
+		}
+
+		if (DateTimeOffset.TryParse(first, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var firstTime) &&
+			DateTimeOffset.TryParse(second, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var secondTime))
+		{
+			return firstTime > secondTime ? first : second;
+		}
+
+		return second;
 	}
 
 	static bool IsNewer(ReadingProgress first, ReadingProgress second)

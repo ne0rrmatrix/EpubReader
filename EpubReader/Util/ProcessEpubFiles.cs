@@ -3,10 +3,6 @@
 /// <summary>
 /// Provides functionality to process EPUB files, including selecting, validating, and saving them to a library.
 /// </summary>
-/// <remarks>This class is responsible for handling EPUB files by allowing users to select files, process them
-/// asynchronously, and save them to a library. It supports operations such as checking if a book is already in the
-/// library and validating the saved files. The class uses platform-specific file type configurations for EPUB files and
-/// integrates with services for file operations and messaging.</remarks>
 public partial class ProcessEpubFiles : BaseViewModel
 {
 	static readonly string[] epubExtensions = [".epub"];
@@ -14,12 +10,11 @@ public partial class ProcessEpubFiles : BaseViewModel
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(ProcessEpubFiles));
-	public readonly IFolderPicker FolderPicker;
-	public readonly FilePickerFileType CustomFileType;
+	public readonly IFolderPicker FolderPicker = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
+			?? throw new InvalidOperationException("IFolderPicker service not available");
+	public readonly FilePickerFileType CustomFileType = CreateCustomFileType();
 	public ProcessEpubFiles()
 	{
-		FolderPicker = GetFolderPickerService();
-		CustomFileType = CreateCustomFileType();
 	}
 
 	/// <summary>
@@ -52,7 +47,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// <param name="filePath">The path to the EPUB file.</param>
 	/// <param name="cancellationToken">Cancellation token for the operation.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
-	async Task ProcessSingleEpubFileAsync(string filePath, int maxCount, int count, CancellationToken cancellationToken)
+	public async Task ProcessSingleEpubFileAsync(string filePath, int? maxCount, int count, CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -85,18 +80,18 @@ public partial class ProcessEpubFiles : BaseViewModel
 				WeakReferenceMessenger.Default.Send(new FolderMessage(new FolderInfo
 				{
 					Title = ebook.Title,
-					MaxCount = maxCount,
+					MaxCount = maxCount ?? 0,
 					Count = count,
 				}));
 				logger.Info($"Processing file {Path.GetFileName(filePath)} ({count}/{maxCount})");
 				stream.Seek(0, SeekOrigin.Begin);
-				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken);
+				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error processing file {filePath}: {ex.Message}");
-			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}");
+			await ShowErrorToastAsync($"Error processing {Path.GetFileName(filePath)}").ConfigureAwait(false);
 		}
 	}
 
@@ -112,9 +107,10 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			var fileNameOnly = Path.GetFileName(filePath);
-			ebook.FilePath = await FileService.SaveFileAsync(stream, fileNameOnly, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(fileNameOnly, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
+			// Prefer a human-friendly title as the saved filename when available (sanitized inside FileService).
+			var bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
+			ebook.FilePath = await FileService.SaveFileAsync(stream, bookName, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 			if (ValidateBookFiles(ebook))
@@ -165,17 +161,6 @@ public partial class ProcessEpubFiles : BaseViewModel
 		}
 	}
 	#region Private Helper Methods
-
-	/// <summary>
-	/// Gets the folder picker service from the application's service container.
-	/// </summary>
-	/// <returns>The folder picker service instance.</returns>
-	/// <exception cref="InvalidOperationException">Thrown if the service cannot be resolved.</exception>
-	static IFolderPicker GetFolderPickerService()
-	{
-		return Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
-			?? throw new InvalidOperationException("IFolderPicker service not available");
-	}
 
 	/// <summary>
 	/// Creates the custom file type configuration for EPUB files across different platforms.
@@ -230,8 +215,13 @@ public partial class ProcessEpubFiles : BaseViewModel
 	{
 		try
 		{
-			ebook.FilePath = await FileService.SaveFileAsync(fileResult, ebook.FilePath, cancellationToken).ConfigureAwait(false);
-			ebook.CoverImagePath = await FileService.SaveImageAsync(ebook.FilePath, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
+			// Use ebook.Title when available — it is more stable than FileResult.FileName across platforms.
+			var bookName = !string.IsNullOrWhiteSpace(ebook.Title)
+				? ebook.Title
+				: Path.GetFileNameWithoutExtension(fileResult.FileName);
+
+			ebook.FilePath = await FileService.SaveFileAsync(fileResult, bookName, cancellationToken).ConfigureAwait(false);
+			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
 			{

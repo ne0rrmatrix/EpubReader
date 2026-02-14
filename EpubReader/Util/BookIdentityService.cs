@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics;
 
 namespace EpubReader.Util;
 
@@ -17,10 +18,26 @@ public static class BookIdentityService
 		{
 			return book.SyncId;
 		}
-		var fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
-		var fileName = Path.GetFileName(book.FilePath);
-		book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
-		return book.SyncId;
+
+		string fileHash;
+		try
+		{
+			if (!string.IsNullOrWhiteSpace(book.FilePath) && File.Exists(book.FilePath))
+			{
+				fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
+				var fileName = Path.GetFileName(book.FilePath);
+				book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
+				return book.SyncId;
+			}
+			else
+			{
+				throw new FileNotFoundException("Book file not found", book.FilePath);
+			}
+		}
+		catch (Exception ex)
+		{
+			throw new InvalidOperationException($"Failed to compute file hash for book '{book.Title}': {ex.Message}", ex);
+		}
 	}
 
 	static async Task<string> ComputeFileHashAsync(string path, CancellationToken token)

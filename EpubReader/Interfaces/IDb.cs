@@ -56,6 +56,13 @@ public interface IDb
 		CancellationToken cancellationToken = default);
 
 	/// <summary>
+	/// Updates the last opened date for a book in the database.
+	/// </summary>
+	/// <param name="bookId">The Id of the book to update.</param>
+	/// <param name="lastOpenedDate">The UTC timestamp of the last open.</param>
+	Task UpdateBookLastOpenedDate(Guid bookId, DateTime lastOpenedDate, CancellationToken cancellationToken = default);
+
+	/// <summary>
 	/// Saves the specified settings to the persistent storage.
 	/// </summary>
 	/// <param name="settings">The settings to be saved. Cannot be null.</param>

@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <toolkit:Popup
     x:Class="EpubReader.Views.SettingsPage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:models="clr-namespace:EpubReader.Models"
     xmlns:system="clr-namespace:System;assembly=mscorlib"
-    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    x:DataType="viewModels:SettingsPageViewModel"
+    x:DataType="SettingsPageViewModel"
     x:TypeArguments="system:Boolean"
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
@@ -53,7 +48,7 @@
             <Picker
                 x:Name="FontPicker"
                 Title="Select Font"
-                ItemDisplayBinding="{Binding FontFamily, x:DataType=models:EpubFonts}"
+                ItemDisplayBinding="{Binding FontFamily, x:DataType=EpubFonts}"
                 ItemsSource="{Binding Fonts}"
                 SelectedIndexChanged="FontPicker_SelectedIndexChanged"
                 WidthRequest="250" />
@@ -70,7 +65,7 @@
             <Picker
                 x:Name="ThemePicker"
                 Title="Theme"
-                ItemDisplayBinding="{Binding Name, x:DataType=models:ColorScheme}"
+                ItemDisplayBinding="{Binding Name, x:DataType=ColorScheme}"
                 ItemsSource="{Binding ColorSchemes}"
                 SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
                 WidthRequest="250" />
@@ -83,7 +78,7 @@
                 HeightRequest="96"
                 ItemsLayout="HorizontalList">
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:ColorScheme">
+                    <DataTemplate x:DataType="ColorScheme">
                         <Border Padding="6" Margin="6" StrokeShape="RoundRectangle 6" BackgroundColor="{Binding BackgroundColor}" Stroke="Transparent">
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="Aa" FontSize="20" TextColor="{Binding TextColor}" HorizontalOptions="Center" />

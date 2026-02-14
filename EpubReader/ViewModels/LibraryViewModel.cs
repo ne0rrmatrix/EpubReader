@@ -110,10 +110,16 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			ArgumentNullException.ThrowIfNull(book);
+			Logger.Info($"Attempting to remove book: {book.Title}");
+			if (!await FileService.ArePermissionsGranted())
+			{
+				return;
+			}
+
 			Logger.Info($"Removing book: {book.Title}");
 
 			var directory = Path.GetDirectoryName(book.FilePath);
+			Logger.Info($"Book file path: {book.FilePath}");
 			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
 			{
 				Directory.Delete(directory, true);
@@ -155,33 +161,23 @@ public partial class LibraryViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// Initiates the Calibre integration process asynchronously.
-	/// </summary>
-	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
-	/// placeholder for future implementation.</returns>
-	[RelayCommand]
-	async Task Calibre()
-	{
-		if (CancellationTokenSource.IsCancellationRequested)
-		{
-			CancellationTokenSource = new CancellationTokenSource();
-		}
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
-	}
-
-	/// <summary>
 	/// Asynchronously adds EPUB files from a selected folder to the library.
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
 	public async Task AddFolderAsync()
 	{
+		if (!await FileService.ArePermissionsGranted())
+		{
+			return;
+		}
+
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
 		}
 
-		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			Logger.Info("No folder selected");
@@ -194,7 +190,7 @@ public partial class LibraryViewModel : BaseViewModel
 			Logger.Info("File dialog popup closed.");
 			WeakReferenceMessenger.Default.UnregisterAll(this);
 		};
-		LoadPopup();
+		await Dispatcher.DispatchAsync(LoadPopup).ConfigureAwait(false);
 
 		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
 
@@ -241,6 +237,11 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddAsync(CancellationToken cancellationToken = default)
 	{
+		if (!await FileService.ArePermissionsGranted())
+		{
+			return;
+		}
+
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
@@ -290,8 +291,16 @@ public partial class LibraryViewModel : BaseViewModel
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};
-
+			settingsPopup.Closed += async (s, e) =>
+			{
+				Logger.Info("Settings popup closed.");
+				var temp = await db.GetAllBooks();
+				temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
+				Books = [.. temp];
+				AlphabeticalTitleSort();
+			};
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+			
 			if (result.WasDismissedByTappingOutsideOfPopup)
 			{
 				Logger.Info("Settings popup dismissed by tapping outside.");

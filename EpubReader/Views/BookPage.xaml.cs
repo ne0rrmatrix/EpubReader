@@ -13,6 +13,7 @@ using EpubReader.Extensions;
 using EpubReader.Models;
 using EpubReader.Service;
 using EpubReader.Util;
+using Microsoft.Maui.Dispatching;
 using Plugin.Maui.Audio;
 
 /// <summary>
@@ -24,6 +25,7 @@ using Plugin.Maui.Audio;
 /// respectively.</remarks>
 public partial class BookPage : ContentPage, IDisposable
 {
+	bool disposedValue = false;
 	bool isMenuOpen = false;
 	const string externalLinkPrefix = "https://runcsharp.jump?";
 	const uint animationDuration = 200u;
@@ -221,7 +223,6 @@ public partial class BookPage : ContentPage, IDisposable
 					return;
 				}
 				var filename = Path.GetFileName(chapterFileName) ?? chapterFileName;
-				System.Diagnostics.Trace.TraceInformation($"Preloading chapter resource: {filename}");
 #if ANDROID || WINDOWS
 				var url = $"https://demo/{filename}";
 #else
@@ -1151,6 +1152,17 @@ public partial class BookPage : ContentPage, IDisposable
 			Trace.TraceWarning($"Failed updating local book progress in DB: {ex.Message}");
 		}
 
+		// Update the book's LastOpenedDate to track recent reads
+		try
+		{
+			book.LastOpenedDate = DateTime.UtcNow;
+			await db.SaveBookData(book, token);
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed updating book LastOpenedDate: {ex.Message}");
+		}
+
 		// Persist Media Overlay playback state to the main Book DB for local-only users.
 		try
 		{
@@ -1188,6 +1200,8 @@ public partial class BookPage : ContentPage, IDisposable
 			DeviceId = string.Empty,
 			DeviceName = string.Empty,
 			IsSynced = false,
+			DateAdded = book.DateAdded.ToString("o"),
+			LastOpenedDate = book.LastOpenedDate?.ToString("o")
 		};
 
 		// Include Media Overlay playback state when available.
@@ -1349,8 +1363,6 @@ public partial class BookPage : ContentPage, IDisposable
 			? parsed
 			: DateTimeOffset.MinValue;
 	}
-
-	bool disposedValue = false; // To detect redundant calls
 
 	/// <summary>
 	/// Dispose pattern implementation. Releases managed resources when disposing is true.
