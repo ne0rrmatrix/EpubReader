@@ -533,7 +533,6 @@ public static partial class EbookService
 	{
 		var processedHtml = ProcessHtml(htmlContent);
 		var fileName = Path.GetFileName(item.FilePath);
-		fileName = fileName.Replace(" ", "_");
 		var title = GetTitle(book, item) ?? fileName;
 
 		return new Chapter

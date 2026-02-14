@@ -77,15 +77,15 @@
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="*" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.11" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.5" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="*" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="*" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="14.0.0" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.0.0" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview980" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview980" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.8" />
@@ -146,28 +146,14 @@
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidKeyStore>True</AndroidKeyStore>
-    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
-    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
-    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|x64'">
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <AndroidKeyStore>True</AndroidKeyStore>
-    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
-    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
-    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|x64'">
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <AndroidKeyStore>True</AndroidKeyStore>
-    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
-    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
-    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
   </PropertyGroup>
 
 	<!-- Fixes Static Registrar causing Linker error: https://github.com/xamarin/xamarin-macios/blob/main/docs/managed-static-registrar.md -->

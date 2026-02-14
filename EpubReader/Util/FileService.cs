@@ -5,6 +5,29 @@
 /// </summary>
 public static partial class FileService
 {
+	/// <summary>
+	/// Requests and checks whether both storage read and write permissions are granted by the user.
+	/// </summary>
+	/// <remarks>If either permission is not granted, an alert is displayed to the user prompting them to grant the
+	/// necessary permissions to use the feature.</remarks>
+	/// <returns>A task that represents the asynchronous operation. The task result is <see langword="true"/> if both storage read
+	/// and write permissions are granted; otherwise, <see langword="false"/>.</returns>
+	public static async Task<bool> ArePermissionsGranted()
+	{
+		var readPermissionStatus = await Permissions.RequestAsync<Permissions.StorageRead>();
+		var writePermissionStatus = await Permissions.RequestAsync<Permissions.StorageWrite>();
+
+		if (readPermissionStatus is PermissionStatus.Granted
+			&& writePermissionStatus is PermissionStatus.Granted)
+		{
+			return true;
+		}
+
+		await Shell.Current.CurrentPage.DisplayAlertAsync("Storage permission is not granted.", "Please grant the permission to use this feature.", "OK");
+
+		return false;
+	}
+
 	#region Constants and Static Fields
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));

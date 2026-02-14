@@ -110,10 +110,16 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			ArgumentNullException.ThrowIfNull(book);
+			Logger.Info($"Attempting to remove book: {book.Title}");
+			if (!await FileService.ArePermissionsGranted())
+			{
+				return;
+			}
+
 			Logger.Info($"Removing book: {book.Title}");
 
 			var directory = Path.GetDirectoryName(book.FilePath);
+			Logger.Info($"Book file path: {book.FilePath}");
 			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
 			{
 				Directory.Delete(directory, true);
@@ -161,6 +167,11 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddFolderAsync()
 	{
+		if (!await FileService.ArePermissionsGranted())
+		{
+			return;
+		}
+
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
@@ -226,6 +237,11 @@ public partial class LibraryViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task AddAsync(CancellationToken cancellationToken = default)
 	{
+		if (!await FileService.ArePermissionsGranted())
+		{
+			return;
+		}
+
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();

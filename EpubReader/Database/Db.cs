@@ -304,7 +304,7 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		logger.Info("Removing book");
+			logger.Info("Removing book");
 		await conn.DeleteAsync(book).WaitAsync(cancellationToken);
 	}
 
