@@ -135,6 +135,45 @@ public static partial class HtmlAgilityPackExtensions
 	}
 
 	/// <summary>
+	/// Replaces or inserts a viewport meta tag in the provided HTML string to ensure proper responsive design on mobile
+	/// devices.
+	/// </summary>
+	/// <param name="html">The HTML string in which to set the viewport meta tag. This string must be a valid HTML document.</param>
+	/// <returns>The modified HTML string with the viewport meta tag set. If no changes are made, the original HTML string is
+	/// returned.</returns>
+	public static string SetViewportMeta(string html)
+	{
+		string newTag = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\" />";
+
+		// Pattern to find an existing viewport meta tag
+		string pattern = @"<meta\s+name=[""']viewport[""'][^>]*>";
+
+		if (Regex.IsMatch(html, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)))
+		{
+			// Replace existing tag
+			return Regex.Replace(html, pattern, newTag, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+		}
+		else
+		{
+			// If no viewport tag exists, try to insert it after the <head> tag
+			string headPattern = @"(<head[^>]*>)";
+			if (Regex.IsMatch(html, headPattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)))
+			{
+				return Regex.Replace(
+					html,
+					headPattern,
+					"$1\n    " + newTag,
+					RegexOptions.IgnoreCase,
+					TimeSpan.FromSeconds(5)
+				);
+			}
+		}
+
+		// If no <head> tag is found, just return as is
+		return html;
+	}
+
+	/// <summary>
 	/// Inserts CSS link elements into the HTML content before the closing <c>&lt;/head&gt;</c> tag.
 	/// </summary>
 	/// <param name="htmlContent">The HTML content into which the CSS links will be inserted. Must contain a closing <c>&lt;/head&gt;</c> tag.</param>

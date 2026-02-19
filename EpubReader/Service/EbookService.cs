@@ -31,7 +31,6 @@ public static partial class EbookService
 		"ReadiumCSS-default.css",
 		"ReadiumCSS-before.css",
 		"ReadiumCSS-after.css",
-		"ReadiumCSS-config.css",
 		"index.html",
 		"favicon.ico",
 		"EpubText.css",
@@ -648,6 +647,7 @@ public static partial class EbookService
 		htmlFile = HtmlAgilityPackExtensions.EnsureXmlLang(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.EnsureXhtml1TransitionalDoctype(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.RemoveKoboScriptLinks(htmlFile);
+		htmlFile = HtmlAgilityPackExtensions.SetViewportMeta(htmlFile);
 		return htmlFile;
 	}
 
