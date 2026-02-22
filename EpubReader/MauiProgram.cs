@@ -158,6 +158,7 @@ public static class MauiProgram
 
 		// Register main pages and their view models
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
+		builder.Services.AddTransientWithShellRoute<RecentBooksPage, RecentBooksViewModel>("RecentBooksPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
 		builder.Services.AddTransientWithShellRoute<BookDetailsPage, BookDetailsViewModel>("BookDetailsPage");
 		builder.Services.AddTransientWithShellRoute<CalibrePage, CalibrePageViewModel>("CalibrePage");

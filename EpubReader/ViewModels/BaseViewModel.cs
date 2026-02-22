@@ -111,6 +111,20 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 		return [.. books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 
+	/// <summary>
+	/// Initiates the Calibre integration process asynchronously.
+	/// </summary>
+	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
+	/// placeholder for future implementation.</returns>
+	[RelayCommand]
+	public async Task Calibre()
+	{
+		if (CancellationTokenSource.IsCancellationRequested)
+		{
+			CancellationTokenSource = new CancellationTokenSource();
+		}
+		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
+	}
 
 
 	#region Toast Helper Methods

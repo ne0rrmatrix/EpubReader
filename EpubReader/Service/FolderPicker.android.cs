@@ -75,7 +75,7 @@ public partial class FolderPicker : IFolderPicker
 
 		try
 		{
-			return await OpenEpubStreamAsync(epubFilePath);
+			return await OpenEpubStreamAsync(epubFilePath).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
@@ -167,7 +167,7 @@ public partial class FolderPicker : IFolderPicker
 		}
 
 		var stream = new MemoryStream();
-		await inputStream.CopyToAsync(stream);
+		await inputStream.CopyToAsync(stream).ConfigureAwait(false);
 		stream.Position = 0; // Reset position to the beginning of the stream
 		return stream;
 	}
@@ -185,39 +185,30 @@ public partial class FolderPicker : IFolderPicker
 
 	static List<string> GetEpubFilesFromDirectory(DocumentFile documentFile)
 	{
-		List<string> epubFiles = [];
-
 		if (!documentFile.IsDirectory)
 		{
-			return epubFiles;
+			return [];
 		}
 
 		var listFiles = documentFile.ListFiles();
 		if (listFiles is null)
 		{
 			logger.Info("No files found in the folder.");
-			return epubFiles;
+			return [];
 		}
-
-		foreach (var file in listFiles.Where(x => IsEpubFile(x)))
-		{
-			var tempUri = file.Uri?.ToString();
-			if (tempUri is null)
-			{
-				logger.Info("File URI is null.");
-				continue;
-			}
-			epubFiles.Add(tempUri);
-		}
-
-		return epubFiles;
+		return documentFile.ListFiles()?
+			.Where(IsEpubFile)
+			.Select(file => file.Uri?.ToString())
+			.Where(uri => uri is not null)
+			.Cast<string>()
+			.ToList() ?? [];
 	}
 
 	static bool IsEpubFile(DocumentFile file)
 	{
 		return file.IsFile &&
-			   file.Name is not null &&
-			   file.Name.EndsWith(".epub", StringComparison.OrdinalIgnoreCase);
+			   file.Name?.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
+			   == true;
 	}
 
 	static DocumentFile? GetDocumentFileFromUri(string folderUri)

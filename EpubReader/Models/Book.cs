@@ -208,4 +208,16 @@ public partial class Book : ObservableObject
 	/// </summary>
 	[Ignore]
 	public List<string> Categories { get; set; } = [];
+
+	/// <summary>
+	/// Gets or sets the date when the book was added to the library.
+	/// </summary>
+	[Column("DateAdded")]
+	public DateTime DateAdded { get; set; } = DateTime.UtcNow;
+
+	/// <summary>
+	/// Gets or sets the date when the book was last opened for reading.
+	/// </summary>
+	[Column("LastOpenedDate")]
+	public DateTime? LastOpenedDate { get; set; }
 }

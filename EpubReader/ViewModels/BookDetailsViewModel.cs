@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Core;
+using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -47,6 +48,15 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 	{
 		try
 		{
+			var token = CancellationTokenSource.Token;
+			token.ThrowIfCancellationRequested();
+
+			if (Book.Id != Guid.Empty)
+			{
+				Book.LastOpenedDate = DateTime.UtcNow;
+				await db.UpdateBookLastOpenedDate(Book.Id, Book.LastOpenedDate.Value, token);
+			}
+
 			var navigationParams = new Dictionary<string, object>
 			{
 				{ "Book", Book }
@@ -84,9 +94,31 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			};
 			await syncService.SaveProgressAsync(progress, token);
 		}
+	}
 
-		// Do not apply the remote progress to the opened Book here. BookPage will compare and prompt the user
-		// whether to move to the remote position. Leaving this method responsible only for ensuring the
-		// sync cache is populated and legacy backfill occurs.
+	[RelayCommand]
+	async Task Settings(CancellationToken cancellation = default)
+	{
+		try
+		{
+			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
+			var authenticationService = services.GetRequiredService<AuthenticationService>();
+			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
+			var settingsOptions = new PopupOptions
+			{
+				CanBeDismissedByTappingOutsideOfPopup = true,
+			};
+			
+			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+
+			if (result.WasDismissedByTappingOutsideOfPopup)
+			{
+				Logger.Info("Settings popup dismissed by tapping outside.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.Error($"Error showing settings popup: {ex.Message}");
+		}
 	}
 }
