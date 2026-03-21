@@ -133,7 +133,7 @@ public static partial class EbookService
 															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
 														  } } : []).ToList();
 		fonts.AddRange(additionalFonts);
-		fonts.ForEach(f => logger.Info($"Font extracted: {f.FontFamily} from {f.FileName} ({f.Content.Length} bytes)"));
+	
 		return new Book
 		{
 			Title = book.Title.Trim(),

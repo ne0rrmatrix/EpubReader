@@ -166,7 +166,7 @@ public static class MauiProgram
 		builder.Services.AddTransientWithShellRoute<PrivacyPage, PrivacyPageViewModel>("privacy");
 		return builder.Build();
 	}
-
+	
 	static MauiAppBuilder RegisterFirebaseServices(this MauiAppBuilder builder)
 	{
 		builder.ConfigureLifecycleEvents(events =>
@@ -181,17 +181,17 @@ public static class MauiProgram
 
 		return builder;
 	}
-
+	
 #if ANDROID
 	static void InitializeFirebaseOnAndroid(Android.App.Activity activity)
 	{
 		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
 		try
 		{
-
 			// Build FirebaseOptions from loaded configuration
 			var appId = FirebaseConfig.AppId;
 			var apiKey = FirebaseConfig.ApiKey;
+			var projectId = FirebaseConfig.ProjectId;
 			var databaseUrl = FirebaseConfig.DatabaseUrl;
 
 			if (!string.IsNullOrWhiteSpace(appId))
@@ -202,6 +202,11 @@ public static class MauiProgram
 				if (!string.IsNullOrWhiteSpace(apiKey))
 				{
 					optionsBuilder.SetApiKey(apiKey);
+				}
+
+				if (!string.IsNullOrWhiteSpace(projectId))
+				{
+					optionsBuilder.SetProjectId(projectId);
 				}
 
 				if (!string.IsNullOrWhiteSpace(databaseUrl))

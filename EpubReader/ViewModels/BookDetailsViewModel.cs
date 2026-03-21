@@ -44,7 +44,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 	}
 
 	[RelayCommand]
-	public async Task ReadAsync()
+	public async Task Read()
 	{
 		try
 		{

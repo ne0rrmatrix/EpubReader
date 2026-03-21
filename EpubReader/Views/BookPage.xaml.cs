@@ -1,20 +1,10 @@
-namespace EpubReader.Views;
-
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using EpubReader.Extensions;
-using EpubReader.Models;
-using EpubReader.Service;
-using EpubReader.Util;
-using Microsoft.Maui.Dispatching;
 using Plugin.Maui.Audio;
+
+namespace EpubReader.Views;
 
 /// <summary>
 /// Represents a page in a book application, providing functionality for displaying and interacting with book content.
@@ -418,7 +408,6 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		if (!url.Contains("https://runcsharp.jump?https://demo/", StringComparison.InvariantCultureIgnoreCase))
 		{
-			System.Diagnostics.Trace.TraceInformation("Not an internal link to handle");
 			return;
 		}
 		var urlParts = url.Split('?')[1].Split('#')[0];

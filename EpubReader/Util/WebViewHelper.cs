@@ -63,6 +63,12 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <returns></returns>
 	public async Task LoadPageAsync(Label label, Book book)
 	{
+		if (book is null || book.Chapters.Count == 0 || book.CurrentChapter < 0 || book.CurrentChapter >= book.Chapters.Count)
+		{
+			logger.Error($"Invalid book state: book is null, chapters empty, or CurrentChapter ({book?.CurrentChapter}) is out of bounds (count: {book?.Chapters.Count ?? 0})");
+			return;
+		}
+
 #if ANDROID || WINDOWS
 		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
 #elif IOS || MACCATALYST

@@ -9,22 +9,6 @@
     Loaded="CurrentPage_Loaded"
     Unloaded="CurrentPage_Unloaded">
 
-    <toolkit:Popup.Resources>
-
-        <Style x:Key="InvalidEntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="Red" />
-        </Style>
-        <Style x:Key="ValidEntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="Green" />
-        </Style>
-        <Style TargetType="Label">
-            <Setter Property="TextColor" Value="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor}, Light={StaticResource AppBackgroundDarkColor}}" />
-        </Style>
-        <ResourceDictionary>
-            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
-        </ResourceDictionary>
-    </toolkit:Popup.Resources>
-
     <Grid
         x:Name="grid"
         Padding="10"
@@ -62,17 +46,13 @@
         <Entry
             x:Name="EntryText"
             Grid.Row="3"
+            HeightRequest="60"
+            Keyboard="Url"
             Completed="Entry_Completed"
-            ReturnType="Done"
+            ReturnType="Go"
             VerticalOptions="Center"
             WidthRequest="200">
-            <Entry.Behaviors>
-                <toolkit:UriValidationBehavior
-                    Flags="ValidateOnValueChanged"
-                    InvalidStyle="{StaticResource InvalidEntryStyle}"
-                    UriKind="RelativeOrAbsolute"
-                    ValidStyle="{StaticResource ValidEntryStyle}" />
-            </Entry.Behaviors>
+           
         </Entry>
     </Grid>
 </toolkit:Popup>

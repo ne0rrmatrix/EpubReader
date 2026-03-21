@@ -30,25 +30,36 @@ public partial class CalibreZeroConf
 
 		try
 		{
-			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync("_calibre._tcp.local.", scanTime);
-			foreach (var host in hosts)
+			MainThread.BeginInvokeOnMainThread(async () =>
 			{
-				logger.Info($"Discovered Host: {host.DisplayName} (IP: {host.IPAddress})");
-
-				foreach (var service in host.Services)
+				ResolveOptions resolveOptions = new("_calibre._tcp.local.")
 				{
-					logger.Info($"  Service: {service.Key} (Port: {service.Value.Port})");
-					if (service.Value.Port == 8080 || service.Value.Port == 8081) // Calibre default is 8080, sometimes 8081 for docker
+					ScanTime = scanTime,
+					Retries = 3,
+					RetryDelay = TimeSpan.FromSeconds(1),
+					AllowOverlappedQueries = true
+				};
+				IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(resolveOptions);
+
+				foreach (var host in hosts)
+				{
+					logger.Info($"Discovered Host: {host.DisplayName} (IP: {host.IPAddress})");
+
+					foreach (var service in host.Services)
 					{
-						logger.Info($"    Potential Calibre Server Found: {host.IPAddress}:{service.Value.Port}");
-						calibreServers.Add((host.IPAddress, service.Value.Port));
+						logger.Info($"  Service: {service.Key} (Port: {service.Value.Port})");
+						if (service.Value.Port == 8080 || service.Value.Port == 8081) // Calibre default is 8080, sometimes 8081 for docker
+						{
+							logger.Info($"    Potential Calibre Server Found: {host.IPAddress}:{service.Value.Port}");
+							calibreServers.Add((host.IPAddress, service.Value.Port));
+						}
 					}
 				}
-			}
-			if (calibreServers.Count == 0)
-			{
-				logger.Info("No Calibre content servers found on the local network.");
-			}
+				if (calibreServers.Count == 0)
+				{
+					logger.Info("No Calibre content servers found on the local network.");
+				}
+			});
 		}
 		catch (Exception ex)
 		{

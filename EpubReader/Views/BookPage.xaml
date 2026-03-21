@@ -2,9 +2,11 @@
 <ContentPage
     x:Class="EpubReader.Views.BookPage"
     xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Name="CurrentPage"
     x:DataType="BookViewModel"
     Loaded="CurrentPage_Loaded"
+    SafeAreaEdges="None"
     Shell.TabBarIsVisible="False"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={OnPlatform WinUI={StaticResource White},
@@ -12,26 +14,25 @@
     <ContentPage.ToolbarItems>
         <ToolbarItem
             BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}"
-            Command="{Binding ShowPopupCommand}"
-            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
-                                                                Default=settings_lightmode.png},
-                                              Dark=settings_lightmode.png}"
-            Order="Primary" />
+           Command="{Binding ShowPopupCommand}"
+           IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
+                                                             Default=settings_lightmode.png},
+                                           Dark=settings_lightmode.png}"
+           Order="Primary" />
     </ContentPage.ToolbarItems>
-
    
-    <Grid IgnoreSafeArea="{OnPlatform Android=False, iOS=True}">
+    <Grid SafeAreaEdges="None">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Overlay/menu (remains in content row so it can overlay the WebView if needed) -->
-        <ScrollView Grid.Row="0" HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
+        <ScrollView SafeAreaEdges="None" Grid.Row="0" HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
             <ScrollView.GestureRecognizers>
                 <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenuAsync" />
             </ScrollView.GestureRecognizers>
-            <Grid x:Name="menu" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
+            <Grid SafeAreaEdges="None" x:Name="menu" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
 
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" />
@@ -69,7 +70,7 @@
         </ScrollView>
 
         <!-- Main content grid holding WebView and loading overlay -->
-        <Grid x:Name="grid" Grid.Row="0" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
+        <Grid SafeAreaEdges="None" x:Name="grid" Grid.Row="0" BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor}, Light={StaticResource White}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -98,7 +99,7 @@
                 HorizontalOptions="Center">
                 <Label.Triggers>
                     <DataTrigger
-                        Binding="{Binding Path=BindingContext.IsReaderModeEnabled, Source={x:Reference CurrentPage}}"
+                        Binding="{Binding IsReaderModeEnabled}"
                         TargetType="Label"
                         Value="True">
                         <Setter Property="IsVisible" Value="False" />
@@ -108,6 +109,7 @@
 
             <!--  Native loading overlay shown while chapter renders and native settings apply  -->
             <Grid
+                SafeAreaEdges="None"
                 x:Name="NativeLoadingOverlay"
                 Grid.RowSpan="3"
                 BackgroundColor="{AppThemeBinding Dark={StaticResource OverlayDarkColor},
@@ -123,6 +125,7 @@
 
                 <!--  Cover area: occupies ~60% of overlay height and centers the image  -->
                 <Grid
+                    SafeAreaEdges="None"
                     Grid.Row="0"
                     HorizontalOptions="Center"
                     VerticalOptions="Center">
@@ -135,6 +138,7 @@
 
                 <!--  Activity indicator centered below the cover  -->
                 <HorizontalStackLayout
+                    SafeAreaEdges="None"
                     Grid.Row="1"
                     Padding="0,10,0,0"
                     HorizontalOptions="Center"
@@ -164,6 +168,7 @@
         <!-- Slider container moved OUTSIDE the WebView grid and placed in its own Auto row
              This ensures the slider is a separate visual element below the page (not on top of it). -->
         <VerticalStackLayout
+            SafeAreaEdges="None"
             x:Name="sliderContainer"
             Grid.Row="1"
             Padding="12,8"
@@ -192,7 +197,6 @@
                 x:Name="sliderPageLabel"
                 TextColor="{AppThemeBinding Dark={StaticResource White},
                             Light={StaticResource Black}}"
-                IsVisible="{Binding isMenuOpen}"
      Grid.Row="2"
      FontSize="{OnPlatform Android=16,
                            iOS=16,

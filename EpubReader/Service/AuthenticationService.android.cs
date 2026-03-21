@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using AndroidX.Credentials;
-using Firebase.Auth.Providers;
 using Xamarin.GoogleAndroid.Libraries.Identity.GoogleId;
 
 namespace EpubReader.Service;
@@ -16,23 +15,40 @@ public partial class AuthenticationService
 			throw new InvalidOperationException("Current Activity is null");
 		}
 
-		var idToken = await GetGoogleIdTokenAsync(activity, cancellationToken).ConfigureAwait(false);
+		var idToken = await GetGoogleIdTokenAsync(activity, cancellationToken);
 		Trace.TraceInformation(string.IsNullOrEmpty(idToken)
 			? "Google sign-in: Google ID token retrieval returned empty"
 			: "Google sign-in: Google ID token retrieved");
-
+		if (firebaseAuthClient is null)
+		{
+			Trace.TraceError("Google sign-in: FirebaseAuthClient is not initialized");
+			throw new InvalidOperationException("FirebaseAuthClient is not initialized");
+		}
 		if (!string.IsNullOrEmpty(idToken))
 		{
 			Trace.TraceInformation("Google sign-in: IdToken retrieved, exchanging with Firebase");
-			// Exchange ID token with Firebase via FirebaseAuthClient
-			var authCredential = GoogleProvider.GetCredential(idToken, OAuthCredentialTokenType.IdToken);
-			var credential = await firebaseAuthClient!.SignInWithCredentialAsync(authCredential).ConfigureAwait(false);
+			// Use the Firebase app already initialized in MauiProgram.InitializeFirebaseOnAndroid.
+			// Never call FirebaseApp.InitializeApp(activity) without options here — it would either
+			// throw IllegalStateException (already initialized) or init without ProjectId and hang.
+			var auth = Firebase.Auth.FirebaseAuth.Instance;
+			var authCredential = Firebase.Auth.GoogleAuthProvider.GetCredential(idToken, null);
+			if (authCredential is null)
+			{
+				Trace.TraceError("Google sign-in: failed to create Firebase auth credential from ID token");
+				throw new InvalidOperationException("Failed to create Firebase auth credential from ID token");
+			}
+			var credential = await auth.SignInWithCredentialAsync(authCredential);
+			if (credential is null)
+			{
+				Trace.TraceError("Google sign-in: Firebase sign-in with credential returned null");
+				throw new InvalidOperationException("Firebase sign-in with credential returned null");
+			}
 
-			if (credential?.User is not null)
+			if (credential.User is not null)
 			{
 				Trace.TraceInformation("Google sign-in: Firebase credential obtained, storing secure data");
 				await SecureStorage.SetAsync(userIdKey, credential.User.Uid).ConfigureAwait(false);
-				await SecureStorage.SetAsync(userEmailKey, credential.User.Info.Email ?? string.Empty).ConfigureAwait(false);
+				await SecureStorage.SetAsync(userEmailKey, credential.User.Email ?? string.Empty).ConfigureAwait(false);
 				Preferences.Set(authModeKey, authModeCloud);
 				AuthStateChanged?.Invoke(this, true);
 				return credential.User.Uid;

@@ -85,7 +85,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// Navigate to the book details page for the specified book.
 	/// </summary>
 	[RelayCommand]
-	public async Task GotoBookDetailsAsync(Book book)
+	public async Task GotoBookDetails(Book book)
 	{
 		try
 		{
@@ -165,7 +165,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddFolderAsync()
+	public async Task AddFolder()
 	{
 		if (!await FileService.ArePermissionsGranted())
 		{
@@ -235,7 +235,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddAsync(CancellationToken cancellationToken = default)
+	public async Task Add(CancellationToken cancellationToken = default)
 	{
 		if (!await FileService.ArePermissionsGranted())
 		{

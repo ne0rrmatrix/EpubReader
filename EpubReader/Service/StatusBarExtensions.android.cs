@@ -1,5 +1,9 @@
 ﻿using Android.Views;
 using AndroidX.Core.View;
+using CommunityToolkit.Maui.Core.Extensions;
+using CommunityToolkit.Maui.Core.Platform;
+using Activity = Android.App.Activity;
+using View = Android.Views.View;
 
 namespace EpubReader.Service;
 
@@ -12,9 +16,7 @@ namespace EpubReader.Service;
 /// cref="WindowInsetsControllerCompat"/> for managing system bar visibility on Android version 34 and above.</remarks>
 public static partial class StatusBarExtensions
 {
-	static Android.Views.Window window => Platform.CurrentActivity?.Window ?? throw new InvalidOperationException("Current activity is null");
-	static Android.Views.View decorView => window.DecorView ?? throw new InvalidOperationException("DecorView is null");
-	static AndroidX.Core.View.WindowInsetsControllerCompat insetsController => WindowCompat.GetInsetsController(window, decorView) ?? throw new InvalidOperationException("InsetsController is null");
+	static Activity Activity => Platform.CurrentActivity ?? throw new InvalidOperationException("Android Activity can't be null.");
 
 	/// <summary>
 	/// Sets the visibility of the status bars on Android devices.
@@ -24,11 +26,23 @@ public static partial class StatusBarExtensions
 	/// <param name="hidden"><see langword="true"/> to hide the status bars; otherwise, <see langword="false"/> to show them.</param>
 	public static void SetStatusBarsHidden(bool hidden)
 	{
+		if (Activity.GetCurrentWindow() is not Android.Views.Window { DecorView.RootView: not null } window)
+		{
+			return;
+		}
+
+		View decorView = window.DecorView;
+		if (decorView is null || decorView.RootView is null)
+		{
+			return;
+		}
+		var insetsController = WindowCompat.GetInsetsController(window, decorView) ?? throw new InvalidOperationException("InsetsController is null");
+		
 		if (OperatingSystem.IsAndroidVersionAtLeast(26))
 		{
 			if (hidden)
 			{
-				window.ClearFlags(WindowManagerFlags.LayoutNoLimits);
+				StatusBar.SetColor(Colors.Transparent);
 				window.AddFlags(WindowManagerFlags.Fullscreen);
 				window.SetFlags(WindowManagerFlags.Fullscreen, WindowManagerFlags.Fullscreen);
 				insetsController.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
@@ -48,6 +62,5 @@ public static partial class StatusBarExtensions
 				}
 			}
 		}
-
 	}
 }

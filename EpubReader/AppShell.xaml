@@ -5,7 +5,7 @@
     Shell.FlyoutBehavior="Disabled">
     <TabBar>
         <Tab Title="Library" Icon="library.png">
-            <ShellContent Route="MainPage" ContentTemplate="{DataTemplate LibraryPage}" />
+    <ShellContent Route="MainPage" ContentTemplate="{DataTemplate LibraryPage}" />
         </Tab>
         <Tab Title="Recent" Icon="book_open.png">
             <ShellContent ContentTemplate="{DataTemplate RecentBooksPage}" />
