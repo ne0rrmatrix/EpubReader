@@ -197,7 +197,7 @@ public class StreamExtensions
 		}
 		catch (UriFormatException)
 		{
-			System.Diagnostics.Trace.WriteLine($"Warning: Failed to unescape URI '{value}'. Using original value.");
+			System.Diagnostics.Trace.TraceError($"Warning: Failed to unescape URI '{value}'. Using original value.");
 		}
 
 		return value.Replace('\\', '/').TrimStart('/');
