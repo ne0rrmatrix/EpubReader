@@ -142,7 +142,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 				}
 			}
 
-			if ((normalized.StartsWith("{", StringComparison.Ordinal) || normalized.StartsWith("[", StringComparison.Ordinal)) && normalized.Contains("\\\"", StringComparison.Ordinal))
+			if ((normalized.StartsWith('{') || normalized.StartsWith('[')) && normalized.Contains("\\\"", StringComparison.Ordinal))
 			{
                normalized = Regex.Unescape(normalized);
 				continue;
