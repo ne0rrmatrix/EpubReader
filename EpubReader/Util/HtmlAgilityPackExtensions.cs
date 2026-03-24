@@ -406,36 +406,42 @@ public static partial class HtmlAgilityPackExtensions
 
 		foreach (var linkNode in linkNodes)
 		{
-			var href = linkNode.GetAttributeValue("href", string.Empty).Trim();
-			if (string.IsNullOrWhiteSpace(href) || IsExternalOrUnsupportedHref(href))
-			{
-				continue;
-			}
-
-			var hashIndex = href.IndexOf('#');
-			var path = hashIndex >= 0 ? href[..hashIndex] : href;
-			var fragment = hashIndex >= 0 ? href[(hashIndex + 1)..] : string.Empty;
-
-			if (string.IsNullOrWhiteSpace(path))
-			{
-				var rewrittenSelfHref = string.IsNullOrWhiteSpace(fragment)
-					? $"#{chapterId}"
-					: $"#{BuildCombinedFragmentId(chapterId, fragment)}";
-				linkNode.SetAttributeValue("href", rewrittenSelfHref);
-				continue;
-			}
-
-			var targetFileName = Path.GetFileName(path);
-			if (string.IsNullOrWhiteSpace(targetFileName) || !chapterTargets.TryGetValue(targetFileName, out var targetChapterId))
-			{
-				continue;
-			}
-
-			var rewrittenHref = string.IsNullOrWhiteSpace(fragment)
-				? $"#{targetChapterId}"
-				: $"#{BuildCombinedFragmentId(targetChapterId, fragment)}";
-			linkNode.SetAttributeValue("href", rewrittenHref);
+			RewriteSingleChapterLink(linkNode, chapterId, chapterTargets);
 		}
+	}
+
+	static void RewriteSingleChapterLink(HtmlNode linkNode, string chapterId, IReadOnlyDictionary<string, string> chapterTargets)
+	{
+		var href = linkNode.GetAttributeValue("href", string.Empty).Trim();
+		if (string.IsNullOrWhiteSpace(href) || IsExternalOrUnsupportedHref(href))
+		{
+			return;
+		}
+
+		var hashIndex = href.IndexOf('#');
+		var path = hashIndex >= 0 ? href[..hashIndex] : href;
+		var fragment = hashIndex >= 0 ? href[(hashIndex + 1)..] : string.Empty;
+
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			linkNode.SetAttributeValue("href", BuildChapterHref(chapterId, fragment));
+			return;
+		}
+
+		var targetFileName = Path.GetFileName(path);
+		if (string.IsNullOrWhiteSpace(targetFileName) || !chapterTargets.TryGetValue(targetFileName, out var targetChapterId))
+		{
+			return;
+		}
+
+		linkNode.SetAttributeValue("href", BuildChapterHref(targetChapterId, fragment));
+	}
+
+	static string BuildChapterHref(string chapterId, string fragment)
+	{
+		return string.IsNullOrWhiteSpace(fragment)
+			? $"#{chapterId}"
+			: $"#{BuildCombinedFragmentId(chapterId, fragment)}";
 	}
 
 	static bool IsExternalOrUnsupportedHref(string href)
