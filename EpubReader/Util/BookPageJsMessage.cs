@@ -40,8 +40,7 @@ public sealed class BookPageJsMessage
 				return false;
 			}
 
-			var action = actionElem.GetString() ?? string.Empty;
-			var href = root.TryGetProperty("href", out var hrefElem) ? hrefElem.GetString() : null;
+			var href = GetStringProperty(root, "href");
 
 			// Convert HTTP to HTTPS if needed
 			if (!string.IsNullOrEmpty(href) && href.StartsWith("http://"))
@@ -49,46 +48,15 @@ public sealed class BookPageJsMessage
 				href = "https://" + href[7..];
 			}
 
-			int? pos = null;
-			if (root.TryGetProperty("position", out var posElem) && posElem.ValueKind == JsonValueKind.Number && posElem.TryGetInt32(out var p))
-			{
-				pos = p;
-			}
-
-			int? chapterIndex = null;
-			if (root.TryGetProperty("chapterIndex", out var chapterElem) && chapterElem.ValueKind == JsonValueKind.Number && chapterElem.TryGetInt32(out var parsedChapterIndex))
-			{
-				chapterIndex = parsedChapterIndex;
-			}
-
-			double? seconds = null;
-			if (root.TryGetProperty("seconds", out var secondsElem) && secondsElem.ValueKind == JsonValueKind.Number && secondsElem.TryGetDouble(out var s))
-			{
-				seconds = s;
-			}
-
-			bool? enabled = null;
-			if (root.TryGetProperty("enabled", out var enabledElem) &&
-				(enabledElem.ValueKind == JsonValueKind.True || enabledElem.ValueKind == JsonValueKind.False))
-			{
-				enabled = enabledElem.GetBoolean();
-			}
-
-			string? messageText = null;
-			if (root.TryGetProperty("message", out var messageElem))
-			{
-				messageText = messageElem.GetString();
-			}
-
 			message = new BookPageJsMessage
 			{
-				Action = action,
+				Action = actionElem.GetString() ?? string.Empty,
 				Href = href,
-				Position = pos,
-              ChapterIndex = chapterIndex,
-				Enabled = enabled,
-				Message = messageText,
-				Seconds = seconds
+				Position = GetInt32Property(root, "position"),
+				ChapterIndex = GetInt32Property(root, "chapterIndex"),
+				Seconds = GetDoubleProperty(root, "seconds"),
+				Enabled = GetBoolProperty(root, "enabled"),
+				Message = GetStringProperty(root, "message"),
 			};
 			return true;
 		}
@@ -99,6 +67,21 @@ public sealed class BookPageJsMessage
 			return false;
 		}
 	}
+
+	static string? GetStringProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) ? elem.GetString() : null;
+
+	static int? GetInt32Property(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetInt32(out var val)
+			? val : null;
+
+	static double? GetDoubleProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetDouble(out var val)
+			? val : null;
+
+	static bool? GetBoolProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
+			? elem.GetBoolean() : null;
 
 	/// <summary>
 	/// Converts the parsed message into the internal "runcsharp" URL used by the native handler.
