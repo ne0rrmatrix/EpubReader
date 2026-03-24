@@ -30,16 +30,13 @@ public partial class BookPage : ContentPage, IDisposable
 	DateTimeOffset lastMediaOverlayProgressSyncedAt = DateTimeOffset.MinValue;
 	MediaOverlayPlaybackProgress? lastMediaOverlayProgressSent;
 	bool loadSequenceStarted = false;
-	bool progressSyncComplete = false;
-	bool pageAtCorrectPosition = false;
+   bool navigateToChapterEndOnLoad = false;
 	ToolbarItem? syncToolbarItem;
 
 	// Slider-related state
 	readonly List<int> chapterOffsets = [];
 	int sliderTotalPages = 0;
 	bool isSliderActive = false;
-	// Ensure we only attempt a preload once per book view lifecycle
-	bool chaptersPreloaded = false;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -58,16 +55,18 @@ public partial class BookPage : ContentPage, IDisposable
 		this.syncService = syncService;
 		this.audioManager = audioManager;
 		webViewHelper = new(webView, db, syncService);
-
-		// Subscribe to webview helper lifecycle events to show/hide native overlay
-		webViewHelper.PageLoadStarted += OnWebViewPageLoadStarted;
-		webViewHelper.SettingsApplied += OnWebViewSettingsApplied;
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+		NativeLoadingOverlay.IsVisible = true;
 
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => { await webViewHelper.OnSettingsClickedAsync(); await UpdateUiAppearance(); });
+      WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) =>
+		{
+			await webViewHelper.OnSettingsClickedAsync();
+			await UpdateUiAppearance();
+			await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
+		});
 	}
 
 	protected override async void OnAppearing()
@@ -79,9 +78,6 @@ public partial class BookPage : ContentPage, IDisposable
 			await EnsureMediaOverlayManagerInitialized();
 			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 			loadSequenceStarted = true;
-			progressSyncComplete = false;
-			pageAtCorrectPosition = false;
-			ShowNativeOverlay();
 			webView.Navigated -= webView_Navigated;
 			webView.Navigating -= webView_Navigating;
 			webView.Navigated += webView_Navigated;
@@ -129,109 +125,35 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		if (!ViewModel.isPopupActive)
 		{
+			// Persist reading position before the page is torn down so reopening restores correctly.
+			try
+			{
+				await SaveProgressAsync(CancellationToken.None);
+			}
+			catch (Exception ex)
+			{
+				Trace.TraceWarning($"Failed saving progress on page disappear: {ex.Message}");
+			}
+
 			WeakReferenceMessenger.Default.UnregisterAll(this);
-			Shell.Current.ToolbarItems.Clear();
+			if (Shell.Current.ToolbarItems.Count > 0)
+			{
+				Shell.Current.ToolbarItems.Clear();
+			}
+
 			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
-			progressSyncComplete = false;
-			pageAtCorrectPosition = false;
+			// Allow a fresh combined.html load next time the book is opened.
+			webViewHelper.ResetCombinedState();
 		}
 
-		// Unsubscribe events
-		webViewHelper.PageLoadStarted -= OnWebViewPageLoadStarted;
-		webViewHelper.SettingsApplied -= OnWebViewSettingsApplied;
 		// detach webview handlers we attached on appearing
 		webView.Navigated -= webView_Navigated;
 		webView.Navigating -= webView_Navigating;
 		base.OnDisappearing();
 	}
 
-	void OnWebViewPageLoadStarted()
-	{
-		if (sliderContainer.IsVisible)
-		{
-			System.Diagnostics.Trace.TraceInformation("Page load started while slider active; not showing overlay.");
-			return;
-		}
-		Dispatcher.Dispatch(() =>
-		{
-			ShowNativeOverlay();
-		});
-	}
-
-	void OnWebViewSettingsApplied()
-	{
-		if (progressSyncComplete && pageAtCorrectPosition)
-		{
-			Dispatcher.Dispatch(() => HideNativeOverlay());
-		}
-	}
-#pragma warning disable S2325 // Method can be static, but keeping as instance for consistency
-	void ShowNativeOverlay()
-	{
-		NativeLoadingOverlay.IsVisible = true;
-	}
-
-	void HideNativeOverlay()
-	{
-		NativeLoadingOverlay.IsVisible = false;
-	}
-#pragma warning restore S2325 // Method can be static
-
-	/// <summary>
-	/// Preloads all chapter resources into the WebView so fast seeks via the slider feel smooth.
-	/// This primes the WebView's network/cache layer by issuing lightweight `fetch` requests for
-	/// each chapter URL. It runs asynchronously and tolerates cancellation/failures.
-	/// </summary>
-	/// <param name="cancellation">Cancellation token to cancel preloading.</param>
-	void PreloadAllChaptersAsync(CancellationToken cancellation)
-	{
-		try
-		{
-			if (chaptersPreloaded)
-			{
-				System.Diagnostics.Trace.TraceInformation("Chapters already preloaded; skipping.");
-				return;
-			}
-
-			if (book?.Chapters is null || book.Chapters.Count == 0)
-			{
-				System.Diagnostics.Trace.TraceInformation("No chapters to preload; skipping.");
-				return;
-			}
-
-			// Mark preloading started to avoid duplicate runs
-			chaptersPreloaded = true;
-
-			// Build and dispatch lightweight fetch requests to prime the WebView cache.
-			book.Chapters.Select(chapter => chapter.FileName).ToList().ForEach(chapterFileName =>
-			{
-				if (cancellation.IsCancellationRequested)
-				{
-					System.Diagnostics.Trace.TraceInformation("Chapter preloading cancelled; aborting.");
-					return;
-				}
-				var filename = Path.GetFileName(chapterFileName) ?? chapterFileName;
-#if ANDROID || WINDOWS
-				var url = $"https://demo/{filename}";
-#else
-				var url = $"app://demo/{filename}";
-#endif
-				// Use the WebView's JS context to fetch each resource so the browser engine
-				// can populate its resource cache. We don't await each JS eval on the UI
-				// thread to keep the UI responsive; allow a short delay between requests
-				// to avoid overwhelming the renderer for very large books.
-				var js = $"(function(){{try{{fetch('{url}', {{cache: 'force-cache'}}).catch(()=>{{}});}}catch(e){{}}}})();";
-				// Dispatch evaluation without blocking the caller; ignore result.
-				Dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync(js));
-			});
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"PreloadAllChaptersAsync failed: {ex.Message}");
-		}
-	}
 
 	/// <summary>
 	/// Handles the tap event on the grid area, triggering animations for translation, scaling, and fading.
@@ -271,9 +193,12 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		await Dispatcher.DispatchAsync(async () =>
 		{
+			Trace.TraceInformation($"[PageRestore] webView_Navigated: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 			var pageLoaded = await LoadAndMergeProgressAsync(ViewModel.CancellationTokenSource.Token);
+			Trace.TraceInformation($"[PageRestore] webView_Navigated: LoadAndMergeProgress returned pageLoaded={pageLoaded}; book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 			if (!pageLoaded)
 			{
+				Trace.TraceInformation("[PageRestore] webView_Navigated: calling LoadChapterContentAsync (pageLoaded=false path)");
 				await LoadChapterContentAsync();
 			}
 		});
@@ -295,45 +220,9 @@ public partial class BookPage : ContentPage, IDisposable
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
-		// Initialize slider mapping once book is available
-		try
-		{
-			BuildSyntheticMapping();
-			PreloadAllChaptersAsync(ViewModel.CancellationTokenSource.Token);
-			if (sliderTotalPages > 0)
-			{
-				pageSlider.Minimum = 0;
-				pageSlider.Maximum = Math.Max(0, sliderTotalPages - 1);
-				// Use the book's current chapter/page to compute the slider position.
-				// chapterOffsets contains the zero-based global page offset for each chapter.
-				int currentGlobalIndex = 0;
-				try
-				{
-					if (book.CurrentChapter >= 0 && book.CurrentChapter < chapterOffsets.Count)
-					{
-						currentGlobalIndex = chapterOffsets[book.CurrentChapter] + Math.Max(0, book.CurrentPage);
-					}
-					else
-					{
-						// Fallback to synthetic calculation (1-based returned) if chapter index is out of range
-						var current = book.GetCurrentPageNumber();
-						currentGlobalIndex = Math.Max(0, current - 1);
-					}
-				}
-				catch
-				{
-					// In case of any unexpected failure, fall back to the previous method
-					var current = book.GetCurrentPageNumber();
-					currentGlobalIndex = Math.Max(0, current - 1);
-				}
-
-				pageSlider.Value = Math.Min(pageSlider.Maximum, Math.Max(0, currentGlobalIndex));
-			}
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"Slider init failed: {ex.Message}");
-		}
+     pageSlider.Minimum = 0;
+		pageSlider.Maximum = 0;
+		pageSlider.Value = 0;
 	}
 
 	/// <summary>
@@ -492,8 +381,11 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandlePageLoadAsync(currentPage);
 				break;
 			case "characterposition":
-				await HandleCharacterPositionAsync(currentPage, data);
+				await HandleCharacterPositionAsync(currentPage);
 				break;
+             case "sectionchange":
+					HandleSectionChange(data);
+					break;
 			case "mediaoverlaylog":
 				HandleMediaOverlayLog(data);
 				break;
@@ -524,14 +416,78 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task HandleNextAsync()
 	{
-		await webViewHelper.Next(pageLabel, book);
+		var requiresPageLoadEvent = await webViewHelper.Next(pageLabel, book);
 		await NotifyMediaOverlayChapterRequestedAsync();
+		if (!requiresPageLoadEvent)
+		{
+			await HandlePostChapterLoadAsync();
+		}
 	}
 
 	async Task HandlePrevAsync()
 	{
-		await webViewHelper.Prev(pageLabel, book);
+		System.Diagnostics.Trace.TraceInformation("Handling prev action from JS");
+        if (book.CurrentChapter <= 0)
+		{
+			navigateToChapterEndOnLoad = false;
+			return;
+		}
+
+      navigateToChapterEndOnLoad = true;
+		var requiresPageLoadEvent = await webViewHelper.Prev(pageLabel, book);
 		await NotifyMediaOverlayChapterRequestedAsync();
+		if (!requiresPageLoadEvent)
+		{
+         await HandlePostChapterLoadAsync();
+		}
+	}
+
+	/// <summary>
+	/// Applies ReadiumCSS settings and positions the page after a section-only swap in combined mode.
+	/// Called instead of waiting for a <c>pageload</c> JS event when <c>showSection()</c> is used.
+	/// </summary>
+	async Task HandlePostChapterLoadAsync()
+	{
+		Trace.TraceInformation($"[PageRestore] HandlePostChapterLoadAsync: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} navigateToEnd={navigateToChapterEndOnLoad}");
+		await Dispatcher.DispatchAsync(async () =>
+		{
+			await webViewHelper.OnSettingsClickedAsync();
+			await UpdateUiAppearance();
+		   if (navigateToChapterEndOnLoad)
+			{
+				navigateToChapterEndOnLoad = false;
+				Trace.TraceInformation("[PageRestore] HandlePostChapterLoadAsync: scrollToHorizontalEnd (navigateToEnd path)");
+				await webView.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
+			}
+			else if (book.CurrentPage > 0)
+			{
+				Trace.TraceInformation($"[PageRestore] HandlePostChapterLoadAsync: calling gotoPage({book.CurrentPage})");
+				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
+			}
+			else
+			{
+				Trace.TraceInformation($"[PageRestore] HandlePostChapterLoadAsync: gotoPage SKIPPED (book.Pg={book.CurrentPage})");
+			}
+			sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+			Trace.TraceInformation($"[PageRestore] HandlePostChapterLoadAsync done: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} label='{pageLabel.Text}'");
+			await NotifyMediaOverlayPageLoadedAsync();
+		});
+	}
+
+	void HandleSectionChange(string data)
+	{
+		if (!int.TryParse(data, out var chapterIndex))
+		{
+			return;
+		}
+
+		if (chapterIndex < 0 || chapterIndex >= book.Chapters.Count)
+		{
+			return;
+		}
+
+		book.CurrentChapter = chapterIndex;
+		book.CurrentPage = 0;
 	}
 
 	void HandleMenu()
@@ -541,35 +497,59 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task HandlePageLoadAsync(int currentPage)
 	{
+		Trace.TraceInformation($"[PageRestore] HandlePageLoadAsync: jsCurrentPage={currentPage} book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} navigateToEnd={navigateToChapterEndOnLoad}");
 		await Dispatcher.DispatchAsync(async () =>
 		{
+		   webViewHelper.MarkCombinedHtmlLoaded();
+			await webView.EvaluateJavaScriptAsync($"showSection({book.CurrentChapter});");
+			Trace.TraceInformation($"[PageRestore] HandlePageLoadAsync: showSection({book.CurrentChapter}) called");
+
 			await webViewHelper.OnSettingsClickedAsync();
 			await UpdateUiAppearance();
-			if (currentPage == 0 && book.CurrentPage > 0)
+		   if (navigateToChapterEndOnLoad)
 			{
+				navigateToChapterEndOnLoad = false;
+				Trace.TraceInformation("[PageRestore] HandlePageLoadAsync: scrollToHorizontalEnd (navigateToEnd path)");
+				await webView.EvaluateJavaScriptAsync("scrollToHorizontalEnd()");
+			}
+			else if (currentPage == 0 && book.CurrentPage > 0)
+			{
+				Trace.TraceInformation($"[PageRestore] HandlePageLoadAsync: calling gotoPage({book.CurrentPage})");
 				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
 			}
+			else
+			{
+				Trace.TraceInformation($"[PageRestore] HandlePageLoadAsync: gotoPage SKIPPED (jsCurrentPage={currentPage}, book.Pg={book.CurrentPage})");
+			}
 			sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
-			pageAtCorrectPosition = true;
-			HideNativeOverlay();
+			Trace.TraceInformation($"[PageRestore] HandlePageLoadAsync done: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} label='{pageLabel.Text}'");
 			await NotifyMediaOverlayPageLoadedAsync();
 		});
 	}
 
-	async Task HandleCharacterPositionAsync(int currentPage, string data)
+	async Task HandleCharacterPositionAsync(int currentPage)
 	{
+		Trace.TraceInformation($"[PageRestore] HandleCharacterPositionAsync: jsPage={currentPage} book.Ch={book.CurrentChapter}");
 		book.CurrentPage = currentPage;
 		await Dispatcher.DispatchAsync(async () =>
 		{
 			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-			if (int.TryParse(data, out int characterPosition) && characterPosition > 0)
+            if (sliderTotalPages <= 0 || book.CurrentChapter < 0 || book.CurrentChapter >= chapterOffsets.Count)
 			{
-				sliderPageLabel.Text = pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
-
+                await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
 			}
-			else
+
+			if (sliderTotalPages <= 0)
 			{
-				sliderPageLabel.Text = pageLabel.Text = WebViewHelper.GetSyntheticPageInfo(book);
+               return;
+			}
+
+			var globalPageNumber = GetCurrentGlobalPageNumber(currentPage);
+			sliderPageLabel.Text = pageLabel.Text = WebViewHelper.FormatPageLabel(book, globalPageNumber, sliderTotalPages);
+
+			if (!isSliderActive && sliderTotalPages > 0)
+			{
+				pageSlider.Value = Math.Max(pageSlider.Minimum, Math.Min(pageSlider.Maximum, globalPageNumber - 1));
 			}
 		});
 	}
@@ -630,6 +610,11 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 	}
 
+	async void OnMediaOverlayChapterAdvanceRequested(object? sender, EventArgs e)
+	{
+		await HandleNextAsync();
+	}
+
 	async void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
 	{
 		switch (e.PropertyName)
@@ -658,6 +643,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 		mediaOverlayManager = new MediaOverlayPlaybackManager(ViewModel, webView, audioManager);
 		mediaOverlayManager.PlaybackProgressChanged += OnMediaOverlayPlaybackProgressChanged;
+		mediaOverlayManager.ChapterAdvanceRequested += OnMediaOverlayChapterAdvanceRequested;
 		await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 	}
 
@@ -734,9 +720,18 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task LoadChapterContentAsync()
 	{
+		Trace.TraceInformation($"[PageRestore] LoadChapterContentAsync: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		await EnsureMediaOverlayManagerInitialized();
 		await NotifyMediaOverlayChapterRequestedAsync();
-		await webViewHelper.LoadPageAsync(pageLabel, book);
+		var requiresPageLoadEvent = await webViewHelper.LoadPageAsync(pageLabel, book);
+		Trace.TraceInformation($"[PageRestore] LoadChapterContentAsync: requiresPageLoadEvent={requiresPageLoadEvent}");
+		if (!requiresPageLoadEvent)
+		{
+			// Combined mode: showSection() was called — no pageload event will fire.
+			// Apply settings and position the page directly here.
+			await HandlePostChapterLoadAsync();
+		}
+		NativeLoadingOverlay.IsVisible = false;
 	}
 
 	/// <summary>
@@ -745,12 +740,27 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <returns>A formatted string with synthetic page information.</returns>
 	async Task<string> GetCurrentPageInfoAsync()
 	{
-		var tempPosition = await webView.EvaluateJavaScriptAsync("getCharacterPositionFromScroll()");
-		if (int.TryParse(tempPosition, out int characterPosition) && characterPosition > 0)
+		// Guard: combined.html sections are not available until the pageload JS event fires and
+		// MarkCombinedHtmlLoaded() is called. Querying JS before that returns stale defaults
+		// (Ch=0, Pg=0) which would corrupt the restored book position.
+		if (!webViewHelper.CombinedHtmlIsLoaded)
 		{
-			return WebViewHelper.GetSyntheticPageInfo(book, characterPosition);
+			Trace.TraceInformation($"[PageRestore] GetCurrentPageInfoAsync: combined.html not loaded yet, returning title only (book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage})");
+			return book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
 		}
-		return WebViewHelper.GetSyntheticPageInfo(book);
+
+		var pagination = await webViewHelper.GetCombinedPaginationInfoAsync(ViewModel.CancellationTokenSource.Token);
+
+		if (pagination is null)
+		{
+			Trace.TraceInformation($"[PageRestore] GetCurrentPageInfoAsync: pagination=null, returning title only (book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage})");
+			return book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+		}
+
+		Trace.TraceInformation($"[PageRestore] GetCurrentPageInfoAsync: pagination.Ch={pagination.CurrentSectionIndex} pagination.Pg={pagination.CurrentPage} pagination.Total={pagination.TotalPages} offsets.Count={pagination.ChapterOffsets.Count}");
+		Trace.TraceInformation($"[PageRestore] GetCurrentPageInfoAsync: calling ApplyPaginationInfo (book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} → will become Ch={pagination.CurrentSectionIndex} Pg={pagination.CurrentPage})");
+		ApplyPaginationInfo(pagination);
+		return WebViewHelper.FormatPageLabel(book, pagination.CurrentGlobalPage, pagination.TotalPages);
 	}
 
 	async Task UpdateUiAppearance()
@@ -846,17 +856,65 @@ public partial class BookPage : ContentPage, IDisposable
 
 	// --- Slider helpers and event handlers ---
 
-	void BuildSyntheticMapping()
+	void ApplyPaginationInfo(WebViewHelper.CombinedPaginationInfo pagination)
 	{
+		Trace.TraceInformation($"[PageRestore] ApplyPaginationInfo: BEFORE book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		chapterOffsets.Clear();
-		var synthetic = book.GenerateSyntheticPages();
-		sliderTotalPages = synthetic.Sum(p => p.PageCount);
-		var offset = 0;
-		foreach (var info in synthetic)
+	  chapterOffsets.AddRange(pagination.ChapterOffsets);
+		sliderTotalPages = pagination.TotalPages;
+		if (pagination.CurrentSectionIndex >= 0 && pagination.CurrentSectionIndex < book.Chapters.Count)
 		{
-			chapterOffsets.Add(offset);
-			offset += info.PageCount;
+		 book.CurrentChapter = pagination.CurrentSectionIndex;
 		}
+
+		book.CurrentPage = pagination.CurrentPage;
+		Trace.TraceInformation($"[PageRestore] ApplyPaginationInfo: AFTER  book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} totalPages={sliderTotalPages}");
+
+		pageSlider.Minimum = 0;
+		pageSlider.Maximum = Math.Max(0, sliderTotalPages - 1);
+		if (!isSliderActive && sliderTotalPages > 0)
+		{
+			pageSlider.Value = Math.Max(pageSlider.Minimum, Math.Min(pageSlider.Maximum, pagination.CurrentGlobalPage - 1));
+		}
+		else if (sliderTotalPages == 0)
+		{
+			pageSlider.Value = 0;
+		}
+	}
+
+	int GetCurrentGlobalPageNumber(int currentPage)
+	{
+		if (sliderTotalPages <= 0)
+		{
+			return Math.Max(1, currentPage + 1);
+		}
+
+		if (book.CurrentChapter < 0 || book.CurrentChapter >= chapterOffsets.Count)
+		{
+			return Math.Max(1, currentPage + 1);
+		}
+
+		var offset = chapterOffsets[book.CurrentChapter];
+		return Math.Min(sliderTotalPages, offset + Math.Max(0, currentPage) + 1);
+	}
+
+	async Task RefreshPaginationStateAsync(CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		if (!webViewHelper.CombinedHtmlIsLoaded)
+		{
+			return;
+		}
+
+		var pagination = await webViewHelper.GetCombinedPaginationInfoAsync(token);
+		if (pagination is null)
+		{
+			return;
+		}
+
+		ApplyPaginationInfo(pagination);
+		sliderPageLabel.Text = pageLabel.Text = WebViewHelper.FormatPageLabel(book, pagination.CurrentGlobalPage, pagination.TotalPages);
 	}
 
 	int MapGlobalPageToChapter(int globalIndex, out int localPage)
@@ -942,7 +1000,8 @@ public partial class BookPage : ContentPage, IDisposable
 				await webView.EvaluateJavaScriptAsync($"gotoPage({localPage});");
 				// update local model so label and save logic remain consistent
 				book.CurrentPage = localPage;
-				sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+                var globalPageNumber = GetCurrentGlobalPageNumber(localPage);
+				sliderPageLabel.Text = pageLabel.Text = WebViewHelper.FormatPageLabel(book, globalPageNumber, sliderTotalPages);
 			}
 			else
 			{
@@ -988,7 +1047,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 			// Persist final position
 			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-			sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+            await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
 		}
 		catch (Exception ex)
 		{
@@ -1003,22 +1062,25 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			token.ThrowIfCancellationRequested();
 
+			Trace.TraceInformation($"[PageRestore] LoadAndMergeProgressAsync: ENTER book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 			var bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
 			var cloud = await syncService.GetProgressAsync(bookId, token);
 
 			if (cloud is null)
 			{
+				Trace.TraceInformation("[PageRestore] LoadAndMergeProgressAsync: cloud=null, using local-only path");
 				await PrimeLocalMediaOverlayRestoreAsync();
 				await BackfillLegacyProgressIfNeededAsync(bookId, token);
 			}
 			else
 			{
+				Trace.TraceInformation($"[PageRestore] LoadAndMergeProgressAsync: cloud found Ch={cloud.CurrentChapter} Pg={cloud.CurrentPage}");
 				pageLoaded = await ResolveProgressAsync(cloud, token);
 			}
 
+			Trace.TraceInformation($"[PageRestore] LoadAndMergeProgressAsync: before GetCurrentPageInfoAsync book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 			sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
-			progressSyncComplete = true;
-			Dispatcher.Dispatch(() => HideNativeOverlay());
+			Trace.TraceInformation($"[PageRestore] LoadAndMergeProgressAsync: EXIT pageLoaded={pageLoaded} book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 			return pageLoaded;
 		}
 		catch (OperationCanceledException ex)
@@ -1082,24 +1144,8 @@ public partial class BookPage : ContentPage, IDisposable
 			? book.Chapters[cloud.CurrentChapter].Title
 			: "Unknown";
 
-		var tempLocal = new Book
-		{
-			Chapters = book.Chapters,
-			CurrentChapter = book.CurrentChapter,
-			CurrentPage = book.CurrentPage
-		};
-		var tempCloud = new Book
-		{
-			Chapters = book.Chapters,
-			CurrentChapter = cloud.CurrentChapter,
-			CurrentPage = cloud.CurrentPage
-		};
-
-		var localSynthetic = WebViewHelper.GetSyntheticPageInfo(tempLocal);
-		var cloudSynthetic = WebViewHelper.GetSyntheticPageInfo(tempCloud);
-
-		var localInfo = $"{localChapterTitle} — {localSynthetic}";
-		var cloudInfo = $"{cloudChapterTitle} — {cloudSynthetic}";
+        var localInfo = $"{localChapterTitle} — Page {Math.Max(1, book.CurrentPage + 1)}";
+		var cloudInfo = $"{cloudChapterTitle} — Page {Math.Max(1, cloud.CurrentPage + 1)}";
 		return (localInfo, cloudInfo);
 	}
 
@@ -1135,6 +1181,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			// Update only the progress columns to avoid overwriting other book fields
 			await db.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, token);
+			System.Diagnostics.Trace.TraceInformation($"Saved progress locally: Chapter {book.CurrentChapter}, Page {book.CurrentPage}");
 		}
 		catch (Exception ex)
 		{
@@ -1146,6 +1193,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			book.LastOpenedDate = DateTime.UtcNow;
 			await db.SaveBookData(book, token);
+			System.Diagnostics.Trace.TraceInformation($"Updated book LastOpenedDate to {book.LastOpenedDate:o}");
 		}
 		catch (Exception ex)
 		{
@@ -1234,6 +1282,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task ApplyProgressToUiAsync(ReadingProgress progress)
 	{
+		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: applying Ch={progress.CurrentChapter} Pg={progress.CurrentPage} (was book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage})");
 		book.CurrentChapter = progress.CurrentChapter;
 		book.CurrentPage = progress.CurrentPage;
 
@@ -1277,14 +1326,14 @@ public partial class BookPage : ContentPage, IDisposable
 
 		if (book.Chapters.Count > book.CurrentChapter && book.CurrentChapter >= 0)
 		{
+			Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: calling LoadChapterContentAsync Ch={book.CurrentChapter} Pg={book.CurrentPage}");
 			await LoadChapterContentAsync();
-			if (book.CurrentPage > 0)
-			{
-				await webView.EvaluateJavaScriptAsync($"gotoPage({book.CurrentPage})");
-			}
+			Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: LoadChapterContentAsync done, book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		}
 
+		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: before GetCurrentPageInfoAsync book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: EXIT book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 	}
 
 	async Task SyncProgressNowAsync(CancellationToken token)
@@ -1367,8 +1416,6 @@ public partial class BookPage : ContentPage, IDisposable
 		if (disposing)
 		{
 			WeakReferenceMessenger.Default.UnregisterAll(this);
-			webViewHelper.PageLoadStarted -= OnWebViewPageLoadStarted;
-			webViewHelper.SettingsApplied -= OnWebViewSettingsApplied;
 
 			webView.Navigated -= webView_Navigated;
 			webView.Navigating -= webView_Navigating;
@@ -1377,6 +1424,7 @@ public partial class BookPage : ContentPage, IDisposable
 			if (mediaOverlayManager is not null)
 			{
 				mediaOverlayManager.PlaybackProgressChanged -= OnMediaOverlayPlaybackProgressChanged;
+				mediaOverlayManager.ChapterAdvanceRequested -= OnMediaOverlayChapterAdvanceRequested;
 				mediaOverlayManager.Dispose();
 			}
 			mediaOverlayManager = null;

@@ -114,30 +114,39 @@ public static partial class WebViewExtensions
 		var url = e.Request.Uri ?? string.Empty;
 		var filename = Path.GetFileName(url);
 
-		// Allow the GitHub Pages site to load normally without interception
+		// Allow the GitHub Pages site to load normally without interception.
+		// Do not acquire a deferral — returning without setting e.Response lets WebView2 perform the default network request.
 		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
 		{
-			// Do not set e.Response so the WebView will perform the default navigation
 			return;
 		}
 
-		if (url.Contains("https://runcsharp"))
+		// Acquire a deferral so WebView2 waits for the async response instead of
+		// proceeding with its default (failed) network request the moment we hit the first await.
+		var deferral = e.GetDeferral();
+		try
 		{
-			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-			return;
-		}
+			if (url.Contains("https://runcsharp"))
+			{
+				e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
+				return;
+			}
 
-		CancellationTokenSource cancellationTokenSource = new();
-		var getData = await StreamAsync(url, cancellationTokenSource.Token);
-		var mimeType = StreamExtensions.GetMimeType(filename);
-		if (getData is null)
-		{
-			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-			return;
+			using CancellationTokenSource cancellationTokenSource = new();
+			var getData = await StreamAsync(url, cancellationTokenSource.Token);
+			var mimeType = StreamExtensions.GetMimeType(filename);
+			if (getData is null || getData == Stream.Null)
+			{
+				e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
+				return;
+			}
+			// Include caching header to allow webview to reuse preloaded resources
+			e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
 		}
-		// Include caching header to allow webview to reuse preloaded resources
-		e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(getData.AsRandomAccessStream(), 200, "OK", GenerateHeaders(mimeType));
-		cancellationTokenSource.Dispose();
+		finally
+		{
+			deferral.Complete();
+		}
 	}
 
 	/// <summary>

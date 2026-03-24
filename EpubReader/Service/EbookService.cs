@@ -94,6 +94,88 @@ public static partial class EbookService
 		return book is null ? null : await CreateFullBookAsync(book, path).ConfigureAwait(false);
 	}
 
+	/// <summary>
+	/// Combines all chapters of the specified <see cref="Book"/> into a single HTML document string
+	/// with all CSS styles embedded inline.
+	/// </summary>
+	/// <param name="book">
+	/// The book to combine. <see cref="Book.Chapters"/> and <see cref="Book.Css"/> must be populated
+	/// (i.e. the book must have been opened via <see cref="OpenEbookAsync"/>).
+	/// </param>
+	/// <returns>
+	/// A string containing a complete HTML document where each chapter's body content is wrapped in a
+	/// <c>&lt;section&gt;</c> element and all CSS is embedded as <c>&lt;style&gt;</c> blocks.
+	/// </returns>
+	public static string CombineChapters(Book book)
+	{
+       ArgumentNullException.ThrowIfNull(book);
+
+		var sb = new StringBuilder();
+		Dictionary<string, string> chapterTargets = new(StringComparer.OrdinalIgnoreCase);
+		for (int i = 0; i < book.Chapters.Count; i++)
+		{
+			Chapter? chapter = book.Chapters[i];
+			if (string.IsNullOrWhiteSpace(chapter.FileName))
+			{
+				continue;
+			}
+
+			var chapterFileName = Path.GetFileName(chapter.FileName);
+			if (string.IsNullOrWhiteSpace(chapterFileName) || chapterTargets.ContainsKey(chapterFileName))
+			{
+				continue;
+			}
+
+			chapterTargets[chapterFileName] = Path.GetFileNameWithoutExtension(chapter.FileName);
+		}
+
+		sb.AppendLine("<!DOCTYPE html>");
+		sb.AppendLine("<html xmlns=\"http://www.w3.org/1999/xhtml\">");
+		sb.AppendLine("<head>");
+		sb.AppendLine("<meta charset=\"UTF-8\"/>");
+		sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\"/>");
+		sb.AppendLine($"<title>{System.Net.WebUtility.HtmlEncode(book.Title)}</title>");
+
+		// ReadiumCSS must bracket the book's own CSS so properties cascade correctly.
+		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReadiumCSS-before.css\"/>");
+		foreach (var css in book.Css)
+		{
+			sb.AppendLine($"<link rel=\"stylesheet\" href=\"{css.FileName}\"/>");
+		}
+		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReadiumCSS-after.css\"/>");
+
+		// Container.js runs inside the iframe and bridges navigation events to the parent frame.
+		sb.AppendLine("<script src=\"Container.js\"></script>");
+
+		// All sections are hidden by default; showSection() in EpubText.js reveals the active one.
+		sb.AppendLine("<style>section[data-chapter-index]{display:none}</style>");
+
+		sb.AppendLine("</head>");
+		sb.AppendLine("<body>");
+
+		for (var i = 0; i < book.Chapters.Count; i++)
+		{
+			var chapter = book.Chapters[i];
+			if (string.IsNullOrEmpty(chapter.HtmlFile))
+			{
+				continue;
+			}
+
+			var chapterId = Path.GetFileNameWithoutExtension(chapter.FileName);
+			sb.AppendLine($"<section id=\"{chapterId}\"");
+			sb.AppendLine($"         data-chapter-index=\"{i}\"");
+			sb.AppendLine($"         data-chapter-title=\"{System.Net.WebUtility.HtmlEncode(chapter.Title)}\"");
+			sb.AppendLine($"         data-chapter-filename=\"{chapter.FileName}\">");
+          sb.AppendLine(HtmlAgilityPackExtensions.PrepareBodyContentForCombinedDocument(chapter.HtmlFile, chapterId, chapterTargets));
+			sb.AppendLine("</section>");
+		}
+
+		sb.AppendLine("</body>");
+		sb.AppendLine("</html>");
+
+		return sb.ToString();
+	}
+
 	#endregion
 
 	#region Private Helper Methods - Book Creation
@@ -133,8 +215,8 @@ public static partial class EbookService
 															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
 														  } } : []).ToList();
 		fonts.AddRange(additionalFonts);
-	
-		return new Book
+
+		var resultBook = new Book
 		{
 			Title = book.Title.Trim(),
 			Author = authors[0],
@@ -153,6 +235,9 @@ public static partial class EbookService
 			MediaOverlayNarrator = mediaOverlayResult.Narrator,
 			MediaOverlayDuration = mediaOverlayResult.Duration,
 		};
+
+		resultBook.CombinedHtml = CombineChapters(resultBook);
+		return resultBook;
 	}
 
 	#endregion
@@ -312,27 +397,30 @@ public static partial class EbookService
 		var resources = new List<MediaOverlayAudioResource>();
 		if (documents.Count == 0)
 		{
+           logger.Info("No media overlay documents available for audio extraction.");
 			return resources;
 		}
 
 		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		logger.Info($"Extracting media overlay audio from {documents.Count} document(s).");
 
 		foreach (var document in documents)
 		{
+          var extractedForDocument = 0;
+			var missingForDocument = 0;
 			foreach (var source in document.FlattenedNodes
 												.Select(node => node.Audio?.Source)
 												.Where(src => !string.IsNullOrWhiteSpace(src)))
 			{
-				var normalized = NormalizeMediaOverlayAudioPath(document, source!);
-				if (string.IsNullOrEmpty(normalized) || !seen.Add(normalized))
+             if (!TryResolveMediaOverlayAudioFile(book, document, source!, out var file, out var normalized))
 				{
+                   logger.Warn($"Missing media overlay audio resource: {source}");
+                   missingForDocument++;
 					continue;
 				}
 
-				var file = FindLocalContentFile(book, normalized);
-				if (file is null)
+				if (!seen.Add(normalized))
 				{
-					logger.Warn($"Missing media overlay audio resource: {source}");
 					continue;
 				}
 				try
@@ -345,13 +433,18 @@ public static partial class EbookService
 						Content = bytes,
 						ContentType = StreamExtensions.GetMimeType(source!)
 					});
+                   extractedForDocument++;
 				}
 				catch (Exception ex)
 				{
 					logger.Warn($"Failed reading media overlay audio '{source}': {ex.Message}");
 				}
 			}
+
+			logger.Info($"Media overlay audio extraction for document '{document.Id}' ({document.Href}): extracted={extractedForDocument}, missing={missingForDocument}, associatedDocs={document.AssociatedContentDocuments.Count}, flattenedNodes={document.FlattenedNodes.Count}");
 		}
+
+		logger.Info($"Extracted {resources.Count} unique media overlay audio resource(s).");
 
 		return resources;
 	}
@@ -369,33 +462,49 @@ public static partial class EbookService
 			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedPath));
 	}
 
-	static string NormalizeMediaOverlayAudioPath(MediaOverlayDocument document, string source)
+  static bool TryResolveMediaOverlayAudioFile(EpubBookRef book, MediaOverlayDocument document, string source, out EpubLocalContentFileRef file, out string normalizedPath)
 	{
-		var normalizedSource = MediaOverlayPathHelper.Normalize(source);
-		if (string.IsNullOrEmpty(normalizedSource))
+        ArgumentNullException.ThrowIfNull(book);
+		ArgumentNullException.ThrowIfNull(document);
+
+		foreach (var candidate in BuildMediaOverlayPathCandidates(document, source))
 		{
-			return string.Empty;
+            var match = FindLocalContentFile(book, candidate);
+			if (match is null)
+			{
+				continue;
+			}
+
+			file = match;
+			normalizedPath = MediaOverlayPathHelper.Normalize(match.FilePath);
+			return true;
 		}
 
-		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
-		if (string.IsNullOrEmpty(normalizedDocumentHref))
+       file = null!;
+		normalizedPath = string.Empty;
+		return false;
+	}
+
+	static IEnumerable<string> BuildMediaOverlayPathCandidates(MediaOverlayDocument document, string source)
+	{
+		var normalizedSource = CollapseRelativeSegments(MediaOverlayPathHelper.Normalize(source));
+		if (!string.IsNullOrEmpty(normalizedSource))
 		{
-			return normalizedSource;
+            yield return normalizedSource;
 		}
 
+       var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
 		var directory = ExtractDirectory(normalizedDocumentHref);
-		if (string.IsNullOrEmpty(directory))
+        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(normalizedSource))
 		{
-			return normalizedSource;
+            yield break;
 		}
 
-		if (normalizedSource.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
+     var combined = CollapseRelativeSegments($"{directory}{normalizedSource}");
+		if (!string.Equals(combined, normalizedSource, StringComparison.OrdinalIgnoreCase))
 		{
-			return CollapseRelativeSegments(normalizedSource);
+          yield return combined;
 		}
-
-		var combined = $"{directory}{normalizedSource}";
-		return CollapseRelativeSegments(combined);
 	}
 
 	static string ExtractDirectory(string normalizedPath)

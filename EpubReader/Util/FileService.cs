@@ -270,7 +270,19 @@ public static partial class FileService
 			return "application/octet-stream";
 		}
 
-		var extension = Path.GetExtension(fileName).ToLowerInvariant();
+     var normalizedPath = fileName.Trim();
+		if (Uri.TryCreate(normalizedPath, UriKind.Absolute, out var absoluteUri))
+		{
+			normalizedPath = absoluteUri.AbsolutePath;
+		}
+
+		var queryIndex = normalizedPath.IndexOfAny(['?', '#']);
+		if (queryIndex >= 0)
+		{
+			normalizedPath = normalizedPath[..queryIndex];
+		}
+
+		var extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
 
 		return extension switch
 		{
@@ -284,6 +296,12 @@ public static partial class FileService
 			".jpg" or ".jpeg" => "image/jpeg",
 			".gif" => "image/gif",
 			".svg" => "image/svg+xml",
+            ".mp3" => "audio/mpeg",
+			".m4a" or ".m4b" or ".mp4" => "audio/mp4",
+			".aac" => "audio/aac",
+			".wav" => "audio/wav",
+			".ogg" => "audio/ogg",
+			".opus" => "audio/opus",
 			".pdf" => "application/pdf",
 			".txt" => "text/plain",
 			_ => "application/octet-stream"

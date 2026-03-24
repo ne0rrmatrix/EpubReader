@@ -14,6 +14,42 @@ namespace EpubReader.Util;
 public static partial class HtmlAgilityPackExtensions
 {
 	/// <summary>
+	/// Extracts the inner HTML content of the <c>&lt;body&gt;</c> element from an HTML string.
+	/// </summary>
+	/// <param name="html">The full HTML document string to parse.</param>
+	/// <returns>The inner HTML of the <c>&lt;body&gt;</c> element, or the original string if no body is found.</returns>
+	public static string ExtractBodyContent(string html)
+	{
+		var doc = new HtmlDocument();
+		doc.LoadHtml(html);
+		var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
+		return bodyNode?.InnerHtml ?? html;
+	}
+
+	/// <summary>
+	/// Rewrites chapter-local identifiers and links so merged EPUB content can navigate entirely within <c>combined.html</c>.
+	/// </summary>
+	/// <param name="html">The source chapter HTML.</param>
+	/// <param name="chapterId">The combined document section identifier for the chapter.</param>
+	/// <param name="chapterTargets">A map of chapter file names to combined section identifiers.</param>
+	/// <returns>The rewritten body HTML for the combined document.</returns>
+	public static string PrepareBodyContentForCombinedDocument(string html, string chapterId, IReadOnlyDictionary<string, string> chapterTargets)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(html);
+		ArgumentException.ThrowIfNullOrWhiteSpace(chapterId);
+		ArgumentNullException.ThrowIfNull(chapterTargets);
+
+		var doc = new HtmlDocument();
+		doc.LoadHtml(html);
+		var bodyNode = doc.DocumentNode.SelectSingleNode("//body") ?? doc.DocumentNode;
+
+		RewriteCombinedAnchorTargets(bodyNode, chapterId);
+		RewriteCombinedChapterLinks(bodyNode, chapterId, chapterTargets);
+
+		return bodyNode.InnerHtml;
+	}
+
+	/// <summary>
 	/// Extracts the names of CSS files linked in an HTML document.
 	/// </summary>
 	/// <remarks>This method parses the provided HTML content to find all <c>&lt;link&gt;</c> elements with a
@@ -320,6 +356,115 @@ public static partial class HtmlAgilityPackExtensions
 		});
 	}
 
+	static void RewriteCombinedAnchorTargets(HtmlNode rootNode, string chapterId)
+	{
+		var idNodes = rootNode.SelectNodes(".//*[@id]");
+		if (idNodes is not null)
+		{
+			foreach (var node in idNodes)
+			{
+				var id = node.GetAttributeValue("id", string.Empty);
+				if (string.IsNullOrWhiteSpace(id))
+				{
+					continue;
+				}
+
+				node.SetAttributeValue("id", BuildCombinedFragmentId(chapterId, id));
+			}
+		}
+
+		var nameNodes = rootNode.SelectNodes(".//*[@name]");
+		if (nameNodes is null)
+		{
+			return;
+		}
+
+		foreach (var node in nameNodes)
+		{
+			var name = node.GetAttributeValue("name", string.Empty);
+			if (string.IsNullOrWhiteSpace(name))
+			{
+				continue;
+			}
+
+			var rewrittenId = BuildCombinedFragmentId(chapterId, name);
+			node.SetAttributeValue("name", rewrittenId);
+			if (!node.Attributes.Contains("id"))
+			{
+				node.SetAttributeValue("id", rewrittenId);
+			}
+		}
+	}
+
+	static void RewriteCombinedChapterLinks(HtmlNode rootNode, string chapterId, IReadOnlyDictionary<string, string> chapterTargets)
+	{
+		var linkNodes = rootNode.SelectNodes(".//a[@href]");
+		if (linkNodes is null)
+		{
+			return;
+		}
+
+		foreach (var linkNode in linkNodes)
+		{
+			var href = linkNode.GetAttributeValue("href", string.Empty).Trim();
+			if (string.IsNullOrWhiteSpace(href) || IsExternalOrUnsupportedHref(href))
+			{
+				continue;
+			}
+
+			var hashIndex = href.IndexOf('#');
+			var path = hashIndex >= 0 ? href[..hashIndex] : href;
+			var fragment = hashIndex >= 0 ? href[(hashIndex + 1)..] : string.Empty;
+
+			if (string.IsNullOrWhiteSpace(path))
+			{
+				var rewrittenSelfHref = string.IsNullOrWhiteSpace(fragment)
+					? $"#{chapterId}"
+					: $"#{BuildCombinedFragmentId(chapterId, fragment)}";
+				linkNode.SetAttributeValue("href", rewrittenSelfHref);
+				continue;
+			}
+
+			var targetFileName = Path.GetFileName(path);
+			if (string.IsNullOrWhiteSpace(targetFileName) || !chapterTargets.TryGetValue(targetFileName, out var targetChapterId))
+			{
+				continue;
+			}
+
+			var rewrittenHref = string.IsNullOrWhiteSpace(fragment)
+				? $"#{targetChapterId}"
+				: $"#{BuildCombinedFragmentId(targetChapterId, fragment)}";
+			linkNode.SetAttributeValue("href", rewrittenHref);
+		}
+	}
+
+	static bool IsExternalOrUnsupportedHref(string href)
+	{
+		if (href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ||
+			href.StartsWith("tel:", StringComparison.OrdinalIgnoreCase) ||
+			href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
+			href.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		if (!Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
+		{
+			return false;
+		}
+
+		return absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+			absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+	}
+
+	static string BuildCombinedFragmentId(string chapterId, string fragmentId)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(chapterId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(fragmentId);
+
+		return $"{chapterId}__{Uri.UnescapeDataString(fragmentId.Trim().TrimStart('#'))}";
+	}
+
 	/// <summary>
 	/// Removes all CSS rules that contain "calibre" from the input CSS string.
 	/// This includes class selectors like .calibre, .calibre1, etc.,
@@ -353,6 +498,30 @@ public static partial class HtmlAgilityPackExtensions
 		// Remove all matches from the HTML content
 		string cleanedHtml = Regex.Replace(htmlContent, koboScriptPattern, string.Empty, RegexOptions.IgnoreCase, matchTimeout: TimeSpan.FromSeconds(10));
 		return RemoveEmptyLines(cleanedHtml);
+	}
+
+	/// <summary>
+	/// Returns the character offset of each chapter boundary within a combined HTML document,
+	/// keyed by chapter index.
+	/// </summary>
+	/// <param name="combinedHtml">The combined HTML string produced by <see cref="EbookService.CombineChapters"/>.</param>
+	/// <returns>
+	/// A list of <see cref="ChapterMarker"/> records describing each chapter's index, title,
+	/// filename, and the position of its opening <c>&lt;section&gt;</c> tag within the string.
+	/// </returns>
+	public static List<ChapterMarker> FindChapterMarkers(string combinedHtml)
+	{
+		var doc = new HtmlDocument();
+		doc.LoadHtml(combinedHtml);
+
+		return [.. doc.DocumentNode
+			.SelectNodes("//section[@data-chapter-index]")
+			?.Select(node => new ChapterMarker(
+				Index:    int.Parse(node.GetAttributeValue("data-chapter-index", "0")),
+				Title:    node.GetAttributeValue("data-chapter-title", string.Empty),
+				FileName: node.GetAttributeValue("data-chapter-filename", string.Empty),
+				CharOffset: node.StreamPosition
+			)) ?? []];
 	}
 
 	static bool IsHtmlPage(string htmlContent)

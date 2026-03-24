@@ -16,6 +16,7 @@ public sealed class BookPageJsMessage
 	public string? Href { get; init; }
 
 	public int? Position { get; init; }
+   public int? ChapterIndex { get; init; }
 	public double? Seconds { get; init; }
 
 	public bool? Enabled { get; init; }
@@ -54,6 +55,12 @@ public sealed class BookPageJsMessage
 				pos = p;
 			}
 
+			int? chapterIndex = null;
+			if (root.TryGetProperty("chapterIndex", out var chapterElem) && chapterElem.ValueKind == JsonValueKind.Number && chapterElem.TryGetInt32(out var parsedChapterIndex))
+			{
+				chapterIndex = parsedChapterIndex;
+			}
+
 			double? seconds = null;
 			if (root.TryGetProperty("seconds", out var secondsElem) && secondsElem.ValueKind == JsonValueKind.Number && secondsElem.TryGetDouble(out var s))
 			{
@@ -78,6 +85,7 @@ public sealed class BookPageJsMessage
 				Action = action,
 				Href = href,
 				Position = pos,
+              ChapterIndex = chapterIndex,
 				Enabled = enabled,
 				Message = messageText,
 				Seconds = seconds
@@ -107,6 +115,7 @@ public sealed class BookPageJsMessage
 			"menu" => "https://runcsharp.menu?true",
 			"pageload" => "https://runcsharp.pageLoad?true",
 			"characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
+          "sectionchange" => ChapterIndex.HasValue ? $"https://runcsharp.sectionchange?{ChapterIndex.Value}" : null,
 			"mediaoverlaytoggle" => Enabled.HasValue ? $"https://runcsharp.mediaoverlaytoggle?{Enabled.Value}" : null,
 			"mediaoverlayplay" => "https://runcsharp.mediaoverlayplay?true",
 			"mediaoverlaypause" => "https://runcsharp.mediaoverlaypause?true",

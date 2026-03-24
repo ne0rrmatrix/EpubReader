@@ -46,8 +46,10 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	double? restoredPositionSeconds;
 	MediaOverlayPlaybackProgress? pendingRestore;
 	bool isApplyingRestore;
+	bool pendingChapterAutoPlay;
 
 	public event EventHandler<MediaOverlayPlaybackProgress>? PlaybackProgressChanged;
+	public event EventHandler? ChapterAdvanceRequested;
 
 	string ActiveClass => string.IsNullOrWhiteSpace(book.MediaOverlayActiveClass)
 		? "-epub-media-overlay-active"
@@ -79,6 +81,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		{
 			audioCache[resource.NormalizedPath] = resource;
 		}
+
+		System.Diagnostics.Trace.TraceInformation($"Media overlay book context updated: overlays={book.MediaOverlays.Count}, audioResources={book.MediaOverlayAudio.Count}, cachedAudio={audioCache.Count}, currentChapter={book.CurrentChapter}");
 	}
 
 	public async Task InitializeUiAsync()
@@ -144,18 +148,26 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		isWebViewReady = true;
-		await InitializeUiAsync();
 
 		if (currentChapterIndex != chapterIndex)
 		{
 			await UpdateChapterContextAsync(chapterIndex).ConfigureAwait(false);
 		}
 
+		await InitializeUiAsync();
+
 		await ApplyPendingRestoreAsync();
 
 		if (isEnabled)
 		{
 			await HighlightCurrentSegmentAsync();
+		}
+
+		if (pendingChapterAutoPlay && isEnabled && segments.Count > 0)
+		{
+			pendingChapterAutoPlay = false;
+			await PlayAsync();
+			return;
 		}
 
 		await UpdateUiStateAsync();
@@ -533,10 +545,15 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var document = ResolveDocumentForChapter(chapter.FileName);
-		segments = BuildSegments(document, chapter.FileName);
+      var documents = ResolveDocumentsForChapter(chapter.FileName);
+		segments = BuildSegments(documents, chapter.FileName);
 		currentChapterDurationSeconds = CalculateDurationSeconds(segments);
 		segmentIndex = 0;
+
+		var matchedDocumentSummary = documents.Count == 0
+			? "none"
+			: string.Join(", ", documents.Select(document => $"{document.Id}:{document.FlattenedNodes.Count} nodes/{document.AssociatedContentDocuments.Count} refs"));
+		System.Diagnostics.Trace.TraceInformation($"Media overlay chapter context: chapterIndex={chapterIndex}, chapterFile='{chapter.FileName}', matchedDocuments={documents.Count}, segments={segments.Count}, cachedAudio={audioCache.Count}, durationSeconds={currentChapterDurationSeconds?.ToString() ?? "null"}, docs=[{matchedDocumentSummary}]");
 
 		if (isEnabled && segments.Count == 0)
 		{
@@ -544,52 +561,102 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 	}
 
-	MediaOverlayDocument? ResolveDocumentForChapter(string chapterFileName)
+ List<MediaOverlayDocument> ResolveDocumentsForChapter(string chapterFileName)
 	{
-		return book.MediaOverlays.FirstOrDefault(document =>
+      var normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
+		var chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
+        List<MediaOverlayDocument> documents = [.. book.MediaOverlays.Where(document =>
 			document.AssociatedContentDocuments.Any(content =>
-				string.Equals(MediaOverlayPathHelper.ExtractFileName(content), chapterFileName, StringComparison.OrdinalIgnoreCase)));
+				MediaOverlayPathHelper.PathsReferToSameFile(content, normalizedChapterPath) ||
+				string.Equals(MediaOverlayPathHelper.ExtractFileName(content), chapterFileNameOnly, StringComparison.OrdinalIgnoreCase)) ||
+			document.FlattenedNodes.Any(node => NodeTargetsChapter(node, normalizedChapterPath, chapterFileNameOnly)))];
+
+		System.Diagnostics.Trace.TraceInformation($"ResolveDocumentsForChapter: chapter='{chapterFileName}', normalized='{normalizedChapterPath}', fileName='{chapterFileNameOnly}', matched={documents.Count}");
+		return documents;
 	}
 
-	static List<MediaOverlaySegment> BuildSegments(MediaOverlayDocument? document, string chapterFileName)
+  static List<MediaOverlaySegment> BuildSegments(IEnumerable<MediaOverlayDocument> documents, string chapterFileName)
 	{
-		if (document is null)
+	   ArgumentNullException.ThrowIfNull(documents);
+		var documentList = documents.ToList();
+
+		var normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
+		var chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
+		if (string.IsNullOrWhiteSpace(chapterFileNameOnly))
 		{
 			return [];
 		}
 
-		var fileName = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
+		// Matches the chapterId used by EbookService when building combined.html sections,
+		// and by HtmlAgilityPackExtensions.BuildCombinedFragmentId when rewriting element IDs.
+		var chapterId = Path.GetFileNameWithoutExtension(chapterFileName);
+
 		var list = new List<MediaOverlaySegment>();
+		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		var candidateNodes = 0;
 
-		foreach (var node in document.FlattenedNodes)
+	  foreach (var document in documentList)
 		{
-			if (node.Text is null || node.Audio is null)
+			foreach (var node in document.FlattenedNodes)
 			{
-				continue;
-			}
+			   if (node.Text is null || node.Audio is null)
+				{
+					continue;
+				}
 
-			var (sourcePath, fragment) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
-			if (string.IsNullOrWhiteSpace(fragment))
-			{
-				continue;
-			}
+			  var (sourcePath, fragment) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
+				if (string.IsNullOrWhiteSpace(fragment) || !PathsTargetChapter(sourcePath, normalizedChapterPath, chapterFileNameOnly))
+				{
+					continue;
+				}
 
-			var sourceFileName = MediaOverlayPathHelper.ExtractFileName(sourcePath);
-			if (!string.Equals(sourceFileName, fileName, StringComparison.OrdinalIgnoreCase))
-			{
-				continue;
-			}
+				candidateNodes++;
 
-			list.Add(new MediaOverlaySegment(node, fragment));
+			  var key = $"{MediaOverlayPathHelper.Normalize(sourcePath)}#{fragment}|{MediaOverlayPathHelper.Normalize(node.Audio.Source)}|{node.Audio.ClipBegin?.Ticks ?? 0}|{node.Audio.ClipEnd?.Ticks ?? 0}";
+				if (!seen.Add(key))
+				{
+					continue;
+				}
+
+			  // Prefix the fragment with the chapter ID to match the rewritten DOM IDs in combined.html
+			  // (e.g., "someId" -> "p002__someId", mirroring BuildCombinedFragmentId).
+			  var combinedFragmentId = $"{chapterId}__{Uri.UnescapeDataString(fragment.Trim())}";
+			  list.Add(new MediaOverlaySegment(node, combinedFragmentId));
+			}
 		}
 
+		System.Diagnostics.Trace.TraceInformation($"BuildSegments: chapter='{chapterFileName}', documents={documentList.Count}, candidates={candidateNodes}, uniqueSegments={list.Count}");
+
 		return list;
+	}
+
+	static bool NodeTargetsChapter(MediaOverlayParallel node, string normalizedChapterPath, string chapterFileNameOnly)
+	{
+		if (node.Text is null)
+		{
+			return false;
+		}
+
+		var (sourcePath, _) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
+		return PathsTargetChapter(sourcePath, normalizedChapterPath, chapterFileNameOnly);
+	}
+
+	static bool PathsTargetChapter(string? sourcePath, string normalizedChapterPath, string chapterFileNameOnly)
+	{
+		if (string.IsNullOrWhiteSpace(sourcePath))
+		{
+			return false;
+		}
+
+		return MediaOverlayPathHelper.PathsReferToSameFile(sourcePath, normalizedChapterPath) ||
+			string.Equals(MediaOverlayPathHelper.ExtractFileName(sourcePath), chapterFileNameOnly, StringComparison.OrdinalIgnoreCase);
 	}
 
 	async Task StartSegmentAsync(MediaOverlaySegment segment, bool forceSeek = false, bool preferPreviousPage = false)
 	{
 		if (!TryGetAudioResource(segment.Node.Audio?.Source, out var resource))
 		{
+            System.Diagnostics.Trace.TraceWarning($"StartSegmentAsync could not resolve audio resource for source '{segment.Node.Audio?.Source}'.");
 			await HandleMissingAudioResourceAsync();
 			return;
 		}
@@ -643,9 +710,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		{
 			if (!audioPlaybackService.HasSession || !reuseExistingSession)
 			{
+              System.Diagnostics.Trace.TraceInformation($"Opening media overlay audio session: resource='{normalizedResourceId}', bytes={resource.Content.Length}, reuseExistingSession={reuseExistingSession}, contentType='{resource.ContentType ?? "unknown"}'");
 				var opened = await audioPlaybackService.OpenResourceAsync(normalizedResourceId, resource.Content);
 				if (!opened)
 				{
+                 System.Diagnostics.Trace.TraceWarning($"Audio session failed to open for resource '{normalizedResourceId}'.");
 					await viewModel.ShowErrorToastAsync("Unable to start audio playback.");
 					currentAudioResourceId = null;
 					return false;
@@ -784,6 +853,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		resource = null!;
 		if (string.IsNullOrWhiteSpace(source))
 		{
+           System.Diagnostics.Trace.TraceWarning("TryGetAudioResource called with an empty source.");
 			return false;
 		}
 
@@ -791,6 +861,15 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		if (audioCache.TryGetValue(normalized, out var cached))
 		{
 			resource = cached;
+			return true;
+		}
+
+		var relativeMatch = audioCache.Values.FirstOrDefault(value =>
+			MediaOverlayPathHelper.PathsReferToSameFile(value.RelativePath, normalized) ||
+			MediaOverlayPathHelper.PathsReferToSameFile(value.NormalizedPath, normalized));
+		if (relativeMatch is not null)
+		{
+			resource = relativeMatch;
 			return true;
 		}
 
@@ -802,6 +881,9 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			resource = match;
 			return true;
 		}
+
+		var sampleKeys = audioCache.Keys.Take(5).ToArray();
+		System.Diagnostics.Trace.TraceWarning($"TryGetAudioResource failed: source='{source}', normalized='{normalized}', fileName='{fileName}', cachedAudio={audioCache.Count}, sampleKeys=[{string.Join(", ", sampleKeys)}]");
 
 		resource = null!;
 		return false;
@@ -1162,10 +1244,31 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	async Task FinishDocumentAsync()
 	{
+		if (isEnabled && NextChapterHasMedia())
+		{
+			StopPlaybackInternal();
+			await ClearHighlightAsync();
+			pendingChapterAutoPlay = true;
+			ChapterAdvanceRequested?.Invoke(this, EventArgs.Empty);
+			return;
+		}
+
 		StopPlaybackInternal();
 		await ClearHighlightAsync();
 		await UpdateUiStateAsync();
 		await viewModel.ShowInfoToastAsync("Reached the end of the narrated content.");
+	}
+
+	bool NextChapterHasMedia()
+	{
+		var nextIndex = currentChapterIndex + 1;
+		if (nextIndex >= book.Chapters.Count)
+		{
+			return false;
+		}
+		var nextChapter = book.Chapters[nextIndex];
+		var docs = ResolveDocumentsForChapter(nextChapter.FileName);
+		return BuildSegments(docs, nextChapter.FileName).Count > 0;
 	}
 
 	string GetCurrentChapterTitle()

@@ -89,7 +89,21 @@ public static class MediaOverlayPathHelper
 			return string.Empty;
 		}
 
-		var normalized = path.Replace('\\', '/').Trim();
+        var normalized = path.Replace('\\', '/').Trim();
+		var queryIndex = normalized.IndexOf('?', StringComparison.Ordinal);
+		if (queryIndex >= 0)
+		{
+			normalized = normalized[..queryIndex];
+		}
+
+		try
+		{
+			normalized = Uri.UnescapeDataString(normalized);
+		}
+		catch (UriFormatException)
+		{
+			// Keep the original path when the EPUB contains invalid escape sequences.
+		}
 
 		while (normalized.StartsWith("./", StringComparison.Ordinal))
 		{

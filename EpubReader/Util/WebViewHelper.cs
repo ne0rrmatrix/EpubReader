@@ -2,6 +2,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using EpubReader.Extensions;
 
 namespace EpubReader.Util;
@@ -25,10 +26,18 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 	};
+	static readonly JsonSerializerOptions combinedPaginationSerializerOptions = new()
+	{
+		PropertyNameCaseInsensitive = true
+	};
 
 	// Events to notify the UI layer about page load lifecycle
 	public event Action? PageLoadStarted;
 	public event Action? SettingsApplied;
+
+	// Tracks whether combined.html has been loaded into the iframe for the current book session.
+	bool combinedHtmlLoaded = false;
+	bool combinedHtmlLoadPending = false;
 
 	/// <summary>
 	/// Asynchronously sets the color scheme and font data for the web view based on user settings.
@@ -47,71 +56,205 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');"));
 		}
 
-		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync("gotoEnd();"));
-		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync("getPageCount()"));
 		dispatcher.Dispatch(() =>
 		{
 			SettingsApplied?.Invoke();
 		});
-	}
+    }
 
 	/// <summary>
-	/// Asynchronously loads a specific page of the book into the web view.
+	/// Asynchronously loads the combined HTML document into the iframe or reveals the active chapter section.
 	/// </summary>
-	/// <param name="label"></param>
-	/// <param name="book"></param>
-	/// <returns></returns>
-	public async Task LoadPageAsync(Label label, Book book)
+	/// <param name="label">Label to update with the current page information.</param>
+	/// <param name="book">The book whose current chapter should be displayed.</param>
+	/// <returns>
+	/// <see langword="true"/> when the iframe <c>src</c> was changed and the caller must wait for the
+	/// <c>pageload</c> JS event before applying settings or positioning the page.
+	/// <see langword="false"/> when <c>showSection()</c> was used and the caller must apply settings
+	/// and position the page immediately after this method returns.
+	/// </returns>
+	public async Task<bool> LoadPageAsync(Label label, Book book)
 	{
 		if (book is null || book.Chapters.Count == 0 || book.CurrentChapter < 0 || book.CurrentChapter >= book.Chapters.Count)
 		{
 			logger.Error($"Invalid book state: book is null, chapters empty, or CurrentChapter ({book?.CurrentChapter}) is out of bounds (count: {book?.Chapters.Count ?? 0})");
-			return;
+			return false;
 		}
 
-#if ANDROID || WINDOWS
-		var pageToLoad = $"https://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-#elif IOS || MACCATALYST
-		var pageToLoad = $"app://demo/" + Path.GetFileName(book.Chapters[book.CurrentChapter].FileName);
-#endif
-		dispatcher.Dispatch(() => PageLoadStarted?.Invoke());
-		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"loadPage('{pageToLoad}');"));
+		EnsureCombinedHtml(book);
+
+		if (!combinedHtmlLoaded)
+		{
+           if (combinedHtmlLoadPending)
+			{
+				UpdatePageLabel(label, book);
+				return true;
+			}
+
+			// First load: put combined.html into the iframe. The pageload JS event will fire next.
+			dispatcher.Dispatch(() => PageLoadStarted?.Invoke());
+			var loadSucceeded = await EvaluateBooleanScriptAsync("loadCombinedPage();");
+			if (!loadSucceeded)
+			{
+				const string message = "Failed to load combined.html into the iframe.";
+				logger.Error(message);
+				throw new InvalidOperationException(message);
+			}
+
+           combinedHtmlLoadPending = true;
+			UpdatePageLabel(label, book);
+			return true;
+		}
+
+		// Combined HTML already in iframe: reveal target section without a full reload.
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"showSection({book.CurrentChapter});"));
 		UpdatePageLabel(label, book);
+		return false;
+	}
+
+	async Task<bool> EvaluateBooleanScriptAsync(string script)
+	{
+		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
+     var normalized = NormalizeJavaScriptResult(result);
+		return bool.TryParse(normalized, out var parsed) && parsed;
+	}
+
+	static string NormalizeJavaScriptResult(string? result)
+	{
+		if (string.IsNullOrWhiteSpace(result))
+		{
+			return string.Empty;
+		}
+
+        var normalized = result.Trim();
+		for (var attempt = 0; attempt < 3; attempt++)
+		{
+         if (normalized.Length >= 2 && normalized[0] == '"' && normalized[^1] == '"')
+			{
+             try
+				{
+					normalized = JsonSerializer.Deserialize<string>(normalized) ?? string.Empty;
+					continue;
+				}
+				catch (JsonException)
+				{
+					normalized = normalized.Trim('"');
+				}
+			}
+
+			if ((normalized.StartsWith("{", StringComparison.Ordinal) || normalized.StartsWith("[", StringComparison.Ordinal)) && normalized.Contains("\\\"", StringComparison.Ordinal))
+			{
+               normalized = Regex.Unescape(normalized);
+				continue;
+			}
+
+			break;
+		}
+
+     return normalized;
+	}
+
+	static void EnsureCombinedHtml(Book book)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		if (string.IsNullOrWhiteSpace(book.CombinedHtml))
+		{
+			throw new InvalidOperationException("CombinedHtml is required for reader navigation.");
+		}
+	}
+
+	/// <summary>
+	/// Resets the combined HTML load state so the next <see cref="LoadPageAsync"/> call reloads the iframe.
+	/// Call this when the book session ends (page disappears) so a fresh load happens on re-entry.
+	/// </summary>
+	public void ResetCombinedState()
+	{
+		combinedHtmlLoaded = false;
+     combinedHtmlLoadPending = false;
+	}
+
+	/// <summary>
+	/// Marks the combined iframe document as ready after the initial <c>pageload</c> signal arrives from JavaScript.
+	/// </summary>
+	public void MarkCombinedHtmlLoaded()
+	{
+		combinedHtmlLoaded = true;
+		combinedHtmlLoadPending = false;
+	}
+
+	/// <summary>
+	/// Returns <see langword="true"/> when <c>combined.html</c> has fully loaded and
+	/// its sections are available for pagination queries.
+	/// </summary>
+	public bool CombinedHtmlIsLoaded => combinedHtmlLoaded;
+
+	/// <summary>
+	/// Gets the current pagination state for the rendered <c>combined.html</c> document.
+	/// </summary>
+	/// <param name="token">The cancellation token.</param>
+	/// <returns>The current combined pagination information, or <see langword="null"/> when it is unavailable.</returns>
+	public async Task<CombinedPaginationInfo?> GetCombinedPaginationInfoAsync(CancellationToken token = default)
+	{
+		token.ThrowIfCancellationRequested();
+
+		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getCombinedPaginationInfo(true);"));
+		var normalized = NormalizeJavaScriptResult(result);
+		if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "null", StringComparison.OrdinalIgnoreCase))
+		{
+			return null;
+		}
+
+		try
+		{
+			return JsonSerializer.Deserialize<CombinedPaginationInfo>(normalized, combinedPaginationSerializerOptions);
+		}
+		catch (JsonException ex)
+		{
+			logger.Error($"Failed to parse combined pagination info: {ex.Message}");
+			return null;
+		}
 	}
 
 	/// <summary>
 	/// Asynchronously navigates to the next chapter of the book in the web view.
 	/// </summary>
-	/// <param name="label"></param>
-	/// <param name="book"></param>
-	/// <returns></returns>
-	public async Task Next(Label label, Book book)
+	/// <param name="label">Label to update with the current page information.</param>
+	/// <param name="book">The book to navigate.</param>
+	/// <returns>
+	/// The same value as <see cref="LoadPageAsync"/>: <see langword="true"/> when the iframe reloaded,
+	/// <see langword="false"/> when only a section swap occurred.
+	/// </returns>
+	public async Task<bool> Next(Label label, Book book)
 	{
 		if (book.CurrentChapter < book.Chapters.Count - 1)
 		{
 			book.CurrentChapter++;
 			book.CurrentPage = 0;
 			await SaveProgressAsync(book);
-			await LoadPageAsync(label, book);
+			return await LoadPageAsync(label, book);
 		}
+		return false;
 	}
 
 	/// <summary>
 	/// Asynchronously navigates to the previous chapter of the book in the web view.
 	/// </summary>
-	/// <param name="label"></param>
-	/// <param name="book"></param>
-	/// <returns></returns>
-	public async Task Prev(Label label, Book book)
+	/// <param name="label">Label to update with the current page information.</param>
+	/// <param name="book">The book to navigate.</param>
+	/// <returns>
+	/// The same value as <see cref="LoadPageAsync"/>: <see langword="true"/> when the iframe reloaded,
+	/// <see langword="false"/> when only a section swap occurred.
+	/// </returns>
+	public async Task<bool> Prev(Label label, Book book)
 	{
 		if (book.CurrentChapter > 0)
 		{
 			book.CurrentChapter--;
 			book.CurrentPage = 0;
 			await SaveProgressAsync(book);
-			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("setPreviousPage()"));
-			await LoadPageAsync(label, book);
+			return await LoadPageAsync(label, book);
 		}
+		return false;
 	}
 
 	/// <summary>
@@ -123,42 +266,51 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		try
 		{
-			var currentPage = book.GetCurrentPageNumber();
-			var totalPages = book.GetTotalPageCount();
-			var chapterTitle = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
-
-			dispatcher.Dispatch(() => label.Text = $"{chapterTitle} (Page {currentPage} of {totalPages})");
+          dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error updating page label: {ex.Message}");
-			// Fallback to chapter title only if synthetic page calculation fails
-			dispatcher.Dispatch(() => label.Text = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty);
+           dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
 		}
 	}
 
 	/// <summary>
-	/// Gets synthetic page information for the current book state.
+ /// Formats the current page information for the active chapter.
 	/// </summary>
-	/// <param name="book">The book to get page information for.</param>
-	/// <param name="characterPosition">Optional character position within the current chapter.</param>
-	/// <returns>A formatted string with synthetic page information.</returns>
-	public static string GetSyntheticPageInfo(Book book, int characterPosition = 0)
+    /// <param name="book">The active book.</param>
+	/// <param name="currentPageNumber">The current global page number.</param>
+	/// <param name="totalPages">The total rendered page count.</param>
+	/// <returns>A formatted string with page information.</returns>
+	public static string FormatPageLabel(Book book, int currentPageNumber, int totalPages)
 	{
 		try
 		{
-			var currentPage = book.GetCurrentPageNumber(characterPosition);
-			var totalPages = book.GetTotalPageCount();
-			var chapterTitle = book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+         var chapterTitle = GetChapterTitle(book);
+			if (totalPages <= 0)
+			{
+				return chapterTitle;
+			}
 
-			return $"{chapterTitle} (Page {currentPage} of {totalPages})";
+			var normalizedPage = Math.Clamp(currentPageNumber, 1, Math.Max(1, totalPages));
+			return $"{chapterTitle} (Page {normalizedPage} of {totalPages})";
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"Error getting synthetic page info: {ex.Message}");
-			// Fallback to chapter title only if synthetic page calculation fails
-			return book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
+           logger.Error($"Error formatting page info: {ex.Message}");
+			return GetChapterTitle(book);
 		}
+	}
+
+	static string GetChapterTitle(Book book)
+	{
+		ArgumentNullException.ThrowIfNull(book);
+		if (book.CurrentChapter < 0 || book.CurrentChapter >= book.Chapters.Count)
+		{
+			return string.Empty;
+		}
+
+		return book.Chapters[book.CurrentChapter]?.Title ?? string.Empty;
 	}
 
 	/// <summary>
@@ -384,5 +536,15 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		public string? HighlightBackground { get; init; }
 		public string? HighlightText { get; init; }
 		public string? HighlightOutline { get; init; }
+	}
+
+	public sealed record CombinedPaginationInfo
+	{
+		public int CurrentSectionIndex { get; init; }
+		public int CurrentPage { get; init; }
+		public int CurrentGlobalPage { get; init; }
+		public int TotalPages { get; init; }
+		public List<int> ChapterPageCounts { get; init; } = [];
+		public List<int> ChapterOffsets { get; init; } = [];
 	}
 }

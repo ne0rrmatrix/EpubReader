@@ -4,10 +4,14 @@
  */
 
 // Global state
-let isPreviousPage = false;
 let currentPage = 0;
 let frame = null;
 let colCount = 1;
+let combinedPaginationState = {
+    chapterPageCounts: [],
+    chapterOffsets: [],
+    totalPages: 0
+};
 
 const mediaOverlayUi = {
     root: null,
@@ -193,9 +197,26 @@ function applyMediaOverlayHighlightTheme() {
  * Sets whether user interaction (scrolling, clicking) is enabled on the iframe
  * @param {any} enabled
  */
+function ensureFrameElement() {
+    if (!frame) {
+        frame = document.getElementById('page');
+    }
+    return frame;
+}
+
+function getReaderBaseUrl() {
+    const platform = domUtils.detectPlatform();
+    if (platform.isIOS || platform.isMac) {
+        return 'app://demo/';
+    }
+
+    return 'https://demo/';
+}
+
 function setInteractionEnabled(enabled) {
-    if (frame) {
-        frame.style.pointerEvents = enabled ? 'auto' : 'none';
+    const iframe = ensureFrameElement();
+    if (iframe) {
+        iframe.style.pointerEvents = enabled ? 'auto' : 'none';
     }
 }
 
@@ -725,6 +746,9 @@ function handleMessage(event, platform) {
     if (data.startsWith("jump.")) {
         const href = data.substring(5);
         console.log("Jumping to:", href);
+        if (tryHandleCombinedInternalLink(href)) {
+            return;
+        }
         sendToNativeMessage({ action: 'jump', href: href });
     } else if (data === "next") {
         if (mediaOverlayUi.state.seeking) {
@@ -936,7 +960,7 @@ function buildMediaOverlayUi(root) {
         try {
             const cx = Math.floor(contentWindow.innerWidth / 2);
             const el = doc.elementFromPoint(cx, Math.floor(contentWindow.innerHeight / 2));
-            if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+            if (el?.nodeType !== Node.ELEMENT_NODE) return;
 
             clearMediaOverlayHighlight();
             if (mediaOverlayHighlight.activeClass) el.classList.add(mediaOverlayHighlight.activeClass);
@@ -1725,6 +1749,33 @@ function handlePrevCommand() {
 }
 
 
+function getActiveSectionElement(doc) {
+    if (!doc?.body) {
+        return null;
+    }
+
+    const sections = doc.querySelectorAll('section[data-chapter-index]');
+    if (sections.length === 0) {
+        return doc.body;
+    }
+
+    const targetIndex = String(currentSectionIndex);
+    for (const section of sections) {
+        if (section.dataset.chapterIndex === targetIndex) {
+            return section;
+        }
+    }
+
+    for (const section of sections) {
+        if (section.style.display !== 'none') {
+            return section;
+        }
+    }
+
+    return doc.body;
+}
+
+
 /**
  * Calculates the approximate character position based on current scroll position
  * This is used to determine which synthetic page is currently being displayed
@@ -1750,7 +1801,7 @@ function getCharacterPositionFromScroll() {
         const scrollProgress = maxScrollX > 0 ? Math.min(1, currentScrollX / maxScrollX) : 0;
 
         // Get the total text content from the document
-        const textContent = extractTextFromDocument(doc);
+        const textContent = extractTextFromDocument(doc, getActiveSectionElement(doc));
         const totalCharacters = textContent.length;
 
         // Calculate character position based on scroll progress
@@ -1770,14 +1821,15 @@ function getCharacterPositionFromScroll() {
  * @param {Document} doc - The document to extract text from
  * @returns {string} The extracted text content
  */
-function extractTextFromDocument(doc) {
-    if (!doc?.body) {
+function extractTextFromDocument(doc, root = null) {
+    const textRoot = root ?? doc?.body;
+    if (!textRoot) {
         return "";
     }
 
     try {
-        // Get the text content from the body, which automatically excludes HTML tags
-        let textContent = doc.body.textContent || doc.body.innerText || "";
+        // Get the text content from the active reading container, which automatically excludes HTML tags
+        let textContent = textRoot.textContent || textRoot.innerText || "";
 
         // Normalize whitespace while preserving paragraph breaks
         textContent = textContent.replaceAll(/\s+/g, " ").trim();
@@ -1853,12 +1905,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.error("Cannot access iframe content - likely CORS restriction or iframe not fully loaded.");
                 return;
             }
-            if (!isPreviousPage) {
-                // Adjust virtual columns after content loads
-                setTimeout(() => {
-                    adjustVirtualColumns();
-                }, 100); // Small delay to ensure content is fully rendered
-            }
+
+            // Adjust virtual columns after content loads
+            setTimeout(() => {
+                adjustVirtualColumns();
+            }, 100); // Small delay to ensure content is fully rendered
 
             requestMediaOverlayHighlightThemeRefresh();
             sendToNativeMessage({ action: 'pageload', value: true });
@@ -1913,45 +1964,254 @@ function getCurrentPage() {
     return currentPage;
 }
 
-/**
- * Navigates to the end of content if previous page flag is set
- */
-function gotoEnd() {
-    if (isPreviousPage) {
-        adjustVirtualColumns();
-
-        // Adjust virtual columns after positioning content at the end
-        // This ensures virtual columns are calculated with the correct final position
-        setTimeout(() => {
-            navigationUtils.scrollToHorizontalEnd();
-            isPreviousPage = false;
-            currentPage = getPageCount();
-            updateCharacterPosition();
-        }, 200);
-    }
+function getPageSlotCount() {
+    return Math.max(1, getPageCount() + 1);
 }
 
 /**
- * Sets a flag indicating that navigation to previous page occurred
- */
-function setPreviousPage() {
-    isPreviousPage = true;
-    currentPage = 0; // Reset current page on previous navigation
-}
-
-/**
- * Loads a specified URL into the iframe
- * @param {string} page - The URL to load
+ * Loads the combined single-page HTML document into the iframe.
  * @returns {boolean} True if the page was loaded
  */
-function loadPage(page) {
-    if (!frame) {
-        console.error("Frame not found for loadPage.");
+function loadCombinedPage() {
+    const iframe = ensureFrameElement();
+    if (!iframe) {
+        console.error("Frame not found for loadCombinedPage.");
         return false;
     }
-    console.log("Frame found. Loading page:", page);
-    frame.setAttribute('src', page);
-    currentPage = 0; // Reset current page on new load
+
+    const page = getReaderBaseUrl() + 'combined.html';
+    console.log("Frame found. Loading combined page:", page);
+    iframe.setAttribute('src', page);
+    currentPage = 0;
+    currentSectionIndex = 0;
+    combinedPaginationState = {
+        chapterPageCounts: [],
+        chapterOffsets: [],
+        totalPages: 0
+    };
+    return true;
+}
+
+// --- Combined single-page view ---
+
+/** Zero-based index of the currently visible chapter section in combined.html. */
+let currentSectionIndex = 0;
+
+function calculateCombinedPaginationState() {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+    if (!doc || !contentWindow) {
+        console.warn('calculateCombinedPaginationState: iframe content not available');
+        return {
+            chapterPageCounts: [],
+            chapterOffsets: [],
+            totalPages: 0
+        };
+    }
+
+    const sections = Array.from(doc.querySelectorAll('section[data-chapter-index]'));
+    if (sections.length === 0) {
+        const totalPages = getPageSlotCount();
+        return {
+            chapterPageCounts: [totalPages],
+            chapterOffsets: [0],
+            totalPages: totalPages
+        };
+    }
+
+    const savedSectionIndex = Math.max(0, Math.min(currentSectionIndex, sections.length - 1));
+    const savedPage = currentPage;
+    const chapterPageCounts = [];
+
+    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+        sections.forEach((section, index) => {
+            section.style.display = index === sectionIndex ? 'block' : 'none';
+        });
+
+        try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to reset scroll during pagination measurement', error); }
+        try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to reset document scroll during pagination measurement', error); }
+
+        adjustVirtualColumns();
+        chapterPageCounts.push(getPageSlotCount());
+    }
+
+    sections.forEach((section, index) => {
+        section.style.display = index === savedSectionIndex ? 'block' : 'none';
+    });
+
+    try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to restore scroll during pagination measurement', error); }
+    try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to restore document scroll during pagination measurement', error); }
+
+    adjustVirtualColumns();
+
+    const currentPageCount = chapterPageCounts[savedSectionIndex] ?? 1;
+    const restoredPage = Math.max(0, Math.min(savedPage, currentPageCount - 1));
+    navigationUtils.scrollToPage(restoredPage);
+    currentPage = restoredPage;
+    currentSectionIndex = savedSectionIndex;
+
+    const chapterOffsets = [];
+    let totalPages = 0;
+    for (const pageCount of chapterPageCounts) {
+        chapterOffsets.push(totalPages);
+        totalPages += pageCount;
+    }
+
+    return {
+        chapterPageCounts: chapterPageCounts,
+        chapterOffsets: chapterOffsets,
+        totalPages: Math.max(1, totalPages)
+    };
+}
+
+/**
+ * Shows the chapter section at the given index and hides all others.
+ * Called from C# via EvaluateJavaScriptAsync after combined.html is loaded into the iframe.
+ * @param {number} sectionIndex - Zero-based chapter index matching data-chapter-index attributes.
+ * @returns {boolean} True if the section was found and made visible.
+ */
+function showSection(sectionIndex) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win) {
+        console.warn('showSection: iframe document not available');
+        return false;
+    }
+
+    const sections = doc.querySelectorAll('section[data-chapter-index]');
+    if (sections.length === 0) {
+        console.warn('showSection: no chapter sections found — is combined.html loaded?');
+        return false;
+    }
+
+    const target = String(sectionIndex);
+    sections.forEach(section => {
+        section.style.display = section.dataset.chapterIndex === target ? 'block' : 'none';
+    });
+
+    // Reset scroll so ReadiumCSS column layout starts from the beginning of the section.
+    try { win.scrollTo(0, 0); } catch (e) { console.warn("error: ", e) }
+    try { doc.documentElement.scrollLeft = 0; } catch (e) { console.warn("error: ", e) }
+
+    currentPage = 0;
+    currentSectionIndex = sectionIndex;
+    console.log(`showSection: section ${sectionIndex} is now visible`);
+    return true;
+}
+
+/**
+ * Returns the zero-based index of the currently visible chapter section.
+ * @returns {number}
+ */
+function getCurrentSectionIndex() {
+    return currentSectionIndex;
+}
+
+function getCombinedPaginationInfo(refresh = false) {
+    if (refresh || combinedPaginationState.chapterPageCounts.length === 0) {
+        combinedPaginationState = calculateCombinedPaginationState();
+    }
+
+    const fallbackPageCount = getPageSlotCount();
+    const currentPageCount = combinedPaginationState.chapterPageCounts[currentSectionIndex] ?? fallbackPageCount;
+    const normalizedCurrentPage = Math.max(0, Math.min(currentPage, currentPageCount - 1));
+    const currentOffset = combinedPaginationState.chapterOffsets[currentSectionIndex] ?? 0;
+
+    currentPage = normalizedCurrentPage;
+
+    return JSON.stringify({
+        currentSectionIndex: currentSectionIndex,
+        currentPage: normalizedCurrentPage,
+        currentGlobalPage: currentOffset + normalizedCurrentPage + 1,
+        totalPages: combinedPaginationState.totalPages > 0 ? combinedPaginationState.totalPages : fallbackPageCount,
+        chapterPageCounts: combinedPaginationState.chapterPageCounts,
+        chapterOffsets: combinedPaginationState.chapterOffsets
+    });
+}
+
+function tryHandleCombinedInternalLink(href) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win || !href) {
+        return false;
+    }
+
+    let hash = '';
+    try {
+        if (href.startsWith('#')) {
+            hash = href;
+        } else {
+            const targetUrl = new URL(href, getReaderBaseUrl() + 'combined.html');
+            hash = targetUrl.hash;
+        }
+    } catch (error) {
+        console.warn('Failed parsing combined link target', href, error);
+        return false;
+    }
+
+    if (!hash || hash === '#') {
+        return false;
+    }
+
+    const targetId = decodeURIComponent(hash.substring(1));
+    const targetElement = doc.getElementById(targetId);
+    if (!targetElement) {
+        return false;
+    }
+
+    const targetSection = targetElement.matches?.('section[data-chapter-index]')
+        ? targetElement
+        : targetElement.closest('section[data-chapter-index]');
+    if (!targetSection) {
+        return false;
+    }
+
+    const sectionIndex = Number.parseInt(targetSection.dataset.chapterIndex ?? '', 10);
+    if (Number.isNaN(sectionIndex)) {
+        return false;
+    }
+
+    const sectionChanged = sectionIndex !== currentSectionIndex;
+    if (sectionChanged) {
+        showSection(sectionIndex);
+        sendToNativeMessage({ action: 'sectionchange', chapterIndex: sectionIndex });
+    }
+
+    setTimeout(() => {
+        const refreshedDoc = domUtils.getIframeDocument();
+        const refreshedWin = domUtils.getContentWindow();
+        if (!refreshedDoc || !refreshedWin) {
+            return;
+        }
+
+        const refreshedTarget = refreshedDoc.getElementById(targetId);
+        if (!refreshedTarget) {
+            return;
+        }
+
+        adjustVirtualColumns();
+
+        if (refreshedTarget.matches?.('section[data-chapter-index]')) {
+            refreshedWin.scrollTo(0, 0);
+            currentPage = 0;
+            updateCharacterPosition();
+            return;
+        }
+
+        try {
+            refreshedTarget.scrollIntoView({ block: 'start', inline: 'start' });
+        } catch (error) {
+            console.warn('scrollIntoView with options failed for combined target', error);
+            refreshedTarget.scrollIntoView();
+        }
+
+        setTimeout(() => {
+            const scrollAmount = navigationUtils.calculateScrollAmount(refreshedWin) || refreshedWin.innerWidth;
+            currentPage = Math.max(0, Math.round(refreshedWin.scrollX / scrollAmount));
+            updateCharacterPosition();
+        }, 75);
+    }, 75);
+
     return true;
 }
 
@@ -1969,16 +2229,18 @@ function gotoPage(page) {
     }
     adjustVirtualColumns();
 
+    // Update currentPage synchronously so that calls to getCombinedPaginationInfo() made
+    // between now and when the deferred scroll executes see the correct page number.
+    // Without this, calculateCombinedPaginationState() would read currentPage=0 (set by
+    // showSection) and restore the scroll to page 0, overwriting the intended restore target.
+    const maxPage = getPageCount();
+    const clampedPage = Math.min(page, maxPage);
+    currentPage = clampedPage;
 
-    // Adjust virtual columns after positioning content at the end
-    // This ensures virtual columns are calculated with the correct final position
     setTimeout(() => {
-        navigationUtils.scrollToPage(page);
-        isPreviousPage = false;
-        // Track the page we navigated to so persistence matches navigation
-        const maxPage = getPageCount();
-        const clampedPage = Math.min(page, maxPage);
-        currentPage = clampedPage;
+        navigationUtils.scrollToPage(clampedPage);
+        // Re-clamp after layout may have settled post-scroll
+        currentPage = Math.min(clampedPage, getPageCount());
         updateCharacterPosition();
     }, 200);
 }
@@ -1988,6 +2250,8 @@ function gotoPage(page) {
  */
 function scrollToHorizontalEnd() {
     navigationUtils.scrollToHorizontalEnd();
+    currentPage = Math.max(0, getPageCount());
+    updateCharacterPosition();
 }
 
 /**
