@@ -168,12 +168,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 
 		Logger.Info($"Using IP address: {settings.IPAddress}, Port: {settings.Port}, prefix: {settings.UrlPrefix}");
-		/*
+		
 		if (!await ValidateUrl($"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", settings.UrlPrefix))
 		{
 			return;
 		}
-		*/
+		
 		Logger.Info("Loading books from Calibre server...");
 		await GetFeedList(new FeedReader(), settings.IPAddress, settings.Port, settings.UrlPrefix);
 		await LoadCalibreDataFromUrl(settings.IPAddress, settings.Port, settings.UrlPrefix);
