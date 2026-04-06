@@ -4,5 +4,5 @@ public interface IReaderBridgeCoordinator
 {
 	event EventHandler<ReaderBridgeMessageEventArgs>? MessageReceived;
 
-	void Publish(string payload, JavaScriptBridgeSource source);
+	void Publish(BookPageJsMessage message, JavaScriptBridgeSource source, string rawPayload);
 }

@@ -13,12 +13,9 @@ namespace EpubReader.Controls;
 /// conjunction with the <see cref="IWebViewHandler"/> interface.</remarks>
 public static partial class WebViewExtensions
 {
-	static readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	static StreamExtensions? streamExtensions;
+	static IJavaScriptBridgeDispatcher? bridgeDispatcher;
 	static IWebViewHandler? webViewHandler;
-	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
-	{
-		return Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
-	}
 
 	/// <summary>
 	/// Initializes the WebView handler and sets up the CoreWebView2 initialization event.
@@ -27,9 +24,11 @@ public static partial class WebViewExtensions
 	/// CoreWebView2 initialization event. Ensure that the handler is properly configured before calling this
 	/// method.</remarks>
 	/// <param name="handler">The <see cref="IWebViewHandler"/> instance to be initialized. Cannot be null.</param>
-	public static void Initialize(IWebViewHandler handler)
+	public static void Initialize(IWebViewHandler handler, StreamExtensions streamExtensions, IJavaScriptBridgeDispatcher dispatcher)
 	{
 		webViewHandler = handler;
+		WebViewExtensions.streamExtensions = streamExtensions;
+		bridgeDispatcher = dispatcher;
 		webViewHandler.PlatformView.CoreWebView2Initialized += WebView2_CoreWebView2Initialized;
 	}
 
@@ -51,7 +50,7 @@ public static partial class WebViewExtensions
 	static void MessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
 	{
 		var rawString = args.TryGetWebMessageAsString();
-		var dispatcher = GetBridgeDispatcher();
+		var dispatcher = bridgeDispatcher;
 		if (dispatcher is null)
 		{
 			System.Diagnostics.Trace.TraceWarning("WebView2 MessageReceived could not resolve bridge dispatcher");
@@ -107,9 +106,8 @@ public static partial class WebViewExtensions
 	/// <summary>
 	/// Handles the WebResourceRequested event for a CoreWebView2 instance.
 	/// </summary>
-	/// <remarks>This method processes web resource requests by checking the request URI and responding accordingly.
-	/// If the URI contains "https://runcsharp", a 404 response is returned. Otherwise, it attempts to retrieve the
-	/// requested resource and respond with the appropriate data and MIME type.</remarks>
+	/// <remarks>This method processes web resource requests by checking the request URI and responding accordingly. It
+	/// attempts to retrieve the requested resource and respond with the appropriate data and MIME type.</remarks>
 	/// <param name="sender">The CoreWebView2 instance that raised the event.</param>
 	/// <param name="e">The event arguments containing details about the web resource request.</param>
 	static async void CoreWebView2_WebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
@@ -130,12 +128,6 @@ public static partial class WebViewExtensions
 		var deferral = e.GetDeferral();
 		try
 		{
-			if (url.Contains("https://runcsharp"))
-			{
-				e.Response = webViewHandler.PlatformView.CoreWebView2.Environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-				return;
-			}
-
 			using CancellationTokenSource cancellationTokenSource = new();
 			var getData = await StreamAsync(url, cancellationTokenSource.Token);
 			var mimeType = StreamExtensions.GetMimeType(filename);
@@ -177,6 +169,7 @@ public static partial class WebViewExtensions
 	/// URL.</returns>
 	static async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
 	{
+		ArgumentNullException.ThrowIfNull(streamExtensions);
 		var result = await streamExtensions.GetStream(url, cancellation);
 		return result;
 	}

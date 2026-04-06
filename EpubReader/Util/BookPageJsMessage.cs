@@ -2,16 +2,17 @@ namespace EpubReader.Util;
 
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text.Json;
+using EpubReader.Models;
 
 /// <summary>
-/// Represents a JavaScript message sent from the WebView to the native layer and
-/// provides helpers to parse it and convert it to the internal "runcsharp" URL format.
+/// Represents a structured JavaScript message sent from the WebView to the native layer and
+/// provides helpers to parse the bridge payload into a typed C# model.
 /// </summary>
 public sealed class BookPageJsMessage
 {
-	public string Action { get; init; } = string.Empty;
+	public ReaderBridgeAction Action { get; init; } = ReaderBridgeAction.Unknown;
+	public string ActionName { get; init; } = string.Empty;
 	public string RawJson { get; init; } = string.Empty;
 
 	public string? Href { get; init; }
@@ -50,9 +51,12 @@ public sealed class BookPageJsMessage
 				href = "https://" + href[7..];
 			}
 
+			var actionName = actionElem.GetString() ?? string.Empty;
+
 			message = new BookPageJsMessage
 			{
-				Action = actionElem.GetString() ?? string.Empty,
+				Action = ReaderBridgeActionParser.Parse(actionName),
+				ActionName = actionName,
 				RawJson = json,
 				Href = href,
 				Position = GetInt32Property(root, "position"),
@@ -86,32 +90,4 @@ public sealed class BookPageJsMessage
 	static bool? GetBoolProperty(JsonElement root, string name) =>
 		root.TryGetProperty(name, out var elem) && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
 			? elem.GetBoolean() : null;
-
-	/// <summary>
-	/// Converts the parsed message into the internal "runcsharp" URL used by the native handler.
-	/// Returns null if no mapping is available.
-	/// </summary>
-	public string? ToRuncsharpUrl()
-	{
-		var action = Action?.ToLowerInvariant() ?? string.Empty;
-		return action switch
-		{
-			"jump" => Href is not null ? $"https://runcsharp.jump?{Href}" : null,
-			"next" => "https://runcsharp.next?true",
-			"prev" => "https://runcsharp.prev?true",
-			"menu" => "https://runcsharp.menu?true",
-			"pageload" => "https://runcsharp.pageLoad?true",
-			"characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
-          "sectionchange" => ChapterIndex.HasValue ? $"https://runcsharp.sectionchange?{ChapterIndex.Value}" : null,
-			"mediaoverlaytoggle" => Enabled.HasValue ? $"https://runcsharp.mediaoverlaytoggle?{Enabled.Value}" : null,
-			"mediaoverlayplay" => "https://runcsharp.mediaoverlayplay?true",
-			"mediaoverlaypause" => "https://runcsharp.mediaoverlaypause?true",
-			"mediaoverlaynext" => "https://runcsharp.mediaoverlaynext?true",
-			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
-			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
-			"mediaoverlayseek" => Seconds.HasValue ? $"https://runcsharp.mediaoverlayseek?{Seconds.Value.ToString(CultureInfo.InvariantCulture)}" : null,
-			"layoutoverflow" => $"https://runcsharp.layoutoverflow?{Uri.EscapeDataString(RawJson)}",
-			_ => null,
-		};
-	}
 }

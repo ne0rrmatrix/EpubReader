@@ -1,4 +1,6 @@
 using EpubReader.Converter;
+using EpubReader.Util;
+using System.Diagnostics;
 
 namespace EpubReader.Service;
 
@@ -22,8 +24,19 @@ public sealed class JavaScriptBridgeDispatcher(IReaderBridgeCoordinator coordina
 			return;
 		}
 
-		normalizedPayload = NormalizeJsonPayload(normalizedPayload);
-		coordinator.Publish(normalizedPayload, source);
+		if (!BookPageJsMessage.TryParse(normalizedPayload, out var message))
+		{
+			Trace.TraceWarning($"Ignoring malformed reader bridge payload from {source}: {ShortenForTrace(normalizedPayload)}");
+			return;
+		}
+
+		if (message.Action == ReaderBridgeAction.Unknown)
+		{
+			Trace.TraceWarning($"Ignoring unsupported reader bridge action '{message.ActionName}' from {source}: {ShortenForTrace(normalizedPayload)}");
+			return;
+		}
+
+		coordinator.Publish(message, source, normalizedPayload);
 	}
 
 	static string DecodePayload(string payload)
@@ -45,18 +58,14 @@ public sealed class JavaScriptBridgeDispatcher(IReaderBridgeCoordinator coordina
 		}
 	}
 
-	static string NormalizeJsonPayload(string payload)
+	static string ShortenForTrace(string payload)
 	{
-		if (!payload.TrimStart().StartsWith('{'))
+		const int maxLength = 300;
+		if (payload.Length <= maxLength)
 		{
 			return payload;
 		}
 
-		if (!BookPageJsMessage.TryParse(payload, out var message))
-		{
-			return payload;
-		}
-
-		return message.ToRuncsharpUrl() ?? payload;
+		return payload[..maxLength] + "…";
 	}
 }

@@ -4,13 +4,13 @@ public sealed class ReaderBridgeCoordinator : IReaderBridgeCoordinator
 {
 	public event EventHandler<ReaderBridgeMessageEventArgs>? MessageReceived;
 
-	public void Publish(string payload, JavaScriptBridgeSource source)
+	public void Publish(BookPageJsMessage message, JavaScriptBridgeSource source, string rawPayload)
 	{
-		if (string.IsNullOrWhiteSpace(payload))
+		if (message is null || string.IsNullOrWhiteSpace(rawPayload))
 		{
 			return;
 		}
 
-		MessageReceived?.Invoke(this, new ReaderBridgeMessageEventArgs(payload, source));
+		MessageReceived?.Invoke(this, new ReaderBridgeMessageEventArgs(message, source, rawPayload));
 	}
 }

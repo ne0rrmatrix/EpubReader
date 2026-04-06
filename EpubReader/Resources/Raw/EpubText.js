@@ -949,39 +949,71 @@ function handleMessage(event, platform) {
         return;
     }
 
-    const { data } = event;
+    const payload = normalizeParentMessage(event.data);
+    if (!payload) {
+        console.warn('Ignoring unsupported parent bridge payload:', event.data);
+        return;
+    }
 
-    if (data.startsWith("jump.")) {
-        const href = data.substring(5);
+    if (payload.action === 'jump') {
+        const href = payload.href;
         console.log("Jumping to:", href);
         if (tryHandleCombinedInternalLink(href)) {
             return;
         }
         sendToNativeMessage({ action: 'jump', href: href });
-    } else if (data === "next") {
-        if (mediaOverlayUi.state.seeking) {
-            logMediaOverlay('Ignoring next command while user is seeking');
-            return;
-        }
-        if (isUserNavigationLocked()) {
-            logMediaOverlay('User navigation blocked during playback', { action: 'next' });
+    } else if (payload.action === 'next') {
+        if (shouldIgnoreManualNavigationAction('next')) {
             return;
         }
         handleNextCommand();
-    } else if (data === "prev") {
-        if (mediaOverlayUi.state.seeking) {
-            logMediaOverlay('Ignoring prev command while user is seeking');
-            return;
-        }
-        if (isUserNavigationLocked()) {
-            logMediaOverlay('User navigation blocked during playback', { action: 'prev' });
+    } else if (payload.action === 'prev') {
+        if (shouldIgnoreManualNavigationAction('prev')) {
             return;
         }
         handlePrevCommand();
-    } else if (data === "menu") {
+    } else if (payload.action === 'menu') {
         console.log("Received menu command.");
         sendToNativeMessage({ action: 'menu' });
     }
+}
+
+function shouldIgnoreManualNavigationAction(action) {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay(`Ignoring ${action} command while user is seeking`);
+        return true;
+    }
+
+    if (isUserNavigationLocked()) {
+        logMediaOverlay('User navigation blocked during playback', { action: action });
+        return true;
+    }
+
+    return false;
+}
+
+function normalizeParentMessage(data) {
+    if (!data) {
+        return null;
+    }
+
+    if (typeof data === 'object' && typeof data.action === 'string') {
+        return data;
+    }
+
+    if (typeof data !== 'string') {
+        return null;
+    }
+
+    if (data.startsWith('jump.')) {
+        return { action: 'jump', href: data.substring(5) };
+    }
+
+    if (data === 'next' || data === 'prev' || data === 'menu') {
+        return { action: data };
+    }
+
+    return null;
 }
 
 function encodeForCSharp(str) {
@@ -994,7 +1026,7 @@ function encodeForCSharp(str) {
     return btoa(binary);
 }
 
-// Helper: send to native bridge on Android using base64-encoded JSON, fallback to location.href scheme
+// Helper: send to native bridge using base64-encoded JSON.
 function sendToNativeMessage(obj) {
     try {
         const payload = (typeof obj === 'string') ? { action: obj } : obj;
@@ -1016,12 +1048,13 @@ function sendToNativeMessage(obj) {
         if(platform.isIOS || platform.isMac){
             console.info('Sending message to native bridge via window.webkit.messageHandlers.webwindowinterop.postMessage:', json);
             globalThis.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
-            return;
+            return true;
         }
-        // If we reach here, bridge not found or calls failed. Use fallback URL scheme for compatibility.
-        console.info('Using fallback URL scheme for native message:', json);
+        console.warn('Native bridge unavailable for message:', json);
+        return false;
     } catch (ex) {
         console.error('sendToNativeMessage failed', ex);
+        return false;
     }
 }
 

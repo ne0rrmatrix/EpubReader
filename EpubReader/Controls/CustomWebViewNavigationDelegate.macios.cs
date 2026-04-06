@@ -17,11 +17,6 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 {
 	readonly IWebViewHandler handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
-	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
-	{
-		return Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
-	}
-
 	/// <summary>
 	/// Handles the completion of a navigation in the web view.
 	/// </summary>
@@ -39,9 +34,8 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// <summary>
 	/// Determines the navigation policy for a given web view navigation action.
 	/// </summary>
-	/// <remarks>This method evaluates the URL of the navigation request. If the URL contains query parameters or 
-	/// matches a specific pattern ("https://runcsharp"), it forwards the payload into the shared bridge dispatcher 
-	/// and cancels the navigation. Otherwise, it allows the navigation to proceed.</remarks>
+	/// <remarks>This method evaluates the navigation request and currently allows it to proceed. Reader bridge traffic
+	/// is handled through the WK script message channel instead of URL interception.</remarks>
 	/// <param name="webView">The <see cref="WKWebView"/> instance that initiated the navigation action.</param>
 	/// <param name="navigationAction">The <see cref="WKNavigationAction"/> representing the navigation request.</param>
 	/// <param name="preferences">The <see cref="WKWebpagePreferences"/> associated with the navigation action.</param>
@@ -50,22 +44,6 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// <exception cref="InvalidOperationException">Thrown if the URL of the navigation request is null.</exception>
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
 	{
-		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
-
-		// Allow the GitHub Pages site to load normally without interception
-		if (path.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
-		{
-			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
-			return;
-		}
-		var url = path.Split('?');
-
-		if (url.Length > 1 || path.Contains("https://runcsharp"))
-		{
-			GetBridgeDispatcher()?.Dispatch(path, JavaScriptBridgeSource.Apple);
-			decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
-			return;
-		}
 		decisionHandler(WKNavigationActionPolicy.Allow, preferences);
 	}
 
@@ -99,12 +77,9 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	}
 }
 
-public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
+public class MyWKScriptMessageHandler(IJavaScriptBridgeDispatcher dispatcher) : NSObject, IWKScriptMessageHandler
 {
-	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
-	{
-		return Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
-	}
+	readonly IJavaScriptBridgeDispatcher dispatcher = dispatcher;
 
 	public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
 	{
@@ -115,12 +90,6 @@ public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
 			if (string.IsNullOrEmpty(message.Body?.ToString()))
 			{
 				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
-				return;
-			}
-			var dispatcher = GetBridgeDispatcher();
-			if (dispatcher is null)
-			{
-				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage could not resolve bridge dispatcher");
 				return;
 			}
 

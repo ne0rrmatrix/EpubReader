@@ -79,17 +79,29 @@ public static class MauiProgram
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) =>
 	  {
-		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler));
+		var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Android WebView setup.");
+		var streamExtensions = services.GetRequiredService<StreamExtensions>();
+		var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
+		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler, streamExtensions, dispatcher));
 	  });
 #elif WINDOWS
 		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
-	  async (handler, view, args) =>{ WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+	  async (handler, view, args) =>
+	  {
+		var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Windows WebView setup.");
+		var streamExtensions = services.GetRequiredService<StreamExtensions>();
+		var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
+		WebViewExtensions.Initialize(handler, streamExtensions, dispatcher);
+		await handler.PlatformView.EnsureCoreWebView2Async();
+	  });
 #elif IOS || MACCATALYST
 		WebViewHandler.PlatformViewFactory = (handler) =>
 		{
+			var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Apple WebView setup.");
+			var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
 			var userContentController = new WKUserContentController();
-			var messageHandler = new MyWKScriptMessageHandler();
+			var messageHandler = new MyWKScriptMessageHandler(dispatcher);
 			userContentController.AddScriptMessageHandler(messageHandler, "webwindowinterop"); // Register the handler with the name
 			var config = new WKWebViewConfiguration { UserContentController = userContentController };
 			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))

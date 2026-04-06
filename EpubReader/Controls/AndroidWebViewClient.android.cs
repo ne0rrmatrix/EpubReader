@@ -14,15 +14,10 @@ namespace EpubReader.Controls;
 /// cref="StreamExtensions"/> service for resource streaming.</remarks>
 class CustomWebViewClient : WebViewClient
 {
-	const string csharp = "runcsharp";
 	readonly Microsoft.Maui.Controls.WebView webView;
+	readonly StreamExtensions streamExtensions;
 
 	readonly CancellationTokenSource cancellationTokenSource = new();
-	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
-	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
-	{
-		return Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
-	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CustomWebViewClient"/> class with the specified web view handler.
@@ -33,9 +28,10 @@ class CustomWebViewClient : WebViewClient
 	/// <param name="handler">The web view handler that provides the platform-specific view and settings. Must not be <see langword="null"/>.</param>
 	/// <exception cref="ArgumentNullException">Thrown if <paramref name="handler"/> is <see langword="null"/> or if the handler's <see
 	/// cref="IWebViewHandler.VirtualView"/> is not a <see cref="Microsoft.Maui.Controls.WebView"/>.</exception>
-	public CustomWebViewClient(IWebViewHandler handler)
+	public CustomWebViewClient(IWebViewHandler handler, StreamExtensions streamExtensions, IJavaScriptBridgeDispatcher dispatcher)
 	{
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
+		this.streamExtensions = streamExtensions;
 		handler.PlatformView.Settings.DomStorageEnabled = true;
 		handler.PlatformView.Settings.JavaScriptEnabled = true;
 		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
@@ -51,7 +47,7 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.SetInitialScale(0);
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
-		handler.PlatformView.AddJavascriptInterface(new JSBridge(), "jsBridge");
+		handler.PlatformView.AddJavascriptInterface(new JSBridge(dispatcher), "jsBridge");
 		handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
 		Trace.TraceInformation("Configured Android WebView with density-aware initial scaling, wide viewport support, and neutral text zoom.");
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
@@ -115,7 +111,7 @@ class CustomWebViewClient : WebViewClient
 	/// <param name="cancellation">A token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the stream retrieved from the specified
 	/// URL.</returns>
-	static async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
+	async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
 	{
 		var result = await streamExtensions.GetStream(url, cancellation);
 		return result;
@@ -132,18 +128,12 @@ class CustomWebViewClient : WebViewClient
 	/// <returns><see langword="true"/> if the URL loading should be overridden; otherwise, <see langword="false"/>.</returns>
 	public override bool ShouldOverrideUrlLoading(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
-		var path = request?.Url?.ToString() ?? string.Empty;
-		var url = path.Split('?');
 		if (request is null || request.Url is null)
 		{
 			return true;
 		}
-		if (url.Length > 1 || path.Contains(csharp))
-		{
-			GetBridgeDispatcher()?.Dispatch(path, JavaScriptBridgeSource.Android);
-			return true;
-		}
-		return false;
+
+		return base.ShouldOverrideUrlLoading(view, request);
 	}
 
 	/// <summary>
@@ -157,7 +147,7 @@ class CustomWebViewClient : WebViewClient
 	/// <param name="favicon">The favicon for the page, if available.</param>
 	public override void OnPageStarted(global::Android.Webkit.WebView? view, string? url, Bitmap? favicon)
 	{
-		if (url is null || url.Contains(csharp))
+		if (url is null)
 		{
 			return;
 		}
@@ -188,7 +178,7 @@ class CustomWebViewClient : WebViewClient
 	/// <param name="url">The URL of the page that has finished loading.</param>
 	public override void OnPageFinished(global::Android.Webkit.WebView? view, string? url)
 	{
-		if (url is null || url.Contains(csharp))
+		if (url is null)
 		{
 			return;
 		}

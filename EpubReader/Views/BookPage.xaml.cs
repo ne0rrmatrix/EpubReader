@@ -16,7 +16,6 @@ public partial class BookPage : ContentPage, IDisposable
 {
 	bool disposedValue = false;
 	bool isMenuOpen = false;
-	const string externalLinkPrefix = "https://runcsharp.jump?";
 	const uint animationDuration = 200u;
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
 	Book book => ViewModel.Book;
@@ -86,9 +85,7 @@ public partial class BookPage : ContentPage, IDisposable
 			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
 			loadSequenceStarted = true;
 			webView.Navigated -= webView_Navigated;
-			webView.Navigating -= webView_Navigating;
 			webView.Navigated += webView_Navigated;
-			webView.Navigating += webView_Navigating;
 			await StartLoadSequenceAsync();
 		}
 	}
@@ -179,7 +176,6 @@ public partial class BookPage : ContentPage, IDisposable
 		if (webView is not null)
 		{
 			webView.Navigated -= webView_Navigated;
-			webView.Navigating -= webView_Navigating;
 		}
 		base.OnDisappearing();
 	}
@@ -208,7 +204,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async void ReaderBridgeCoordinator_MessageReceived(object? sender, ReaderBridgeMessageEventArgs e)
 	{
-		await Dispatcher.DispatchAsync(async () => await HandleJavascriptAsync(e.Payload));
+		await Dispatcher.DispatchAsync(async () => await HandleJavascriptAsync(e.Message));
 	}
 
 	void SubscribeToSettingsState()
@@ -366,178 +362,173 @@ public partial class BookPage : ContentPage, IDisposable
 	}
 
 	/// <summary>
-	/// Asynchronously handles a JavaScript action based on the provided URL.
+	/// Asynchronously handles a parsed JavaScript bridge message.
 	/// </summary>
-	/// <remarks>This method processes the URL to determine the appropriate JavaScript action and updates the UI
-	/// accordingly. It attempts to handle both internal and external links before executing a specific web view
-	/// action.</remarks>
-	/// <param name="url">The URL that determines the JavaScript action to be handled. Cannot be null or empty.</param>
-	/// <returns></returns>
-	async Task HandleJavascriptAsync(string url)
+	/// <remarks>This method receives structured JSON bridge data from the native dispatcher, handles link navigation
+	/// when needed, and routes supported reader actions directly to their C# handlers.</remarks>
+	/// <param name="message">The parsed reader bridge message.</param>
+	async Task HandleJavascriptAsync(BookPageJsMessage message)
 	{
-		await TryHandleInternalLinkAsync(url);
-		await BookPage.TryHandleExternalLinkAsync(url);
-		var methodName = GetMethodNameFromUrl(url);
-		var data = BookPage.GetDataFromUrl(url);
-		await HandleWebViewActionAsync(methodName, data);
+		ArgumentNullException.ThrowIfNull(message);
+
+		if (message.Action == ReaderBridgeAction.Jump)
+		{
+			var handled = await TryHandleInternalLinkAsync(message.Href);
+			if (!handled)
+			{
+				handled = await TryHandleExternalLinkAsync(message.Href);
+			}
+
+			if (!handled)
+			{
+				Trace.TraceWarning($"Unhandled jump bridge payload: {message.RawJson}");
+			}
+
+			await UpdateUiAppearance();
+			return;
+		}
+
+		await HandleWebViewActionAsync(message);
 		await UpdateUiAppearance();
 	}
 
-	/// <summary>
-	/// Handles the navigation event for the web view, intercepting specific URLs for custom processing.
-	/// </summary>
-	/// <remarks>This method cancels navigation if the URL contains the substring "runcsharp", ignoring case, and
-	/// processes the URL asynchronously.</remarks>
-	/// <param name="sender">The source of the event, typically the web view control.</param>
-	/// <param name="e">The <see cref="WebNavigatingEventArgs"/> containing event data, including the URL being navigated to.</param>
-	async void webView_Navigating(object? sender, WebNavigatingEventArgs? e)
+	async Task<bool> TryHandleInternalLinkAsync(string? href)
 	{
-		if (e is null)
+		if (string.IsNullOrWhiteSpace(href))
 		{
-			return;
-		}
-		var url = e.Url;
-
-		if (!url.Contains("runcsharp", StringComparison.CurrentCultureIgnoreCase))
-		{
-			return;
+			return false;
 		}
 
-		e.Cancel = true;
-		await HandleJavascriptAsync(e.Url);
+		var target = NormalizeBridgeHref(href);
+		if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
+		{
+			return false;
+		}
+
+		var isInternalReaderLink = uri.Host.Equals("demo", StringComparison.OrdinalIgnoreCase)
+			&& (uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+				|| uri.Scheme.Equals("app", StringComparison.OrdinalIgnoreCase));
+        if (!isInternalReaderLink)
+		{
+			return false;
+		}
+
+		var chapterFileName = Path.GetFileName(uri.LocalPath);
+		if (string.IsNullOrWhiteSpace(chapterFileName))
+		{
+			Trace.TraceWarning($"Internal bridge link did not contain a chapter file name: {href}");
+			return false;
+		}
+
+		var chapter = book.Chapters.Find(candidate => candidate.FileName.Contains(chapterFileName, StringComparison.OrdinalIgnoreCase));
+		if (chapter is null)
+		{
+			Trace.TraceWarning($"Chapter not found for internal link '{chapterFileName}'.");
+			return true;
+		}
+
+		Trace.TraceInformation($"Found chapter: {chapter.Title}");
+		book.CurrentChapter = book.Chapters.IndexOf(chapter);
+		await LoadChapterContentAsync();
+		await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+		return true;
 	}
 
-	static string GetDataFromUrl(string url)
+	static async Task<bool> TryHandleExternalLinkAsync(string? href)
 	{
-		var parts = url.Split('?');
-		if (parts.Length > 1)
+		if (string.IsNullOrWhiteSpace(href))
 		{
-			var data = parts[1].Split('#')[0];
-			return data;
+			return false;
 		}
-		return string.Empty;
+
+		var target = NormalizeBridgeHref(href);
+		if (target.Contains("https://demo", StringComparison.OrdinalIgnoreCase) || target.Contains("app://demo", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
+		{
+			Trace.TraceWarning($"External bridge link was not a valid absolute URI: {href}");
+			return false;
+		}
+
+		if (!uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+		{
+			Trace.TraceWarning($"Ignoring external bridge link with unsupported scheme '{uri.Scheme}': {href}");
+			return false;
+		}
+
+		Trace.TraceInformation($"Opening external link: {uri}");
+		await Launcher.OpenAsync(uri);
+		return true;
 	}
 
-	async Task TryHandleInternalLinkAsync(string url)
+	static string NormalizeBridgeHref(string href)
 	{
-		if (!url.Contains("https://runcsharp.jump?https://demo/", StringComparison.InvariantCultureIgnoreCase))
+		var normalized = href.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase);
+		var fragmentIndex = normalized.IndexOf('#');
+		if (fragmentIndex >= 0)
 		{
-			return;
+			normalized = normalized[..fragmentIndex];
 		}
-		var urlParts = url.Split('?')[1].Split('#')[0];
-		if (!string.IsNullOrEmpty(urlParts))
-		{
-			if (urlParts.Contains("https://demo/"))
-			{
-				urlParts = urlParts.Replace("https://demo/", string.Empty, StringComparison.OrdinalIgnoreCase);
-			}
 
-			var chapter = book.Chapters.Find(chapter => chapter.FileName.Contains(Path.GetFileName(urlParts), StringComparison.OrdinalIgnoreCase));
-			if (chapter is null)
-			{
-				System.Diagnostics.Trace.TraceWarning("Chapter not found for internal link");
-				return;
-			}
-			System.Diagnostics.Trace.TraceInformation($"Found chapter: {chapter.Title}");
-			book.CurrentChapter = book.Chapters.IndexOf(chapter);
-			// Use helper to ensure native and media overlay state stay in sync
-			await LoadChapterContentAsync();
-			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-		}
+		return normalized;
 	}
 
-	static async Task TryHandleExternalLinkAsync(string url)
+	async Task HandleWebViewActionAsync(BookPageJsMessage message)
 	{
-		if (!url.Contains(externalLinkPrefix, StringComparison.OrdinalIgnoreCase) || url.Contains("https://demo") || url.Contains("app://demo"))
+		switch (message.Action)
 		{
-			return;
-		}
-		var urlParts = url.Split('?');
-		if (urlParts.Length <= 1)
-		{
-			return;
-		}
-
-		var queryString = urlParts[1].Replace("http://", "https://");
-		if (!string.IsNullOrEmpty(queryString) && queryString.Contains("https://"))
-		{
-			System.Diagnostics.Trace.TraceInformation($"Opening external link: {queryString}");
-			await Launcher.OpenAsync(queryString);
-		}
-	}
-
-	static string GetMethodNameFromUrl(string url)
-	{
-		var urlParts = url.Split('.');
-		if (urlParts.Length < 2)
-		{
-			return string.Empty;
-		}
-
-		var funcToCall = urlParts[1].Split('?');
-		var candidate = funcToCall[0];
-		if (string.IsNullOrEmpty(candidate))
-		{
-			return string.Empty;
-		}
-
-		// Extract a valid identifier at the start (handles "prev", "prev()", "menu()", etc.)
-		var m = System.Text.RegularExpressions.Regex.Match(candidate, "[A-Za-z_][A-Za-z0-9_]*", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
-		return m.Success ? m.Value : string.Empty;
-	}
-
-	async Task HandleWebViewActionAsync(string methodName, string data)
-	{
-		var currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int parsedPage) ? parsedPage : 0;
-		var lowerMethod = methodName.ToLowerInvariant();
-		switch (lowerMethod)
-		{
-			case "next":
+			case ReaderBridgeAction.Next:
 				await HandleNextAsync();
 				break;
-			case "prev":
+			case ReaderBridgeAction.Prev:
 				System.Diagnostics.Trace.TraceInformation("Handling prev action from JS");
 				await HandlePrevAsync();
 				break;
-			case "menu":
+			case ReaderBridgeAction.Menu:
 				HandleMenu();
 				break;
-			case "pageload":
-				await HandlePageLoadAsync(currentPage);
+			case ReaderBridgeAction.PageLoad:
+				await HandlePageLoadAsync(int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int currentPageOnLoad) ? currentPageOnLoad : 0);
 				break;
-			case "characterposition":
-				await HandleCharacterPositionAsync(currentPage);
+			case ReaderBridgeAction.CharacterPosition:
+				await HandleCharacterPositionAsync(int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int currentCharacterPage) ? currentCharacterPage : 0);
 				break;
-             case "sectionchange":
-					HandleSectionChange(data);
-					break;
-			case "mediaoverlaylog":
-				HandleMediaOverlayLog(data);
+			case ReaderBridgeAction.SectionChange:
+				HandleSectionChange(message);
 				break;
-			case "mediaoverlaytoggle":
-				await HandleMediaOverlayToggleAsync(data);
+			case ReaderBridgeAction.MediaOverlayLog:
+				HandleMediaOverlayLog(message);
 				break;
-			case "mediaoverlayplay":
+			case ReaderBridgeAction.MediaOverlayToggle:
+				await HandleMediaOverlayToggleAsync(message);
+				break;
+			case ReaderBridgeAction.MediaOverlayPlay:
 				await HandleMediaOverlayPlayAsync();
 				break;
-			case "mediaoverlaypause":
+			case ReaderBridgeAction.MediaOverlayPause:
 				await HandleMediaOverlayPauseAsync();
 				break;
-			case "mediaoverlaynext":
+			case ReaderBridgeAction.MediaOverlayNext:
 				await HandleMediaOverlayNextAsync().ConfigureAwait(false);
 				break;
-			case "mediaoverlayprev":
+			case ReaderBridgeAction.MediaOverlayPrev:
 				System.Diagnostics.Trace.TraceInformation("Handling media overlay prev action from JS");
 				await HandleMediaOverlayPrevAsync().ConfigureAwait(false);
 				break;
-			case "mediaoverlayseek":
-				if (mediaOverlayManager is not null && double.TryParse(data, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
+			case ReaderBridgeAction.MediaOverlaySeek:
+				if (mediaOverlayManager is not null && message.Seconds is double secs)
 				{
 					await mediaOverlayManager.SeekAsync(secs);
 				}
 				break;
-			case "layoutoverflow":
-				HandleLayoutOverflow(data);
+			case ReaderBridgeAction.LayoutOverflow:
+				HandleLayoutOverflow(message);
+				break;
+			default:
+				Trace.TraceWarning($"Ignoring unsupported bridge action '{message.ActionName}'.");
 				break;
 		}
 	}
@@ -602,9 +593,9 @@ public partial class BookPage : ContentPage, IDisposable
 		});
 	}
 
-	void HandleSectionChange(string data)
+	void HandleSectionChange(BookPageJsMessage message)
 	{
-		if (!int.TryParse(data, out var chapterIndex))
+		if (message.ChapterIndex is not int chapterIndex)
 		{
 			return;
 		}
@@ -682,37 +673,38 @@ public partial class BookPage : ContentPage, IDisposable
 		});
 	}
 
-	static void HandleMediaOverlayLog(string data)
+	static void HandleMediaOverlayLog(BookPageJsMessage message)
 	{
-		if (!string.IsNullOrEmpty(data))
+		if (!string.IsNullOrEmpty(message.Message))
 		{
-			var decoded = Uri.UnescapeDataString(data);
-			Trace.TraceInformation($"[MediaOverlay JS] {decoded}");
+			Trace.TraceInformation($"[MediaOverlay JS] {message.Message}");
+			return;
 		}
+
+		Trace.TraceInformation($"[MediaOverlay JS] {message.RawJson}");
 	}
 
-	static void HandleLayoutOverflow(string data)
+	static void HandleLayoutOverflow(BookPageJsMessage message)
 	{
-		if (string.IsNullOrWhiteSpace(data))
+		if (string.IsNullOrWhiteSpace(message.RawJson))
 		{
 			Trace.TraceWarning("[ReaderOverflow] Received empty overflow payload from JS.");
 			return;
 		}
 
-		var decoded = Uri.UnescapeDataString(data);
-		Trace.TraceWarning($"[ReaderOverflow] {decoded}");
+		Trace.TraceWarning($"[ReaderOverflow] {message.RawJson}");
 	}
 
-	async Task HandleMediaOverlayToggleAsync(string data)
+	async Task HandleMediaOverlayToggleAsync(BookPageJsMessage message)
 	{
 		if (mediaOverlayManager is null)
 		{
 			Trace.TraceInformation("Media overlay toggle ignored; manager unavailable.");
 			return;
 		}
-		if (!bool.TryParse(data, out var enabled))
+		if (message.Enabled is not bool enabled)
 		{
-			Trace.TraceWarning($"Invalid media overlay toggle payload: {data}");
+			Trace.TraceWarning($"Invalid media overlay toggle payload: {message.RawJson}");
 			return;
 		}
 		await mediaOverlayManager.SetEnabledAsync(enabled);
@@ -1603,7 +1595,6 @@ public partial class BookPage : ContentPage, IDisposable
 			CancelPendingSettingsRefresh();
 
 			webView.Navigated -= webView_Navigated;
-			webView.Navigating -= webView_Navigating;
 			ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
 			if (mediaOverlayManager is not null)
