@@ -54,6 +54,12 @@ public class Settings
 	public string BodyHyphens { get; set; } = string.Empty;
 
 	/// <summary>
+	/// Gets or sets the preferred letter spacing for reader content.
+	/// </summary>
+	[Column("LetterSpacing")]
+	public string LetterSpacing { get; set; } = string.Empty;
+
+	/// <summary>
 	/// Gets or sets the background color as a string representation.
 	/// </summary>
 	[Column("BackgroundColor")]

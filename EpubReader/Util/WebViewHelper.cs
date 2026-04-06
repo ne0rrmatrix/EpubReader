@@ -27,6 +27,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	const string readerTextAlignmentPublisherDefault = "";
 	const string readerParagraphSpacingPublisherDefault = "";
 	const string readerHyphenationPublisherDefault = "";
+	const string readerLetterSpacingPublisherDefault = "";
 
 	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
@@ -414,10 +415,20 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		if (string.IsNullOrEmpty(normalizedHyphenation))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__bodyHyphens')"));
+		}
+		else
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__bodyHyphens','{normalizedHyphenation}')"));
+		}
+
+		var normalizedLetterSpacing = NormalizeReaderLetterSpacing(settings.LetterSpacing);
+		if (string.IsNullOrEmpty(normalizedLetterSpacing))
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__letterSpacing')"));
 			return;
 		}
 
-		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__bodyHyphens','{normalizedHyphenation}')"));
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__letterSpacing','{normalizedLetterSpacing}')"));
 	}
 
 	/// <summary>
@@ -531,6 +542,23 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			"manual" => "manual",
 			"none" => "none",
 			_ => readerHyphenationPublisherDefault
+		};
+	}
+
+	static string NormalizeReaderLetterSpacing(string? letterSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(letterSpacing))
+		{
+			return readerLetterSpacingPublisherDefault;
+		}
+
+		return letterSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0em" or "0.0em" => "0",
+			"0.02em" => "0.02em",
+			"0.04em" => "0.04em",
+			"0.06em" => "0.06em",
+			_ => readerLetterSpacingPublisherDefault
 		};
 	}
 

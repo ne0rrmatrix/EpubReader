@@ -20,6 +20,8 @@ public partial class SettingsPage : Popup<bool>
 	const string defaultReaderTextAlignment = "";
 	const string defaultReaderParagraphSpacing = "";
 	const string defaultReaderBodyHyphens = "";
+	const string defaultReaderLetterSpacing = "";
+	const string publisherDefaultOptionLabel = "Publisher Default";
 	static readonly IReadOnlyList<(string Label, string Value)> lineSpacingOptions =
 	[
 		("Tight", "1.25"),
@@ -29,13 +31,13 @@ public partial class SettingsPage : Popup<bool>
 	];
 	static readonly IReadOnlyList<(string Label, string Value)> textAlignmentOptions =
 	[
-		("Publisher Default", ""),
+		(publisherDefaultOptionLabel, ""),
 		("Left", "left"),
 		("Justified", "justify")
 	];
 	static readonly IReadOnlyList<(string Label, string Value)> paragraphSpacingOptions =
 	[
-		("Publisher Default", ""),
+		(publisherDefaultOptionLabel, ""),
 		("Compact", "0"),
 		("Normal", "0.5rem"),
 		("Relaxed", "1rem"),
@@ -43,10 +45,18 @@ public partial class SettingsPage : Popup<bool>
 	];
 	static readonly IReadOnlyList<(string Label, string Value)> hyphenationOptions =
 	[
-		("Publisher Default", ""),
+		(publisherDefaultOptionLabel, ""),
 		("Automatic", "auto"),
 		("Manual Only", "manual"),
 		("Off", "none")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> letterSpacingOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		("Normal", "0"),
+		("Wide", "0.02em"),
+		("Wider", "0.04em"),
+		("Extra Wide", "0.06em")
 	];
 
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
@@ -72,6 +82,7 @@ public partial class SettingsPage : Popup<bool>
 		TextAlignmentPicker.ItemsSource = textAlignmentOptions.Select(option => option.Label).ToList();
 		ParagraphSpacingPicker.ItemsSource = paragraphSpacingOptions.Select(option => option.Label).ToList();
 		HyphenationPicker.ItemsSource = hyphenationOptions.Select(option => option.Label).ToList();
+		LetterSpacingPicker.ItemsSource = letterSpacingOptions.Select(option => option.Label).ToList();
 	}
 
 	/// <summary>
@@ -118,6 +129,7 @@ public partial class SettingsPage : Popup<bool>
 		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
 		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
 		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
+		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Reset));
 		logger.Info("Settings removed");
 	}
@@ -216,6 +228,30 @@ public partial class SettingsPage : Popup<bool>
 		settings.BodyHyphens = selectedValue;
 		await db.SaveSettings(settings);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Hyphenation));
+	}
+
+	async void LetterSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change letter spacing.");
+			return;
+		}
+
+		if (LetterSpacingPicker.SelectedIndex < 0 || LetterSpacingPicker.SelectedIndex >= letterSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeLetterSpacing(letterSpacingOptions[LetterSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.LetterSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.LetterSpacing = selectedValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.LetterSpacing));
 	}
 
 	/// <summary>
@@ -350,17 +386,20 @@ public partial class SettingsPage : Popup<bool>
 		var normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
 		var normalizedParagraphSpacing = NormalizeParagraphSpacing(settings.ParagraphSpacing);
 		var normalizedBodyHyphens = NormalizeBodyHyphens(settings.BodyHyphens);
+		var normalizedLetterSpacing = NormalizeLetterSpacing(settings.LetterSpacing);
 		if (settings.FontSize != normalizedFontSize
 			|| !string.Equals(settings.LineSpacing, normalizedLineSpacing, StringComparison.Ordinal)
 			|| !string.Equals(settings.TextAlignment, normalizedTextAlignment, StringComparison.Ordinal)
 			|| !string.Equals(settings.ParagraphSpacing, normalizedParagraphSpacing, StringComparison.Ordinal)
-			|| !string.Equals(settings.BodyHyphens, normalizedBodyHyphens, StringComparison.Ordinal))
+			|| !string.Equals(settings.BodyHyphens, normalizedBodyHyphens, StringComparison.Ordinal)
+			|| !string.Equals(settings.LetterSpacing, normalizedLetterSpacing, StringComparison.Ordinal))
 		{
 			settings.FontSize = normalizedFontSize;
 			settings.LineSpacing = normalizedLineSpacing;
 			settings.TextAlignment = normalizedTextAlignment;
 			settings.ParagraphSpacing = normalizedParagraphSpacing;
 			settings.BodyHyphens = normalizedBodyHyphens;
+			settings.LetterSpacing = normalizedLetterSpacing;
 			await db.SaveSettings(settings);
 		}
 
@@ -369,6 +408,7 @@ public partial class SettingsPage : Popup<bool>
 		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
 		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
 		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
+		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
@@ -487,6 +527,23 @@ public partial class SettingsPage : Popup<bool>
 		};
 	}
 
+	static string NormalizeLetterSpacing(string? letterSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(letterSpacing))
+		{
+			return defaultReaderLetterSpacing;
+		}
+
+		return letterSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0em" or "0.0em" => "0",
+			"0.02em" => "0.02em",
+			"0.04em" => "0.04em",
+			"0.06em" => "0.06em",
+			_ => defaultReaderLetterSpacing
+		};
+	}
+
 	static int GetLineSpacingOptionIndex(string? lineSpacing)
 	{
 		var normalizedValue = NormalizeLineSpacing(lineSpacing);
@@ -535,6 +592,20 @@ public partial class SettingsPage : Popup<bool>
 		for (var index = 0; index < hyphenationOptions.Count; index++)
 		{
 			if (string.Equals(hyphenationOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetLetterSpacingOptionIndex(string? letterSpacing)
+	{
+		var normalizedValue = NormalizeLetterSpacing(letterSpacing);
+		for (var index = 0; index < letterSpacingOptions.Count; index++)
+		{
+			if (string.Equals(letterSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
 				return index;
 			}

@@ -114,6 +114,19 @@
         </StackLayout>
 
         <StackLayout Grid.Row="8" Spacing="6" HorizontalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                Text="Letter Spacing" />
+
+            <Picker
+                x:Name="LetterSpacingPicker"
+                Title="Letter Spacing"
+                SelectedIndexChanged="LetterSpacingPicker_SelectedIndexChanged"
+                WidthRequest="250" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="9" Spacing="6" HorizontalOptions="Center">
             <Picker
                 x:Name="ThemePicker"
                 Title="Theme"
@@ -145,7 +158,7 @@
 
         <HorizontalStackLayout
             x:Name="stackLayout"
-            Grid.Row="10"
+            Grid.Row="11"
             HorizontalOptions="Center"
             IsVisible="{OnPlatform WinUI=true,
                                    Default=false}"
@@ -160,13 +173,13 @@
 
         <!--  Authentication Section  -->
         <Label
-            Grid.Row="11"
+            Grid.Row="12"
             FontAttributes="Bold"
             HorizontalOptions="Center"
             Text="Account &amp; Sync" />
 
         <VerticalStackLayout
-            Grid.Row="12"
+            Grid.Row="13"
             Spacing="10">
             
             <!--  Auth Status Display  -->

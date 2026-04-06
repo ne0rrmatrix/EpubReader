@@ -63,7 +63,7 @@ public partial class Db : IDb
 		await EnsureColumnsAsync(
 			connection,
 			"settings",
-			[("LineSpacing", "TEXT"), ("TextAlignment", "TEXT"), ("ParagraphSpacing", "TEXT"), ("BodyHyphens", "TEXT")],
+			[("LineSpacing", "TEXT"), ("TextAlignment", "TEXT"), ("ParagraphSpacing", "TEXT"), ("BodyHyphens", "TEXT"), ("LetterSpacing", "TEXT")],
 			cancellationToken);
 	}
 
