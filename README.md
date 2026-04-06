@@ -327,6 +327,8 @@ If you are not in the repository root, prefer invoking scripts with `pwsh -File`
 
 The main build script handles Firebase secrets without committing them to source control. It supports multiple ways to provide Firebase configuration:
 
+For Android forks, also verify the Android signing property groups in `EpubReader/EpubReader.csproj`. The current `Debug|net10.0-android|AnyCPU` and `Release|net10.0-android|AnyCPU` blocks must point to a valid keystore file, alias, and passwords on your machine or Android builds can fail. See [`docs/firebase-fork-setup.md`](docs/firebase-fork-setup.md) for the full signing-path guidance.
+
 **Basic Usage:**
 
 ```powershell

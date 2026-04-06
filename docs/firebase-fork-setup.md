@@ -148,6 +148,102 @@ Important:
 - the Firebase Android app package name must match the app ID exactly
 - if they do not match, Google sign-in will fail
 
+## Step 1A: Review Android signing settings in `EpubReader.csproj`
+
+This repo's Android `Debug` and `Release` builds also depend on the Android signing properties in `EpubReader/EpubReader.csproj`.
+
+At the time of writing, the project contains Android-specific signing blocks for both:
+
+- `Release|net10.0-android|AnyCPU`
+- `Debug|net10.0-android|AnyCPU`
+
+Those property groups point to:
+
+- `AndroidSigningKeyStore`
+- `AndroidSigningStorePass`
+- `AndroidSigningKeyAlias`
+- `AndroidSigningKeyPass`
+
+If those values are wrong for your machine, Android builds can fail before the app runs.
+
+### Important path rule
+
+`AndroidSigningKeyStore` is resolved relative to `EpubReader/EpubReader.csproj`, not relative to the repository root.
+
+So these are different:
+
+- `Epubreader.keystore`
+  - means a file next to `EpubReader.csproj`
+- `..\build-secrets\android\MyFork.keystore`
+  - means a file under `build-secrets/android/` at the repository root
+
+### Shortest path
+
+If the existing repo keystore works for your local build, you can leave these properties unchanged.
+
+If you want to use your own signing file, update **both** Android property groups in `EpubReader/EpubReader.csproj` so that `Debug` and `Release` are consistent.
+
+Example shape:
+
+```xml
+<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
+  <AndroidPackageFormat>apk</AndroidPackageFormat>
+  <AndroidKeyStore>True</AndroidKeyStore>
+  <AndroidUseAapt2>True</AndroidUseAapt2>
+  <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+  <AndroidSigningKeyStore>..\build-secrets\android\MyFork.keystore</AndroidSigningKeyStore>
+  <AndroidSigningStorePass>your-store-password</AndroidSigningStorePass>
+  <AndroidSigningKeyAlias>your-key-alias</AndroidSigningKeyAlias>
+  <AndroidSigningKeyPass>your-key-password</AndroidSigningKeyPass>
+</PropertyGroup>
+
+<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
+  <AndroidUseAapt2>True</AndroidUseAapt2>
+  <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+  <AndroidPackageFormat>apk</AndroidPackageFormat>
+  <AndroidKeyStore>True</AndroidKeyStore>
+  <AndroidSigningKeyStore>..\build-secrets\android\MyFork.keystore</AndroidSigningKeyStore>
+  <AndroidSigningStorePass>your-store-password</AndroidSigningStorePass>
+  <AndroidSigningKeyAlias>your-key-alias</AndroidSigningKeyAlias>
+  <AndroidSigningKeyPass>your-key-password</AndroidSigningKeyPass>
+</PropertyGroup>
+```
+
+### When you should update these values
+
+Update the Android signing values if:
+
+- your fork uses a different keystore file
+- the keystore file is stored in a different folder
+- the alias or passwords are different on your machine
+- Android build fails with signing or keystore errors
+
+### Recommended local layout for a fork
+
+To keep custom signing files out of source control, a practical local layout is:
+
+- `build-secrets/android/MyFork.keystore`
+
+Then set:
+
+- `AndroidSigningKeyStore` to `..\build-secrets\android\MyFork.keystore`
+
+Because that path is relative to `EpubReader/EpubReader.csproj`.
+
+### After editing the signing block
+
+From the repository root, test the Android build again:
+
+```powershell
+./build.ps1 -Android -DebugBuild
+```
+
+or, from any directory:
+
+```powershell
+pwsh -File "C:\path\to\your\EpubReader-clone\build.ps1" -Android -DebugBuild
+```
+
 ## Step 2: Create your Firebase project
 
 1. Go to the Firebase Console:
