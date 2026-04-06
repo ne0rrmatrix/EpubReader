@@ -27,7 +27,7 @@ public class Settings
 	/// Gets or sets the font size for the text.
 	/// </summary>
 	[Column("FontSize")]
-	public int FontSize { get; set; } = 0;
+	public int FontSize { get; set; } = 16;
 
 	/// <summary>
 	/// Gets or sets the background color as a string representation.

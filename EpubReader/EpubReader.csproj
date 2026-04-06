@@ -136,10 +136,10 @@
     <AndroidUseAapt2>True</AndroidUseAapt2>
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
     <AndroidKeyStore>True</AndroidKeyStore>
-    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
-    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
-    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
+    <AndroidSigningKeyStore>Epubreader.keystore</AndroidSigningKeyStore>
+    <AndroidSigningStorePass>Jqbywx5Jqbywx5</AndroidSigningStorePass>
+    <AndroidSigningKeyAlias>EpubReader</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>Jqbywx5Jqbywx5</AndroidSigningKeyPass>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
@@ -147,10 +147,10 @@
     <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidKeyStore>True</AndroidKeyStore>
-    <AndroidSigningKeyStore>$(AndroidKeystoreFile)</AndroidSigningKeyStore>
-    <AndroidSigningStorePass>$(AndroidKeystorePassword)</AndroidSigningStorePass>
-    <AndroidSigningKeyAlias>$(AndroidKeyAlias)</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(AndroidKeyPassword)</AndroidSigningKeyPass>
+    <AndroidSigningKeyStore>Epubreader.keystore</AndroidSigningKeyStore>
+    <AndroidSigningStorePass>Jqbywx5Jqbywx5</AndroidSigningStorePass>
+    <AndroidSigningKeyAlias>EpubReader</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>Jqbywx5Jqbywx5</AndroidSigningKeyPass>
   </PropertyGroup>
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">

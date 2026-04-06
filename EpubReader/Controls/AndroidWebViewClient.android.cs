@@ -1,6 +1,7 @@
 ﻿using Android.Graphics;
 using Android.Webkit;
 using Microsoft.Maui.Handlers;
+using System.Diagnostics;
 
 namespace EpubReader.Controls;
 
@@ -37,13 +38,18 @@ class CustomWebViewClient : WebViewClient
 		handler.PlatformView.Settings.AllowContentAccess = true;
 		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
 		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
-		handler.PlatformView.Settings.LoadWithOverviewMode = true;
+		handler.PlatformView.Settings.LoadWithOverviewMode = false;
 		handler.PlatformView.Settings.UseWideViewPort = true;
+		handler.PlatformView.Settings.SetSupportZoom(false);
+		handler.PlatformView.Settings.BuiltInZoomControls = false;
+		handler.PlatformView.Settings.DisplayZoomControls = false;
 		handler.PlatformView.Settings.TextZoom = 100;
+		handler.PlatformView.SetInitialScale(0);
 		handler.PlatformView.VerticalScrollBarEnabled = false;
 		handler.PlatformView.HorizontalScrollBarEnabled = false;
 		handler.PlatformView.AddJavascriptInterface(new JSBridge(), "jsBridge");
 		handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+		Trace.TraceInformation("Configured Android WebView with density-aware initial scaling, wide viewport support, and neutral text zoom.");
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
 #pragma warning disable CA1422  // Type or member is obsolete
 		handler.PlatformView.Settings.SetAppCacheEnabled(true);

@@ -37,6 +37,7 @@ public partial class BookPage : ContentPage, IDisposable
 	readonly List<int> chapterOffsets = [];
 	int sliderTotalPages = 0;
 	bool isSliderActive = false;
+	CancellationTokenSource? settingsRefreshCancellationTokenSource;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -61,12 +62,7 @@ public partial class BookPage : ContentPage, IDisposable
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-      WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) =>
-		{
-			await webViewHelper.OnSettingsClickedAsync();
-			await UpdateUiAppearance();
-			await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
-		});
+		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await HandleSettingsChangedAsync(m));
 	}
 
 	protected override async void OnAppearing()
@@ -144,6 +140,7 @@ public partial class BookPage : ContentPage, IDisposable
 			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
+			CancelPendingSettingsRefresh();
 			// Allow a fresh combined.html load next time the book is opened.
 			webViewHelper.ResetCombinedState();
 		}
@@ -152,6 +149,57 @@ public partial class BookPage : ContentPage, IDisposable
 		webView.Navigated -= webView_Navigated;
 		webView.Navigating -= webView_Navigating;
 		base.OnDisappearing();
+	}
+
+	async Task HandleSettingsChangedAsync(SettingsMessage message)
+	{
+		await webViewHelper.OnSettingsClickedAsync();
+		await UpdateUiAppearance();
+
+		if (!message.RequiresPaginationRefresh)
+		{
+			return;
+		}
+
+		SchedulePaginationRefresh();
+	}
+
+	void SchedulePaginationRefresh()
+	{
+		CancelPendingSettingsRefresh();
+		settingsRefreshCancellationTokenSource = new CancellationTokenSource();
+		var token = settingsRefreshCancellationTokenSource.Token;
+		_ = DebouncedRefreshPaginationAsync(token);
+	}
+
+	void CancelPendingSettingsRefresh()
+	{
+		if (settingsRefreshCancellationTokenSource is null)
+		{
+			return;
+		}
+
+		settingsRefreshCancellationTokenSource.Cancel();
+		settingsRefreshCancellationTokenSource.Dispose();
+		settingsRefreshCancellationTokenSource = null;
+	}
+
+	async Task DebouncedRefreshPaginationAsync(CancellationToken token)
+	{
+		try
+		{
+			await Task.Delay(TimeSpan.FromMilliseconds(400), token);
+			token.ThrowIfCancellationRequested();
+			await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
+		}
+		catch (OperationCanceledException)
+		{
+			Trace.TraceInformation("Settings pagination refresh canceled.");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Debounced settings pagination refresh failed: {ex.Message}");
+		}
 	}
 
 
@@ -411,6 +459,9 @@ public partial class BookPage : ContentPage, IDisposable
 					await mediaOverlayManager.SeekAsync(secs);
 				}
 				break;
+			case "layoutoverflow":
+				HandleLayoutOverflow(data);
+				break;
 		}
 	}
 
@@ -561,6 +612,18 @@ public partial class BookPage : ContentPage, IDisposable
 			var decoded = Uri.UnescapeDataString(data);
 			Trace.TraceInformation($"[MediaOverlay JS] {decoded}");
 		}
+	}
+
+	static void HandleLayoutOverflow(string data)
+	{
+		if (string.IsNullOrWhiteSpace(data))
+		{
+			Trace.TraceWarning("[ReaderOverflow] Received empty overflow payload from JS.");
+			return;
+		}
+
+		var decoded = Uri.UnescapeDataString(data);
+		Trace.TraceWarning($"[ReaderOverflow] {decoded}");
 	}
 
 	async Task HandleMediaOverlayToggleAsync(string data)
@@ -1416,6 +1479,7 @@ public partial class BookPage : ContentPage, IDisposable
 		if (disposing)
 		{
 			WeakReferenceMessenger.Default.UnregisterAll(this);
+			CancelPendingSettingsRefresh();
 
 			webView.Navigated -= webView_Navigated;
 			webView.Navigating -= webView_Navigating;

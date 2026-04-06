@@ -7,11 +7,19 @@
 let currentPage = 0;
 let frame = null;
 let colCount = 1;
+let currentFrameResizeHandler = null;
 let combinedPaginationState = {
     chapterPageCounts: [],
     chapterOffsets: [],
     totalPages: 0
 };
+let combinedPaginationCalculationInProgress = false;
+let scheduledVirtualColumnAdjustment = null;
+let virtualColumnAdjustmentInProgress = false;
+let lastVirtualColumnLayoutKey = null;
+let scheduledOverflowAudit = null;
+let overflowAuditInProgress = false;
+let lastOverflowAuditSignature = null;
 
 const mediaOverlayUi = {
     root: null,
@@ -220,6 +228,20 @@ function setInteractionEnabled(enabled) {
     }
 }
 
+function parseCssPixelValue(value, fallback = 0) {
+    if (typeof value !== 'string') {
+        return fallback;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return fallback;
+    }
+
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 /**
  * Scrolling and navigation utilities
  */
@@ -417,12 +439,12 @@ const navigationUtils = {
      * @returns {number} The scroll amount in pixels
      */
     calculateScrollAmount(contentWindow) {
-        const gap = Number.parseInt(
-            globalThis.getComputedStyle(contentWindow.document.documentElement)
-                .getPropertyValue("column-gap")
-        ) || 0;
+        const root = contentWindow.document.documentElement;
+        const computedStyle = globalThis.getComputedStyle(root);
+        const gap = parseCssPixelValue(computedStyle.getPropertyValue("column-gap"), 0);
+        const viewportWidth = Math.max(0, Math.floor(contentWindow.innerWidth));
 
-        return contentWindow.innerWidth + gap;
+        return Math.max(1, Math.round(viewportWidth + gap));
     },
 
     /**
@@ -486,21 +508,183 @@ const layoutUtils = {
         const contentWindow = domUtils.getContentWindow();
         if (!contentWindow) {
             console.warn("Iframe contentWindow is not available for dimension setting yet.");
-            return;
+            return false;
         }
 
         const width = Math.floor(contentWindow.innerWidth);
         const height = Math.floor(contentWindow.innerHeight);
+        const nextWidth = `${width}px`;
+        const nextHeight = `${height}px`;
 
-        frame.style.width = `${width}px`;
-        body.style.width = `${width}px`;
-        body.style.height = `${height}px`;
-        frame.style.height = `${height}px`;
+        if (root.style.getPropertyValue('--root-width') === nextWidth && root.style.getPropertyValue('--root-height') === nextHeight) {
+            return false;
+        }
 
-        root.style.setProperty('--root-width', `${width}px`);
-        root.style.setProperty('--root-height', `${height}px`);
+        frame.style.width = nextWidth;
+        body.style.width = nextWidth;
+        body.style.height = nextHeight;
+        frame.style.height = nextHeight;
+
+        root.style.setProperty('--root-width', nextWidth);
+        root.style.setProperty('--root-height', nextHeight);
+        lastVirtualColumnLayoutKey = null;
+        return true;
     },
 };
+
+function getVirtualColumnLayoutKey(contentWindow) {
+    if (!contentWindow?.document?.documentElement) {
+        return null;
+    }
+
+    const doc = contentWindow.document;
+    const root = doc.documentElement;
+    const computedStyle = contentWindow.getComputedStyle(root);
+    const visibleSection = doc.querySelector('section[data-chapter-index]:not([style*="display: none"])')?.dataset.chapterIndex ?? 'body';
+    const scrollWidth = doc.scrollingElement?.scrollWidth ?? root.scrollWidth;
+    const columnCount = computedStyle.getPropertyValue('column-count').trim();
+    const lineLength = computedStyle.getPropertyValue('--USER__lineLength').trim();
+
+    return [
+        visibleSection,
+        Math.floor(contentWindow.innerWidth),
+        Math.floor(contentWindow.innerHeight),
+        Math.ceil(scrollWidth),
+        computedStyle.fontSize,
+        computedStyle.fontFamily,
+        columnCount,
+        lineLength
+    ].join('|');
+}
+
+function scheduleVirtualColumnAdjustment(reason = 'unknown', delay = 75, force = false) {
+    if (scheduledVirtualColumnAdjustment) {
+        clearTimeout(scheduledVirtualColumnAdjustment);
+    }
+
+    scheduledVirtualColumnAdjustment = setTimeout(() => {
+        scheduledVirtualColumnAdjustment = null;
+        adjustVirtualColumns({ force, reason });
+    }, delay);
+}
+
+function refreshLayout(reason = 'manual', force = false) {
+    const iframe = ensureFrameElement();
+    const body = document.getElementById('body');
+    const root = document.documentElement;
+    const contentWindow = domUtils.getContentWindow();
+    if (!iframe || !body || !root || !contentWindow) {
+        console.warn(`refreshLayout skipped (${reason}) because the reader frame is not ready.`);
+        return false;
+    }
+
+    const dimensionsChanged = layoutUtils.setDimensions(body, root);
+    if (dimensionsChanged) {
+        console.log(`refreshLayout(${reason}): dimensions updated.`);
+    }
+
+    lastVirtualColumnLayoutKey = null;
+    scheduleVirtualColumnAdjustment(reason, force ? 0 : 90, true);
+    scheduleOverflowAudit(reason, force ? 140 : 220);
+    return dimensionsChanged;
+}
+
+function describeOverflowElement(element) {
+    if (!element) {
+        return 'unknown';
+    }
+
+    const idPart = element.id ? `#${element.id}` : '';
+    const classPart = element.classList?.length ? `.${Array.from(element.classList).slice(0, 3).join('.')}` : '';
+    return `${element.tagName?.toLowerCase?.() ?? 'unknown'}${idPart}${classPart}`;
+}
+
+function scheduleOverflowAudit(reason = 'unknown', delay = 180) {
+    if (scheduledOverflowAudit) {
+        clearTimeout(scheduledOverflowAudit);
+    }
+
+    scheduledOverflowAudit = setTimeout(() => {
+        scheduledOverflowAudit = null;
+        auditOverflowingContent(reason);
+    }, delay);
+}
+
+function auditOverflowingContent(reason = 'unknown') {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+    if (!doc || !contentWindow) {
+        return [];
+    }
+
+    if (overflowAuditInProgress) {
+        scheduleOverflowAudit(`requeued:${reason}`, 180);
+        return [];
+    }
+
+    overflowAuditInProgress = true;
+
+    try {
+        const activeRoot = getActiveSectionElement(doc) ?? doc.body;
+        if (!activeRoot) {
+            return [];
+        }
+
+        const viewportWidth = Math.max(0, Math.floor(contentWindow.innerWidth));
+        const selector = 'img,svg,video,canvas,iframe,object,embed,table,pre,code,p,li,dd,blockquote,figcaption,h1,h2,h3,h4,h5,h6,a';
+        const candidates = Array.from(activeRoot.querySelectorAll(selector)).slice(0, 300);
+        const issues = [];
+
+        for (const element of candidates) {
+            const computedStyle = contentWindow.getComputedStyle(element);
+            if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
+                continue;
+            }
+
+            const rect = element.getBoundingClientRect();
+            const renderedWidth = Math.ceil(rect.width || 0);
+            const scrollWidth = Math.ceil(element.scrollWidth || 0);
+            const clientWidth = Math.ceil(element.clientWidth || 0);
+            const measuredWidth = Math.max(renderedWidth, scrollWidth, clientWidth);
+            const overflowAmount = measuredWidth - viewportWidth;
+
+            if (overflowAmount <= 2) {
+                continue;
+            }
+
+            issues.push({
+                element: describeOverflowElement(element),
+                width: measuredWidth,
+                viewportWidth: viewportWidth,
+                overflowAmount: overflowAmount,
+                chapterIndex: currentSectionIndex,
+                whiteSpace: computedStyle.whiteSpace,
+                wordBreak: computedStyle.wordBreak,
+                overflowWrap: computedStyle.overflowWrap
+            });
+
+            if (issues.length >= 5) {
+                break;
+            }
+        }
+
+        const signature = JSON.stringify(issues);
+        if (issues.length > 0 && signature !== lastOverflowAuditSignature) {
+            lastOverflowAuditSignature = signature;
+            console.warn(`[ReaderOverflow] ${reason}`, issues);
+            sendToNativeMessage({ action: 'layoutoverflow', reason: reason, issues: issues });
+        } else if (issues.length === 0) {
+            lastOverflowAuditSignature = null;
+        }
+
+        return issues;
+    } catch (error) {
+        console.error('Overflow audit failed', error);
+        return [];
+    } finally {
+        overflowAuditInProgress = false;
+    }
+}
 
 /**
  * Column management utilities
@@ -525,14 +709,20 @@ const columnUtils = {
         const columnWidth = computedStyle.getPropertyValue('column-width');
 
         if (columnCount && columnCount !== 'auto') {
-            return Number.parseInt(columnCount, 10);
+            const parsedColumnCount = Number.parseInt(columnCount, 10);
+            return Number.isFinite(parsedColumnCount) && parsedColumnCount > 0 ? parsedColumnCount : 1;
         }
 
         if (columnWidth && columnWidth !== 'auto') {
-            const width = Number.parseFloat(columnWidth);
+            const width = parseCssPixelValue(columnWidth, 0);
             const containerWidth = contentWindow.innerWidth;
-            const gap = Number.parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
-            return Math.floor((containerWidth + gap) / (width + gap));
+            const gap = parseCssPixelValue(computedStyle.getPropertyValue('column-gap'), 0);
+            const totalColumnWidth = width + gap;
+            if (totalColumnWidth <= 0) {
+                return 1;
+            }
+
+            return Math.max(1, Math.floor((containerWidth + gap) / totalColumnWidth));
         }
 
         // Default to 1 column if no column properties are set
@@ -641,18 +831,37 @@ const columnUtils = {
  * This should be called after content is loaded or when layout changes
  * @returns {boolean} True if virtual columns were adjusted
  */
-function adjustVirtualColumns() {
+function adjustVirtualColumns(options = {}) {
     const contentWindow = domUtils.getContentWindow();
     if (!contentWindow) {
         console.warn("Cannot adjust virtual columns - iframe content not available.");
         return false;
     }
 
+    const force = options.force === true;
+    const reason = options.reason || 'unspecified';
+    const layoutKey = getVirtualColumnLayoutKey(contentWindow);
+
+    if (!force && layoutKey && layoutKey === lastVirtualColumnLayoutKey) {
+        return false;
+    }
+
+    if (virtualColumnAdjustmentInProgress) {
+        scheduleVirtualColumnAdjustment(`requeued:${reason}`, 100, force);
+        return false;
+    }
+
+    virtualColumnAdjustmentInProgress = true;
+
     try {
-        return columnUtils.appendVirtualColumnIfNeeded(contentWindow);
+        const adjusted = columnUtils.appendVirtualColumnIfNeeded(contentWindow);
+        lastVirtualColumnLayoutKey = getVirtualColumnLayoutKey(contentWindow) ?? layoutKey;
+        return adjusted;
     } catch (error) {
         console.error("Error adjusting virtual columns:", error);
         return false;
+    } finally {
+        virtualColumnAdjustmentInProgress = false;
     }
 }
 
@@ -680,11 +889,10 @@ const styleUtils = {
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
 
-        // Adjust virtual columns after column-related property changes
-        if (property.includes('column')) {
-            setTimeout(() => {
-                adjustVirtualColumns();
-            }, 50);
+        const affectsLayout = property.includes('column') || property.includes('font') || property.includes('lineLength');
+        if (affectsLayout) {
+            lastVirtualColumnLayoutKey = null;
+            scheduleVirtualColumnAdjustment(`css-property:${property}`, 125, true);
         }
     },
 
@@ -1848,6 +2056,7 @@ function extractTextFromDocument(doc, root = null) {
 function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
     console.log(`Updating character position: ${characterPosition}`);
+    scheduleOverflowAudit('page-change', 180);
     // Notify C# code about the character position change
     sendToNativeMessage({ action: 'characterposition', position: characterPosition });
 }
@@ -1891,11 +2100,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Set initial dimensions and add resize listener
     if (!domUtils.isCssVariableSet(root, '--root-width') || !domUtils.isCssVariableSet(root, '--root-height')) {
-        console.log("Root dimensions already set, skipping initial resize.");
+        console.log("Initializing root dimensions.");
         layoutUtils.setDimensions(body, root);
     }
-
-    frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
 
     // Handle iframe load events
     frame.onload = function () {
@@ -1906,10 +2113,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            // Adjust virtual columns after content loads
-            setTimeout(() => {
-                adjustVirtualColumns();
-            }, 100); // Small delay to ensure content is fully rendered
+            if (currentFrameResizeHandler) {
+                contentWindow.removeEventListener('resize', currentFrameResizeHandler);
+            }
+
+            currentFrameResizeHandler = () => {
+                if (layoutUtils.setDimensions(body, root)) {
+                    scheduleVirtualColumnAdjustment('iframe-resize', 125, true);
+                }
+            };
+            contentWindow.addEventListener('resize', currentFrameResizeHandler);
+
+            refreshLayout('iframe-load', true);
 
             requestMediaOverlayHighlightThemeRefresh();
             sendToNativeMessage({ action: 'pageload', value: true });
@@ -2009,59 +2224,72 @@ function calculateCombinedPaginationState() {
         };
     }
 
-    const sections = Array.from(doc.querySelectorAll('section[data-chapter-index]'));
-    if (sections.length === 0) {
-        const totalPages = getPageSlotCount();
-        return {
-            chapterPageCounts: [totalPages],
-            chapterOffsets: [0],
-            totalPages: totalPages
-        };
+    if (combinedPaginationCalculationInProgress) {
+        console.warn('calculateCombinedPaginationState: skipping re-entrant calculation');
+        return combinedPaginationState;
     }
 
-    const savedSectionIndex = Math.max(0, Math.min(currentSectionIndex, sections.length - 1));
-    const savedPage = currentPage;
-    const chapterPageCounts = [];
+    combinedPaginationCalculationInProgress = true;
 
-    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    try {
+        const sections = Array.from(doc.querySelectorAll('section[data-chapter-index]'));
+        if (sections.length === 0) {
+            const totalPages = getPageSlotCount();
+            return {
+                chapterPageCounts: [totalPages],
+                chapterOffsets: [0],
+                totalPages: totalPages
+            };
+        }
+
+        const savedSectionIndex = Math.max(0, Math.min(currentSectionIndex, sections.length - 1));
+        const savedPage = currentPage;
+        const chapterPageCounts = [];
+
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            sections.forEach((section, index) => {
+                section.style.display = index === sectionIndex ? 'block' : 'none';
+            });
+
+            lastVirtualColumnLayoutKey = null;
+            try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to reset scroll during pagination measurement', error); }
+            try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to reset document scroll during pagination measurement', error); }
+
+            adjustVirtualColumns({ force: true, reason: `pagination-measure:${sectionIndex}` });
+            chapterPageCounts.push(getPageSlotCount());
+        }
+
         sections.forEach((section, index) => {
-            section.style.display = index === sectionIndex ? 'block' : 'none';
+            section.style.display = index === savedSectionIndex ? 'block' : 'none';
         });
 
-        try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to reset scroll during pagination measurement', error); }
-        try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to reset document scroll during pagination measurement', error); }
+        lastVirtualColumnLayoutKey = null;
+        try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to restore scroll during pagination measurement', error); }
+        try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to restore document scroll during pagination measurement', error); }
 
-        adjustVirtualColumns();
-        chapterPageCounts.push(getPageSlotCount());
+        adjustVirtualColumns({ force: true, reason: 'pagination-restore' });
+
+        const currentPageCount = chapterPageCounts[savedSectionIndex] ?? 1;
+        const restoredPage = Math.max(0, Math.min(savedPage, currentPageCount - 1));
+        navigationUtils.scrollToPage(restoredPage);
+        currentPage = restoredPage;
+        currentSectionIndex = savedSectionIndex;
+
+        const chapterOffsets = [];
+        let totalPages = 0;
+        for (const pageCount of chapterPageCounts) {
+            chapterOffsets.push(totalPages);
+            totalPages += pageCount;
+        }
+
+        return {
+            chapterPageCounts: chapterPageCounts,
+            chapterOffsets: chapterOffsets,
+            totalPages: Math.max(1, totalPages)
+        };
+    } finally {
+        combinedPaginationCalculationInProgress = false;
     }
-
-    sections.forEach((section, index) => {
-        section.style.display = index === savedSectionIndex ? 'block' : 'none';
-    });
-
-    try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to restore scroll during pagination measurement', error); }
-    try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to restore document scroll during pagination measurement', error); }
-
-    adjustVirtualColumns();
-
-    const currentPageCount = chapterPageCounts[savedSectionIndex] ?? 1;
-    const restoredPage = Math.max(0, Math.min(savedPage, currentPageCount - 1));
-    navigationUtils.scrollToPage(restoredPage);
-    currentPage = restoredPage;
-    currentSectionIndex = savedSectionIndex;
-
-    const chapterOffsets = [];
-    let totalPages = 0;
-    for (const pageCount of chapterPageCounts) {
-        chapterOffsets.push(totalPages);
-        totalPages += pageCount;
-    }
-
-    return {
-        chapterPageCounts: chapterPageCounts,
-        chapterOffsets: chapterOffsets,
-        totalPages: Math.max(1, totalPages)
-    };
 }
 
 /**
@@ -2095,6 +2323,7 @@ function showSection(sectionIndex) {
 
     currentPage = 0;
     currentSectionIndex = sectionIndex;
+    refreshLayout(`show-section:${sectionIndex}`, true);
     console.log(`showSection: section ${sectionIndex} is now visible`);
     return true;
 }
@@ -2189,7 +2418,8 @@ function tryHandleCombinedInternalLink(href) {
             return;
         }
 
-        adjustVirtualColumns();
+        lastVirtualColumnLayoutKey = null;
+        adjustVirtualColumns({ force: true, reason: 'internal-link' });
 
         if (refreshedTarget.matches?.('section[data-chapter-index]')) {
             refreshedWin.scrollTo(0, 0);
@@ -2227,7 +2457,8 @@ function gotoPage(page) {
         currentPage = 0;
         return;
     }
-    adjustVirtualColumns();
+    lastVirtualColumnLayoutKey = null;
+    adjustVirtualColumns({ force: true, reason: 'goto-page' });
 
     // Update currentPage synchronously so that calls to getCombinedPaginationInfo() made
     // between now and when the deferred scroll executes see the correct page number.
@@ -2261,6 +2492,10 @@ function scrollToHorizontalEnd() {
  */
 function setReadiumProperty(property, value) {
     styleUtils.setReadiumProperty(property, value);
+}
+
+function refreshReaderLayout(reason = 'manual') {
+    refreshLayout(reason, true);
 }
 
 /**

@@ -15,6 +15,15 @@ namespace EpubReader.Util;
 /// <param name="syncService"></param>
 public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncService)
 {
+	const int defaultReaderFontSize = 16;
+	const int minimumReaderFontSize = 8;
+	const int maximumReaderFontSize = 36;
+	const int minimumReaderFontPercent = 50;
+	const int maximumReaderFontPercent = 225;
+	const int androidReaderFontPercentPerStep = 10;
+	const int androidMinimumReaderFontPercent = 80;
+	const int androidMaximumReaderFontPercent = 360;
+
 	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
 	readonly ISyncService syncServiceInstance = syncService;
@@ -55,6 +64,8 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			var width = await GetWidthAsync(settings);
 			dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');"));
 		}
+
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("refreshReaderLayout('settings');"));
 
 		dispatcher.Dispatch(() =>
 		{
@@ -354,22 +365,19 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		if (!string.IsNullOrEmpty(settings.FontFamily))
 		{
+			var fontFamilyValue = JsonSerializer.Serialize(ToReaderFontFamilyValue(settings.FontFamily));
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')"));
-			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', '{settings.FontFamily}')"));
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', {fontFamilyValue})"));
 		}
 		else
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontOverride')"));
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontFamily')"));
 		}
-		if (settings.FontSize > 0)
-		{
-			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{settings.FontSize * 10}%')"));
-		}
-		else
-		{
-			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontSize')"));
-		}
+
+		var normalizedFontSize = GetNormalizedReaderFontSize(settings.FontSize);
+		var fontPercent = ToReaderFontPercent(normalizedFontSize, OperatingSystem.IsAndroid());
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{fontPercent}')"));
 	}
 
 	/// <summary>
@@ -383,13 +391,55 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	async Task<int> GetWidthAsync(Settings settings)
 	{
 		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getWidth()"));
-		var fontSize = settings.FontSize > 0 ? settings.FontSize * 10 : 30;
+		var fontSize = GetNormalizedReaderFontSize(settings.FontSize);
 
 		if (settings.SupportMultipleColumns)
 		{
 			return (Convert.ToInt32(result) / 3 - fontSize);
 		}
 		return (Convert.ToInt32(result) - fontSize);
+	}
+
+	static int GetNormalizedReaderFontSize(int fontSize)
+	{
+		if (fontSize <= 0)
+		{
+			return defaultReaderFontSize;
+		}
+
+		return Math.Clamp(fontSize, minimumReaderFontSize, maximumReaderFontSize);
+	}
+
+	static string ToReaderFontFamilyValue(string fontFamily)
+	{
+		var sanitized = fontFamily.Trim();
+		if (string.IsNullOrEmpty(sanitized))
+		{
+			return string.Empty;
+		}
+
+		var escapedFamily = sanitized.Replace("\\", "\\\\", StringComparison.Ordinal)
+			.Replace("\"", "\\\"", StringComparison.Ordinal);
+
+		return sanitized switch
+		{
+			"Arial" or "Verdana" or "Tahoma" or "Trebuchet MS" or "Comic Sans MS" or "Helvetica" => $"\"{escapedFamily}\", sans-serif",
+			"Courier New" => $"\"{escapedFamily}\", monospace",
+			_ => $"\"{escapedFamily}\", serif"
+		};
+	}
+
+	static string ToReaderFontPercent(int fontSize, bool isAndroid)
+	{
+		var normalizedFontSize = GetNormalizedReaderFontSize(fontSize);
+		var scalePercent = isAndroid
+			? normalizedFontSize * androidReaderFontPercentPerStep
+			: (int)Math.Round(normalizedFontSize / (double)defaultReaderFontSize * 100d, MidpointRounding.AwayFromZero);
+
+		var clampedScale = isAndroid
+			? Math.Clamp(scalePercent, androidMinimumReaderFontPercent, androidMaximumReaderFontPercent)
+			: Math.Clamp(scalePercent, minimumReaderFontPercent, maximumReaderFontPercent);
+		return $"{clampedScale}%";
 	}
 
 	async Task SaveProgressAsync(Book book)

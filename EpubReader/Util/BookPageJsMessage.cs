@@ -12,6 +12,7 @@ using System.Text.Json;
 public sealed class BookPageJsMessage
 {
 	public string Action { get; init; } = string.Empty;
+	public string RawJson { get; init; } = string.Empty;
 
 	public string? Href { get; init; }
 
@@ -22,6 +23,7 @@ public sealed class BookPageJsMessage
 	public bool? Enabled { get; init; }
 
 	public string? Message { get; init; }
+	public string? Reason { get; init; }
 
 	public static bool TryParse(string json, [NotNullWhen(true)] out BookPageJsMessage? message)
 	{
@@ -51,12 +53,14 @@ public sealed class BookPageJsMessage
 			message = new BookPageJsMessage
 			{
 				Action = actionElem.GetString() ?? string.Empty,
+				RawJson = json,
 				Href = href,
 				Position = GetInt32Property(root, "position"),
 				ChapterIndex = GetInt32Property(root, "chapterIndex"),
 				Seconds = GetDoubleProperty(root, "seconds"),
 				Enabled = GetBoolProperty(root, "enabled"),
 				Message = GetStringProperty(root, "message"),
+				Reason = GetStringProperty(root, "reason"),
 			};
 			return true;
 		}
@@ -106,6 +110,7 @@ public sealed class BookPageJsMessage
 			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
 			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
 			"mediaoverlayseek" => Seconds.HasValue ? $"https://runcsharp.mediaoverlayseek?{Seconds.Value.ToString(CultureInfo.InvariantCulture)}" : null,
+			"layoutoverflow" => $"https://runcsharp.layoutoverflow?{Uri.EscapeDataString(RawJson)}",
 			_ => null,
 		};
 	}

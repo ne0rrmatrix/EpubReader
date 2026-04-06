@@ -12,6 +12,10 @@ namespace EpubReader.Views;
 /// when settings are changed.</remarks>
 public partial class SettingsPage : Popup<bool>
 {
+	const int defaultReaderFontSize = 16;
+	const int minimumReaderFontSize = 8;
+	const int maximumReaderFontSize = 36;
+
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
@@ -47,13 +51,13 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("ValueChangedEventArgs is null, cannot change font size.");
 			return;
 		}
-		if ((int)e.NewValue == 0 || settings is null)
+		if (settings is null)
 		{
 			return;
 		}
-		settings.FontSize = (int)e.NewValue;
+		settings.FontSize = NormalizeFontSize((int)Math.Round(e.NewValue, MidpointRounding.AwayFromZero));
 		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.FontSize));
 	}
 
 	/// <summary>
@@ -73,7 +77,7 @@ public partial class SettingsPage : Popup<bool>
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Reset));
 		logger.Info("Settings removed");
 	}
 
@@ -103,7 +107,7 @@ public partial class SettingsPage : Popup<bool>
 		settings.ColorScheme = scheme.Name;
 		logger.Info($"Changing color scheme to: {scheme.Name}");
 		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Theme));
 	}
 
 	async void ThemePreview_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
@@ -152,7 +156,7 @@ public partial class SettingsPage : Popup<bool>
 		settings.FontFamily = family;
 		logger.Info($"Chaging Font to: {family}");
 		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.FontFamily));
 
 		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
 		{
@@ -198,12 +202,19 @@ public partial class SettingsPage : Popup<bool>
 		}
 		settings.SupportMultipleColumns = switchControl.IsToggled;
 		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Layout));
 	}
 
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		settings = await db.GetSettings() ?? new();
+		var normalizedFontSize = NormalizeFontSize(settings.FontSize);
+		if (settings.FontSize != normalizedFontSize)
+		{
+			settings.FontSize = normalizedFontSize;
+			await db.SaveSettings(settings);
+		}
+
 		FontSizeSlider.Value = settings.FontSize;
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
@@ -242,6 +253,16 @@ public partial class SettingsPage : Popup<bool>
 			name = Path.GetFileNameWithoutExtension(name);
 		}
 		return name;
+	}
+
+	static int NormalizeFontSize(int fontSize)
+	{
+		if (fontSize <= 0)
+		{
+			return defaultReaderFontSize;
+		}
+
+		return Math.Clamp(fontSize, minimumReaderFontSize, maximumReaderFontSize);
 	}
 
 	async void OnCloseClicked(object? sender, EventArgs? e)

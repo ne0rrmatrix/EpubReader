@@ -31,6 +31,7 @@ public static partial class EbookService
 		"ReadiumCSS-default.css",
 		"ReadiumCSS-before.css",
 		"ReadiumCSS-after.css",
+		"ReaderFonts.css",
 		"index.html",
 		"favicon.ico",
 		"EpubText.css",
@@ -138,6 +139,7 @@ public static partial class EbookService
 
 		// ReadiumCSS must bracket the book's own CSS so properties cascade correctly.
 		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReadiumCSS-before.css\"/>");
+		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReaderFonts.css\"/>");
 		foreach (var css in book.Css)
 		{
 			sb.AppendLine($"<link rel=\"stylesheet\" href=\"{css.FileName}\"/>");
@@ -741,6 +743,7 @@ public static partial class EbookService
 
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
+		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReaderFonts.css");
 		htmlFile = HtmlAgilityPackExtensions.AddCssLinks(htmlFile, cssFiles);
 
 		if (cssFiles.Count == 0)
