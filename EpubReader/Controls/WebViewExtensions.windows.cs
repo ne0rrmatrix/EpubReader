@@ -15,6 +15,10 @@ public static partial class WebViewExtensions
 {
 	static readonly StreamExtensions streamExtensions = Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	static IWebViewHandler? webViewHandler;
+	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
+	{
+		return Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
+	}
 
 	/// <summary>
 	/// Initializes the WebView handler and sets up the CoreWebView2 initialization event.
@@ -47,13 +51,13 @@ public static partial class WebViewExtensions
 	static void MessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
 	{
 		var rawString = args.TryGetWebMessageAsString();
-		var json = Base64Decoder.DecodeFromBase64(rawString);
-		if (json is null)
+		var dispatcher = GetBridgeDispatcher();
+		if (dispatcher is null)
 		{
-			System.Diagnostics.Trace.TraceWarning("WebView2 MessageReceived failed to decode base64 message");
+			System.Diagnostics.Trace.TraceWarning("WebView2 MessageReceived could not resolve bridge dispatcher");
 			return;
 		}
-		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
+		dispatcher.Dispatch(rawString, JavaScriptBridgeSource.Windows, isBase64Encoded: true);
 	}
 
 	/// <summary>

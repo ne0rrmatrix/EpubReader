@@ -112,7 +112,12 @@ public partial class SettingsPageViewModel : BaseViewModel
 			AuthStatusText = string.IsNullOrWhiteSpace(userEmail)
 				? "Signed in - Cloud sync enabled"
 				: $"Signed in as:\n{userEmail}";
+			return;
 		}
+
+		AuthStatusText = isLocal
+			? "Offline mode - Sign in from Settings to enable cloud sync"
+			: "Not signed in - Sign in from Settings to enable cloud sync";
 	}
 
 	[RelayCommand]

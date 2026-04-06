@@ -6,6 +6,11 @@ namespace EpubReader.Controls;
 
 public class JSBridge : Java.Lang.Object
 {
+	static IJavaScriptBridgeDispatcher? GetDispatcher()
+	{
+		return Microsoft.Maui.Controls.Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
+	}
+
 	[JavascriptInterface]
 	[Export("sendMessageToCSharp")] // This is the name JavaScript will use
 	public static void SendMessageToCSharp(string message)
@@ -15,12 +20,13 @@ public class JSBridge : Java.Lang.Object
 			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 			return;
 		}
-		var json = Base64Decoder.DecodeFromBase64(message);
-		if (json is null)
+		var dispatcher = GetDispatcher();
+		if (dispatcher is null)
 		{
-			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage failed to decode base64 message");
+			System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage could not resolve bridge dispatcher");
 			return;
 		}
-		Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json)));
+
+		dispatcher.Dispatch(message, JavaScriptBridgeSource.Android, isBase64Encoded: true);
 	}
 }

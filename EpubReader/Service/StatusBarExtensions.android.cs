@@ -22,7 +22,8 @@ public static partial class StatusBarExtensions
 	/// Sets the visibility of the status bars on Android devices.
 	/// </summary>
 	/// <remarks>This method is effective on Android versions 26 and above. On Android version 34 and above, it uses
-	/// the <see cref="WindowInsetsControllerCompat"/> to manage the visibility of system bars.</remarks>
+	/// the <see cref="WindowInsetsControllerCompat"/> to manage the visibility of system bars. Callers must invoke this
+	/// method on the UI thread.</remarks>
 	/// <param name="hidden"><see langword="true"/> to hide the status bars; otherwise, <see langword="false"/> to show them.</param>
 	public static void SetStatusBarsHidden(bool hidden)
 	{

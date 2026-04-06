@@ -142,6 +142,11 @@ public static class MauiProgram
 		// Register services
 		builder.Services.AddSingleton<IDb, Db>();
 		builder.Services.AddSingleton<AuthenticationService>();
+		builder.Services.AddSingleton<ILibraryStateService, LibraryStateService>();
+		builder.Services.AddSingleton<IImportStateService, ImportStateService>();
+		builder.Services.AddSingleton<IReaderBridgeCoordinator, ReaderBridgeCoordinator>();
+		builder.Services.AddSingleton<IJavaScriptBridgeDispatcher, JavaScriptBridgeDispatcher>();
+		builder.Services.AddSingleton<IReaderSettingsStateService, ReaderSettingsStateService>();
 		builder.Services.AddSingleton<ISyncService, FirebaseSyncService>();
 		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
 		LoggerFactory.Initialize(config);
@@ -151,6 +156,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton<AppShell>();
 		builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
+		builder.Services.AddTransient<FolderDialogPageViewModel>();
+		builder.Services.AddTransient<FolderDialogePage>();
 
 		// Register Popup pages and their view models
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();

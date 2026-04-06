@@ -142,10 +142,13 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[RelayCommand]
 	public void Press()
 	{
+		Dispatcher.Dispatch(() =>
+		{
 #if ANDROID
-		Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
+			Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
 #endif
-		IsNavMenuVisible = !IsNavMenuVisible;
-		Dispatcher.Dispatch(() => Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible));
+			IsNavMenuVisible = !IsNavMenuVisible;
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		});
 	}
 }

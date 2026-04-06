@@ -30,7 +30,8 @@ public partial class CalibreZeroConf
 
 		try
 		{
-			MainThread.BeginInvokeOnMainThread(async () =>
+			var dispatcher = Application.Current?.Dispatcher ?? throw new InvalidOperationException("Application dispatcher is unavailable.");
+			await dispatcher.DispatchAsync(async () =>
 			{
 				ResolveOptions resolveOptions = new("_calibre._tcp.local.")
 				{

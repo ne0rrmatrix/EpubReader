@@ -10,11 +10,15 @@ public partial class ProcessEpubFiles : BaseViewModel
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(ProcessEpubFiles));
-	public readonly IFolderPicker FolderPicker = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IFolderPicker>()
-			?? throw new InvalidOperationException("IFolderPicker service not available");
+	readonly IImportStateService importStateService;
+	readonly ILibraryStateService libraryStateService;
+	public readonly IFolderPicker FolderPicker;
 	public readonly FilePickerFileType CustomFileType = CreateCustomFileType();
-	public ProcessEpubFiles()
+	public ProcessEpubFiles(IFolderPicker folderPicker, IImportStateService importStateService, ILibraryStateService libraryStateService)
 	{
+		FolderPicker = folderPicker;
+		this.importStateService = importStateService;
+		this.libraryStateService = libraryStateService;
 	}
 
 	/// <summary>
@@ -77,12 +81,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
 					return;
 				}
-				WeakReferenceMessenger.Default.Send(new FolderMessage(new FolderInfo
-				{
-					Title = ebook.Title,
-					MaxCount = maxCount ?? 0,
-					Count = count,
-				}));
+				importStateService.ReportProgress(ebook.Title, count, maxCount ?? 0);
 				logger.Info($"Processing file {Path.GetFileName(filePath)} ({count}/{maxCount})");
 				stream.Seek(0, SeekOrigin.Begin);
 				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken).ConfigureAwait(false);
@@ -115,8 +114,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 			if (ValidateBookFiles(ebook))
 			{
-				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
-				WeakReferenceMessenger.Default.Send(new BookMessage(ebook));
+				await libraryStateService.AddBookAsync(ebook, cancellationToken).ConfigureAwait(false);
 				logger.Info($"Book saved successfully: {ebook.Title}");
 				return;
 			}
@@ -200,8 +198,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 	/// <returns>True if the book already exists in the library, false otherwise.</returns>
 	public async Task<bool> IsBookAlreadyInLibrary(Book ebook)
 	{
-		var books = await db.GetAllBooks();
-		return books.Any(x => string.Equals(x.Title, ebook.Title, StringComparison.OrdinalIgnoreCase));
+		return await libraryStateService.ContainsAsync(ebook);
 	}
 
 	/// <summary>
@@ -225,8 +222,7 @@ public partial class ProcessEpubFiles : BaseViewModel
 
 			if (ValidateBookFiles(ebook))
 			{
-				await db.SaveBookData(ebook, cancellationToken).ConfigureAwait(false);
-				WeakReferenceMessenger.Default.Send(new BookMessage(ebook));
+				await libraryStateService.AddBookAsync(ebook, cancellationToken).ConfigureAwait(false);
 				await ShowInfoToastAsync("Book added to library");
 				logger.Info($"Book added to library: {ebook.Title}");
 			}

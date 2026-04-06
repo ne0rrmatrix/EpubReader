@@ -51,6 +51,13 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			var token = CancellationTokenSource.Token;
 			token.ThrowIfCancellationRequested();
 
+			if (Book.Chapters.Count == 0)
+			{
+				Logger.Error($"Error opening ebook: no readable chapters found for '{Book.Title}'.");
+				await ShowErrorToastAsync("Error opening ebook. No readable chapters were found.");
+				return;
+			}
+
 			if (Book.Id != Guid.Empty)
 			{
 				Book.LastOpenedDate = DateTime.UtcNow;

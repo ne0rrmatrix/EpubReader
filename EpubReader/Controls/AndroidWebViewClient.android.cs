@@ -19,6 +19,10 @@ class CustomWebViewClient : WebViewClient
 
 	readonly CancellationTokenSource cancellationTokenSource = new();
 	static readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
+	static IJavaScriptBridgeDispatcher? GetBridgeDispatcher()
+	{
+		return Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IJavaScriptBridgeDispatcher>();
+	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CustomWebViewClient"/> class with the specified web view handler.
@@ -120,7 +124,7 @@ class CustomWebViewClient : WebViewClient
 	/// <summary>
 	/// Determines whether the URL loading should be overridden based on the specified request.
 	/// </summary>
-	/// <remarks>This method checks the URL of the request and sends a <see cref="JavaScriptMessage"/> if the URL
+	/// <remarks>This method checks the URL of the request and forwards bridge-compatible URLs into the shared reader bridge dispatcher.
 	/// contains query parameters or a specific keyword. If the request or URL is null, the method returns <see
 	/// langword="true"/> to indicate that the loading should be overridden.</remarks>
 	/// <param name="view">The <see cref="global::Android.Webkit.WebView"/> that is requesting the URL.</param>
@@ -136,7 +140,7 @@ class CustomWebViewClient : WebViewClient
 		}
 		if (url.Length > 1 || path.Contains(csharp))
 		{
-			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
+			GetBridgeDispatcher()?.Dispatch(path, JavaScriptBridgeSource.Android);
 			return true;
 		}
 		return false;

@@ -37,6 +37,11 @@ public partial class BookPage : ContentPage, IDisposable
 	int sliderTotalPages = 0;
 	bool isSliderActive = false;
 	CancellationTokenSource? settingsRefreshCancellationTokenSource;
+	readonly IReaderSettingsStateService readerSettingsStateService;
+	readonly IReaderBridgeCoordinator readerBridgeCoordinator;
+	bool isSettingsStateSubscribed;
+	bool isReaderBridgeSubscribed;
+	bool invalidBookStateHandled;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
@@ -47,26 +52,33 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <param name="db">The database interface used for data operations within the page.</param>
 	/// <param name="syncService">The sync service for managing reading progress synchronization.</param>
 	/// <param name="audioManager">The cross-platform audio manager used for narrated overlays.</param>
-	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService, IAudioManager audioManager)
+	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService, IAudioManager audioManager, IReaderSettingsStateService readerSettingsStateService, IReaderBridgeCoordinator readerBridgeCoordinator)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		this.syncService = syncService;
 		this.audioManager = audioManager;
+		this.readerSettingsStateService = readerSettingsStateService;
+		this.readerBridgeCoordinator = readerBridgeCoordinator;
 		webViewHelper = new(webView, db, syncService);
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 		NativeLoadingOverlay.IsVisible = true;
 
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
-		WeakReferenceMessenger.Default.Register<JavaScriptMessage>(this, async (r, m) => await HandleJavascriptAsync(m.Value));
-		WeakReferenceMessenger.Default.Register<SettingsMessage>(this, async (r, m) => await HandleSettingsChangedAsync(m));
 	}
 
 	protected override async void OnAppearing()
 	{
 		base.OnAppearing();
+		if (!await EnsureReadableBookStateAsync())
+		{
+			return;
+		}
+
+		SubscribeToSettingsState();
+		SubscribeToReaderBridge();
 		await UpdateSyncToolbarAsync();
 		if (!loadSequenceStarted)
 		{
@@ -144,7 +156,8 @@ public partial class BookPage : ContentPage, IDisposable
 				Trace.TraceWarning($"Failed saving progress on page disappear: {ex.Message}");
 			}
 
-			WeakReferenceMessenger.Default.UnregisterAll(this);
+			UnsubscribeFromSettingsState();
+			UnsubscribeFromReaderBridge();
 			var currentShell = Shell.Current;
 			if (currentShell?.ToolbarItems is not null && currentShell.ToolbarItems.Count > 0)
 			{
@@ -171,7 +184,61 @@ public partial class BookPage : ContentPage, IDisposable
 		base.OnDisappearing();
 	}
 
-	async Task HandleSettingsChangedAsync(SettingsMessage message)
+	void SubscribeToReaderBridge()
+	{
+		if (isReaderBridgeSubscribed)
+		{
+			return;
+		}
+
+		readerBridgeCoordinator.MessageReceived += ReaderBridgeCoordinator_MessageReceived;
+		isReaderBridgeSubscribed = true;
+	}
+
+	void UnsubscribeFromReaderBridge()
+	{
+		if (!isReaderBridgeSubscribed)
+		{
+			return;
+		}
+
+		readerBridgeCoordinator.MessageReceived -= ReaderBridgeCoordinator_MessageReceived;
+		isReaderBridgeSubscribed = false;
+	}
+
+	async void ReaderBridgeCoordinator_MessageReceived(object? sender, ReaderBridgeMessageEventArgs e)
+	{
+		await Dispatcher.DispatchAsync(async () => await HandleJavascriptAsync(e.Payload));
+	}
+
+	void SubscribeToSettingsState()
+	{
+		if (isSettingsStateSubscribed)
+		{
+			return;
+		}
+
+		readerSettingsStateService.SettingsChanged += ReaderSettingsStateService_SettingsChanged;
+		isSettingsStateSubscribed = true;
+	}
+
+	void UnsubscribeFromSettingsState()
+	{
+		if (!isSettingsStateSubscribed)
+		{
+			return;
+		}
+
+		readerSettingsStateService.SettingsChanged -= ReaderSettingsStateService_SettingsChanged;
+		isSettingsStateSubscribed = false;
+	}
+
+	async void ReaderSettingsStateService_SettingsChanged(object? sender, ReaderSettingsChangedEventArgs e)
+	{
+		await HandleSettingsChangedAsync(e);
+	}
+
+	async Task HandleSettingsChangedAsync(ReaderSettingsChangedEventArgs message)
 	{
 		await webViewHelper.OnSettingsClickedAsync();
 		await UpdateUiAppearance();
@@ -181,15 +248,15 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 
-		SchedulePaginationRefresh();
+		await SchedulePaginationRefreshAsync();
 	}
 
-	void SchedulePaginationRefresh()
+	async Task SchedulePaginationRefreshAsync()
 	{
 		CancelPendingSettingsRefresh();
 		settingsRefreshCancellationTokenSource = new CancellationTokenSource();
 		var token = settingsRefreshCancellationTokenSource.Token;
-		_ = DebouncedRefreshPaginationAsync(token);
+		await DebouncedRefreshPaginationAsync(token);
 	}
 
 	void CancelPendingSettingsRefresh()
@@ -287,6 +354,11 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <param name="e">The event data.</param>
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
+		if (!HasReadableChapters())
+		{
+			return;
+		}
+
 		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
      pageSlider.Minimum = 0;
 		pageSlider.Maximum = 0;
@@ -303,21 +375,6 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <returns></returns>
 	async Task HandleJavascriptAsync(string url)
 	{
-		if (!string.IsNullOrEmpty(url) && url.TrimStart().StartsWith('{'))
-		{
-			if (BookPageJsMessage.TryParse(url, out var msg))
-			{
-				var resolved = msg.ToRuncsharpUrl();
-				if (!string.IsNullOrEmpty(resolved))
-				{
-					url = resolved;
-				}
-			}
-			else
-			{
-				Trace.TraceWarning("Failed parsing JSON message from JS bridge");
-			}
-		}
 		await TryHandleInternalLinkAsync(url);
 		await BookPage.TryHandleExternalLinkAsync(url);
 		var methodName = GetMethodNameFromUrl(url);
@@ -803,6 +860,11 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task LoadChapterContentAsync()
 	{
+		if (!await EnsureReadableBookStateAsync())
+		{
+			return;
+		}
+
 		Trace.TraceInformation($"[PageRestore] LoadChapterContentAsync: book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		await EnsureMediaOverlayManagerInitialized();
 		await NotifyMediaOverlayChapterRequestedAsync();
@@ -823,6 +885,12 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <returns>A formatted string with synthetic page information.</returns>
 	async Task<string> GetCurrentPageInfoAsync()
 	{
+		if (!HasReadableChapters())
+		{
+			Trace.TraceWarning("[PageRestore] GetCurrentPageInfoAsync: book has no readable chapters.");
+			return string.Empty;
+		}
+
 		// Guard: combined.html sections are not available until the pageload JS event fires and
 		// MarkCombinedHtmlLoaded() is called. Querying JS before that returns stale defaults
 		// (Ch=0, Pg=0) which would corrupt the restored book position.
@@ -844,6 +912,32 @@ public partial class BookPage : ContentPage, IDisposable
 		Trace.TraceInformation($"[PageRestore] GetCurrentPageInfoAsync: calling ApplyPaginationInfo (book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} → will become Ch={pagination.CurrentSectionIndex} Pg={pagination.CurrentPage})");
 		ApplyPaginationInfo(pagination);
 		return WebViewHelper.FormatPageLabel(book, pagination.CurrentGlobalPage, pagination.TotalPages);
+	}
+
+	bool HasReadableChapters()
+	{
+		return book.Chapters.Count > 0 && book.CurrentChapter >= 0 && book.CurrentChapter < book.Chapters.Count;
+	}
+
+	async Task<bool> EnsureReadableBookStateAsync()
+	{
+		if (HasReadableChapters())
+		{
+			return true;
+		}
+
+		Trace.TraceError($"Invalid book state: CurrentChapter={book.CurrentChapter}, ChapterCount={book.Chapters.Count}, Title='{book.Title}'.");
+		NativeLoadingOverlay.IsVisible = false;
+
+		if (invalidBookStateHandled)
+		{
+			return false;
+		}
+
+		invalidBookStateHandled = true;
+		await ViewModel.ShowErrorToastAsync("Error opening ebook. No readable chapters were found.");
+		await Dispatcher.DispatchAsync(() => Shell.Current.GoToAsync(".."));
+		return false;
 	}
 
 	async Task UpdateUiAppearance()
@@ -1504,7 +1598,8 @@ public partial class BookPage : ContentPage, IDisposable
 
 		if (disposing)
 		{
-			WeakReferenceMessenger.Default.UnregisterAll(this);
+			UnsubscribeFromSettingsState();
+			UnsubscribeFromReaderBridge();
 			CancelPendingSettingsRefresh();
 
 			webView.Navigated -= webView_Navigated;

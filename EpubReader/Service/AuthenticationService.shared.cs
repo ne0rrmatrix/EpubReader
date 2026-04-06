@@ -66,6 +66,25 @@ public partial class AuthenticationService : IDisposable
 		return Task.FromResult(authMode == authModeLocal);
 	}
 
+	public static async Task SetLocalOnlyModeAsync(CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		Preferences.Set(authModeKey, authModeLocal);
+		SecureStorage.Remove(userEmailKey);
+		SecureStorage.Remove(authTokenKey);
+		SecureStorage.Remove(refreshTokenKey);
+		SecureStorage.Remove(authTokenExpirationKey);
+
+		var userId = await SecureStorage.GetAsync(userIdKey);
+		if (string.IsNullOrWhiteSpace(userId) || !userId.StartsWith("local-", StringComparison.Ordinal))
+		{
+			await SecureStorage.SetAsync(userIdKey, $"local-{Guid.NewGuid():N}");
+		}
+
+		Trace.TraceInformation("Local-only mode enabled");
+	}
+
 	public async Task<string> SignInWithGoogleAsync(CancellationToken cancellationToken = default)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);

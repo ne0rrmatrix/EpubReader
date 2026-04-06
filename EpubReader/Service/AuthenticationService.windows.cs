@@ -116,7 +116,7 @@ public partial class AuthenticationService
 		return firebaseSession;
 	}
 
-	static async Task<string> GetStoredAuthTokenAsync(CancellationToken cancellationToken)
+	internal static async Task<string> GetStoredAuthTokenAsync(CancellationToken cancellationToken)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
@@ -247,25 +247,6 @@ public partial class AuthenticationService
 	{
 		// Clear WebView2 cache and cookies to force fresh Google login
 		await EpubReader.Platforms.Windows.OAuthWebViewHandler.ClearWebViewDataAsync();
-	}
-
-	public static async Task SetLocalOnlyModeAsync(CancellationToken cancellationToken)
-	{
-		cancellationToken.ThrowIfCancellationRequested();
-
-		Preferences.Set(authModeKey, authModeLocal);
-		SecureStorage.Remove(userEmailKey);
-		SecureStorage.Remove(authTokenKey);
-		SecureStorage.Remove(refreshTokenKey);
-		SecureStorage.Remove(authTokenExpirationKey);
-
-		var userId = await SecureStorage.GetAsync(userIdKey);
-		if (string.IsNullOrWhiteSpace(userId) || !userId.StartsWith("local-", StringComparison.Ordinal))
-		{
-			await SecureStorage.SetAsync(userIdKey, $"local-{Guid.NewGuid():N}");
-		}
-
-		Trace.TraceInformation("Windows local-only mode enabled");
 	}
 
 	sealed class FirebaseGoogleSignInRequest

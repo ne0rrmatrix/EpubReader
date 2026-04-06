@@ -73,6 +73,7 @@ public partial class SettingsPage : Popup<bool>
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
 	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly IReaderSettingsStateService settingsStateService = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IReaderSettingsStateService>() ?? throw new InvalidOperationException();
 	Settings? settings;
 	const string deleteLocalDataTitle = "Delete Local Data";
 	const string exportDataTitle = "Export Data";
@@ -114,8 +115,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 		settings.FontSize = NormalizeFontSize((int)Math.Round(e.NewValue, MidpointRounding.AwayFromZero));
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.FontSize));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontSize);
 	}
 
 	/// <summary>
@@ -128,9 +128,7 @@ public partial class SettingsPage : Popup<bool>
 	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
 	async void RemoveAllSettings(object? sender, EventArgs? e)
 	{
-		await db.RemoveAllSettings();
-		settings = new Settings();
-		await db.SaveSettings(settings);
+		settings = await settingsStateService.ResetAsync();
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
@@ -141,7 +139,6 @@ public partial class SettingsPage : Popup<bool>
 		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
 		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
 		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Reset));
 		logger.Info("Settings removed");
 	}
 
@@ -165,8 +162,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.LineSpacing = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.LineSpacing));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.LineSpacing);
 	}
 
 	async void TextAlignmentPicker_SelectedIndexChanged(object? sender, EventArgs? e)
@@ -189,8 +185,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.TextAlignment = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.TextAlignment));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.TextAlignment);
 	}
 
 	async void ParagraphSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
@@ -213,8 +208,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.ParagraphSpacing = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.ParagraphSpacing));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.ParagraphSpacing);
 	}
 
 	async void HyphenationPicker_SelectedIndexChanged(object? sender, EventArgs? e)
@@ -237,8 +231,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.BodyHyphens = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Hyphenation));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Hyphenation);
 	}
 
 	async void LetterSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
@@ -261,8 +254,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.LetterSpacing = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.LetterSpacing));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.LetterSpacing);
 	}
 
 	async void WordSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
@@ -290,8 +282,7 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		settings.WordSpacing = selectedValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.WordSpacing));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.WordSpacing);
 	}
 
 	/// <summary>
@@ -319,8 +310,7 @@ public partial class SettingsPage : Popup<bool>
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
 		logger.Info($"Changing color scheme to: {scheme.Name}");
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Theme));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Theme);
 	}
 
 	async void ThemePreview_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
@@ -368,8 +358,7 @@ public partial class SettingsPage : Popup<bool>
 		var family = SanitizeFontFamily(font.FontFamily);
 		settings.FontFamily = family;
 		logger.Info($"Chaging Font to: {family}");
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.FontFamily));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontFamily);
 
 		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
 		{
@@ -412,13 +401,12 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 		settings.SupportMultipleColumns = switchControl.IsToggled;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Layout));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Layout);
 	}
 
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
-		settings = await db.GetSettings() ?? new();
+		settings = await settingsStateService.GetCurrentAsync();
 		var normalizedFontSize = NormalizeFontSize(settings.FontSize);
 		var normalizedLineSpacing = NormalizeLineSpacing(settings.LineSpacing);
 		var normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
@@ -442,6 +430,7 @@ public partial class SettingsPage : Popup<bool>
 			settings.LetterSpacing = normalizedLetterSpacing;
 			settings.WordSpacing = normalizedWordSpacing;
 			await db.SaveSettings(settings);
+			settings = await settingsStateService.GetCurrentAsync();
 		}
 
 		FontSizeSlider.Value = settings.FontSize;
@@ -766,6 +755,7 @@ public partial class SettingsPage : Popup<bool>
 			}
 			await db.RemoveAllBooks();
 			await db.RemoveAllSettings();
+			await settingsStateService.GetCurrentAsync();
 			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Local data deleted.", "OK");
 		}
 		catch (Exception ex)

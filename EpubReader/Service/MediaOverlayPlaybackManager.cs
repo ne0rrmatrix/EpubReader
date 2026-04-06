@@ -64,7 +64,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		this.viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
 		this.webView = webView ?? throw new ArgumentNullException(nameof(webView));
-		_ = audioManager ?? throw new ArgumentNullException(nameof(audioManager));
+		ArgumentNullException.ThrowIfNull(audioManager);
 		book = viewModel.Book ?? new Book();
 		dispatcher = Application.Current?.Dispatcher ?? throw new InvalidOperationException("Dispatcher unavailable.");
 		UpdateBook(book);

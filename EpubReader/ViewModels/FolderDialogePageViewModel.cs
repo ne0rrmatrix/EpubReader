@@ -2,7 +2,7 @@
 
 public partial class FolderDialogPageViewModel : BaseViewModel
 {
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
+	readonly IImportStateService importStateService;
 	[ObservableProperty]
 	public partial string Text { get; set; } = "Please wait...";
 
@@ -38,15 +38,26 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial double Progress { get; set; } = 0.0;
 
-	public FolderDialogPageViewModel()
+	public FolderDialogPageViewModel(IImportStateService importStateService)
 	{
-		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => {
-			var info = m.Value;
-			Text = $"{info.Title}";
-			CounterText = $"{info.Count}/{info.MaxCount}";
-			Count = info.Count;
-			MaxCount = info.MaxCount;
-		});
+		this.importStateService = importStateService;
+		this.importStateService.PropertyChanged += ImportStateService_PropertyChanged;
+		SyncFromImportState();
+	}
+
+	void ImportStateService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+	{
+		SyncFromImportState();
+	}
+
+	void SyncFromImportState()
+	{
+		Text = importStateService.Title;
+		CounterText = importStateService.CounterText;
+		Count = importStateService.Count;
+		MaxCount = importStateService.MaxCount;
+		ProgressPercent = importStateService.ProgressPercent;
+		Progress = importStateService.Progress;
 	}
 
 	partial void OnCountChanged(int value)
@@ -89,7 +100,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	{
 		if (disposing)
 		{
-			processEpubFiles?.Dispose();
+			importStateService.PropertyChanged -= ImportStateService_PropertyChanged;
 		}
 		base.Dispose(disposing);
 	}
@@ -101,9 +112,9 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	/// cref="CancellationTokenSource"/>. After cancellation, it sets the visibility state to indicate that the operation
 	/// is no longer active.</remarks>
 	[RelayCommand]
-	static void Cancel()
+	void Cancel()
 	{
-		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
+		importStateService.Cancel();
 	}
 
 	/// <summary>
@@ -114,6 +125,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	/// proper cleanup.</remarks>
 	public void OnClose()
 	{
-		WeakReferenceMessenger.Default.UnregisterAll(this);
+		importStateService.PropertyChanged -= ImportStateService_PropertyChanged;
 	}
 }
