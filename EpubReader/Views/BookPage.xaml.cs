@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using EpubReader.Extensions;
 using Plugin.Maui.Audio;
 
 namespace EpubReader.Views;

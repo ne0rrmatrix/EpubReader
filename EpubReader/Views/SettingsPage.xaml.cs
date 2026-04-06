@@ -24,7 +24,6 @@ public partial class SettingsPage : Popup<bool>
 	const string defaultReaderWordSpacing = "";
 	const string publisherDefaultOptionLabel = "Publisher Default";
 	const string normalOptionLabel = "Normal";
-	const string wordSpacingPickerName = "WordSpacingPicker";
 	static readonly IReadOnlyList<(string Label, string Value)> lineSpacingOptions =
 	[
 		("Tight", "1.25"),
@@ -77,10 +76,6 @@ public partial class SettingsPage : Popup<bool>
 	Settings? settings;
 	const string deleteLocalDataTitle = "Delete Local Data";
 	const string exportDataTitle = "Export Data";
-#pragma warning disable S2325 // UI lookup helper intentionally uses the current popup instance.
-	Picker? GetWordSpacingPickerControl() => CurrentPage.FindByName<Picker>(wordSpacingPickerName);
-#pragma warning restore S2325
-
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="SettingsPage"/> class with the specified view model and database.
@@ -97,8 +92,7 @@ public partial class SettingsPage : Popup<bool>
 		ParagraphSpacingPicker.ItemsSource = paragraphSpacingOptions.Select(option => option.Label).ToList();
 		HyphenationPicker.ItemsSource = hyphenationOptions.Select(option => option.Label).ToList();
 		LetterSpacingPicker.ItemsSource = letterSpacingOptions.Select(option => option.Label).ToList();
-		var wordSpacingPicker = GetWordSpacingPickerControl();
-		wordSpacingPicker?.ItemsSource = wordSpacingOptions.Select(option => option.Label).ToList();
+		WordSpacingPicker.ItemsSource = wordSpacingOptions.Select(option => option.Label).ToList();
 	}
 
 	/// <summary>
@@ -146,8 +140,7 @@ public partial class SettingsPage : Popup<bool>
 		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
 		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
 		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
-		var wordSpacingPicker = GetWordSpacingPickerControl();
-		wordSpacingPicker?.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
+		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Reset));
 		logger.Info("Settings removed");
 	}
@@ -279,20 +272,18 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("Settings are null, cannot change word spacing.");
 			return;
 		}
-
-		var wordSpacingPicker = GetWordSpacingPickerControl();
-		if (wordSpacingPicker is null)
+		if (WordSpacingPicker is null)
 		{
 			logger.Warn("Word spacing picker is null, cannot change word spacing.");
 			return;
 		}
 
-		if (wordSpacingPicker.SelectedIndex < 0 || wordSpacingPicker.SelectedIndex >= wordSpacingOptions.Count)
+		if (WordSpacingPicker.SelectedIndex < 0 || WordSpacingPicker.SelectedIndex >= wordSpacingOptions.Count)
 		{
 			return;
 		}
 
-		var selectedValue = NormalizeWordSpacing(wordSpacingOptions[wordSpacingPicker.SelectedIndex].Value);
+		var selectedValue = NormalizeWordSpacing(wordSpacingOptions[WordSpacingPicker.SelectedIndex].Value);
 		if (string.Equals(settings.WordSpacing, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -390,12 +381,10 @@ public partial class SettingsPage : Popup<bool>
 		}
 	}
 
-#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
 		stackLayout.Remove(switchControl);
 	}
-#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
 
 	/// <summary>
 	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
@@ -461,11 +450,7 @@ public partial class SettingsPage : Popup<bool>
 		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
 		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
 		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
-		var wordSpacingPicker = GetWordSpacingPickerControl();
-		if (wordSpacingPicker is not null)
-		{
-			wordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
-		}
+		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
