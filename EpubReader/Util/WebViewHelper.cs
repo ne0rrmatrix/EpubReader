@@ -23,6 +23,10 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	const int androidReaderFontPercentPerStep = 10;
 	const int androidMinimumReaderFontPercent = 80;
 	const int androidMaximumReaderFontPercent = 360;
+	const string defaultReaderLineSpacing = "1.5";
+	const string readerTextAlignmentPublisherDefault = "";
+	const string readerParagraphSpacingPublisherDefault = "";
+	const string readerHyphenationPublisherDefault = "";
 
 	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
@@ -57,6 +61,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		var settings = await database.GetSettings() ?? new();
 		await SetColorSchemeAsync(settings);
 		await SetFontDataAsync(settings);
+		await SetLayoutDataAsync(settings);
 		var colCount = settings.SupportMultipleColumns ? "2" : "1";
 		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')"));
 		if (OperatingSystem.IsWindows())
@@ -380,6 +385,41 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{fontPercent}')"));
 	}
 
+	async Task SetLayoutDataAsync(Settings settings)
+	{
+		var normalizedLineSpacing = NormalizeReaderLineSpacing(settings.LineSpacing);
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineHeight','{normalizedLineSpacing}')"));
+
+		var normalizedTextAlignment = NormalizeReaderTextAlignment(settings.TextAlignment);
+		if (string.IsNullOrEmpty(normalizedTextAlignment))
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__textAlign')"));
+		}
+		else
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textAlign','{normalizedTextAlignment}')"));
+		}
+
+		var normalizedParagraphSpacing = NormalizeReaderParagraphSpacing(settings.ParagraphSpacing);
+		if (string.IsNullOrEmpty(normalizedParagraphSpacing))
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__paraSpacing')"));
+		}
+		else
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__paraSpacing','{normalizedParagraphSpacing}')"));
+		}
+
+		var normalizedHyphenation = NormalizeReaderBodyHyphens(settings.BodyHyphens);
+		if (string.IsNullOrEmpty(normalizedHyphenation))
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__bodyHyphens')"));
+			return;
+		}
+
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__bodyHyphens','{normalizedHyphenation}')"));
+	}
+
 	/// <summary>
 	/// Asynchronously retrieves the width of the content and adjusts it based on the specified settings.
 	/// </summary>
@@ -426,6 +466,71 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			"Arial" or "Verdana" or "Tahoma" or "Trebuchet MS" or "Comic Sans MS" or "Helvetica" => $"\"{escapedFamily}\", sans-serif",
 			"Courier New" => $"\"{escapedFamily}\", monospace",
 			_ => $"\"{escapedFamily}\", serif"
+		};
+	}
+
+	static string NormalizeReaderLineSpacing(string? lineSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(lineSpacing))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		var allowedValues = new[] { 1.25d, 1.5d, 1.75d, 2d };
+		var nearest = allowedValues.OrderBy(value => Math.Abs(value - parsedValue)).First();
+		return nearest.ToString("0.##", CultureInfo.InvariantCulture);
+	}
+
+	static string NormalizeReaderTextAlignment(string? textAlignment)
+	{
+		if (string.IsNullOrWhiteSpace(textAlignment))
+		{
+			return readerTextAlignmentPublisherDefault;
+		}
+
+		return textAlignment.Trim().ToLowerInvariant() switch
+		{
+			"left" => "left",
+			"justify" => "justify",
+			_ => readerTextAlignmentPublisherDefault
+		};
+	}
+
+	static string NormalizeReaderParagraphSpacing(string? paragraphSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(paragraphSpacing))
+		{
+			return readerParagraphSpacingPublisherDefault;
+		}
+
+		return paragraphSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0rem" or "0.0" or "0.0rem" => "0",
+			"0.5rem" => "0.5rem",
+			"1rem" => "1rem",
+			"1.5rem" => "1.5rem",
+			_ => readerParagraphSpacingPublisherDefault
+		};
+	}
+
+	static string NormalizeReaderBodyHyphens(string? bodyHyphens)
+	{
+		if (string.IsNullOrWhiteSpace(bodyHyphens))
+		{
+			return readerHyphenationPublisherDefault;
+		}
+
+		return bodyHyphens.Trim().ToLowerInvariant() switch
+		{
+			"auto" => "auto",
+			"manual" => "manual",
+			"none" => "none",
+			_ => readerHyphenationPublisherDefault
 		};
 	}
 

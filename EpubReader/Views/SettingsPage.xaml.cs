@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 
 namespace EpubReader.Views;
@@ -15,6 +16,38 @@ public partial class SettingsPage : Popup<bool>
 	const int defaultReaderFontSize = 16;
 	const int minimumReaderFontSize = 8;
 	const int maximumReaderFontSize = 36;
+	const string defaultReaderLineSpacing = "1.5";
+	const string defaultReaderTextAlignment = "";
+	const string defaultReaderParagraphSpacing = "";
+	const string defaultReaderBodyHyphens = "";
+	static readonly IReadOnlyList<(string Label, string Value)> lineSpacingOptions =
+	[
+		("Tight", "1.25"),
+		("Normal", "1.5"),
+		("Relaxed", "1.75"),
+		("Spacious", "2")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> textAlignmentOptions =
+	[
+		("Publisher Default", ""),
+		("Left", "left"),
+		("Justified", "justify")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> paragraphSpacingOptions =
+	[
+		("Publisher Default", ""),
+		("Compact", "0"),
+		("Normal", "0.5rem"),
+		("Relaxed", "1rem"),
+		("Spacious", "1.5rem")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> hyphenationOptions =
+	[
+		("Publisher Default", ""),
+		("Automatic", "auto"),
+		("Manual Only", "manual"),
+		("Off", "none")
+	];
 
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
@@ -35,6 +68,10 @@ public partial class SettingsPage : Popup<bool>
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		LineSpacingPicker.ItemsSource = lineSpacingOptions.Select(option => option.Label).ToList();
+		TextAlignmentPicker.ItemsSource = textAlignmentOptions.Select(option => option.Label).ToList();
+		ParagraphSpacingPicker.ItemsSource = paragraphSpacingOptions.Select(option => option.Label).ToList();
+		HyphenationPicker.ItemsSource = hyphenationOptions.Select(option => option.Label).ToList();
 	}
 
 	/// <summary>
@@ -77,8 +114,108 @@ public partial class SettingsPage : Popup<bool>
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
+		LineSpacingPicker.SelectedIndex = GetLineSpacingOptionIndex(settings.LineSpacing);
+		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
+		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
+		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
 		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Reset));
 		logger.Info("Settings removed");
+	}
+
+	async void LineSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change line spacing.");
+			return;
+		}
+
+		if (LineSpacingPicker.SelectedIndex < 0 || LineSpacingPicker.SelectedIndex >= lineSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeLineSpacing(lineSpacingOptions[LineSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.LineSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.LineSpacing = selectedValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.LineSpacing));
+	}
+
+	async void TextAlignmentPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change text alignment.");
+			return;
+		}
+
+		if (TextAlignmentPicker.SelectedIndex < 0 || TextAlignmentPicker.SelectedIndex >= textAlignmentOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeTextAlignment(textAlignmentOptions[TextAlignmentPicker.SelectedIndex].Value);
+		if (string.Equals(settings.TextAlignment, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.TextAlignment = selectedValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.TextAlignment));
+	}
+
+	async void ParagraphSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change paragraph spacing.");
+			return;
+		}
+
+		if (ParagraphSpacingPicker.SelectedIndex < 0 || ParagraphSpacingPicker.SelectedIndex >= paragraphSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeParagraphSpacing(paragraphSpacingOptions[ParagraphSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.ParagraphSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.ParagraphSpacing = selectedValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.ParagraphSpacing));
+	}
+
+	async void HyphenationPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change hyphenation.");
+			return;
+		}
+
+		if (HyphenationPicker.SelectedIndex < 0 || HyphenationPicker.SelectedIndex >= hyphenationOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeBodyHyphens(hyphenationOptions[HyphenationPicker.SelectedIndex].Value);
+		if (string.Equals(settings.BodyHyphens, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.BodyHyphens = selectedValue;
+		await db.SaveSettings(settings);
+		WeakReferenceMessenger.Default.Send(new SettingsMessage(SettingsChangeKind.Hyphenation));
 	}
 
 	/// <summary>
@@ -209,13 +346,29 @@ public partial class SettingsPage : Popup<bool>
 	{
 		settings = await db.GetSettings() ?? new();
 		var normalizedFontSize = NormalizeFontSize(settings.FontSize);
-		if (settings.FontSize != normalizedFontSize)
+		var normalizedLineSpacing = NormalizeLineSpacing(settings.LineSpacing);
+		var normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
+		var normalizedParagraphSpacing = NormalizeParagraphSpacing(settings.ParagraphSpacing);
+		var normalizedBodyHyphens = NormalizeBodyHyphens(settings.BodyHyphens);
+		if (settings.FontSize != normalizedFontSize
+			|| !string.Equals(settings.LineSpacing, normalizedLineSpacing, StringComparison.Ordinal)
+			|| !string.Equals(settings.TextAlignment, normalizedTextAlignment, StringComparison.Ordinal)
+			|| !string.Equals(settings.ParagraphSpacing, normalizedParagraphSpacing, StringComparison.Ordinal)
+			|| !string.Equals(settings.BodyHyphens, normalizedBodyHyphens, StringComparison.Ordinal))
 		{
 			settings.FontSize = normalizedFontSize;
+			settings.LineSpacing = normalizedLineSpacing;
+			settings.TextAlignment = normalizedTextAlignment;
+			settings.ParagraphSpacing = normalizedParagraphSpacing;
+			settings.BodyHyphens = normalizedBodyHyphens;
 			await db.SaveSettings(settings);
 		}
 
 		FontSizeSlider.Value = settings.FontSize;
+		LineSpacingPicker.SelectedIndex = GetLineSpacingOptionIndex(settings.LineSpacing);
+		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
+		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
+		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
@@ -263,6 +416,131 @@ public partial class SettingsPage : Popup<bool>
 		}
 
 		return Math.Clamp(fontSize, minimumReaderFontSize, maximumReaderFontSize);
+	}
+
+	static string NormalizeLineSpacing(string? lineSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(lineSpacing))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		var nearest = lineSpacingOptions
+			.Select(option => option.Value)
+			.Select(value => double.Parse(value, CultureInfo.InvariantCulture))
+			.OrderBy(value => Math.Abs(value - parsedValue))
+			.FirstOrDefault();
+
+		return nearest.ToString("0.##", CultureInfo.InvariantCulture);
+	}
+
+	static string NormalizeTextAlignment(string? textAlignment)
+	{
+		if (string.IsNullOrWhiteSpace(textAlignment))
+		{
+			return defaultReaderTextAlignment;
+		}
+
+		return textAlignment.Trim().ToLowerInvariant() switch
+		{
+			"left" => "left",
+			"justify" => "justify",
+			_ => defaultReaderTextAlignment
+		};
+	}
+
+	static string NormalizeParagraphSpacing(string? paragraphSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(paragraphSpacing))
+		{
+			return defaultReaderParagraphSpacing;
+		}
+
+		return paragraphSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0rem" or "0.0" or "0.0rem" => "0",
+			"0.5rem" => "0.5rem",
+			"1rem" => "1rem",
+			"1.5rem" => "1.5rem",
+			_ => defaultReaderParagraphSpacing
+		};
+	}
+
+	static string NormalizeBodyHyphens(string? bodyHyphens)
+	{
+		if (string.IsNullOrWhiteSpace(bodyHyphens))
+		{
+			return defaultReaderBodyHyphens;
+		}
+
+		return bodyHyphens.Trim().ToLowerInvariant() switch
+		{
+			"auto" => "auto",
+			"manual" => "manual",
+			"none" => "none",
+			_ => defaultReaderBodyHyphens
+		};
+	}
+
+	static int GetLineSpacingOptionIndex(string? lineSpacing)
+	{
+		var normalizedValue = NormalizeLineSpacing(lineSpacing);
+		for (var index = 0; index < lineSpacingOptions.Count; index++)
+		{
+			if (string.Equals(lineSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 1;
+	}
+
+	static int GetTextAlignmentOptionIndex(string? textAlignment)
+	{
+		var normalizedValue = NormalizeTextAlignment(textAlignment);
+		for (var index = 0; index < textAlignmentOptions.Count; index++)
+		{
+			if (string.Equals(textAlignmentOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetParagraphSpacingOptionIndex(string? paragraphSpacing)
+	{
+		var normalizedValue = NormalizeParagraphSpacing(paragraphSpacing);
+		for (var index = 0; index < paragraphSpacingOptions.Count; index++)
+		{
+			if (string.Equals(paragraphSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetHyphenationOptionIndex(string? bodyHyphens)
+	{
+		var normalizedValue = NormalizeBodyHyphens(bodyHyphens);
+		for (var index = 0; index < hyphenationOptions.Count; index++)
+		{
+			if (string.Equals(hyphenationOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
 	}
 
 	async void OnCloseClicked(object? sender, EventArgs? e)

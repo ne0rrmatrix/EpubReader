@@ -85,6 +85,11 @@ public partial class BookPage : ContentPage, IDisposable
 	async Task UpdateSyncToolbarAsync()
 	{
 		RemoveSyncToolbarItem();
+		var currentShell = Shell.Current;
+		if (currentShell is null)
+		{
+			return;
+		}
 
 		var isLocalAuth = await AuthenticationService.IsLocalOnlyModeAsync();
 		if (syncService.IsLocalOnly || isLocalAuth)
@@ -99,14 +104,21 @@ public partial class BookPage : ContentPage, IDisposable
 			Order = ToolbarItemOrder.Primary,
 			Command = new Command(() => Dispatcher.Dispatch(async () => await SyncProgressNowAsync(ViewModel.CancellationTokenSource.Token)))
 		};
-		Shell.Current.ToolbarItems.Add(syncToolbarItem);
+		currentShell.ToolbarItems.Add(syncToolbarItem);
 	}
 
 	void RemoveSyncToolbarItem()
 	{
-		if (syncToolbarItem is not null && Shell.Current.ToolbarItems.Contains(syncToolbarItem))
+		var currentShell = Shell.Current;
+		if (currentShell is null)
 		{
-			Shell.Current.ToolbarItems.Remove(syncToolbarItem);
+			syncToolbarItem = null;
+			return;
+		}
+
+		if (syncToolbarItem is not null && currentShell.ToolbarItems.Contains(syncToolbarItem))
+		{
+			currentShell.ToolbarItems.Remove(syncToolbarItem);
 		}
 		syncToolbarItem = null;
 	}
@@ -119,7 +131,9 @@ public partial class BookPage : ContentPage, IDisposable
 	/// method.</remarks>
 	protected override async void OnDisappearing()
 	{
-		if (!ViewModel.isPopupActive)
+		var viewModel = BindingContext as BookViewModel;
+		var isPopupActive = viewModel?.isPopupActive == true;
+		if (!isPopupActive)
 		{
 			// Persist reading position before the page is torn down so reopening restores correctly.
 			try
@@ -132,12 +146,16 @@ public partial class BookPage : ContentPage, IDisposable
 			}
 
 			WeakReferenceMessenger.Default.UnregisterAll(this);
-			if (Shell.Current.ToolbarItems.Count > 0)
+			var currentShell = Shell.Current;
+			if (currentShell?.ToolbarItems is not null && currentShell.ToolbarItems.Count > 0)
 			{
-				Shell.Current.ToolbarItems.Clear();
+				currentShell.ToolbarItems.Clear();
 			}
 
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, true);
+			if (Application.Current?.Windows is { Count: > 0 } windows && windows[0].Page is Page currentPage)
+			{
+				Shell.SetNavBarIsVisible(currentPage, true);
+			}
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
 			CancelPendingSettingsRefresh();
@@ -146,8 +164,11 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 
 		// detach webview handlers we attached on appearing
-		webView.Navigated -= webView_Navigated;
-		webView.Navigating -= webView_Navigating;
+		if (webView is not null)
+		{
+			webView.Navigated -= webView_Navigated;
+			webView.Navigating -= webView_Navigating;
+		}
 		base.OnDisappearing();
 	}
 
@@ -896,6 +917,12 @@ public partial class BookPage : ContentPage, IDisposable
 			Height = new GridLength(1, GridUnitType.Auto)
 		});
 #else
+		var currentShell = Shell.Current;
+		if (currentShell is null)
+		{
+			return;
+		}
+
         var toolbarItem = new ToolbarItem
         {
             Text = chapter.Title,
@@ -913,7 +940,7 @@ public partial class BookPage : ContentPage, IDisposable
                 });
             })
         };
-        Shell.Current.ToolbarItems.Add(toolbarItem);
+		currentShell.ToolbarItems.Add(toolbarItem);
 #endif
 	}
 

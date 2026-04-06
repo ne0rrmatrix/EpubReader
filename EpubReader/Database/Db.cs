@@ -50,11 +50,21 @@ public partial class Db : IDb
 		logger.Info("Settings Table created");
 		await conn.CreateTableAsync<Book>().WaitAsync(cancellationToken);
 		logger.Info("Book Table created");
+		await EnsureSettingsColumnsAsync(conn, cancellationToken);
 		await EnsureSyncIdColumnAsync(cancellationToken);
 		await BackfillBookSyncIdsAsync(cancellationToken);
 		await EnsureBookMediaOverlayColumnsAsync(conn, cancellationToken);
 		await EnsureLastOpenedDateColumnAsync(conn, cancellationToken);
 		isInitialized = true;
+	}
+
+	static async Task EnsureSettingsColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		await EnsureColumnsAsync(
+			connection,
+			"settings",
+			[("LineSpacing", "TEXT"), ("TextAlignment", "TEXT"), ("ParagraphSpacing", "TEXT"), ("BodyHyphens", "TEXT")],
+			cancellationToken);
 	}
 
 	static async Task EnsureLastOpenedDateColumnAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)

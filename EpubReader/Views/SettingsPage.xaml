@@ -62,6 +62,58 @@
         </StackLayout>
 
         <StackLayout Grid.Row="4" Spacing="6" HorizontalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                Text="Line Spacing" />
+
+            <Picker
+                x:Name="LineSpacingPicker"
+                Title="Line Spacing"
+                SelectedIndexChanged="LineSpacingPicker_SelectedIndexChanged"
+                WidthRequest="250" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="5" Spacing="6" HorizontalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                Text="Text Alignment" />
+
+            <Picker
+                x:Name="TextAlignmentPicker"
+                Title="Text Alignment"
+                SelectedIndexChanged="TextAlignmentPicker_SelectedIndexChanged"
+                WidthRequest="250" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="6" Spacing="6" HorizontalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                Text="Paragraph Spacing" />
+
+            <Picker
+                x:Name="ParagraphSpacingPicker"
+                Title="Paragraph Spacing"
+                SelectedIndexChanged="ParagraphSpacingPicker_SelectedIndexChanged"
+                WidthRequest="250" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="7" Spacing="6" HorizontalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                Text="Hyphenation" />
+
+            <Picker
+                x:Name="HyphenationPicker"
+                Title="Hyphenation"
+                SelectedIndexChanged="HyphenationPicker_SelectedIndexChanged"
+                WidthRequest="250" />
+        </StackLayout>
+
+        <StackLayout Grid.Row="8" Spacing="6" HorizontalOptions="Center">
             <Picker
                 x:Name="ThemePicker"
                 Title="Theme"
@@ -93,7 +145,7 @@
 
         <HorizontalStackLayout
             x:Name="stackLayout"
-            Grid.Row="6"
+            Grid.Row="10"
             HorizontalOptions="Center"
             IsVisible="{OnPlatform WinUI=true,
                                    Default=false}"
@@ -108,13 +160,13 @@
 
         <!--  Authentication Section  -->
         <Label
-            Grid.Row="7"
+            Grid.Row="11"
             FontAttributes="Bold"
             HorizontalOptions="Center"
             Text="Account &amp; Sync" />
 
         <VerticalStackLayout
-            Grid.Row="8"
+            Grid.Row="12"
             Spacing="10">
             
             <!--  Auth Status Display  -->
