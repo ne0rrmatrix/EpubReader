@@ -28,6 +28,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	const string readerParagraphSpacingPublisherDefault = "";
 	const string readerHyphenationPublisherDefault = "";
 	const string readerLetterSpacingPublisherDefault = "";
+	const string readerWordSpacingPublisherDefault = "";
 
 	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
@@ -425,10 +426,20 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		if (string.IsNullOrEmpty(normalizedLetterSpacing))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__letterSpacing')"));
+		}
+		else
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__letterSpacing','{normalizedLetterSpacing}')"));
+		}
+
+		var normalizedWordSpacing = NormalizeReaderWordSpacing(settings.WordSpacing);
+		if (string.IsNullOrEmpty(normalizedWordSpacing))
+		{
+			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__wordSpacing')"));
 			return;
 		}
 
-		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__letterSpacing','{normalizedLetterSpacing}')"));
+		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__wordSpacing','{normalizedWordSpacing}')"));
 	}
 
 	/// <summary>
@@ -559,6 +570,23 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			"0.04em" => "0.04em",
 			"0.06em" => "0.06em",
 			_ => readerLetterSpacingPublisherDefault
+		};
+	}
+
+	static string NormalizeReaderWordSpacing(string? wordSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(wordSpacing))
+		{
+			return readerWordSpacingPublisherDefault;
+		}
+
+		return wordSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0em" or "0.0em" => "0",
+			"0.05em" => "0.05em",
+			"0.1em" => "0.1em",
+			"0.16em" => "0.16em",
+			_ => readerWordSpacingPublisherDefault
 		};
 	}
 

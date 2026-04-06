@@ -14,7 +14,8 @@ public enum SettingsChangeKind
 	TextAlignment = 7,
 	ParagraphSpacing = 8,
 	Hyphenation = 9,
-	LetterSpacing = 10
+	LetterSpacing = 10,
+	WordSpacing = 11
 }
 
 /// <summary>
@@ -25,5 +26,5 @@ public enum SettingsChangeKind
 /// <param name="value"></param>
 public sealed class SettingsMessage(SettingsChangeKind value) : ValueChangedMessage<SettingsChangeKind>(value)
 {
-	public bool RequiresPaginationRefresh => Value is SettingsChangeKind.FontSize or SettingsChangeKind.FontFamily or SettingsChangeKind.Layout or SettingsChangeKind.Reset or SettingsChangeKind.LineSpacing or SettingsChangeKind.TextAlignment or SettingsChangeKind.ParagraphSpacing or SettingsChangeKind.Hyphenation or SettingsChangeKind.LetterSpacing;
+	public bool RequiresPaginationRefresh => Value is SettingsChangeKind.FontSize or SettingsChangeKind.FontFamily or SettingsChangeKind.Layout or SettingsChangeKind.Reset or SettingsChangeKind.LineSpacing or SettingsChangeKind.TextAlignment or SettingsChangeKind.ParagraphSpacing or SettingsChangeKind.Hyphenation or SettingsChangeKind.LetterSpacing or SettingsChangeKind.WordSpacing;
 }

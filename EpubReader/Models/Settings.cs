@@ -60,6 +60,12 @@ public class Settings
 	public string LetterSpacing { get; set; } = string.Empty;
 
 	/// <summary>
+	/// Gets or sets the preferred word spacing for reader content.
+	/// </summary>
+	[Column("WordSpacing")]
+	public string WordSpacing { get; set; } = string.Empty;
+
+	/// <summary>
 	/// Gets or sets the background color as a string representation.
 	/// </summary>
 	[Column("BackgroundColor")]
