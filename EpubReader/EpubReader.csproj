@@ -73,27 +73,25 @@
   <ItemGroup>
     <PackageReference Include="AsyncAwaitBestPractices" Version="10.0.0" />
     <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
-    <PackageReference Include="FirebaseAuthentication.net" Version="4.1.0" />
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.50" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.50" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.51" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.51" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.50" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.50" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.51" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.51" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview2204" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview2204" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview2298" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview2298" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
+    <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.9" />
     <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.5" />
-    <PackageReference Include="Plugin.Firebase" Version="3.1.1" />
-    <PackageReference Include="Plugin.Firebase.Auth" Version="3.1.0" />
-    <PackageReference Include="Plugin.Firebase.Auth.Google" Version="3.1.0" />
-    <PackageReference Include="Plugin.Firebase.Crashlytics" Version="3.1.1" />
+    <PackageReference Include="Plugin.Firebase.Auth" Version="5.0.1" />
+    <PackageReference Include="Plugin.Firebase.Crashlytics" Version="4.0.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLite.Net.Extensions" Version="3.0.0" />
@@ -105,11 +103,11 @@
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.3" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.3" />
     <PackageReference Include="Xamarin.Google.Android.Material" Version="1.13.0.2" />
-    <!-- AndroidX Credential Manager + Google Identity (replaces GoogleSignIn APIs) -->
-    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.0.1.2" />
     <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.5" />
     <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.5" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.13" />
+    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.5.1.1" />
+    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.0.1.2" />
     <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.10.4.1" />
     <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.10.4.1" ExcludeAssets="all" />

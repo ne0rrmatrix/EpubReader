@@ -18,7 +18,7 @@ This file tells an AI coding agent how to be immediately productive in the EpubR
   - `Messages/` — message classes used with `WeakReferenceMessenger`
 
 - **Build / Run**
-  - Primary build script: `build.ps1`. Example debug build:pwsh -File ./build.ps1 -ApiKey <key> -AuthDomain <domain> -DatabaseUrl <url> -Configuration Debug  - VS Code tasks available: "Build with Firebase Secrets", "Build (Release) with Firebase Secrets", "Build from .env file", and "Run app (Windows)".
+  - Primary build script: `build.ps1`. Example debug build: `pwsh -File ./build.ps1 -ApiKey <key> -AuthDomain <domain> -DatabaseUrl <url> -Configuration Debug` - VS Code tasks available: "Build with Firebase Secrets", "Build (Release) with Firebase Secrets", "Build from .env file", and "Run app (Windows)".
   - Secrets live in `build-secrets/google-services.json` or are passed via `build.ps1` flags. Do not commit secrets.
 
 - **Repository conventions (must follow)**
@@ -61,7 +61,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 ### Core Layers
 - **EbookService** (`Service/EbookService.cs`): Handles EPUB parsing via VersOne.Epub library, cover extraction, font/image embedding, and synthetic page numbering.
 - **Database** (`Database/Db.cs`): SQLite wrapper for book metadata, settings, and sync state; auto-initializes tables on first use.
-- **Authentication** (`Service/AuthenticationService.*.cs`): Platform-specific implementations for Google Firebase auth; supports local-only mode without authentication.
+- **Authentication** (`Service/AuthenticationService.*.cs`): Platform-specific implementations for Google Firebase auth; supports local-only mode without authentication. Note: `Plugin.Firebase.Auth.Google` 3.1.2 is incompatible with `Plugin.Firebase.Auth` 5.x. For Google sign-in with `Plugin.Firebase.Auth` 5.x, implement providers directly with the native platform SDK and pass native credentials into `Plugin.Firebase.Auth`.
 - **Sync** (`Service/FirebaseSyncService.cs`): Manages reading progress sync across devices; queues offline changes, reconciles on reconnect.
 - **MVVM**: ViewModels inherit `ObservableObject` (MVVM Toolkit); communicate via `WeakReferenceMessenger` using message classes in `Messages/`.
 - **Platform-Specific UI**: Platform folders contain `*.android.cs`, `*.macios.cs`, `*.windows.cs` implementations for WebView handlers, auth, and file pickers.
@@ -147,17 +147,19 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 ### Building
 **Prerequisites**: .NET 10 SDK, Visual Studio 2026 with .NET MAUI workload, platform-specific SDKs (Android API 34+, Windows SDK, Xcode 16+ for iOS/macOS).
 
-**With Firebase Secrets**:# Debug build
-./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Debug
+**With Firebase Secrets**:
+- # Debug build
+  `./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Debug`
 
-# Release build
-./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Release
+- # Release build
+  `./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Release`
 
-# From google-services.json
-./build.ps1 -GoogleJsonPath "./build-secrets/google-services.json"
+- # From google-services.json
+  `./build.ps1 -GoogleJsonPath "./build-secrets/google-services.json"`
 
-# From .env file (via .vscode/build-from-env.ps1)
-./build.ps1
+- # From .env file (via .vscode/build-from-env.ps1)
+  `./build.ps1`
+
 **Secrets Management**:
 - **Never** commit Firebase secrets to source code.
 - Place secrets in `build-secrets/google-services.json` (not in repo).

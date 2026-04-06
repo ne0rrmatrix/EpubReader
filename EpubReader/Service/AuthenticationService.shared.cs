@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics;
-using Firebase.Auth;
-using Firebase.Auth.Providers;
-using Firebase.Auth.Repository;
+using Plugin.Firebase.Auth;
 
 namespace EpubReader.Service;
 
@@ -12,8 +10,12 @@ public partial class AuthenticationService : IDisposable
 	const string authModeCloud = "cloud";
 	const string userIdKey = "Auth.UserId";
 	const string userEmailKey = "Auth.UserEmail";
+	const string authTokenKey = "Auth.Token";
+	const string refreshTokenKey = "Auth.RefreshToken";
+	const string authTokenExpirationKey = "Auth.TokenExpirationUtc";
 
-	FirebaseAuthClient? firebaseAuthClient;
+	IFirebaseAuth? firebaseAuth;
+	IDisposable? authStateListenerSubscription;
 	bool disposed;
 
 	public event EventHandler<bool>? AuthStateChanged;
@@ -38,9 +40,10 @@ public partial class AuthenticationService : IDisposable
 
 		disposed = true;
 
-		if (disposing && firebaseAuthClient is not null)
+		if (disposing)
 		{
-			firebaseAuthClient.AuthStateChanged -= OnAuthStateChanged;
+			authStateListenerSubscription?.Dispose();
+			authStateListenerSubscription = null;
 		}
 	}
 
@@ -65,13 +68,21 @@ public partial class AuthenticationService : IDisposable
 
 	public async Task<string> SignInWithGoogleAsync(CancellationToken cancellationToken = default)
 	{
+		ObjectDisposedException.ThrowIf(disposed, this);
 		cancellationToken.ThrowIfCancellationRequested();
 
-		if (firebaseAuthClient is null)
+#if !WINDOWS
+		if (!CrossFirebaseAuth.IsSupported)
 		{
-			Trace.TraceError("Google sign-in: firebaseAuthClient not initialized");
-			throw new InvalidOperationException("Firebase Authentication is not configured. Please configure Firebase.ApiKey and Firebase.AuthDomain.");
+			Trace.TraceWarning("Google sign-in is not supported on this platform by the installed Firebase auth plugin.");
+			throw new PlatformNotSupportedException("Google sign-in is not supported on this platform by the installed Firebase auth plugin.");
 		}
+#else
+		if (!CrossFirebaseAuth.IsSupported)
+		{
+			Trace.TraceInformation("Native Firebase auth plugin is unavailable on Windows; using the WebView-based Google sign-in flow.");
+		}
+#endif
 
 		try
 		{
@@ -96,18 +107,26 @@ public partial class AuthenticationService : IDisposable
 		cancellationToken.ThrowIfCancellationRequested();
 
 		// Get Firebase ID token if authenticated
-		if (firebaseAuthClient?.User is not null)
+		if (firebaseAuth?.CurrentUser is not null)
 		{
 			try
 			{
-				var token = await firebaseAuthClient.User.GetIdTokenAsync();
-				return token;
+				var tokenResult = await firebaseAuth.CurrentUser.GetIdTokenResultAsync(false);
+				return tokenResult.Token ?? string.Empty;
 			}
 			catch (Exception ex)
 			{
 				Trace.TraceError($"Failed to get Firebase token: {ex.Message}");
 			}
 		}
+
+#if WINDOWS
+		var storedToken = await GetStoredAuthTokenAsync(cancellationToken);
+		if (!string.IsNullOrWhiteSpace(storedToken))
+		{
+			return storedToken;
+		}
+#endif
 
 		// For local mode, return empty string
 		return string.Empty;
@@ -125,10 +144,18 @@ public partial class AuthenticationService : IDisposable
 		}
 
 		// Check if Firebase user exists
-		if (firebaseAuthClient?.User is not null)
+		if (firebaseAuth?.CurrentUser is not null)
 		{
 			return true;
 		}
+
+#if WINDOWS
+		var storedToken = await GetStoredAuthTokenAsync(cancellationToken);
+		if (!string.IsNullOrWhiteSpace(storedToken) && authMode == authModeCloud)
+		{
+			return true;
+		}
+#endif
 
 		// Check stored credentials
 		var userId = await SecureStorage.GetAsync(userIdKey);
@@ -140,9 +167,9 @@ public partial class AuthenticationService : IDisposable
 		cancellationToken.ThrowIfCancellationRequested();
 
 		// Try Firebase user first
-		if (firebaseAuthClient?.User is not null)
+		if (firebaseAuth?.CurrentUser is not null)
 		{
-			return firebaseAuthClient.User.Uid;
+			return firebaseAuth.CurrentUser.Uid;
 		}
 
 		// Fall back to stored user ID
@@ -155,9 +182,9 @@ public partial class AuthenticationService : IDisposable
 		cancellationToken.ThrowIfCancellationRequested();
 
 		// Try Firebase user first
-		if (firebaseAuthClient?.User?.Info?.Email is not null)
+		if (firebaseAuth?.CurrentUser?.Email is not null)
 		{
-			return firebaseAuthClient.User.Info.Email;
+			return firebaseAuth.CurrentUser.Email;
 		}
 
 		// Fall back to stored email
@@ -172,15 +199,17 @@ public partial class AuthenticationService : IDisposable
 		try
 		{
 			// Sign out from Firebase
-			firebaseAuthClient?.SignOut();
+			if (firebaseAuth is not null)
+			{
+				await firebaseAuth.SignOutAsync();
+			}
 
 			// Clear stored credentials
 			SecureStorage.Remove(userIdKey);
 			SecureStorage.Remove(userEmailKey);
-
-			// Clear Firebase user repository cache to force re-authentication
-			// This ensures the user must provide credentials on next sign-in
-			await ClearFirebaseUserCacheAsync();
+			SecureStorage.Remove(authTokenKey);
+			SecureStorage.Remove(refreshTokenKey);
+			SecureStorage.Remove(authTokenExpirationKey);
 #if WINDOWS
 			// Platform-specific cleanup
 			await ClearPlatformAuthDataAsync();
@@ -201,64 +230,18 @@ public partial class AuthenticationService : IDisposable
 		}
 	}
 
-	static async Task ClearFirebaseUserCacheAsync()
-	{
-		try
-		{
-			// Clear the FileUserRepository cache
-			// The cache is stored in the user's application data folder
-			var appDataPath = FileSystem.AppDataDirectory;
-			var firebaseUserFile = Path.Combine(appDataPath, "EpubReader.json");
-
-			if (File.Exists(firebaseUserFile))
-			{
-				await Task.Run(() => File.Delete(firebaseUserFile));
-				Trace.TraceInformation("Firebase user cache cleared");
-			}
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"Failed to clear Firebase user cache: {ex.Message}");
-			// Don't throw - this is a cleanup operation
-		}
-	}
 	void InitializeFirebaseAuthClient()
 	{
 		try
 		{
-			var apiKey = FirebaseConfig.ApiKey;
-			var authDomain = FirebaseConfig.AuthDomain;
-
-			Trace.TraceInformation("Auth init: loading Firebase configuration");
-
-			if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(authDomain))
+			if (!CrossFirebaseAuth.IsSupported)
 			{
-				Trace.TraceWarning("Firebase not configured. Set FIREBASE_API_KEY and FIREBASE_AUTH_DOMAIN environment variables or pass MSBuild properties.");
+				Trace.TraceWarning("Firebase Authentication is not supported on this platform by the installed Firebase auth plugin.");
 				return;
 			}
 
-			var config = new FirebaseAuthConfig
-			{
-				ApiKey = apiKey,
-				AuthDomain = authDomain,
-				Providers =
-				[
-					new GoogleProvider().AddScopes("email"),
-                    // Apple provider - uncomment when ready to implement:
-                    // new AppleProvider()
-                    // Note: Apple Sign-In requires:
-                    // 1. Apple Developer Program membership
-                    // 2. Configure Sign in with Apple capability in your app
-                    // 3. Add Service ID in Apple Developer portal
-                    // 4. Configure redirect URLs
-                ],
-				UserRepository = new FileUserRepository("EpubReader")
-			};
-
-			firebaseAuthClient = new FirebaseAuthClient(config);
-
-			// Subscribe to auth state changes
-			firebaseAuthClient.AuthStateChanged += OnAuthStateChanged;
+			firebaseAuth = CrossFirebaseAuth.Current;
+			authStateListenerSubscription = firebaseAuth.AddAuthStateListener(OnAuthStateChanged);
 
 			Trace.TraceInformation("Firebase Authentication initialized successfully");
 		}
@@ -268,19 +251,10 @@ public partial class AuthenticationService : IDisposable
 		}
 	}
 
-	void OnAuthStateChanged(object? sender, UserEventArgs e)
+	void OnAuthStateChanged(IFirebaseAuth auth)
 	{
-		if (e.User is not null)
-		{
-			Trace.TraceInformation($"Auth state changed: User signed in - {e.User.Info.Email}");
-			Preferences.Set(authModeKey, authModeCloud);
-			AuthStateChanged?.Invoke(this, true);
-		}
-		else
-		{
-			Trace.TraceInformation("Auth state changed: User signed out");
-			Preferences.Set(authModeKey, authModeLocal);
-			AuthStateChanged?.Invoke(this, false);
-		}
+		var isAuthenticated = auth.CurrentUser is not null;
+		Trace.TraceInformation($"Authentication state changed. Authenticated: {isAuthenticated}");
+		AuthStateChanged?.Invoke(this, isAuthenticated);
 	}
 }

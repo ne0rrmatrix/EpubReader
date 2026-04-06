@@ -218,7 +218,7 @@ public static class MauiProgram
 				Firebase.FirebaseApp.InitializeApp(activity, options);
 			}
 
-			CrossFirebase.Initialize(activity);
+			CrossFirebase.Initialize(activity, () => Platform.CurrentActivity ?? activity);
 		}
 		catch (Exception ex)
 		{
