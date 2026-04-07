@@ -87,7 +87,6 @@
     <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview2298" />
     <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview2298" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.9" />
     <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.5" />

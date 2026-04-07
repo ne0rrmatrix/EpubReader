@@ -70,7 +70,7 @@ public partial class SettingsPage : Popup<bool>
 	];
 
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
+ static readonly ILogger logger = AppLogger.CreateLogger<SettingsPage>();
 	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
 	readonly IReaderSettingsStateService settingsStateService = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IReaderSettingsStateService>() ?? throw new InvalidOperationException();

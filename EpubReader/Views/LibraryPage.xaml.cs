@@ -9,7 +9,7 @@ namespace EpubReader.Views;
 /// displayed.</remarks>
 public partial class LibraryPage : ContentPage
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryPage));
+  static readonly ILogger logger = AppLogger.CreateLogger<LibraryPage>();
 	readonly IDb db;
 	ViewModels.LibraryViewModel viewModel => (ViewModels.LibraryViewModel)BindingContext;
 

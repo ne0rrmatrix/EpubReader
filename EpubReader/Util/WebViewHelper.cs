@@ -33,7 +33,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	readonly IDb database = db;
 	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(WebViewHelper));
+    static readonly ILogger logger = AppLogger.CreateLogger<WebViewHelper>();
 	static readonly JsonSerializerOptions mediaOverlayThemeSerializerOptions = new()
 	{
 		Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

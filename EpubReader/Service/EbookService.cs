@@ -48,7 +48,7 @@ public static partial class EbookService
 		"tahoma.ttf"
 	];
 
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(EbookService));
+	static readonly ILogger logger = AppLogger.CreateLogger(nameof(EbookService));
 
 	const int coverImageWidth = 200;
 	const int coverImageHeight = 400;

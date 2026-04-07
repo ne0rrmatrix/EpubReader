@@ -3,7 +3,7 @@ namespace EpubReader.Views;
 public partial class CalibreSettingsPage : Popup<bool>
 {
 	readonly CalibreSettingsPageViewModel viewModel;
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreSettingsPage));
+  static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPage>();
 
 	public CalibreSettingsPage(CalibreSettingsPageViewModel viewModel)
 	{

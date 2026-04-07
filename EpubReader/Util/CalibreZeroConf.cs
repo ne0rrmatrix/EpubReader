@@ -7,7 +7,7 @@ namespace EpubReader.Util;
 /// </summary>
 public partial class CalibreZeroConf
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreZeroConf));
+  static readonly ILogger logger = AppLogger.CreateLogger<CalibreZeroConf>();
 
 	protected CalibreZeroConf()
 	{

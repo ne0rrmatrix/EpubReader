@@ -1,12 +1,8 @@
 ﻿using FFImageLoading.Maui;
-using MetroLog.Operators;
-using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.LifecycleEvents;
 using Syncfusion.Maui.Toolkit.Hosting;
-using LoggerFactory = MetroLog.LoggerFactory;
-using LogLevel = MetroLog.LogLevel;
 using Plugin.Maui.Audio;
 
 #if ANDROID
@@ -31,6 +27,14 @@ public static class MauiProgram
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
+       builder.Logging.ClearProviders();
+		builder.Logging.AddProvider(new TraceLoggerProvider());
+	#if DEBUG
+		builder.Logging.AddDebug();
+		builder.Logging.SetMinimumLevel(LogLevel.Debug);
+	#else
+		builder.Logging.SetMinimumLevel(LogLevel.Information);
+	#endif
 		builder.UseMauiApp<App>().ConfigureFonts(fonts =>
 		{
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -124,33 +128,6 @@ public static class MauiProgram
 			return webView;
 		};
 #endif
-		var config = new LoggingConfiguration();
-#if RELEASE
-        config.AddTarget(
-            LogLevel.Info,
-            LogLevel.Fatal,
-            new StreamingFileTarget(retainDays: 2));
-#else
-		// Will write logs to the Debug output
-		config.AddTarget(
-			LogLevel.Trace,
-			LogLevel.Fatal,
-			new TraceTarget());
-#endif
-
-		// will write logs to the console output (Logcat for android)
-		config.AddTarget(
-			LogLevel.Info,
-			LogLevel.Fatal,
-			new ConsoleTarget());
-
-		config.AddTarget(
-			LogLevel.Info,
-			LogLevel.Fatal,
-			new MemoryTarget(2048));
-#if DEBUG
-		builder.Logging.AddDebug();
-#endif
 		// Register services
 		builder.Services.AddSingleton<IDb, Db>();
 		builder.Services.AddSingleton<AuthenticationService>();
@@ -161,8 +138,6 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IReaderSettingsStateService, ReaderSettingsStateService>();
 		builder.Services.AddSingleton<ISyncService, FirebaseSyncService>();
 		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
-		LoggerFactory.Initialize(config);
-		builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();
 		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
 		builder.Services.AddSingleton<AppShell>();

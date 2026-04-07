@@ -1,8 +1,6 @@
 ﻿using Android.App;
 using Android.Content;
 using AndroidX.DocumentFile.Provider;
-using ILogger = MetroLog.ILogger;
-using LoggerFactory = MetroLog.LoggerFactory;
 using Uri = Android.Net.Uri;
 
 namespace EpubReader.Service;
@@ -17,7 +15,7 @@ namespace EpubReader.Service;
 /// folder access and file manipulation capabilities.</remarks>
 public partial class FolderPicker : IFolderPicker
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
+ static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
 	public const int PickFolderRequestCode = 1001;
 	TaskCompletionSource<string>? folderPickedTcs;
 

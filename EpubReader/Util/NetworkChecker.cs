@@ -14,7 +14,7 @@ namespace EpubReader.Util;
 /// they are local, while permitting HTTPS connections regardless of locality.</remarks>
 public class NetworkChecker
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(NetworkChecker));
+   static readonly ILogger logger = AppLogger.CreateLogger<NetworkChecker>();
 	protected NetworkChecker()
 	{
 		// This constructor is protected to prevent instantiation of this class.

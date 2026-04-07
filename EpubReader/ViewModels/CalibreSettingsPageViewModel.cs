@@ -4,7 +4,7 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 {
 	const string defaultCalibrePrefix = "http";
 	const int defaultCalibrePort = 8080;
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreSettingsPageViewModel));
+ static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPageViewModel>();
 	string loadedManualServerAddress = string.Empty;
 
 	[ObservableProperty]

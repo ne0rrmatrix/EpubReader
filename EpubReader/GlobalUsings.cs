@@ -10,5 +10,5 @@ global using EpubReader.Service;
 global using EpubReader.Util;
 global using EpubReader.ViewModels;
 global using EpubReader.Views;
-global using MetroLog;
+global using Microsoft.Extensions.Logging;
 global using Microsoft.Maui;

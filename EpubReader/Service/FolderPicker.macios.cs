@@ -1,8 +1,6 @@
 ﻿using Foundation;
 using UIKit;
 using UniformTypeIdentifiers;
-using ILogger = MetroLog.ILogger;
-using LoggerFactory = MetroLog.LoggerFactory;
 
 namespace EpubReader.Service;
 
@@ -14,7 +12,7 @@ namespace EpubReader.Service;
 /// iOS-specific APIs and requires a valid UIViewController to present the picker.</remarks>
 public partial class FolderPicker : IFolderPicker
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
+ static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
 
 	/// <summary>
 	/// Asynchronously presents a folder picker dialog to the user and returns the path of the selected folder.

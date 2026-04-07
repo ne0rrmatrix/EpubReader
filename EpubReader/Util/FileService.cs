@@ -30,7 +30,7 @@ public static partial class FileService
 
 	#region Constants and Static Fields
 
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FileService));
+	static readonly ILogger logger = AppLogger.CreateLogger(nameof(FileService));
 	public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpubReader");
 
 	// Cache for invalid characters to avoid repeated allocations
