@@ -143,8 +143,6 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 	static bool TryBuildManualEndpoint(string manualServerAddress, out CalibreEndpoint? endpoint, out string validationMessage)
 	{
 		endpoint = null;
-		validationMessage = string.Empty;
-
 		if (string.IsNullOrWhiteSpace(manualServerAddress))
 		{
 			validationMessage = "Enter a Calibre server address such as http://192.168.1.10:8080.";
@@ -205,9 +203,9 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 			throw new InvalidOperationException("No Calibre servers were discovered on the local network.");
 		}
 
-		foreach (var server in discoveredServers)
+		foreach (var (IpAddress, Port) in discoveredServers)
 		{
-			var endpoint = new CalibreEndpoint(defaultCalibrePrefix, server.IpAddress, server.Port);
+			var endpoint = new CalibreEndpoint(defaultCalibrePrefix, IpAddress, Port);
 			try
 			{
 				await VerifyEndpointAsync(endpoint, token);

@@ -3,6 +3,7 @@
     <TargetFrameworks>$(NetVersion)-ios;$(NetVersion)-android;$(NetVersion)-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);$(NetVersion)-windows10.0.19041.0</TargetFrameworks>
 
+    <LangVersion>preview</LangVersion>
     <OutputType>Exe</OutputType>
     <RootNamespace>EpubReader</RootNamespace>
     <UseMaui>true</UseMaui>

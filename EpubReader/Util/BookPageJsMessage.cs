@@ -1,6 +1,5 @@
 namespace EpubReader.Util;
 
-using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using EpubReader.Models;

@@ -1,5 +1,4 @@
-﻿using Microsoft.Maui.ApplicationModel;
-using Zeroconf;
+﻿using Zeroconf;
 
 namespace EpubReader.Util;
 

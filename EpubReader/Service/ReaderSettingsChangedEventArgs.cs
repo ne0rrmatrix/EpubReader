@@ -1,13 +1,8 @@
 namespace EpubReader.Service;
 
-public sealed class ReaderSettingsChangedEventArgs : EventArgs
+public sealed class ReaderSettingsChangedEventArgs(SettingsChangeKind changeKind) : EventArgs
 {
-	public ReaderSettingsChangedEventArgs(SettingsChangeKind changeKind)
-	{
-		ChangeKind = changeKind;
-	}
-
-	public SettingsChangeKind ChangeKind { get; }
+	public SettingsChangeKind ChangeKind { get; } = changeKind;
 
 	public bool RequiresPaginationRefresh => ChangeKind is SettingsChangeKind.FontSize
 		or SettingsChangeKind.FontFamily

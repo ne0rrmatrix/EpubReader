@@ -1,15 +1,8 @@
 namespace EpubReader.Service;
 
-public sealed class ReaderBridgeMessageEventArgs : EventArgs
+public sealed class ReaderBridgeMessageEventArgs(BookPageJsMessage message, JavaScriptBridgeSource source, string rawPayload) : EventArgs
 {
-	public ReaderBridgeMessageEventArgs(BookPageJsMessage message, JavaScriptBridgeSource source, string rawPayload)
-	{
-		Message = message;
-		Source = source;
-		RawPayload = rawPayload;
-	}
-
-	public BookPageJsMessage Message { get; }
-	public JavaScriptBridgeSource Source { get; }
-	public string RawPayload { get; }
+	public BookPageJsMessage Message { get; } = message;
+	public JavaScriptBridgeSource Source { get; } = source;
+	public string RawPayload { get; } = rawPayload;
 }

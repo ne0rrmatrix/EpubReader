@@ -71,12 +71,10 @@ public class NetworkChecker
 	/// encountered.</remarks>
 	/// <param name="requestMessage">The HTTP request message associated with the server certificate.</param>
 	/// <param name="certificate">The server's SSL certificate to validate. Can be <see langword="null"/> if no certificate is provided.</param>
-	/// <param name="chain">The chain of certificate authorities associated with the server's certificate. Can be <see langword="null"/> if no
-	/// chain is provided.</param>
 	/// <param name="sslErrors">The SSL policy errors encountered during the certificate validation process.</param>
 	/// <returns><see langword="true"/> if the certificate is considered valid based on the custom logic; otherwise, <see
 	/// langword="false"/>.</returns>
-	public static bool ServerCertificateCustomValidation(HttpRequestMessage requestMessage, X509Certificate2? certificate, X509Chain? chain, SslPolicyErrors sslErrors)
+	public static bool ServerCertificateCustomValidation(HttpRequestMessage requestMessage, X509Certificate2? certificate, SslPolicyErrors sslErrors)
 	{
 		logger.Info($"Requested URI: {requestMessage.RequestUri}");
 		logger.Info($"Effective date: {certificate?.GetEffectiveDateString()}");
@@ -106,7 +104,7 @@ public class NetworkChecker
 		{
 			ServerCertificateCustomValidationCallback = (request, cert, chain, errors) =>
 			{
-				certificateValid = ServerCertificateCustomValidation(request, cert, chain, errors);
+				certificateValid = ServerCertificateCustomValidation(request, cert, errors);
 				return certificateValid; // Or return true to always allow connection for testing
 			}
 		};

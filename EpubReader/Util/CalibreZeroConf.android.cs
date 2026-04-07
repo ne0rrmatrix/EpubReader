@@ -1,8 +1,6 @@
-#if ANDROID
 using Android.Content;
 using Android.Net.Nsd;
 using Android.Net.Wifi;
-using Android.OS;
 
 namespace EpubReader.Util;
 
@@ -20,7 +18,7 @@ public partial class CalibreZeroConf
 		}
 
 		Dictionary<string, (string IpAddress, int Port)> servers = new(StringComparer.OrdinalIgnoreCase);
-		System.Threading.Lock syncRoot = new();
+		Lock syncRoot = new();
 
 		foreach (var serviceType in GetCalibreServiceTypes())
 		{
@@ -106,7 +104,7 @@ public partial class CalibreZeroConf
 		logger.Info($"Android subnet probe will scan {hostsToProbe.Count} host(s) near {currentHost} for Calibre OPDS endpoints.");
 
 		Dictionary<string, (string IpAddress, int Port)> discoveredServers = new(StringComparer.OrdinalIgnoreCase);
-		System.Threading.Lock syncRoot = new();
+		Lock syncRoot = new();
 		using HttpClient client = new()
 		{
 			Timeout = TimeSpan.FromMilliseconds(Math.Clamp((int)(scanTime.TotalMilliseconds / 8), 300, 600))
@@ -295,14 +293,9 @@ public partial class CalibreZeroConf
 		return new DiscoveryScope(multicastLock);
 	}
 
-	sealed class DiscoveryScope : IDisposable
+	sealed class DiscoveryScope(WifiManager.MulticastLock multicastLock) : IDisposable
 	{
-		readonly WifiManager.MulticastLock multicastLock;
-
-		public DiscoveryScope(WifiManager.MulticastLock multicastLock)
-		{
-			this.multicastLock = multicastLock;
-		}
+		readonly WifiManager.MulticastLock multicastLock = multicastLock;
 
 		public void Dispose()
 		{
@@ -314,19 +307,12 @@ public partial class CalibreZeroConf
 		}
 	}
 
-	sealed class AndroidCalibreDiscoveryListener : Java.Lang.Object, NsdManager.IDiscoveryListener
+	sealed class AndroidCalibreDiscoveryListener(NsdManager nsdManager, IDictionary<string, (string IpAddress, int Port)> servers, System.Threading.Lock syncRoot) : Java.Lang.Object, NsdManager.IDiscoveryListener
 	{
-		readonly NsdManager nsdManager;
-		readonly IDictionary<string, (string IpAddress, int Port)> servers;
-		readonly System.Threading.Lock syncRoot;
+		readonly NsdManager nsdManager = nsdManager;
+		readonly IDictionary<string, (string IpAddress, int Port)> servers = servers;
+		readonly System.Threading.Lock syncRoot = syncRoot;
 		bool isStopped;
-
-		public AndroidCalibreDiscoveryListener(NsdManager nsdManager, IDictionary<string, (string IpAddress, int Port)> servers, System.Threading.Lock syncRoot)
-		{
-			this.nsdManager = nsdManager;
-			this.servers = servers;
-			this.syncRoot = syncRoot;
-		}
 
 		public void OnDiscoveryStarted(string? serviceType)
 		{
@@ -412,16 +398,10 @@ public partial class CalibreZeroConf
 		}
 	}
 
-	sealed class AndroidCalibreResolveListener : Java.Lang.Object, NsdManager.IResolveListener
+	sealed class AndroidCalibreResolveListener(IDictionary<string, (string IpAddress, int Port)> servers, System.Threading.Lock syncRoot) : Java.Lang.Object, NsdManager.IResolveListener
 	{
-		readonly IDictionary<string, (string IpAddress, int Port)> servers;
-		readonly System.Threading.Lock syncRoot;
-
-		public AndroidCalibreResolveListener(IDictionary<string, (string IpAddress, int Port)> servers, System.Threading.Lock syncRoot)
-		{
-			this.servers = servers;
-			this.syncRoot = syncRoot;
-		}
+		readonly IDictionary<string, (string IpAddress, int Port)> servers = servers;
+		readonly Lock syncRoot = syncRoot;
 
 		public void OnResolveFailed(NsdServiceInfo? serviceInfo, NsdFailure errorCode)
 		{
@@ -438,7 +418,7 @@ public partial class CalibreZeroConf
 
 			if (GetHostAddress(serviceInfo) is not string hostAddress)
 			{
-				logger.Warn($"Android NSD resolved service '{serviceInfo?.ServiceName}' without a host address.");
+				logger.Warn($"Android NSD resolved service '{serviceInfo.ServiceName}' without a host address.");
 				return;
 			}
 
@@ -453,4 +433,3 @@ public partial class CalibreZeroConf
 		}
 	}
 }
-#endif

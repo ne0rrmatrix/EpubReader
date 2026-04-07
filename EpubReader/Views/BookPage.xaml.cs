@@ -173,10 +173,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 
 		// detach webview handlers we attached on appearing
-		if (webView is not null)
-		{
-			webView.Navigated -= webView_Navigated;
-		}
+		webView?.Navigated -= webView_Navigated;
 		base.OnDisappearing();
 	}
 

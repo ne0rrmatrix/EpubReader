@@ -3,23 +3,17 @@
 /// <summary>
 /// Provides functionality to process EPUB files, including selecting, validating, and saving them to a library.
 /// </summary>
-public partial class ProcessEpubFiles : BaseViewModel
+public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateService importStateService, ILibraryStateService libraryStateService) : BaseViewModel
 {
 	static readonly string[] epubExtensions = [".epub"];
 	static readonly string[] androidEpubTypes = ["application/epub+zip", ".epub"];
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
 
 	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(ProcessEpubFiles));
-	readonly IImportStateService importStateService;
-	readonly ILibraryStateService libraryStateService;
-	public readonly IFolderPicker FolderPicker;
+	readonly IImportStateService importStateService = importStateService;
+	readonly ILibraryStateService libraryStateService = libraryStateService;
+	public readonly IFolderPicker FolderPicker = folderPicker;
 	public readonly FilePickerFileType CustomFileType = CreateCustomFileType();
-	public ProcessEpubFiles(IFolderPicker folderPicker, IImportStateService importStateService, ILibraryStateService libraryStateService)
-	{
-		FolderPicker = folderPicker;
-		this.importStateService = importStateService;
-		this.libraryStateService = libraryStateService;
-	}
 
 	/// <summary>
 	/// Processes a collection of EPUB files from a folder.

@@ -162,12 +162,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 			if (disposing)
 			{
 #if ANDROID
-#pragma warning disable S1066 // Mergeable "if" statements should be combined
-				if (Application.Current is not null)
-				{
-					Application.Current.RequestedThemeChanged -= Current_RequestedThemeChanged;
-				}
-#pragma warning restore S1066 // Mergeable "if" statements should be combined
+				Application.Current?.RequestedThemeChanged -= Current_RequestedThemeChanged;
 #endif
 			}
 

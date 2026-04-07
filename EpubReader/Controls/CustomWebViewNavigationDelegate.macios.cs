@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Foundation;
+﻿using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 

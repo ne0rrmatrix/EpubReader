@@ -12,7 +12,10 @@ namespace EpubReader.ViewModels;
 /// including adding books from files, removing books, and navigating to a book's page. It interacts with services
 /// for file picking, database operations, and ebook processing.
 /// </remarks>
-public partial class LibraryViewModel : BaseViewModel
+/// <remarks>
+/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
+/// </remarks>
+public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibraryStateService libraryStateService, IImportStateService importStateService, ISyncService syncService) : BaseViewModel
 {
 	bool isAlphabeticalSorted = true;
 
@@ -28,28 +31,16 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <remarks>This field retrieves the <see cref="ProcessEpubFiles"/> service from the current application's
 	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
 	/// thrown.</remarks>
-	readonly ProcessEpubFiles processEpubFiles;
-	readonly ILibraryStateService libraryStateService;
-	readonly IImportStateService importStateService;
-	readonly ISyncService syncService;
+	readonly ProcessEpubFiles processEpubFiles = processEpubFiles;
+	readonly ILibraryStateService libraryStateService = libraryStateService;
+	readonly IImportStateService importStateService = importStateService;
+	readonly ISyncService syncService = syncService;
 
 	/// <summary>
 	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
-	public partial ObservableCollection<Book> Books { get; set; }
-
-	/// <summary>
-	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
-	/// </summary>
-	public LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibraryStateService libraryStateService, IImportStateService importStateService, ISyncService syncService)
-	{
-		this.processEpubFiles = processEpubFiles;
-		this.libraryStateService = libraryStateService;
-		this.importStateService = importStateService;
-		this.syncService = syncService;
-		Books = libraryStateService.Books;
-	}
+	public partial ObservableCollection<Book> Books { get; set; } = libraryStateService.Books;
 
 	protected override void Dispose(bool disposing)
 	{
