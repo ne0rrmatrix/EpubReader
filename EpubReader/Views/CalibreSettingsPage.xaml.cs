@@ -1,95 +1,47 @@
 namespace EpubReader.Views;
 
-public partial class CalibreSettingsPage : Popup
+public partial class CalibreSettingsPage : Popup<bool>
 {
-	CalibreSettingsPageViewModel viewModel => (CalibreSettingsPageViewModel)BindingContext;
-	MetroLog.ILogger logger => viewModel.Logger;
+	readonly CalibreSettingsPageViewModel viewModel;
+	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibreSettingsPage));
 
 	public CalibreSettingsPage(CalibreSettingsPageViewModel viewModel)
 	{
 		InitializeComponent();
-		BindingContext = viewModel;
+		BindingContext = this.viewModel = viewModel;
+		Loaded += CurrentPage_Loaded;
+		Unloaded += CurrentPage_Unloaded;
+		this.viewModel.CloseRequested += ViewModel_CloseRequested;
 	}
 
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
-		if (viewModel.db is null)
+		try
 		{
-			logger.Error("Database service is not available.");
-			return;
+			await viewModel.InitializeAsync();
 		}
-		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
-		if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+		catch (Exception ex)
 		{
-			logger.Info("CalibreSettingsPage loaded on Windows or macOS, setting EntryText to visible.");
-			switchController.IsToggled = settings.CalibreAutoDiscovery;
+			logger.Error($"Failed to initialize Calibre settings popup: {ex.Message}");
 		}
-		else
-		{
-			logger.Info("CalibreSettingsPage loaded on Android or iOS, setting EntryText to not visible.");
-			switchController.IsToggled = false;
-		}
-
-		EntryText.Text = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
-		logger.Info("CalibreSettingsPage loaded.");
-	}
-
-	async void Switch_Toggled(object? sender, ToggledEventArgs? e)
-	{
-		if (sender is null)
-		{
-			logger.Warn("Sender is null, cannot toggle Calibre auto discovery.");
-			return;
-		}
-		if (sender is not Switch switchControl)
-		{
-			logger.Warn("Sender is not a Switch control, cannot toggle Calibre auto discovery.");
-			return;
-		}
-		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
-		settings.CalibreAutoDiscovery = switchControl.IsToggled;
-		EntryText.IsVisible = !settings.CalibreAutoDiscovery;
-		logger.Info($"Calibre auto discovery toggled to: {settings.CalibreAutoDiscovery}");
-		await viewModel.db.SaveSettings(settings);
-		logger.Info("Settings saved successfully.");
 	}
 
 	void CurrentPage_Unloaded(object? sender, EventArgs? e)
 	{
-		horizontalStacklayout.Remove(switchController);
-		switchController.Toggled -= Switch_Toggled;
-		grid.Remove(EntryText);
-		EntryText.Completed -= Entry_Completed;
+		Loaded -= CurrentPage_Loaded;
+		Unloaded -= CurrentPage_Unloaded;
+		viewModel.CloseRequested -= ViewModel_CloseRequested;
 	}
 
-	async void Entry_Completed(object? sender, EventArgs? e)
+	async void ViewModel_CloseRequested(object? sender, bool result)
 	{
-		if (sender is null)
+		try
 		{
-			logger.Warn("Sender is null, cannot process completed event.");
-			return;
+			await CloseAsync(result);
 		}
-		if (sender is not Entry entry)
+		catch (Exception ex)
 		{
-			logger.Warn("Sender is not an Entry control, cannot process completed event.");
-			return;
+			logger.Error($"Failed to close Calibre settings popup: {ex.Message}");
 		}
-		logger.Info("Entry completed event triggered.");
-		var text = entry.Text;
-
-		if (string.IsNullOrWhiteSpace(text))
-		{
-			logger.Warn("URL is empty or whitespace. Please enter a valid URL.");
-			return;
-		}
-		logger.Info($"Processing URL: {text}");
-
-		var settings = await viewModel.db.GetSettings() ?? new Models.Settings();
-		var uri = new Uri(text);
-		settings.IPAddress = string.Concat(uri.Host, uri.AbsolutePath.AsSpan(1));
-		settings.UrlPrefix = uri.Scheme;
-		settings.Port = uri.Port;
-		await viewModel.db.SaveSettings(settings);
-		logger.Info($"URL updated to: {settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}");
 	}
 }

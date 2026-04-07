@@ -25,8 +25,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 
-	Popup settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
-
 	public CalibrePageViewModel()
 	{
 		Books = [];
@@ -75,10 +73,22 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <remarks>Clears the current book list before displaying the settings page to ensure any changes to server
 	/// address or other settings are reflected.</remarks>
 	[RelayCommand]
-	public void Settings()
+	public async Task Settings(CancellationToken token = default)
 	{
-		settingsPopup = new CalibreSettingsPage(new CalibreSettingsPageViewModel());
-		Shell.Current.ShowPopup(settingsPopup);
+		token.ThrowIfCancellationRequested();
+
+		var popup = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<CalibreSettingsPage>() ?? throw new InvalidOperationException("Calibre settings popup is not available.");
+		PopupOptions options = new()
+		{
+			CanBeDismissedByTappingOutsideOfPopup = false,
+		};
+
+		var result = await Shell.Current.ShowPopupAsync<bool>(popup, options, token);
+		if (result.Result)
+		{
+			EmptyLabelText = "Calibre settings verified. Tap refresh to load books from the saved server.";
+			await ShowInfoToastAsync("Calibre settings verified and saved.");
+		}
 	}
 
 	/// <summary>
@@ -148,22 +158,45 @@ public partial class CalibrePageViewModel : BaseViewModel
 		Logger.Info("Initializing Url...");
 		var settings = await db.GetSettings() ?? new Settings();
 
-		if (!settings.CalibreAutoDiscovery)
+		if (settings.CalibreAutoDiscovery)
 		{
 			Logger.Info("Calibre auto discovery is enabled, initializing IP address...");
-			EmptyLabelText = "Connecting to Calibre server...\nPlease wait while the server is being discovered.";
-			(settings.IPAddress, settings.Port) = await InitializeIpAddress().ConfigureAwait(true);
+			EmptyLabelText = HasSavedEndpoint(settings)
+				? "Connecting to Calibre server...\nPlease wait while the saved server is being checked."
+				: "Connecting to Calibre server...\nPlease wait while the server is being discovered.";
+
+			CalibreServerResolution endpointResolution = await ResolveServerAddressAsync(settings, CancellationTokenSource.Token).ConfigureAwait(true);
+			settings.UrlPrefix = endpointResolution.Address.UrlPrefix;
+			settings.IPAddress = endpointResolution.Address.IPAddress;
+			settings.Port = endpointResolution.Address.Port;
 			if (settings.IPAddress == string.Empty || settings.Port == 0)
 			{
 				Logger.Warn("No Calibre servers found using Bonjour. Please check your network connection.");
 				EmptyLabelText = "No Calibre servers found on the network using Bonjour.\nPlease check your network connection.";
 				return;
 			}
+			EmptyLabelText = endpointResolution.UsedSavedEndpoint
+				? "Connecting to Calibre server...\nPlease wait while the saved server is being loaded."
+				: "Connecting to Calibre server...\nPlease wait while the discovered server is being loaded.";
+			settings.CalibreManualUrlPrefix = settings.UrlPrefix;
+			settings.CalibreManualIPAddress = settings.IPAddress;
+			settings.CalibreManualPort = settings.Port;
 			await db.SaveSettings(settings).ConfigureAwait(false);
 		}
 		else
 		{
-			Logger.Info("Calibre auto discovery is disabled, using settings from database.");
+			if (!TryGetManualSettings(settings, out CalibreServerAddress manualSettings))
+			{
+				Logger.Warn("Calibre manual settings are incomplete. Prompting the user to update settings.");
+				EmptyLabelText = "Enter and verify a manual Calibre server address in Settings before loading books.";
+				return;
+			}
+
+			settings.UrlPrefix = manualSettings.UrlPrefix;
+			settings.IPAddress = manualSettings.IPAddress;
+			settings.Port = manualSettings.Port;
+			await db.SaveSettings(settings).ConfigureAwait(false);
+			Logger.Info("Calibre auto discovery is disabled, using verified manual settings from the database.");
 			EmptyLabelText = "Connecting to Calibre server...\nPlease wait while the server is being loaded.";
 		}
 
@@ -316,34 +349,96 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// found, it sets the base URL to the first discovered server's address. If no servers are found, a default base URL
 	/// is used.</remarks>
 	/// <returns>A task that represents the asynchronous operation.</returns>
-	async Task<(string IPAddress, int Port)> InitializeIpAddress()
+	async Task<CalibreServerResolution> ResolveServerAddressAsync(Settings settings, CancellationToken token)
 	{
-		var db = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException("Database service is not available.");
-		var settings = await db.GetSettings() ?? new Settings();
-		var urlPrefix = settings.UrlPrefix;
-		var baseUrl = $"{urlPrefix}://{settings.IPAddress}:{settings.Port}";
+		token.ThrowIfCancellationRequested();
 
-		List<(string IpAddress, int Port)> servers = [];
+		if (await TryGetReachableSavedEndpointAsync(settings, token).ConfigureAwait(false) is CalibreServerAddress cachedEndpoint)
+		{
+			Logger.Info($"Using previously verified Calibre endpoint at {cachedEndpoint.UrlPrefix}://{cachedEndpoint.IPAddress}:{cachedEndpoint.Port} before network discovery.");
+			return new CalibreServerResolution(cachedEndpoint, true);
+		}
+
 		if (settings.CalibreAutoDiscovery)
 		{
-			servers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
-			if (servers.Count == 0)
+			List<(string IpAddress, int Port)> discoveredServers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+			if (discoveredServers.Count == 0)
 			{
-				return (string.Empty, 0);
+				return new CalibreServerResolution(new CalibreServerAddress(string.Empty, string.Empty, 0), false);
 			}
-			baseUrl = $"{urlPrefix}://{servers[0].IpAddress}:{servers[0].Port}";
+
+			CalibreServerAddress discoveredServer = new(settings.UrlPrefix, discoveredServers[0].IpAddress, discoveredServers[0].Port);
+			Logger.Info($"Using discovered Calibre server at {discoveredServer.UrlPrefix}://{discoveredServer.IPAddress}:{discoveredServer.Port}");
+			return new CalibreServerResolution(discoveredServer, false);
 		}
 
-		if (servers.Count > 1)
-		{
-			Logger.Info($"Using discovered Calibre server at {baseUrl}");
-		}
-		else
-		{
-			servers.Add((settings.IPAddress, settings.Port));
-			Logger.Warn("No Calibre servers found. Using default base URL.");
-		}
-
-		return (servers[0].IpAddress, servers[0].Port);
+		Logger.Warn("No Calibre servers found. Using default base URL.");
+		return new CalibreServerResolution(new CalibreServerAddress(settings.UrlPrefix, settings.IPAddress, settings.Port), false);
 	}
+
+	static bool HasSavedEndpoint(Settings settings)
+		=> GetSavedEndpoints(settings).Any();
+
+	static async Task<CalibreServerAddress?> TryGetReachableSavedEndpointAsync(Settings settings, CancellationToken token)
+	{
+		foreach (var endpoint in GetSavedEndpoints(settings))
+		{
+			token.ThrowIfCancellationRequested();
+
+			string url = $"{endpoint.UrlPrefix}://{endpoint.IPAddress}:{endpoint.Port}/opds";
+			if (await NetworkChecker.ValidateNetworkConnection(url, token).ConfigureAwait(false))
+			{
+				return endpoint;
+			}
+		}
+
+		return null;
+	}
+
+	static IEnumerable<CalibreServerAddress> GetSavedEndpoints(Settings settings)
+	{
+		HashSet<string> seenEndpoints = new(StringComparer.OrdinalIgnoreCase);
+		foreach (var endpoint in new[]
+		{
+			TryCreateSavedEndpoint(settings.UrlPrefix, settings.IPAddress, settings.Port),
+			TryCreateSavedEndpoint(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort),
+		})
+		{
+			if (endpoint is not CalibreServerAddress candidate)
+			{
+				continue;
+			}
+
+			string key = $"{candidate.UrlPrefix}://{candidate.IPAddress}:{candidate.Port}";
+			if (seenEndpoints.Add(key))
+			{
+				yield return candidate;
+			}
+		}
+	}
+
+	static CalibreServerAddress? TryCreateSavedEndpoint(string prefix, string host, int port)
+	{
+		if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(host) || port <= 0)
+		{
+			return null;
+		}
+
+		return new CalibreServerAddress(prefix, host, port);
+	}
+
+	static bool TryGetManualSettings(Settings settings, out CalibreServerAddress manualSettings)
+	{
+		if (string.IsNullOrWhiteSpace(settings.CalibreManualIPAddress) || string.IsNullOrWhiteSpace(settings.CalibreManualUrlPrefix) || settings.CalibreManualPort <= 0)
+		{
+			manualSettings = default;
+			return false;
+		}
+
+		manualSettings = new CalibreServerAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
+		return true;
+	}
+
+	readonly record struct CalibreServerAddress(string UrlPrefix, string IPAddress, int Port);
+	readonly record struct CalibreServerResolution(CalibreServerAddress Address, bool UsedSavedEndpoint);
 }

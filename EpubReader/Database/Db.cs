@@ -11,6 +11,10 @@ namespace EpubReader.Database;
 public partial class Db : IDb
 {
 	bool isInitialized = false;
+	const string textColumnType = "TEXT";
+	const string integerColumnType = "INTEGER";
+	const string realColumnType = "REAL";
+	const string dateTimeColumnType = "DATETIME";
 	static readonly string dbErrorMsg = "Database connection is not initialized.";
 	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
@@ -63,7 +67,7 @@ public partial class Db : IDb
 		await EnsureColumnsAsync(
 			connection,
 			"settings",
-			[("LineSpacing", "TEXT"), ("TextAlignment", "TEXT"), ("ParagraphSpacing", "TEXT"), ("BodyHyphens", "TEXT"), ("LetterSpacing", "TEXT"), ("WordSpacing", "TEXT")],
+			[("LineSpacing", textColumnType), ("TextAlignment", textColumnType), ("ParagraphSpacing", textColumnType), ("BodyHyphens", textColumnType), ("LetterSpacing", textColumnType), ("WordSpacing", textColumnType), ("CalibreManualPort", integerColumnType), ("CalibreManualIPAddress", textColumnType), ("CalibreManualUrlPrefix", textColumnType)],
 			cancellationToken);
 	}
 
@@ -72,7 +76,7 @@ public partial class Db : IDb
 		await EnsureColumnsAsync(
 			connection,
 			"Book",
-			[("LastOpenedDate", "DATETIME")],
+			[("LastOpenedDate", dateTimeColumnType)],
 			cancellationToken);
 	}
 
@@ -83,11 +87,11 @@ public partial class Db : IDb
 			connection,
 			"Book",
 			[
-				("MediaOverlayEnabled", "INTEGER"),
-				("MediaOverlayChapter", "INTEGER"),
-				("MediaOverlaySegmentIndex", "INTEGER"),
-				("MediaOverlayPositionSeconds", "REAL"),
-				("MediaOverlayFragmentId", "TEXT")
+				("MediaOverlayEnabled", integerColumnType),
+				("MediaOverlayChapter", integerColumnType),
+				("MediaOverlaySegmentIndex", integerColumnType),
+				("MediaOverlayPositionSeconds", realColumnType),
+				("MediaOverlayFragmentId", textColumnType)
 			],
 			cancellationToken);
 	}

@@ -112,4 +112,22 @@ public class Settings
 	/// </summary>
 	[Column("UrlPrefix")]
 	public string UrlPrefix { get; set; } = "http"; // Default URL prefix for Calibre server
+
+	/// <summary>
+	/// Gets or sets the user-specified Calibre server port used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualPort")]
+	public int CalibreManualPort { get; set; } = 8080;
+
+	/// <summary>
+	/// Gets or sets the user-specified Calibre server host or IP address used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualIPAddress")]
+	public string CalibreManualIPAddress { get; set; } = "localhost";
+
+	/// <summary>
+	/// Gets or sets the user-specified URL prefix used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualUrlPrefix")]
+	public string CalibreManualUrlPrefix { get; set; } = "http";
 }
