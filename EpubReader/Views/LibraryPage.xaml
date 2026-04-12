@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:model="clr-namespace:EpubReader.Models"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    x:DataType="LibraryViewModel"
+    x:DataType="viewModel:LibraryViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
 
-        <ContentPage.ToolbarItems>
+    <ContentPage.ToolbarItems>
         <ToolbarItem
             Command="{Binding CalibreCommand}"
             IconImageSource="globe_book_24dp.png"
@@ -101,7 +105,7 @@
             </CollectionView.ItemsLayout>
 
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="Book">
+                <DataTemplate x:DataType="model:Book">
                     <Grid Margin="4" Padding="4">
                         <SwipeView>
                             <SwipeView.RightItems>
@@ -109,7 +113,7 @@
 
                                     <SwipeItem
                                         BackgroundColor="LightGray"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=RemoveBookCommand}"
+                                        Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:LibraryViewModel}}, Path=RemoveBookCommand}"
                                         CommandParameter="{Binding .}"
                                         IconImageSource="delete.png"
                                         Text="Delete" />
@@ -131,7 +135,7 @@
                                         <FlyoutBase.ContextFlyout>
                                             <MenuFlyout>
                                                 <MenuFlyoutItem
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=RemoveBookCommand}"
+                                                    Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:LibraryViewModel}}, Path=RemoveBookCommand}"
                                                     CommandParameter="{Binding .}"
                                                     IconImageSource="delete.png"
                                                     Text="Delete" />
@@ -139,8 +143,7 @@
                                         </FlyoutBase.ContextFlyout>
 
                                         <ffimageloading:CachedImage.GestureRecognizers>
-                                            <TapGestureRecognizer  Command="{Binding Source={RelativeSource AncestorType={x:Type LibraryViewModel}}, Path=GotoBookDetailsCommand}"
-                                                                   CommandParameter="{Binding .}" />
+                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:LibraryViewModel}}, Path=GotoBookDetailsCommand}" CommandParameter="{Binding .}" />
                                         </ffimageloading:CachedImage.GestureRecognizers>
                                     </ffimageloading:CachedImage>
 

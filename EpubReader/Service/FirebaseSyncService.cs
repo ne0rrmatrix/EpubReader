@@ -199,13 +199,13 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 				.Child(bookId)
 				.OnceSingleAsync<ReadingProgress>();
 
-			// Return the newest version
-			if (cloudProgress is not null && local is not null)
+			var newest = SelectNewestProgress(local, cloudProgress);
+			if (newest is not null)
 			{
-				return IsNewer(cloudProgress, local) ? cloudProgress : local;
+				await SaveLocalProgressAsync(newest, token);
 			}
 
-			return cloudProgress ?? local;
+			return newest;
 		}
 		catch (Exception ex)
 		{
@@ -226,12 +226,19 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-			return await firebaseClient
+         var cloudProgress = await firebaseClient
 				.Child(usersNode)
 				.Child(userId!)
 				.Child(booksNode)
 				.Child(bookId)
 				.OnceSingleAsync<ReadingProgress>();
+
+			if (cloudProgress is not null)
+			{
+				await SaveLocalProgressAsync(cloudProgress, token);
+			}
+
+			return cloudProgress;
 		}
 		catch (Exception ex)
 		{
@@ -298,21 +305,16 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-			var subscription = firebaseClient
+           var subscription = firebaseClient
 				.Child(usersNode)
 				.Child(userId!)
 				.Child(booksNode)
 				.AsObservable<ReadingProgress>()
 				.Where(change => change.EventType == Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
+             .Where(change => change.Object is not null)
+				.SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object!, change.Key, ct)))
 				.Subscribe(
-					onNext: change =>
-					{
-						if (change.Object is not null && change.Object.DeviceId != deviceId)
-						{
-							Trace.TraceInformation($"Remote change detected for {change.Key} from {change.Object.DeviceId}");
-							ProgressSynced?.Invoke(this, change.Object);
-						}
-					},
+					onNext: _ => { },
 					onError: ex => Trace.TraceError($"Remote subscription error: {ex.Message}"));
 
 			subscriptions.Add(subscription);
@@ -562,11 +564,18 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 				// Cloud entry may not exist; proceed with push
 			}
 
-			// Apply latest-timestamp-wins for date fields
-			if (cloudProgress is not null)
+			if (cloudProgress is not null && IsNewer(cloudProgress, progress))
 			{
-				progress = ReconcileDateFields(progress, cloudProgress);
+				var newestCloudProgress = ReconcileDateFields(cloudProgress, progress);
+				await SaveLocalProgressAsync(newestCloudProgress, token);
+				ProgressSynced?.Invoke(this, newestCloudProgress);
+				Trace.TraceInformation($"Skipped cloud overwrite for {progress.BookId}; remote position is newer.");
+				return;
 			}
+
+			progress = cloudProgress is null
+				? progress
+				: ReconcileDateFields(progress, cloudProgress);
 
 			await firebaseClient
 				.Child(usersNode)
@@ -584,6 +593,25 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		{
 			Trace.TraceError($"Cloud sync failed for {progress.BookId}: {ex.Message}");
 			await QueueProgressAsync(progress, token);
+		}
+	}
+
+    async Task HandleRemoteProgressChangeAsync(ReadingProgress progress, string? key, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+		ArgumentNullException.ThrowIfNull(progress);
+
+		var localProgress = await GetLocalProgressAsync(progress.BookId, token);
+		var newest = SelectNewestProgress(localProgress, progress);
+		if (newest is not null)
+		{
+			await SaveLocalProgressAsync(newest, token);
+		}
+
+		if (!string.Equals(progress.DeviceId, deviceId, StringComparison.Ordinal))
+		{
+			Trace.TraceInformation($"Remote change detected for {key ?? progress.BookId} from {progress.DeviceId}");
+			ProgressSynced?.Invoke(this, newest ?? progress);
 		}
 	}
 
@@ -626,12 +654,31 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 	static bool IsNewer(ReadingProgress first, ReadingProgress second)
 	{
-		if (DateTimeOffset.TryParse(first.LastUpdated, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var firstTime) &&
-			DateTimeOffset.TryParse(second.LastUpdated, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var secondTime))
+      return ParseTimestamp(first.LastUpdated) > ParseTimestamp(second.LastUpdated);
+	}
+
+	static ReadingProgress? SelectNewestProgress(ReadingProgress? local, ReadingProgress? cloud)
+	{
+		if (local is null)
 		{
-			return firstTime > secondTime;
+			return cloud;
 		}
-		return false;
+
+		if (cloud is null)
+		{
+			return local;
+		}
+
+		return IsNewer(cloud, local)
+			? ReconcileDateFields(cloud, local)
+			: ReconcileDateFields(local, cloud);
+	}
+
+	static DateTimeOffset ParseTimestamp(string? timestamp)
+	{
+		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+			? parsed
+			: DateTimeOffset.MinValue;
 	}
 
 	void EnsureUserSet()

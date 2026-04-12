@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <toolkit:Popup
     x:Class="EpubReader.Views.CalibreSettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converter="clr-namespace:EpubReader.Converter"
+    xmlns:model="clr-namespace:EpubReader.Models"
     xmlns:system="clr-namespace:System;assembly=mscorlib"
-    x:DataType="CalibreSettingsPageViewModel"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:DataType="viewModel:CalibreSettingsPageViewModel"
     x:TypeArguments="system:Boolean"
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
@@ -51,9 +56,7 @@
                     </Grid>
                 </Border>
 
-                <VerticalStackLayout
-                    IsVisible="{Binding IsManualAddressVisible}"
-                    Spacing="6">
+                <VerticalStackLayout IsVisible="{Binding IsManualAddressVisible}" Spacing="6">
                     <Label FontAttributes="Bold" Text="Manual server address" />
                     <Entry
                         ClearButtonVisibility="WhileEditing"

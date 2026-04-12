@@ -141,6 +141,25 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	}
 
 	/// <summary>
+	/// Shows an informational snackbar with an optional action.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="action">The action to invoke when the user selects the action button.</param>
+	/// <param name="actionButtonText">The action button text.</param>
+	/// <param name="token">Cancellation token.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	public async Task ShowActionSnackbarAsync(string message, Action action, string actionButtonText, CancellationToken token = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(message);
+		ArgumentNullException.ThrowIfNull(action);
+		ArgumentException.ThrowIfNullOrWhiteSpace(actionButtonText);
+
+		await Dispatcher.DispatchAsync(async () =>
+			await Snackbar.Make(message, action, actionButtonText, TimeSpan.FromSeconds(6)).Show(token));
+		Logger.Info(message);
+	}
+
+	/// <summary>
 	/// Shows an error toast message.
 	/// </summary>
 	/// <param name="message">The message to display.</param>

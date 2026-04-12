@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.RecentBooksPage"
-    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
-    x:DataType="RecentBooksViewModel"
+    xmlns:model="clr-namespace:EpubReader.Models"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:DataType="viewModel:RecentBooksViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}, Path=CalibreCommand}"
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=CalibreCommand}"
             IconImageSource="globe_book_24dp.png"
             Order="Primary" />
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}, Path=SettingsCommand}"
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=SettingsCommand}"
             IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
@@ -57,7 +61,7 @@
             </CollectionView.ItemsLayout>
 
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="Book">
+                <DataTemplate x:DataType="model:Book">
                     <Grid Margin="4" Padding="4">
                         <Border Style="{x:StaticResource EbookCardStyle}">
                             <VerticalStackLayout
@@ -69,8 +73,7 @@
                                     HeightRequest="250"
                                     Source="{Binding CoverImagePath}">
                                     <ffimageloading:CachedImage.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding GotoBookDetailsCommand, x:DataType=RecentBooksViewModel, Source={RelativeSource AncestorType={x:Type RecentBooksViewModel}}}" 
-                                                              CommandParameter="{Binding .}" />
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=GotoBookDetailsCommand}" CommandParameter="{Binding .}" />
                                     </ffimageloading:CachedImage.GestureRecognizers>
                                 </ffimageloading:CachedImage>
 

@@ -31,8 +31,10 @@ This file tells an AI coding agent how to be immediately productive in the EpubR
 - **MVVM / messaging patterns**
   - ViewModels inherit `BaseViewModel : ObservableObject`.
   - Properties use `[ObservableProperty]` and commands use `[RelayCommand]` (source-generated code used broadly).
+  - Prefer `[ObservableProperty]` for bindable view model properties in this repo.
   - Cross-VM communication uses `WeakReferenceMessenger.Default.Send(...)` with message classes under `Messages/`.
   - ViewModels often `Dispose()` and unregister from messages.
+  - Use view models and MVVM patterns for UI components in this repo.
 
 - **Platform integration notes**
   - Platform-specific behavior is implemented via files with platform suffixes (`*.android.cs`, `*.macios.cs`, `*.windows.cs`).
@@ -177,8 +179,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 {
     token.ThrowIfCancellationRequested();
     // implementation
-}
-**ViewModel with Messaging**:public partial class BookViewModel : BaseViewModel
+}**ViewModel with Messaging**:public partial class BookViewModel : BaseViewModel
 {
     [ObservableProperty] Book? currentBook;
     
@@ -195,9 +196,11 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
         WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
         base.Dispose();
     }
-}
-**Platform-Specific Registration in MauiProgram**:#if ANDROID
+}**Platform-Specific Registration in MauiProgram**:#if ANDROID
 FirebaseConfigLoader.InjectFirebaseSecrets();
 #endif
+### Floating-Point Comparisons
+- When comparing floating-point values, use explicit epsilon ranges and avoid equality-style fallbacks in nullable comparison helpers.
+
 ### Reader Architecture
 - Keep `index.html` plus the iframe, but use only one readiness event for the initial iframe load path.

@@ -89,8 +89,8 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.51" />
     <PackageReference Include="Microsoft.Maui.Core" Version="10.0.51" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="99.0.0-preview2298" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="99.0.0-preview2298" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="14.1.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.9" />
@@ -158,6 +158,12 @@
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <GoogleServicesJson Include="Resources\Raw\google-services.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <MauiXaml Update="Views\SwitchProgressPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
   </ItemGroup>
   
   <!-- Fixes Static Registrar causing Linker error: https://github.com/xamarin/xamarin-macios/blob/main/docs/managed-static-registrar.md -->
