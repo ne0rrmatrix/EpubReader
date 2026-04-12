@@ -14,31 +14,27 @@
     <Border
         Margin="12"
         Padding="20"
-        BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor}, Dark={StaticResource AppBackgroundDarkColor}}"
-        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+        BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
+                                          Dark={StaticResource AppBackgroundDarkColor}}"
+        Stroke="{AppThemeBinding Light={StaticResource Gray300},
+                                 Dark={StaticResource Gray700}}"
         StrokeShape="RoundRectangle 16">
         <VerticalStackLayout Spacing="16">
             <Label
                 FontAttributes="Bold"
                 FontSize="18"
-                Text="{Binding Title}"
-                HorizontalTextAlignment="Center" />
+                HorizontalTextAlignment="Center"
+                Text="{Binding Title}" />
 
             <Label
                 HorizontalTextAlignment="Center"
                 LineBreakMode="WordWrap"
                 Text="{Binding Message}" />
 
-            <HorizontalStackLayout
-                HorizontalOptions="Center"
-                Spacing="12">
-                <Button
-                    Command="{Binding CancelCommand}"
-                    Text="{Binding CancelText}" />
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                <Button Command="{Binding CancelCommand}" Text="{Binding CancelText}" />
 
-                <Button
-                    Command="{Binding ConfirmCommand}"
-                    Text="{Binding ConfirmText}" />
+                <Button Command="{Binding ConfirmCommand}" Text="{Binding ConfirmText}" />
             </HorizontalStackLayout>
         </VerticalStackLayout>
     </Border>
