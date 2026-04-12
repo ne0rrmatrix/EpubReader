@@ -3,7 +3,7 @@
 public partial class CalibreSettingsPageViewModel : BaseViewModel
 {
 	const string defaultCalibrePrefix = "http";
- static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPageViewModel>();
+	static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPageViewModel>();
 	string loadedManualServerAddress = string.Empty;
 	CancellationTokenSource? settingsOperationCancellationTokenSource;
 
@@ -63,11 +63,11 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 				settings.CalibreManualPort = Port;
 				
 				await db.SaveSettings(settings, operationCancellationTokenSource.Token);
-					loadedManualServerAddress = BuildAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
-			SavedConfigurationSummary = $"Saved connection: {BuildAddress("http", settings.CalibreManualIPAddress, settings.CalibreManualPort)}";
-			StatusMessage = "Connection verified and settings saved.";
-			logger.Info($"Calibre settings saved successfully using {(IsAutoConfigEnabled ? "auto configuration" : "manual configuration")}: {SavedConfigurationSummary}");
-			await ShowInfoToastAsync("Calibre connection verified and settings saved.");
+				loadedManualServerAddress = BuildAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
+				SavedConfigurationSummary = $"Saved connection: {BuildAddress("http", settings.CalibreManualIPAddress, settings.CalibreManualPort)}";
+				StatusMessage = "Connection verified and settings saved.";
+				logger.Info($"Calibre settings saved successfully using {(IsAutoConfigEnabled ? "auto configuration" : "manual configuration")}: {SavedConfigurationSummary}");
+				await ShowInfoToastAsync("Calibre connection verified and settings saved.");
 				SavedConfigurationSummary = $"Saved connection: ";
 				logger.Info($"Discovered Calibre server at http://{settings.CalibreManualIPAddress}:{settings.CalibreManualPort} during settings save.");
 				logger.Info($"Calibre settings saved successfully using {(IsAutoConfigEnabled ? "auto configuration" : "manual configuration")}: {SavedConfigurationSummary}");

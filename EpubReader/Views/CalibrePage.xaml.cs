@@ -2,7 +2,7 @@ namespace EpubReader.Views;
 
 public partial class CalibrePage : ContentPage
 {
-  static readonly ILogger logger = AppLogger.CreateLogger<CalibrePage>();
+	static readonly ILogger logger = AppLogger.CreateLogger<CalibrePage>();
 	CalibrePageViewModel viewModel => (CalibrePageViewModel)BindingContext;
 
 	public CalibrePage(CalibrePageViewModel viewModel)
