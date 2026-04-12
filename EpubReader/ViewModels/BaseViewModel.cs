@@ -27,7 +27,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	/// <summary>
 	/// Gets the logger instance associated with the <see cref="BaseViewModel"/>.
 	/// </summary>
-   /// <remarks>This logger is used for logging messages related to the operations and state of the current view model.</remarks>
+	/// <remarks>This logger is used for logging messages related to the operations and state of the current view model.</remarks>
 	public ILogger Logger { get; }
 	/// <summary>
 	/// Gets the dispatcher associated with the current application.
@@ -49,7 +49,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 
 	public BaseViewModel()
 	{
-       Logger = AppLogger.CreateLogger(GetType().FullName ?? GetType().Name);
+		Logger = AppLogger.CreateLogger(GetType().FullName ?? GetType().Name);
 		Book = new();
 #if ANDROID
 		ArgumentNullException.ThrowIfNull(Application.Current);

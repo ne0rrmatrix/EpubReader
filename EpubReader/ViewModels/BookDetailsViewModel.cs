@@ -113,7 +113,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};
-			
+
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
 
 			if (result.WasDismissedByTappingOutsideOfPopup)

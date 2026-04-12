@@ -109,7 +109,7 @@ public static partial class EbookService
 	/// </returns>
 	public static string CombineChapters(Book book)
 	{
-       ArgumentNullException.ThrowIfNull(book);
+		ArgumentNullException.ThrowIfNull(book);
 
 		var sb = new StringBuilder();
 		Dictionary<string, string> chapterTargets = new(StringComparer.OrdinalIgnoreCase);
@@ -168,7 +168,7 @@ public static partial class EbookService
 			sb.AppendLine($"         data-chapter-index=\"{i}\"");
 			sb.AppendLine($"         data-chapter-title=\"{System.Net.WebUtility.HtmlEncode(chapter.Title)}\"");
 			sb.AppendLine($"         data-chapter-filename=\"{chapter.FileName}\">");
-          sb.AppendLine(HtmlAgilityPackExtensions.PrepareBodyContentForCombinedDocument(chapter.HtmlFile, chapterId, chapterTargets));
+			sb.AppendLine(HtmlAgilityPackExtensions.PrepareBodyContentForCombinedDocument(chapter.HtmlFile, chapterId, chapterTargets));
 			sb.AppendLine("</section>");
 		}
 
@@ -399,7 +399,7 @@ public static partial class EbookService
 		var resources = new List<MediaOverlayAudioResource>();
 		if (documents.Count == 0)
 		{
-           logger.Info("No media overlay documents available for audio extraction.");
+			logger.Info("No media overlay documents available for audio extraction.");
 			return resources;
 		}
 
@@ -408,16 +408,16 @@ public static partial class EbookService
 
 		foreach (var document in documents)
 		{
-          var extractedForDocument = 0;
+			var extractedForDocument = 0;
 			var missingForDocument = 0;
 			foreach (var source in document.FlattenedNodes
 												.Select(node => node.Audio?.Source)
 												.Where(src => !string.IsNullOrWhiteSpace(src)))
 			{
-             if (!TryResolveMediaOverlayAudioFile(book, document, source!, out var file, out var normalized))
+				if (!TryResolveMediaOverlayAudioFile(book, document, source!, out var file, out var normalized))
 				{
-                   logger.Warn($"Missing media overlay audio resource: {source}");
-                   missingForDocument++;
+					logger.Warn($"Missing media overlay audio resource: {source}");
+					missingForDocument++;
 					continue;
 				}
 
@@ -435,7 +435,7 @@ public static partial class EbookService
 						Content = bytes,
 						ContentType = StreamExtensions.GetMimeType(source!)
 					});
-                   extractedForDocument++;
+					extractedForDocument++;
 				}
 				catch (Exception ex)
 				{
@@ -464,14 +464,14 @@ public static partial class EbookService
 			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedPath));
 	}
 
-  static bool TryResolveMediaOverlayAudioFile(EpubBookRef book, MediaOverlayDocument document, string source, out EpubLocalContentFileRef file, out string normalizedPath)
+	static bool TryResolveMediaOverlayAudioFile(EpubBookRef book, MediaOverlayDocument document, string source, out EpubLocalContentFileRef file, out string normalizedPath)
 	{
-        ArgumentNullException.ThrowIfNull(book);
+		ArgumentNullException.ThrowIfNull(book);
 		ArgumentNullException.ThrowIfNull(document);
 
 		foreach (var candidate in BuildMediaOverlayPathCandidates(document, source))
 		{
-            var match = FindLocalContentFile(book, candidate);
+			var match = FindLocalContentFile(book, candidate);
 			if (match is null)
 			{
 				continue;
@@ -482,7 +482,7 @@ public static partial class EbookService
 			return true;
 		}
 
-       file = null!;
+		file = null!;
 		normalizedPath = string.Empty;
 		return false;
 	}
@@ -492,20 +492,20 @@ public static partial class EbookService
 		var normalizedSource = CollapseRelativeSegments(MediaOverlayPathHelper.Normalize(source));
 		if (!string.IsNullOrEmpty(normalizedSource))
 		{
-            yield return normalizedSource;
+			yield return normalizedSource;
 		}
 
-       var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
+		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
 		var directory = ExtractDirectory(normalizedDocumentHref);
-        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(normalizedSource))
+		if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(normalizedSource))
 		{
-            yield break;
+			yield break;
 		}
 
-     var combined = CollapseRelativeSegments($"{directory}{normalizedSource}");
+		var combined = CollapseRelativeSegments($"{directory}{normalizedSource}");
 		if (!string.Equals(combined, normalizedSource, StringComparison.OrdinalIgnoreCase))
 		{
-          yield return combined;
+			yield return combined;
 		}
 	}
 

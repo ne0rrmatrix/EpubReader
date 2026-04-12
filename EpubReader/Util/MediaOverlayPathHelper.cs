@@ -9,7 +9,7 @@ public static class MediaOverlayPathHelper
 			return string.Empty;
 		}
 
-        var normalized = path.Replace('\\', '/').Trim();
+		var normalized = path.Replace('\\', '/').Trim();
 		var queryIndex = normalized.IndexOf('?', StringComparison.Ordinal);
 		if (queryIndex >= 0)
 		{

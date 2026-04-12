@@ -293,7 +293,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 				AlphabeticalTitleSort();
 			};
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
-			
+
 			if (result.WasDismissedByTappingOutsideOfPopup)
 			{
 				Logger.Info("Settings popup dismissed by tapping outside.");

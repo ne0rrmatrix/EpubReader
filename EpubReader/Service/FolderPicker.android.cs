@@ -15,7 +15,7 @@ namespace EpubReader.Service;
 /// folder access and file manipulation capabilities.</remarks>
 public partial class FolderPicker : IFolderPicker
 {
- static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
+	static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
 	public const int PickFolderRequestCode = 1001;
 	TaskCompletionSource<string>? folderPickedTcs;
 

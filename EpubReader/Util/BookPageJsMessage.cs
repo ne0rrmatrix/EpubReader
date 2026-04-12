@@ -17,7 +17,7 @@ public sealed class BookPageJsMessage
 	public string? Href { get; init; }
 
 	public int? Position { get; init; }
-   public int? ChapterIndex { get; init; }
+	public int? ChapterIndex { get; init; }
 	public double? Seconds { get; init; }
 
 	public bool? Enabled { get; init; }

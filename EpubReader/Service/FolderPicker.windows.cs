@@ -14,7 +14,7 @@ public partial class FolderPicker : IFolderPicker
 {
 	StorageFolder? pickedFolder;
 	static Window window => App.Current?.Windows[0] ?? throw new InvalidOperationException("Current window is null");
- static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
+	static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
 
 	/// <summary>
 	/// Prompts the user to select a folder and returns the path of the selected folder.

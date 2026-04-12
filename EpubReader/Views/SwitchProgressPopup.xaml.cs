@@ -8,7 +8,7 @@ namespace EpubReader.Views;
 /// </summary>
 public sealed partial class SwitchProgressPopup : Popup<bool>, IDisposable
 {
-   readonly SwitchProgressPopupViewModel viewModel;
+	readonly SwitchProgressPopupViewModel viewModel;
 	bool disposedValue;
 
 	/// <summary>
@@ -25,18 +25,18 @@ public sealed partial class SwitchProgressPopup : Popup<bool>, IDisposable
 		ArgumentException.ThrowIfNullOrWhiteSpace(confirmText);
 		ArgumentException.ThrowIfNullOrWhiteSpace(cancelText);
 
-      viewModel = new SwitchProgressPopupViewModel(title, message, confirmText, cancelText);
+		viewModel = new SwitchProgressPopupViewModel(title, message, confirmText, cancelText);
 		viewModel.CloseRequested += OnCloseRequested;
 		BindingContext = viewModel;
 
 		InitializeComponent();
 	}
 
-   async void OnCloseRequested(bool result)
+	async void OnCloseRequested(bool result)
 	{
-      viewModel.CloseRequested -= OnCloseRequested;
+		viewModel.CloseRequested -= OnCloseRequested;
 		await CloseAsync(result);
-       Dispose();
+		Dispose();
 	}
 
 	void Dispose(bool disposing)

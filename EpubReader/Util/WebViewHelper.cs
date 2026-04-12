@@ -33,7 +33,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	readonly IDb database = db;
 	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
-    static readonly ILogger logger = AppLogger.CreateLogger<WebViewHelper>();
+	static readonly ILogger logger = AppLogger.CreateLogger<WebViewHelper>();
 	static readonly JsonSerializerOptions mediaOverlayThemeSerializerOptions = new()
 	{
 		Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -77,7 +77,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		{
 			SettingsApplied?.Invoke();
 		});
-    }
+	}
 
 	/// <summary>
 	/// Asynchronously loads the combined HTML document into the iframe or reveals the active chapter section.
@@ -102,7 +102,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 		if (!combinedHtmlLoaded)
 		{
-           if (combinedHtmlLoadPending)
+			if (combinedHtmlLoadPending)
 			{
 				UpdatePageLabel(label, book);
 				return true;
@@ -118,7 +118,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 				throw new InvalidOperationException(message);
 			}
 
-           combinedHtmlLoadPending = true;
+			combinedHtmlLoadPending = true;
 			UpdatePageLabel(label, book);
 			return true;
 		}
@@ -132,7 +132,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	async Task<bool> EvaluateBooleanScriptAsync(string script)
 	{
 		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
-     var normalized = NormalizeJavaScriptResult(result);
+		var normalized = NormalizeJavaScriptResult(result);
 		return bool.TryParse(normalized, out var parsed) && parsed;
 	}
 
@@ -143,12 +143,12 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			return string.Empty;
 		}
 
-        var normalized = result.Trim();
+		var normalized = result.Trim();
 		for (var attempt = 0; attempt < 3; attempt++)
 		{
-         if (normalized.Length >= 2 && normalized[0] == '"' && normalized[^1] == '"')
+			if (normalized.Length >= 2 && normalized[0] == '"' && normalized[^1] == '"')
 			{
-             try
+				try
 				{
 					normalized = JsonSerializer.Deserialize<string>(normalized) ?? string.Empty;
 					continue;
@@ -161,14 +161,14 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 			if ((normalized.StartsWith('{') || normalized.StartsWith('[')) && normalized.Contains("\\\"", StringComparison.Ordinal))
 			{
-               normalized = Regex.Unescape(normalized);
+				normalized = Regex.Unescape(normalized);
 				continue;
 			}
 
 			break;
 		}
 
-     return normalized;
+		return normalized;
 	}
 
 	static void EnsureCombinedHtml(Book book)
@@ -187,7 +187,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	public void ResetCombinedState()
 	{
 		combinedHtmlLoaded = false;
-     combinedHtmlLoadPending = false;
+		combinedHtmlLoadPending = false;
 	}
 
 	/// <summary>
@@ -283,19 +283,19 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		try
 		{
-          dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
+			dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Error updating page label: {ex.Message}");
-           dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
+			dispatcher.Dispatch(() => label.Text = GetChapterTitle(book));
 		}
 	}
 
 	/// <summary>
- /// Formats the current page information for the active chapter.
+	/// Formats the current page information for the active chapter.
 	/// </summary>
-    /// <param name="book">The active book.</param>
+	/// <param name="book">The active book.</param>
 	/// <param name="currentPageNumber">The current global page number.</param>
 	/// <param name="totalPages">The total rendered page count.</param>
 	/// <returns>A formatted string with page information.</returns>
@@ -303,7 +303,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		try
 		{
-         var chapterTitle = GetChapterTitle(book);
+			var chapterTitle = GetChapterTitle(book);
 			if (totalPages <= 0)
 			{
 				return chapterTitle;
@@ -314,7 +314,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		}
 		catch (Exception ex)
 		{
-           logger.Error($"Error formatting page info: {ex.Message}");
+			logger.Error($"Error formatting page info: {ex.Message}");
 			return GetChapterTitle(book);
 		}
 	}

@@ -270,7 +270,7 @@ public static partial class FileService
 			return "application/octet-stream";
 		}
 
-     var normalizedPath = fileName.Trim();
+		var normalizedPath = fileName.Trim();
 		if (Uri.TryCreate(normalizedPath, UriKind.Absolute, out var absoluteUri))
 		{
 			normalizedPath = absoluteUri.AbsolutePath;
@@ -296,7 +296,7 @@ public static partial class FileService
 			".jpg" or ".jpeg" => "image/jpeg",
 			".gif" => "image/gif",
 			".svg" => "image/svg+xml",
-            ".mp3" => "audio/mpeg",
+			".mp3" => "audio/mpeg",
 			".m4a" or ".m4b" or ".mp4" => "audio/mp4",
 			".aac" => "audio/aac",
 			".wav" => "audio/wav",

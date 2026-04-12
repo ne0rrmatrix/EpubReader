@@ -27,14 +27,14 @@ public static class MauiProgram
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
-       builder.Logging.ClearProviders();
+		builder.Logging.ClearProviders();
 		builder.Logging.AddProvider(new TraceLoggerProvider());
-	#if DEBUG
+#if DEBUG
 		builder.Logging.AddDebug();
 		builder.Logging.SetMinimumLevel(LogLevel.Debug);
-	#else
+#else
 		builder.Logging.SetMinimumLevel(LogLevel.Information);
-	#endif
+#endif
 		builder.UseMauiApp<App>().ConfigureFonts(fonts =>
 		{
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -161,7 +161,7 @@ public static class MauiProgram
 		builder.Services.AddTransientWithShellRoute<PrivacyPage, PrivacyPageViewModel>("privacy");
 		return builder.Build();
 	}
-	
+
 	static MauiAppBuilder RegisterFirebaseServices(this MauiAppBuilder builder)
 	{
 		builder.ConfigureLifecycleEvents(events =>
@@ -176,7 +176,7 @@ public static class MauiProgram
 
 		return builder;
 	}
-	
+
 #if ANDROID
 	static void InitializeFirebaseOnAndroid(Android.App.Activity activity)
 	{

@@ -11,7 +11,7 @@ public partial class CalibrePage : ContentPage
 		BindingContext = viewModel;
 	}
 
-    async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
+	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
 		if (e is null)
 		{
@@ -21,9 +21,9 @@ public partial class CalibrePage : ContentPage
 
 		try
 		{
-          await viewModel.SearchBooksAsync(e.NewTextValue);
+			await viewModel.SearchBooksAsync(e.NewTextValue);
 		}
-       catch (OperationCanceledException)
+		catch (OperationCanceledException)
 		{
 			logger.Info("Calibre search was cancelled.");
 		}

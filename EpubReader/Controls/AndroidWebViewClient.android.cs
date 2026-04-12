@@ -1,7 +1,7 @@
-﻿using Android.Graphics;
+﻿using System.Diagnostics;
+using Android.Graphics;
 using Android.Webkit;
 using Microsoft.Maui.Handlers;
-using System.Diagnostics;
 
 namespace EpubReader.Controls;
 

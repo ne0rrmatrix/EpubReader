@@ -9,7 +9,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	static readonly string[] androidEpubTypes = ["application/epub+zip", ".epub"];
 	static readonly string[] iOSEpubTypes = ["org.idpf.epub-container"];
 
- static readonly ILogger logger = AppLogger.CreateLogger<ProcessEpubFiles>();
+	static readonly ILogger logger = AppLogger.CreateLogger<ProcessEpubFiles>();
 	readonly IImportStateService importStateService = importStateService;
 	readonly ILibraryStateService libraryStateService = libraryStateService;
 	public readonly IFolderPicker FolderPicker = folderPicker;

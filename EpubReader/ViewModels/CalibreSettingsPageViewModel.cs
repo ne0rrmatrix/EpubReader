@@ -43,25 +43,25 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 	}
 
 	[RelayCommand(CanExecute = nameof(CanSaveSettings))]
-   async Task SaveSettingsAsync(CancellationToken token)
+	async Task SaveSettingsAsync(CancellationToken token)
 	{
 		using CancellationTokenSource operationCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
 		settingsOperationCancellationTokenSource = operationCancellationTokenSource;
 		IsBusy = true;
-		
+
 		try
 		{
-            Settings settings = await db.GetSettings(operationCancellationTokenSource.Token) ?? new Settings();
+			Settings settings = await db.GetSettings(operationCancellationTokenSource.Token) ?? new Settings();
 			settings.CalibreAutoDiscovery = IsAutoConfigEnabled;
-			
+
 			var result = await CalibreZeroConf.DiscoverCalibreServers(cancellationToken: operationCancellationTokenSource.Token); // Start discovery early to populate cache for faster verification, even if auto config is not enabled
-			if(result.Count > 0)
+			if (result.Count > 0)
 			{
 				var (IpAddress, Port) = result[0];
 				settings.CalibreManualUrlPrefix = defaultCalibrePrefix;
 				settings.CalibreManualIPAddress = IpAddress;
 				settings.CalibreManualPort = Port;
-				
+
 				await db.SaveSettings(settings, operationCancellationTokenSource.Token);
 				loadedManualServerAddress = BuildAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
 				SavedConfigurationSummary = $"Saved connection: {BuildAddress("http", settings.CalibreManualIPAddress, settings.CalibreManualPort)}";
@@ -102,9 +102,9 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 	[RelayCommand(CanExecute = nameof(CanCancel))]
 	void Cancel()
 	{
-        if (IsBusy)
+		if (IsBusy)
 		{
-            StatusMessage = "Cancelling Calibre settings update...";
+			StatusMessage = "Cancelling Calibre settings update...";
 			settingsOperationCancellationTokenSource?.Cancel();
 			return;
 		}

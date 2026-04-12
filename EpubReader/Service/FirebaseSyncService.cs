@@ -226,12 +226,12 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-         var cloudProgress = await firebaseClient
-				.Child(usersNode)
-				.Child(userId!)
-				.Child(booksNode)
-				.Child(bookId)
-				.OnceSingleAsync<ReadingProgress>();
+			var cloudProgress = await firebaseClient
+				   .Child(usersNode)
+				   .Child(userId!)
+				   .Child(booksNode)
+				   .Child(bookId)
+				   .OnceSingleAsync<ReadingProgress>();
 
 			if (cloudProgress is not null)
 			{
@@ -305,17 +305,17 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-           var subscription = firebaseClient
-				.Child(usersNode)
-				.Child(userId!)
-				.Child(booksNode)
-				.AsObservable<ReadingProgress>()
-				.Where(change => change.EventType == Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
-             .Where(change => change.Object is not null)
-				.SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object!, change.Key, ct)))
-				.Subscribe(
-					onNext: _ => { },
-					onError: ex => Trace.TraceError($"Remote subscription error: {ex.Message}"));
+			var subscription = firebaseClient
+				 .Child(usersNode)
+				 .Child(userId!)
+				 .Child(booksNode)
+				 .AsObservable<ReadingProgress>()
+				 .Where(change => change.EventType == Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
+			  .Where(change => change.Object is not null)
+				 .SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object!, change.Key, ct)))
+				 .Subscribe(
+					 onNext: _ => { },
+					 onError: ex => Trace.TraceError($"Remote subscription error: {ex.Message}"));
 
 			subscriptions.Add(subscription);
 			Trace.TraceInformation("Subscribed to real-time Firebase updates");
@@ -395,14 +395,14 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		}
 
 		var dbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
-		
+
 		// Ensure the directory exists before creating the database
 		var directory = Path.GetDirectoryName(dbPath);
 		if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
 		{
 			Directory.CreateDirectory(directory);
 		}
-		
+
 		localDb = new SQLiteAsyncConnection(dbPath, flags);
 		await localDb.CreateTableAsync<ReadingProgress>().WaitAsync(token);
 		await localDb.CreateTableAsync<SyncQueueItem>().WaitAsync(token);
@@ -596,7 +596,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		}
 	}
 
-    async Task HandleRemoteProgressChangeAsync(ReadingProgress progress, string? key, CancellationToken token)
+	async Task HandleRemoteProgressChangeAsync(ReadingProgress progress, string? key, CancellationToken token)
 	{
 		token.ThrowIfCancellationRequested();
 		ArgumentNullException.ThrowIfNull(progress);
@@ -619,7 +619,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 	{
 		// Latest-timestamp-wins conflict resolution for DateAdded and LastOpenedDate
 		// Keep the value with the more recent timestamp, or local if timestamps are equal
-		
+
 		local.DateAdded = GetNewerDateString(cloud.DateAdded, local.DateAdded);
 		local.LastOpenedDate = GetNewerDateString(cloud.LastOpenedDate, local.LastOpenedDate);
 
@@ -654,7 +654,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 	static bool IsNewer(ReadingProgress first, ReadingProgress second)
 	{
-      return ParseTimestamp(first.LastUpdated) > ParseTimestamp(second.LastUpdated);
+		return ParseTimestamp(first.LastUpdated) > ParseTimestamp(second.LastUpdated);
 	}
 
 	static ReadingProgress? SelectNewestProgress(ReadingProgress? local, ReadingProgress? cloud)

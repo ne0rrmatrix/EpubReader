@@ -11,7 +11,7 @@ namespace EpubReader.Util;
 /// </summary>
 public partial class CalibreZeroConf
 {
-  static readonly ILogger logger = AppLogger.CreateLogger<CalibreZeroConf>();
+	static readonly ILogger logger = AppLogger.CreateLogger<CalibreZeroConf>();
 
 	protected CalibreZeroConf()
 	{
@@ -22,7 +22,7 @@ public partial class CalibreZeroConf
 	/// </summary>
 	/// <param name="scanTimeSeconds">The duration in seconds to scan for services. Default is 5 seconds.</param>
 	/// <returns>A list of tuples containing the IP address and port of discovered Calibre servers.</returns>
-    public static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServers(int scanTimeSeconds = 5, CancellationToken cancellationToken = default)
+	public static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServers(int scanTimeSeconds = 5, CancellationToken cancellationToken = default)
 	{
 		TimeSpan scanTime = TimeSpan.FromSeconds(scanTimeSeconds);
 		logger.Info($"Scanning for services on the local network for {scanTimeSeconds} seconds...");
@@ -82,7 +82,7 @@ public partial class CalibreZeroConf
 				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
 			logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
 		});
-	
+
 		return calibreServers;
 	}
 }

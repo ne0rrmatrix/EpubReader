@@ -15,7 +15,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	readonly Stack<CalibreFeedNavigationState> feedNavigationStack = [];
 	public List<Book> BookList { get; set; } = [];
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	
+
 	[ObservableProperty]
 	public partial bool Cancelled { get; set; } = false;
 
@@ -29,15 +29,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public partial OpdsFeedSelection? SelectedFeedSelection { get; set; } = new();
 
 	[ObservableProperty]
-    public partial OpdsFeed Feed { get; set; } = new();
+	public partial OpdsFeed Feed { get; set; } = new();
 
 	[ObservableProperty]
-    public partial string CurrentFeedTitle { get; set; } = "Browse feeds";
+	public partial string CurrentFeedTitle { get; set; } = "Browse feeds";
 
 	[ObservableProperty]
 	public partial bool CanNavigateBack { get; set; }
 
-	[ObservableProperty]	
+	[ObservableProperty]
 	public partial string SearchText { get; set; } = string.Empty;
 
 	[ObservableProperty]
@@ -168,7 +168,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, CancellationTokenSource.Token);
 		var feedReader = new FeedReader();
-		OpdsFeed? feed = new();
+		OpdsFeed? feed = null;
 		try
 		{
 			string feedUrl = NormalizeOpdsHref(selection.FeedUrl);
@@ -185,7 +185,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			Logger.Info("Feed selection cancelled by user.");
 			return;
 		}
-		
+
 
 		if (IsNavigationFeed(feed))
 		{
@@ -203,7 +203,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 		else
 		{
-			await LoadBookFeedAsync(feed, selection.FeedUrl, selection.Title, linkedTokenSource.Token);
+			await LoadBookFeedAsync(feed, selection.FeedUrl, selection.Title);
 		}
 
 		SelectedFeedSelection = null;
@@ -239,7 +239,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			}
 
 			var searchFeed = await new FeedReader().GetFeedAsync(searchUrl, searchToken);
-			var searchResults = await BuildBooksFromFeedAsync(searchFeed, searchToken);
+			var searchResults = await BuildBooksFromFeedAsync(searchFeed);
 			Books = [.. searchResults];
 			EmptyLabelText = $"No books found matching '{SearchText}'.";
 			Logger.Info($"Loaded {searchResults.Count} search results for '{SearchText}'.");
@@ -274,7 +274,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task LoadBooks()
 	{
-       ResetFeedState();
+		ResetFeedState();
 
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
@@ -329,14 +329,14 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		Logger.Info($"Using IP address: {settings.IPAddress}, Port: {settings.Port}, prefix: {settings.UrlPrefix}");
 		calibreServerBaseUrl = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
-		
-      if (!await ValidateUrl(calibreServerBaseUrl, settings.UrlPrefix))
+
+		if (!await ValidateUrl(calibreServerBaseUrl, settings.UrlPrefix))
 		{
 			return;
 		}
-		
+
 		Logger.Info("Loading books from Calibre server...");
-      var rootFeedUrl = $"{calibreServerBaseUrl}/opds";
+		var rootFeedUrl = $"{calibreServerBaseUrl}/opds";
 		var rootFeed = await new FeedReader().GetFeedAsync(rootFeedUrl, CancellationTokenSource.Token);
 		ApplyFeedSelections(rootFeed, rootFeedUrl);
 		CurrentFeedTitle = rootFeed.Title ?? "Library";
@@ -363,12 +363,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <remarks>This method retrieves the latest feed from the specified Calibre server and processes each entry to
 	/// populate the book collection. It logs the number of books found and handles cancellation requests. If no books are
 	/// found, a warning is logged and an appropriate message is set.</remarks>
- async Task LoadBookFeedAsync(OpdsFeed feed, string feedUrl, string? feedTitle, CancellationToken token)
+	async Task LoadBookFeedAsync(OpdsFeed feed, string feedUrl, string? feedTitle)
 	{
-        Feed = feed;
+		Feed = feed;
 		currentFeedUrl = feedUrl;
 		CurrentFeedTitle = feedTitle ?? feed.Title ?? "Calibre";
-		var books = await BuildBooksFromFeedAsync(feed, token);
+		var books = await BuildBooksFromFeedAsync(feed);
 		BookList = books;
 		Books = [.. books];
 		currentFeedEmptyLabelText = $"No books found in {CurrentFeedTitle}.";
@@ -376,26 +376,23 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		if (books.Count == 0)
 		{
-          Logger.Warn($"No books found in the Calibre feed '{CurrentFeedTitle}'.");
+			Logger.Warn($"No books found in the Calibre feed '{CurrentFeedTitle}'.");
 			return;
 		}
 
 		Logger.Info($"Number of books found in '{CurrentFeedTitle}': {books.Count}");
 	}
 
-    async Task<List<Book>> BuildBooksFromFeedAsync(OpdsFeed feed, CancellationToken token)
+	async Task<List<Book>> BuildBooksFromFeedAsync(OpdsFeed feed)
 	{
-		token.ThrowIfCancellationRequested();
-
 		List<Book> books = [];
 		foreach (var entry in feed.Entries)
 		{
-          if (entry is null)
+			if (entry is null)
 			{
 				Logger.Warn("Encountered a null entry in the feed. Skipping...");
 				continue;
 			}
-           token.ThrowIfCancellationRequested();
 
 			if (CancellationTokenSource.IsCancellationRequested)
 			{
@@ -416,8 +413,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 			}
 			if (string.IsNullOrEmpty(imageUrl))
 			{
-              Logger.Warn($"Entry '{entry.Title}' is missing image URL. Generating a cover image.");
-				if(entry.Title is null)
+				Logger.Warn($"Entry '{entry.Title}' is missing image URL. Generating a cover image.");
+				if (entry.Title is null)
 				{
 					Logger.Warn("Entry title is null. Cannot generate cover image without a title. Skipping image generation.");
 					continue;
@@ -426,28 +423,32 @@ public partial class CalibrePageViewModel : BaseViewModel
 			}
 
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
-			var book = new Book
-			{
-				Title = entry.Title ?? string.Empty,
-				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
-                PublishedDate = entry.Published ?? entry.DcDate ?? DateTime.MinValue,
-				Description = entry.Content ?? entry.Summary ?? string.Empty,
-				DownloadUrl = CombineUrl(calibreServerBaseUrl, downloadUrl),
-				Thumbnail = string.IsNullOrWhiteSpace(imageUrl) ? string.Empty : CombineUrl(calibreServerBaseUrl, imageUrl),
-				Categories = [.. entry.Categories],
-				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
-			};
+			var book = await GetBook(entry, downloadUrl, imageUrl);
 			if (string.IsNullOrEmpty(imageUrl) && imageName.Length > 0)
 			{
 				Logger.Info($"Generated cover image for '{entry.Title}' because the entry is missing an image URL.");
-                book.CoverImage = imageName;
+				book.CoverImage = imageName;
 			}
-            books.Add(book);
+			books.Add(book);
 		}
 
 		return books;
 	}
 
+	async Task<Book> GetBook(OpdsEntry entry, string downloadUrl, string imageUrl)
+	{
+		return new Book
+		{
+			Title = entry.Title ?? string.Empty,
+			Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
+			PublishedDate = entry.Published ?? entry.DcDate ?? DateTime.MinValue,
+			Description = entry.Content ?? entry.Summary ?? string.Empty,
+			DownloadUrl = CombineUrl(calibreServerBaseUrl, downloadUrl),
+			Thumbnail = string.IsNullOrWhiteSpace(imageUrl) ? string.Empty : CombineUrl(calibreServerBaseUrl, imageUrl),
+			Categories = [.. entry.Categories],
+			IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
+		};
+	}
 	void ApplyFeedSelections(OpdsFeed feed, string sourceFeedUrl)
 	{
 		FeedSelections = [.. CalibrePageViewModel.CreateFeedSelections(feed, sourceFeedUrl)];
@@ -621,7 +622,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 
 		return new Uri(baseUri, relativeOrAbsoluteUrl).AbsoluteUri;
-   }
+	}
 
 	/// <summary>
 	/// Validates the specified URL to ensure it is either local or a permitted external address, and optionally checks the
@@ -763,14 +764,14 @@ public partial class CalibrePageViewModel : BaseViewModel
 		return true;
 	}
 
-  readonly record struct CalibreFeedNavigationState(
-		string CurrentFeedTitle,
-		string CurrentFeedUrl,
-		string EmptyLabelText,
-		string SearchUrlTemplate,
-		List<OpdsFeedSelection> FeedSelections,
-		List<Book> BookList,
-		List<Book> VisibleBooks);
+	readonly record struct CalibreFeedNavigationState(
+		  string CurrentFeedTitle,
+		  string CurrentFeedUrl,
+		  string EmptyLabelText,
+		  string SearchUrlTemplate,
+		  List<OpdsFeedSelection> FeedSelections,
+		  List<Book> BookList,
+		  List<Book> VisibleBooks);
 
 	readonly record struct CalibreServerAddress(string UrlPrefix, string IPAddress, int Port);
 	readonly record struct CalibreServerResolution(CalibreServerAddress Address, bool UsedSavedEndpoint);

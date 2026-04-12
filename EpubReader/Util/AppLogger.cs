@@ -117,7 +117,7 @@ public sealed partial class TraceLoggerProvider : ILoggerProvider
 		}
 	}
 
-    sealed partial class NullScope : IDisposable
+	sealed partial class NullScope : IDisposable
 	{
 		public static NullScope Instance { get; } = new();
 

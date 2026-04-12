@@ -1,6 +1,6 @@
+using System.Diagnostics;
 using EpubReader.Converter;
 using EpubReader.Util;
-using System.Diagnostics;
 
 namespace EpubReader.Service;
 

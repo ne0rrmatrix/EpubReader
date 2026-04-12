@@ -35,7 +35,7 @@ public partial class SwitchProgressPopupViewModel(string title, string message, 
 		CloseRequested?.Invoke(true);
 	}
 
-   [RelayCommand]
+	[RelayCommand]
 	void Cancel()
 	{
 		CloseRequested?.Invoke(false);

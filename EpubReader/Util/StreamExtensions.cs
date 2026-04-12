@@ -42,7 +42,7 @@ public class StreamExtensions
 	/// Returns <see cref="Stream.Null"/> if the content cannot be retrieved or the file type is unsupported.</returns>
 	public async Task<Stream> GetStream(string url, CancellationToken cancellation = default)
 	{
-     var resourcePath = NormalizeResourcePath(url);
+		var resourcePath = NormalizeResourcePath(url);
 		var fileName = Path.GetFileName(resourcePath);
 		var text = Content(resourcePath, fileName);
 		if (text is not null && IsText(resourcePath))
@@ -55,7 +55,7 @@ public class StreamExtensions
 			postDataStream.Seek(0, SeekOrigin.Begin);
 			return postDataStream;
 		}
-      var bytes = ByteContent(resourcePath, fileName);
+		var bytes = ByteContent(resourcePath, fileName);
 		if (bytes is not null)
 		{
 			MemoryStream postDataStream = new(bytes.Length);
@@ -76,7 +76,7 @@ public class StreamExtensions
 	/// returns "application/octet-stream".</returns>
 	public static string GetMimeType(string fileName)
 	{
-       var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 
 		return extension switch
 		{
@@ -86,12 +86,12 @@ public class StreamExtensions
 			".ico" => "image/x-icon",
 			".js" => "application/javascript",
 			".json" => "application/json",
-          ".smil" => "application/smil+xml",
+			".smil" => "application/smil+xml",
 			".png" => "image/png",
 			".jpg" or ".jpeg" => "image/jpeg",
 			".gif" => "image/gif",
 			".svg" => "image/svg+xml",
-            ".mp3" => "audio/mpeg",
+			".mp3" => "audio/mpeg",
 			".m4a" or ".m4b" or ".mp4" => "audio/mp4",
 			".aac" => "audio/aac",
 			".wav" => "audio/wav",
@@ -122,7 +122,7 @@ public class StreamExtensions
 	/// langword="false"/>.</returns>
 	public static bool IsText(string fileName)
 	{
-       var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 		return extension switch
 		{
 			".xhtml" => true,
@@ -132,7 +132,7 @@ public class StreamExtensions
 			".css" => true,
 			".js" => true,
 			".json" => true,
-         ".smil" => true,
+			".smil" => true,
 			_ => false,
 		};
 	}
@@ -146,7 +146,7 @@ public class StreamExtensions
 	/// <returns><see langword="true"/> if the file is considered binary based on its extension; otherwise, <see langword="false"/>.</returns>
 	public static bool IsBinary(string fileName)
 	{
-     var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 		return extension switch
 		{
 			".png" => true,
@@ -163,7 +163,7 @@ public class StreamExtensions
 			".aac" => true,
 			".wav" => true,
 			".ogg" => true,
-         ".opus" => true,
+			".opus" => true,
 			".mp4" => true,
 			".m4b" => true,
 			".pdf" => true,
@@ -211,7 +211,7 @@ public class StreamExtensions
 	/// initialized, the method returns <see langword="null"/>.</remarks>
 	/// <param name="fileName">The name of the file to search for within the book's chapters, files, and CSS.</param>
 	/// <returns>A string containing the HTML content of the file if found; otherwise, <see langword="null"/>.</returns>
-    string? Content(string resourcePath, string fileName)
+	string? Content(string resourcePath, string fileName)
 	{
 		if (Instance is null || Book is null)
 		{
@@ -227,10 +227,10 @@ public class StreamExtensions
 			return Book.CombinedHtml;
 		}
 
-      return Book.Chapters.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HtmlFile
-			?? Book.Files.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HTMLContent
-			?? Book.Css.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.Content
-			?? Book.Files.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HTMLContent;
+		return Book.Chapters.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HtmlFile
+			  ?? Book.Files.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HTMLContent
+			  ?? Book.Css.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.Content
+			  ?? Book.Files.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.HTMLContent;
 	}
 
 	/// <summary>
@@ -242,13 +242,13 @@ public class StreamExtensions
 	/// <param name="fileName">The name of the file to search for within the book's resources. The search is case-sensitive and matches any part
 	/// of the file name.</param>
 	/// <returns>A byte array containing the content of the file if found; otherwise, <see langword="null"/>.</returns>
-    byte[]? ByteContent(string resourcePath, string fileName)
+	byte[]? ByteContent(string resourcePath, string fileName)
 	{
 		if (Instance is null || Book is null)
 		{
 			return null;
 		}
-      fileName = Path.GetFileName(fileName);
+		fileName = Path.GetFileName(fileName);
 		resourcePath = NormalizeResourcePath(resourcePath);
 		return Book.Images.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.Content
 			?? Book.Fonts.FirstOrDefault(f => MatchesResource(f.FileName, resourcePath, fileName))?.Content

@@ -18,7 +18,7 @@ public partial class Db : IDb
 	static readonly string dbErrorMsg = "Database connection is not initialized.";
 	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
-   static readonly ILogger logger = AppLogger.CreateLogger<Db>();
+	static readonly ILogger logger = AppLogger.CreateLogger<Db>();
 	SQLiteAsyncConnection? conn;
 	readonly SQLite.SQLiteOpenFlags flags =
 		// open the database in read/write mode
@@ -318,7 +318,7 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-			logger.Info("Removing book");
+		logger.Info("Removing book");
 		await conn.DeleteAsync(book).WaitAsync(cancellationToken);
 	}
 
