@@ -51,6 +51,11 @@ public class NetworkChecker
 			logger.Info($"Network request failed: {e.Message}");
 			return false;
 		}
+       catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			logger.Info($"Network request to {url} was cancelled.");
+			throw;
+		}
 		catch (TaskCanceledException)
 		{
 			logger.Info("Network request timed out.");
@@ -96,7 +101,7 @@ public class NetworkChecker
 	/// <param name="url">The URL of the server whose SSL certificate is to be validated. Must be a valid URI.</param>
 	/// <returns><see langword="true"/> if the SSL certificate is valid and the server responds successfully;  otherwise, <see
 	/// langword="false"/>. </returns>
-	public static async Task<bool> ValidateSSLCertificate(string url)
+   public static async Task<bool> ValidateSSLCertificate(string url, CancellationToken cancellationToken = default)
 	{
 		bool certificateValid = false;
 
@@ -113,9 +118,19 @@ public class NetworkChecker
 
 		try
 		{
-			HttpResponseMessage response = await client.GetAsync(url);
+          HttpResponseMessage response = await client.GetAsync(url, cancellationToken);
 			response.EnsureSuccessStatusCode();
 			return certificateValid; // Return the actual certificate validation result
+		}
+      catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			logger.Info($"HTTPS request to {url} was cancelled.");
+			throw;
+		}
+		catch (TaskCanceledException)
+		{
+			logger.Info("HTTPS request timed out.");
+			return false;
 		}
 		catch (HttpRequestException e)
 		{

@@ -1,4 +1,8 @@
-﻿using Zeroconf;
+﻿#if ANDROID
+using Android.Content;
+using Android.Net.Wifi;
+#endif
+using Zeroconf;
 
 namespace EpubReader.Util;
 
@@ -18,69 +22,67 @@ public partial class CalibreZeroConf
 	/// </summary>
 	/// <param name="scanTimeSeconds">The duration in seconds to scan for services. Default is 5 seconds.</param>
 	/// <returns>A list of tuples containing the IP address and port of discovered Calibre servers.</returns>
-	public static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServers(int scanTimeSeconds = 5)
+    public static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServers(int scanTimeSeconds = 5, CancellationToken cancellationToken = default)
 	{
 		TimeSpan scanTime = TimeSpan.FromSeconds(scanTimeSeconds);
-
 		logger.Info($"Scanning for services on the local network for {scanTimeSeconds} seconds...");
 
+#if ANDROID
+		List<(string IpAddress, int Port)> calibreServers = [];
+		var ApplicationContext = Android.App.Application.Context;
+		var wifi = (WifiManager?)ApplicationContext.GetSystemService(Context.WifiService) ?? throw new InvalidOperationException("WiFi service unavailable.");
+		var mlock = wifi.CreateMulticastLock("Zeroconf lock");
+		if (mlock is null)
+		{
+			logger.Error("Failed to create multicast lock for Zeroconf discovery.");
+			return [];
+		}
 		try
 		{
-#if ANDROID
-			var calibreServers = await MainThread.InvokeOnMainThreadAsync(() => DiscoverCalibreServersOnAndroidAsync(scanTime));
-#else
-			var calibreServers = await DiscoverCalibreServersWithZeroconfAsync(scanTime);
-#endif
-			if (calibreServers.Count == 0)
-			{
-				logger.Info("No Calibre content servers found on the local network.");
-			}
-
-			return calibreServers;
+			mlock.Acquire();
+			logger.Info("Multicast lock acquired for Zeroconf discovery.");
 		}
 		catch (Exception ex)
 		{
-			logger.Error($"An error occurred during Calibre discovery: {ex.Message}");
+			logger.Error($"Failed to acquire multicast lock for Zeroconf discovery: {ex.Message}");
+			return [];
 		}
-
-		logger.Info("No Calibre content servers found on the local network.");
-		return [];
-	}
-
-	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfAsync(TimeSpan scanTime)
-	{
-		List<(string IpAddress, int Port)> calibreServers = [];
-
-		ResolveOptions resolveOptions = new("_calibre._tcp.local.")
+		finally
 		{
-			ScanTime = scanTime,
-			Retries = 3,
-			RetryDelay = TimeSpan.FromSeconds(1),
-			AllowOverlappedQueries = true
-		};
-
-		IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(resolveOptions);
-		foreach (var host in hosts)
-		{
-			logger.Info($"Discovered Host: {host.DisplayName} (IP: {host.IPAddress})");
-
-			foreach (var service in host.Services)
+			if (mlock.IsHeld)
 			{
-				logger.Info($"  Service: {service.Key} (Port: {service.Value.Port})");
-				if (IsPotentialCalibrePort(service.Value.Port) || MatchesCalibreServiceType(service.Key))
-				{
-					logger.Info($"    Potential Calibre Server Found: {host.IPAddress}:{service.Value.Port}");
-					calibreServers.Add((host.IPAddress, service.Value.Port));
-				}
+				logger.Info("Starting Zeroconf discovery on Android with multicast lock held.");
+				calibreServers = await DiscoverCalibreServersWithZeroconfInternalAsync(scanTime, cancellationToken);
+				logger.Info("Zeroconf discovery completed on Android. Releasing multicast lock.");
+				mlock.Release();
+				logger.Info("Multicast lock released after Zeroconf discovery.");
+				
+			}
+			else
+			{
+				logger.Warn("Multicast lock was not held during release attempt.");
 			}
 		}
-
 		return calibreServers;
+		
+#else
+		return await DiscoverCalibreServersWithZeroconfInternalAsync(scanTime, cancellationToken);
+#endif
 	}
 
-	static bool MatchesCalibreServiceType(string? serviceType)
-		=> !string.IsNullOrWhiteSpace(serviceType) && serviceType.Contains("_calibre._tcp", StringComparison.OrdinalIgnoreCase);
 
-	static bool IsPotentialCalibrePort(int port)
-		=> port == 8080 || port == 8081;
+	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsync(TimeSpan scanTime, CancellationToken cancellationToken)
+	{
+		List<(string IpAddress, int Port)> calibreServers = [];
+		var aService = new List<string> { "_calibre._tcp.local." };
+		await MainThread.InvokeOnMainThreadAsync(async () =>
+		{
+			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime).WaitAsync(cancellationToken);
+			calibreServers.AddRange(hosts.SelectMany(host => host.Services.Where(service => service.Value.Port == 8080 || service.Value.Port == 8081)
+				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
+			logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
+		});
+	
+		return calibreServers;
+	}
 }

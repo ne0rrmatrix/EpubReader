@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Extensions;
 using EpubReader.ODPS;
 
@@ -361,7 +361,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		if (settings.CalibreAutoDiscovery)
 		{
-			List<(string IpAddress, int Port)> discoveredServers = await CalibreZeroConf.DiscoverCalibreServers().ConfigureAwait(false);
+			List<(string IpAddress, int Port)> discoveredServers = await CalibreZeroConf.DiscoverCalibreServers(cancellationToken: token).ConfigureAwait(false);
 			if (discoveredServers.Count == 0)
 			{
 				return new CalibreServerResolution(new CalibreServerAddress(string.Empty, string.Empty, 0), false);
