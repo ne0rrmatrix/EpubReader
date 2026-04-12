@@ -160,12 +160,6 @@
     <GoogleServicesJson Include="Resources\Raw\google-services.json" />
   </ItemGroup>
 
-  <ItemGroup>
-    <MauiXaml Update="Views\SwitchProgressPopup.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </MauiXaml>
-  </ItemGroup>
-  
   <!-- Fixes Static Registrar causing Linker error: https://github.com/xamarin/xamarin-macios/blob/main/docs/managed-static-registrar.md -->
   <Target Name="SelectStaticRegistrar" AfterTargets="SelectRegistrar">
     <PropertyGroup Condition="'$(Registrar)' == 'managed-static'">

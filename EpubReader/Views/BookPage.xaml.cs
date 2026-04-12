@@ -1,8 +1,7 @@
-using CommunityToolkit.Maui.Core;
-using CommunityToolkit.Maui.Extensions;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using CommunityToolkit.Maui.Extensions;
 using Plugin.Maui.Audio;
 
 namespace EpubReader.Views;

@@ -37,11 +37,18 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
+            <HorizontalStackLayout
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Grid.Column="0">
                 <ImageButton
                     Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
@@ -84,21 +91,45 @@
             <HorizontalStackLayout
                 Grid.Row="0"
                 Grid.Column="1"
-                HorizontalOptions="Center">
+                Margin="10,10,10,0"
+                HorizontalOptions="Fill">
+                <ImageButton
+                    Padding="12,0"
+                    BackgroundColor="Transparent"
+                    Command="{Binding NavigateBackCommand}"
+                    HeightRequest="48"
+                    IsVisible="{Binding CanNavigateBack}"
+                    Source="{AppThemeBinding Dark=arrow_back.png,
+                                             Light=arrow_back_light_mode.png}"
+                    VerticalOptions="Center"
+                    WidthRequest="48" />
                 <Label
                     FontAttributes="Bold"
-                    Text="Library"
+                    LineBreakMode="TailTruncation"
+                    Text="{Binding CurrentFeedTitle}"
                     VerticalOptions="Center" />
-                <SearchBar
+                <Picker
+                    Title="Browse feeds"
                     Margin="10,0,0,0"
-                    HorizontalOptions="Fill"
-                    Placeholder="Search books..."
-                    TextChanged="OnSearchBarTextChanged"
-                    VerticalOptions="Center"
-                    WidthRequest="{OnIdiom Desktop=300,
-                                           Tablet=300,
-                                           Phone=200}" />
+                    HorizontalOptions="FillAndExpand"
+                    ItemDisplayBinding="{Binding Title}"
+                    ItemsSource="{Binding FeedSelections}"
+                    SelectedIndexChanged="OnFeedSelectionChanged"
+                    SelectedItem="{Binding SelectedFeedSelection, Mode=TwoWay}"
+                    VerticalOptions="Center" />
             </HorizontalStackLayout>
+            <SearchBar
+                Grid.Row="1"
+                Grid.Column="1"
+                Margin="10,5,10,0"
+                HorizontalOptions="Fill"
+                Placeholder="Search books..."
+                Text="{Binding SearchText}"
+                TextChanged="OnSearchBarTextChanged"
+                VerticalOptions="Center"
+                WidthRequest="{OnIdiom Desktop=300,
+                                       Tablet=300,
+                                       Phone=200}" />
         </Grid>
         <Grid Grid.Row="1">
             <CollectionView
@@ -125,6 +156,7 @@
                                 <Grid RowDefinitions="350,40" VerticalOptions="Center">
 
                                     <ffimageloading:CachedImage
+                                        x:Name="ImageName"
                                         Grid.Row="0"
                                         Aspect="AspectFit"
                                         HeightRequest="300"

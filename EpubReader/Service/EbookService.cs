@@ -767,7 +767,7 @@ public static partial class EbookService
 
 	#region Private Helper Methods - Image Processing
 
-	static byte[] GenerateCoverImage(string title)
+	public static byte[] GenerateCoverImage(string title)
 	{
 		using var bmp = new SkiaBitmapExportContext(coverImageWidth, coverImageHeight, 1.0f);
 		ICanvas canvas = bmp.Canvas;

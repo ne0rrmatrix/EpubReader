@@ -7,7 +7,15 @@ namespace EpubReader.ViewModels;
 public partial class CalibrePageViewModel : BaseViewModel
 {
 	bool isAlphabeticalSorted = false;
-
+	string calibreServerBaseUrl = string.Empty;
+	string searchUrlTemplate = string.Empty;
+	string currentFeedUrl = string.Empty;
+	string currentFeedEmptyLabelText = "No books found in Calibre library.\nPlease load books from your Calibre server.";
+	CancellationTokenSource searchCancellationTokenSource = new();
+	readonly Stack<CalibreFeedNavigationState> feedNavigationStack = [];
+	public List<Book> BookList { get; set; } = [];
+	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
+	
 	[ObservableProperty]
 	public partial bool Cancelled { get; set; } = false;
 
@@ -15,15 +23,25 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public partial ObservableCollection<Book> Books { get; set; }
 
 	[ObservableProperty]
-	public partial List<OpdsFeed> OpdsFeed { get; set; } = [];
+	public partial ObservableCollection<OpdsFeedSelection> FeedSelections { get; set; } = [];
 
 	[ObservableProperty]
-	public partial OpdsFeed Feed { get; set; } = new();
+	public partial OpdsFeedSelection? SelectedFeedSelection { get; set; } = new();
+
+	[ObservableProperty]
+    public partial OpdsFeed Feed { get; set; } = new();
+
+	[ObservableProperty]
+    public partial string CurrentFeedTitle { get; set; } = "Browse feeds";
+
+	[ObservableProperty]
+	public partial bool CanNavigateBack { get; set; }
+
+	[ObservableProperty]	
+	public partial string SearchText { get; set; } = string.Empty;
+
 	[ObservableProperty]
 	public partial string EmptyLabelText { get; set; } = "No books found in Calibre library.\nPlease load books from your Calibre server.";
-	public List<Book> BookList { get; set; } = [];
-
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 
 	public CalibrePageViewModel()
 	{
@@ -132,6 +150,120 @@ public partial class CalibrePageViewModel : BaseViewModel
 		Logger.Info("Sorting books by date (Oldest - Most Recent)");
 		Books = [.. Books.OrderByDescending(b => b.PublishedDate)];
 	}
+
+	public async Task SelectFeedAsync(OpdsFeedSelection? selection, CancellationToken token = default)
+	{
+		token.ThrowIfCancellationRequested();
+
+		if (selection is null || string.IsNullOrWhiteSpace(selection.FeedUrl))
+		{
+			return;
+		}
+
+		CancelSearchRequests();
+		if (!string.IsNullOrWhiteSpace(SearchText))
+		{
+			SearchText = string.Empty;
+		}
+
+		using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, CancellationTokenSource.Token);
+		var feedReader = new FeedReader();
+		OpdsFeed? feed = new();
+		try
+		{
+			string feedUrl = NormalizeOpdsHref(selection.FeedUrl);
+			feed = await feedReader.GetFeedAsync(feedUrl, linkedTokenSource.Token);
+		}
+		catch (HttpRequestException ex)
+		{
+			Logger.Error($"Failed to load feed from {selection.FeedUrl}: {ex.Message}");
+			await ShowInfoToastAsync("Failed to load the selected feed. Please check your network connection and try again.");
+			return;
+		}
+		catch (OperationCanceledException)
+		{
+			Logger.Info("Feed selection cancelled by user.");
+			return;
+		}
+		
+
+		if (IsNavigationFeed(feed))
+		{
+			feedNavigationStack.Push(CreateNavigationStateSnapshot());
+			UpdateNavigationState();
+			ApplyFeedSelections(feed, selection.FeedUrl);
+			CurrentFeedTitle = selection.Title;
+			currentFeedUrl = selection.FeedUrl;
+			Feed = feed;
+			BookList = [];
+			Books = [];
+			currentFeedEmptyLabelText = $"Select an entry from {selection.Title}.";
+			EmptyLabelText = currentFeedEmptyLabelText;
+			Logger.Info($"Loaded navigation feed '{selection.Title}' with {FeedSelections.Count} entries.");
+		}
+		else
+		{
+			await LoadBookFeedAsync(feed, selection.FeedUrl, selection.Title, linkedTokenSource.Token);
+		}
+
+		SelectedFeedSelection = null;
+	}
+
+	public async Task SearchBooksAsync(string? searchText, CancellationToken token = default)
+	{
+		SearchText = searchText?.Trim() ?? string.Empty;
+		ResetSearchCancellationTokenSource(token);
+		var searchToken = searchCancellationTokenSource.Token;
+
+		if (string.IsNullOrWhiteSpace(SearchText))
+		{
+			RestoreCurrentBookResults();
+			return;
+		}
+
+		try
+		{
+			await Task.Delay(300, searchToken);
+
+			if (string.IsNullOrWhiteSpace(searchUrlTemplate))
+			{
+				ApplyLocalSearch(SearchText);
+				return;
+			}
+
+			var searchUrl = BuildSearchUrl(SearchText);
+			if (string.IsNullOrWhiteSpace(searchUrl))
+			{
+				ApplyLocalSearch(SearchText);
+				return;
+			}
+
+			var searchFeed = await new FeedReader().GetFeedAsync(searchUrl, searchToken);
+			var searchResults = await BuildBooksFromFeedAsync(searchFeed, searchToken);
+			Books = [.. searchResults];
+			EmptyLabelText = $"No books found matching '{SearchText}'.";
+			Logger.Info($"Loaded {searchResults.Count} search results for '{SearchText}'.");
+		}
+		catch (OperationCanceledException)
+		{
+			Logger.Info("Calibre search request cancelled.");
+		}
+	}
+
+	[RelayCommand]
+	public void NavigateBack()
+	{
+		CancelSearchRequests();
+		SearchText = string.Empty;
+
+		if (feedNavigationStack.Count == 0)
+		{
+			return;
+		}
+
+		RestoreNavigationState(feedNavigationStack.Pop());
+		UpdateNavigationState();
+	}
 	/// <summary>
 	/// Asynchronously loads books from a Calibre server if they are not already loaded.
 	/// </summary>
@@ -142,12 +274,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	[RelayCommand]
 	public async Task LoadBooks()
 	{
-		if (Books.Count > 0)
-		{
-			Feed.Entries.Clear();
-			Books.Clear();
-			Logger.Warn("Books are already loaded, clearing list and continuing.");
-		}
+       ResetFeedState();
 
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
@@ -201,40 +328,33 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 
 		Logger.Info($"Using IP address: {settings.IPAddress}, Port: {settings.Port}, prefix: {settings.UrlPrefix}");
+		calibreServerBaseUrl = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}";
 		
-		if (!await ValidateUrl($"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}", settings.UrlPrefix))
+      if (!await ValidateUrl(calibreServerBaseUrl, settings.UrlPrefix))
 		{
 			return;
 		}
 		
 		Logger.Info("Loading books from Calibre server...");
-		await GetFeedList(new FeedReader(), settings.IPAddress, settings.Port, settings.UrlPrefix);
-		await LoadCalibreDataFromUrl(settings.IPAddress, settings.Port, settings.UrlPrefix);
+      var rootFeedUrl = $"{calibreServerBaseUrl}/opds";
+		var rootFeed = await new FeedReader().GetFeedAsync(rootFeedUrl, CancellationTokenSource.Token);
+		ApplyFeedSelections(rootFeed, rootFeedUrl);
+		CurrentFeedTitle = rootFeed.Title ?? "Library";
+		currentFeedUrl = rootFeedUrl;
+		Feed = rootFeed;
+		currentFeedEmptyLabelText = "Select a Calibre feed to browse books.";
+		EmptyLabelText = currentFeedEmptyLabelText;
 
-	}
-	async Task GetFeedList(FeedReader feedReader, string ipAddress, int port, string prefix)
-	{
-		var url = $"{prefix}://{ipAddress}:{port}/opds";
-		var mainFeed = await feedReader.GetFeedAsync(url, CancellationTokenSource.Token);
-		var title = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Title")?.Links ?? [];
-		var authors = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Authors")?.Links ?? [];
-		var newestFeed = mainFeed.Entries.FirstOrDefault(e => e.Title == "By Newest")?.Links ?? [];
-		OpdsFeed.Add(new OpdsFeed
+		var defaultFeedSelection = FeedSelections.FirstOrDefault(selection => string.Equals(selection.Title, "By Newest", StringComparison.OrdinalIgnoreCase))
+			?? FeedSelections.FirstOrDefault();
+		if (defaultFeedSelection is not null)
 		{
-			Title = "By Title",
-			Links = title,
-		});
-		OpdsFeed.Add(new OpdsFeed
-		{
-			Title = "By Authors",
-			Links = authors,
-		});
-		OpdsFeed.Add(new OpdsFeed
-		{
-			Title = "By Newest",
-			Links = newestFeed,
-		});
-		Logger.Info("Feedlist has been downloaded successfully");
+			await SelectFeedAsync(defaultFeedSelection, CancellationTokenSource.Token);
+			return;
+		}
+
+		Logger.Warn("No Calibre feed entries were returned by the OPDS root feed.");
+
 	}
 
 	/// <summary>
@@ -243,30 +363,40 @@ public partial class CalibrePageViewModel : BaseViewModel
 	/// <remarks>This method retrieves the latest feed from the specified Calibre server and processes each entry to
 	/// populate the book collection. It logs the number of books found and handles cancellation requests. If no books are
 	/// found, a warning is logged and an appropriate message is set.</remarks>
-	async Task LoadCalibreDataFromUrl(string ipAddress, int port, string prefix)
+ async Task LoadBookFeedAsync(OpdsFeed feed, string feedUrl, string? feedTitle, CancellationToken token)
 	{
-		var settings = await db.GetSettings() ?? new Settings();
-		var feedReader = new FeedReader();
-		var newestFeedUrl = OpdsFeed.FirstOrDefault(f => f.Title == "By Newest")?.Links.FirstOrDefault()?.Href ?? string.Empty;
-		Logger.Info($"Newest feed URL: {newestFeedUrl}");
-		var uri = new Uri(new Uri($"{prefix}://{ipAddress}:{port}/opds"), newestFeedUrl);
-		Feed = await feedReader.GetFeedAsync(uri.AbsoluteUri, CancellationTokenSource.Token);
-		if (Feed.Entries.Count == 0)
+        Feed = feed;
+		currentFeedUrl = feedUrl;
+		CurrentFeedTitle = feedTitle ?? feed.Title ?? "Calibre";
+		var books = await BuildBooksFromFeedAsync(feed, token);
+		BookList = books;
+		Books = [.. books];
+		currentFeedEmptyLabelText = $"No books found in {CurrentFeedTitle}.";
+		EmptyLabelText = currentFeedEmptyLabelText;
+
+		if (books.Count == 0)
 		{
-			Logger.Warn("No books found in the Calibre feed.");
-			EmptyLabelText = "No books found in the Calibre feed.";
+          Logger.Warn($"No books found in the Calibre feed '{CurrentFeedTitle}'.");
 			return;
 		}
-		Logger.Info($"Number of books found: {Feed.Entries.Count}");
 
-		using var client = new HttpClient();
-		foreach (var entry in Feed.Entries)
+		Logger.Info($"Number of books found in '{CurrentFeedTitle}': {books.Count}");
+	}
+
+    async Task<List<Book>> BuildBooksFromFeedAsync(OpdsFeed feed, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		List<Book> books = [];
+		foreach (var entry in feed.Entries)
 		{
-			if (entry is null)
+          if (entry is null)
 			{
 				Logger.Warn("Encountered a null entry in the feed. Skipping...");
 				continue;
 			}
+           token.ThrowIfCancellationRequested();
+
 			if (CancellationTokenSource.IsCancellationRequested)
 			{
 				Cancelled = true;
@@ -275,29 +405,223 @@ public partial class CalibrePageViewModel : BaseViewModel
 			}
 
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
+			byte[] imageName = [];
 			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
 			var DownloadList = entry.Links.FindAll(l => l.Rel == "http://opds-spec.org/acquisition") ?? [];
 			var downloadUrl = DownloadList.FirstOrDefault(l => l.Type == "application/epub+zip")?.Href ?? string.Empty;
 			if (string.IsNullOrEmpty(downloadUrl))
 			{
-				Logger.Warn($"Entry '{entry.Title}' is missing image or download URL. Skipping...");
+				Logger.Warn($"Entry '{entry.Title}' is missing download URL. Skipping...");
 				continue;
 			}
+			if (string.IsNullOrEmpty(imageUrl))
+			{
+              Logger.Warn($"Entry '{entry.Title}' is missing image URL. Generating a cover image.");
+				if(entry.Title is null)
+				{
+					Logger.Warn("Entry title is null. Cannot generate cover image without a title. Skipping image generation.");
+					continue;
+				}
+				imageName = EbookService.GenerateCoverImage(entry.Title);
+			}
+
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			var book = new Book
 			{
 				Title = entry.Title ?? string.Empty,
 				Author = entry.Authors.FirstOrDefault()?.Name ?? string.Empty,
-				PublishedDate = entry.Published ?? DateTime.MinValue,
-				Description = entry.Content ?? string.Empty,
-				DownloadUrl = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{downloadUrl}",
-				Thumbnail = $"{settings.UrlPrefix}://{settings.IPAddress}:{settings.Port}/{imageUrl}",
+                PublishedDate = entry.Published ?? entry.DcDate ?? DateTime.MinValue,
+				Description = entry.Content ?? entry.Summary ?? string.Empty,
+				DownloadUrl = CombineUrl(calibreServerBaseUrl, downloadUrl),
+				Thumbnail = string.IsNullOrWhiteSpace(imageUrl) ? string.Empty : CombineUrl(calibreServerBaseUrl, imageUrl),
+				Categories = [.. entry.Categories],
 				IsInLibrary = await processEpubFiles.IsBookAlreadyInLibrary(new Book { Title = entry.Title ?? string.Empty })
 			};
-			Books.Add(book);
-			BookList.Add(book);
+			if (string.IsNullOrEmpty(imageUrl) && imageName.Length > 0)
+			{
+				Logger.Info($"Generated cover image for '{entry.Title}' because the entry is missing an image URL.");
+                book.CoverImage = imageName;
+			}
+            books.Add(book);
+		}
+
+		return books;
+	}
+
+	void ApplyFeedSelections(OpdsFeed feed, string sourceFeedUrl)
+	{
+		FeedSelections = [.. CalibrePageViewModel.CreateFeedSelections(feed, sourceFeedUrl)];
+		Feed = feed;
+		var searchLink = feed.Links.FirstOrDefault(link => string.Equals(link.Rel, "search", StringComparison.OrdinalIgnoreCase));
+		if (!string.IsNullOrWhiteSpace(searchLink?.Href))
+		{
+			searchUrlTemplate = CombineUrl(sourceFeedUrl, NormalizeOpdsHref(searchLink.Href));
 		}
 	}
+
+	static List<OpdsFeedSelection> CreateFeedSelections(OpdsFeed feed, string sourceFeedUrl)
+		=> [.. feed.Entries
+			.Select(entry => CalibrePageViewModel.CreateFeedSelection(entry, sourceFeedUrl))
+			.OfType<OpdsFeedSelection>()];
+
+	static OpdsFeedSelection? CreateFeedSelection(OpdsEntry entry, string sourceFeedUrl)
+	{
+		var link = entry.Links.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate.Href));
+		if (link is null)
+		{
+			return null;
+		}
+
+		return new OpdsFeedSelection
+		{
+			Title = entry.Title ?? string.Empty,
+			Description = entry.Content ?? entry.Summary ?? string.Empty,
+			FeedUrl = CombineUrl(sourceFeedUrl, NormalizeOpdsHref(link.Href ?? string.Empty)),
+			Id = entry.Id ?? string.Empty,
+			FeedType = DetermineFeedType(entry),
+		};
+	}
+
+	void ApplyLocalSearch(string searchText)
+	{
+		var filteredBooks = BookList.Where(book =>
+			book.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+			book.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+			book.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+			book.Language.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+			book.Series.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+			book.Categories.Any(category => category.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
+			.ToList();
+
+		Books = [.. filteredBooks];
+		EmptyLabelText = $"No books found matching '{searchText}'.";
+		Logger.Info($"Applied local Calibre search for '{searchText}' with {filteredBooks.Count} results.");
+	}
+
+	void RestoreCurrentBookResults()
+	{
+		Books = [.. BookList];
+		EmptyLabelText = currentFeedEmptyLabelText;
+	}
+
+	void ResetFeedState()
+	{
+		CancelSearchRequests();
+		feedNavigationStack.Clear();
+		UpdateNavigationState();
+		FeedSelections = [];
+		SelectedFeedSelection = null;
+		Feed = new();
+		Books = [];
+		BookList = [];
+		CurrentFeedTitle = "Browse feeds";
+		SearchText = string.Empty;
+		calibreServerBaseUrl = string.Empty;
+		searchUrlTemplate = string.Empty;
+		currentFeedUrl = string.Empty;
+		currentFeedEmptyLabelText = "No books found in Calibre library.\nPlease load books from your Calibre server.";
+		EmptyLabelText = currentFeedEmptyLabelText;
+		Cancelled = false;
+	}
+
+	void ResetSearchCancellationTokenSource(CancellationToken token)
+	{
+		CancelSearchRequests();
+		searchCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
+	}
+
+	void CancelSearchRequests()
+	{
+		if (!searchCancellationTokenSource.IsCancellationRequested)
+		{
+			searchCancellationTokenSource.Cancel();
+		}
+
+		searchCancellationTokenSource.Dispose();
+		searchCancellationTokenSource = new();
+	}
+
+	void RestoreNavigationState(CalibreFeedNavigationState state)
+	{
+		CurrentFeedTitle = state.CurrentFeedTitle;
+		currentFeedUrl = state.CurrentFeedUrl;
+		currentFeedEmptyLabelText = state.EmptyLabelText;
+		searchUrlTemplate = state.SearchUrlTemplate;
+		FeedSelections = [.. state.FeedSelections];
+		BookList = [.. state.BookList];
+		Books = [.. state.VisibleBooks];
+		EmptyLabelText = currentFeedEmptyLabelText;
+		SelectedFeedSelection = null;
+	}
+
+	CalibreFeedNavigationState CreateNavigationStateSnapshot()
+		=> new(
+			CurrentFeedTitle,
+			currentFeedUrl,
+			currentFeedEmptyLabelText,
+			searchUrlTemplate,
+			[.. FeedSelections],
+			[.. BookList],
+			[.. Books]);
+
+	void UpdateNavigationState()
+		=> CanNavigateBack = feedNavigationStack.Count > 0;
+
+	string BuildSearchUrl(string searchText)
+		=> searchUrlTemplate.Replace("{searchTerms}", Uri.EscapeDataString(searchText), StringComparison.Ordinal);
+
+	static bool IsNavigationFeed(OpdsFeed feed)
+		=> feed.Entries.Count > 0 && feed.Entries.All(entry => !HasAcquisitionLink(entry));
+
+	static bool HasAcquisitionLink(OpdsEntry entry)
+		=> entry.Links.Any(link => link.Rel?.Contains("acquisition", StringComparison.OrdinalIgnoreCase) == true);
+
+	static string DetermineFeedType(OpdsEntry entry)
+	{
+		if (entry.Id?.StartsWith("calibre-library:", StringComparison.OrdinalIgnoreCase) == true)
+		{
+			return "library";
+		}
+
+		return HasAcquisitionLink(entry) ? "acquisition" : "navigation";
+	}
+
+	static string CombineUrl(string baseUrl, string relativeOrAbsoluteUrl)
+	{
+		if (string.IsNullOrWhiteSpace(relativeOrAbsoluteUrl))
+		{
+			return string.Empty;
+		}
+
+		if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+		{
+			return relativeOrAbsoluteUrl;
+		}
+
+		if (Uri.TryCreate(relativeOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri))
+		{
+			if (absoluteUri.Scheme is "http" or "https")
+			{
+				return absoluteUri.AbsoluteUri;
+			}
+
+			// Calibre/OPDS navigation links must not stay as file://
+			if (absoluteUri.Scheme == Uri.UriSchemeFile)
+			{
+				var pathAndQuery = absoluteUri.PathAndQuery;
+				return $"{baseUri.Scheme}://{baseUri.Authority}{pathAndQuery}";
+			}
+
+			return relativeOrAbsoluteUrl;
+		}
+
+		if (relativeOrAbsoluteUrl.StartsWith('/'))
+		{
+			return $"{baseUri.Scheme}://{baseUri.Authority}{relativeOrAbsoluteUrl}";
+		}
+
+		return new Uri(baseUri, relativeOrAbsoluteUrl).AbsoluteUri;
+   }
 
 	/// <summary>
 	/// Validates the specified URL to ensure it is either local or a permitted external address, and optionally checks the
@@ -319,7 +643,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		{
 			// If the URL is not local and/or does not use https, log a warning and use localhost as a fallback
 
-			Logger.Warn($"URL address {url} is not local or permitted external. Using default base URL.");
+			Logger.Warn($"URL address {url} is not local or permitted. Using default base URL.");
 			EmptyLabelText = "Web Address must be local\nif using http: Please upgrade to https\nin order to access a\ncalibre server on the\ninternet!";
 			return false;
 		}
@@ -439,6 +763,42 @@ public partial class CalibrePageViewModel : BaseViewModel
 		return true;
 	}
 
+  readonly record struct CalibreFeedNavigationState(
+		string CurrentFeedTitle,
+		string CurrentFeedUrl,
+		string EmptyLabelText,
+		string SearchUrlTemplate,
+		List<OpdsFeedSelection> FeedSelections,
+		List<Book> BookList,
+		List<Book> VisibleBooks);
+
 	readonly record struct CalibreServerAddress(string UrlPrefix, string IPAddress, int Port);
 	readonly record struct CalibreServerResolution(CalibreServerAddress Address, bool UsedSavedEndpoint);
+
+	static string NormalizeOpdsHref(string href)
+	{
+		if (string.IsNullOrWhiteSpace(href))
+		{
+			return string.Empty;
+		}
+
+		int encodedQueryIndex = href.IndexOf("%3F", StringComparison.OrdinalIgnoreCase);
+		if (encodedQueryIndex >= 0)
+		{
+			href = string.Concat(
+				href.AsSpan(0, encodedQueryIndex),
+				"?",
+				href.AsSpan(encodedQueryIndex + 3));
+		}
+
+		int queryIndex = href.IndexOf('?');
+		if (queryIndex >= 0)
+		{
+			string path = href[..(queryIndex + 1)];
+			string query = href[(queryIndex + 1)..].Replace("%26", "&", StringComparison.OrdinalIgnoreCase);
+			return path + query;
+		}
+
+		return href;
+	}
 }

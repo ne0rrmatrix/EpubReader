@@ -140,6 +140,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
 		builder.Services.AddSingleton<StreamExtensions>();
 		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
+		builder.Services.AddSingleton<IFullScreenService, FullScreenService>();
 		builder.Services.AddSingleton<AppShell>();
 		builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
