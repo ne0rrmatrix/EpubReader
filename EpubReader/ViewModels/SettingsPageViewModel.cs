@@ -11,9 +11,12 @@ namespace EpubReader.ViewModels;
 /// options.</remarks>
 public partial class SettingsPageViewModel : BaseViewModel
 {
+	const string displayTabKey = "Display";
+	const string generalTabKey = "General";
 	readonly AuthenticationService authenticationService;
 	readonly ISyncService syncService;
 	readonly List<EpubFonts> fonts = [
+		new EpubFonts { FontFamily = string.Empty },
 		new EpubFonts { FontFamily = "Arial" },
 		new EpubFonts { FontFamily = "Times New Roman" },
 		new EpubFonts { FontFamily = "Verdana" },
@@ -52,6 +55,13 @@ public partial class SettingsPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public partial string AuthStatusText { get; set; } = string.Empty;
 
+	[ObservableProperty]
+	public partial string SelectedTabKey { get; set; } = displayTabKey;
+
+	public bool IsDisplayTabSelected => string.Equals(SelectedTabKey, displayTabKey, StringComparison.Ordinal);
+
+	public bool IsGeneralTabSelected => string.Equals(SelectedTabKey, generalTabKey, StringComparison.Ordinal);
+
 	/// <summary>
 	/// Gets the collection of available color schemes.
 	/// </summary>
@@ -76,6 +86,13 @@ public partial class SettingsPageViewModel : BaseViewModel
 			Debug.WriteLine($"Error during SettingsPageViewModel initialization: {ex}");
 		});
 	}
+
+	partial void OnSelectedTabKeyChanged(string value)
+	{
+		OnPropertyChanged(nameof(IsDisplayTabSelected));
+		OnPropertyChanged(nameof(IsGeneralTabSelected));
+	}
+
 	protected override void Dispose(bool disposing)
 	{
 		authenticationService.AuthStateChanged -= OnAuthStateChanged;
@@ -118,6 +135,18 @@ public partial class SettingsPageViewModel : BaseViewModel
 		AuthStatusText = isLocal
 			? "Offline mode - Sign in from Settings to enable cloud sync"
 			: "Not signed in - Sign in from Settings to enable cloud sync";
+	}
+
+	[RelayCommand]
+	void SelectDisplayTab()
+	{
+		SelectedTabKey = displayTabKey;
+	}
+
+	[RelayCommand]
+	void SelectGeneralTab()
+	{
+		SelectedTabKey = generalTabKey;
 	}
 
 	[RelayCommand]

@@ -132,6 +132,7 @@ public partial class SettingsPage : Popup<bool>
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ApplyFontPreview(settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
 		LineSpacingPicker.SelectedIndex = GetLineSpacingOptionIndex(settings.LineSpacing);
 		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
@@ -359,15 +360,7 @@ public partial class SettingsPage : Popup<bool>
 		settings.FontFamily = family;
 		logger.Info($"Chaging Font to: {family}");
 		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontFamily);
-
-		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
-		{
-			FontPreview.FontFamily = family;
-		}
-		else
-		{
-			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
-		}
+		ApplyFontPreview(family);
 	}
 
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
@@ -442,6 +435,7 @@ public partial class SettingsPage : Popup<bool>
 		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ApplyFontPreview(settings.FontFamily);
 		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		ThemePicker.SelectedItem = scheme;
 		if (ThemePreview is not null && scheme is not null)
@@ -449,15 +443,26 @@ public partial class SettingsPage : Popup<bool>
 			ThemePreview.SelectedItem = scheme;
 		}
 
-		if (FontPreview is not null && FontPicker.SelectedItem is EpubFonts selectedFont)
-		{
-			FontPreview.FontFamily = SanitizeFontFamily(selectedFont.FontFamily);
-		}
-
 		if (BindingContext is SettingsPageViewModel viewModel)
 		{
 			await viewModel.LoadAuthStatusAsync();
 		}
+	}
+
+	void ApplyFontPreview(string? family)
+	{
+		if (FontPreview is null)
+		{
+			return;
+		}
+
+		if (string.IsNullOrEmpty(family))
+		{
+			FontPreview.ClearValue(Label.FontFamilyProperty);
+			return;
+		}
+
+		FontPreview.FontFamily = SanitizeFontFamily(family);
 	}
 
 	static string SanitizeFontFamily(string? family)

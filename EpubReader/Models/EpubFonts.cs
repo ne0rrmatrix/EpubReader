@@ -5,6 +5,8 @@
 /// </summary>
 public class EpubFonts
 {
+	public string DisplayName => string.IsNullOrWhiteSpace(FontFamily) ? "Publisher Default" : FontFamily;
+
 	/// <summary>
 	/// Gets or sets the font family name used for text rendering.
 	/// </summary>

@@ -13,11 +13,11 @@
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
     CanBeDismissedByTappingOutsideOfPopup="True"
-    HeightRequest="{OnPlatform WinUI=550,
-                               Default=450}"
+    HeightRequest="{OnPlatform WinUI=640,
+                               Default=560}"
     Loaded="CurrentPage_Loaded"
     Unloaded="CurrentPage_Unloaded"
-    WidthRequest="330">
+    WidthRequest="380">
 
     <ScrollView
         x:Name="ScrollView"
@@ -25,314 +25,355 @@
         VerticalScrollBarVisibility="Never">
         <Border
             Margin="5"
-            Padding="5"
+            Padding="20"
             Style="{StaticResource BorderGalleryCard}">
-            <VerticalStackLayout
-                x:Name="grid"
-                Padding="0"
-                Spacing="20">
+            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="18">
 
-                <!--  Reader Appearance Section  -->
-                <StackLayout
-                    Grid.Row="0"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Picker
-                        x:Name="ThemePicker"
-                        Title="Theme"
-                        ItemDisplayBinding="{Binding Name, x:DataType=model:ColorScheme}"
-                        ItemsSource="{Binding ColorSchemes}"
-                        SelectedIndexChanged="ThemePicker_SelectedIndexChanged"
-                        WidthRequest="250" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Spacing="4">
+                        <Label
+                            FontAttributes="Bold"
+                            FontSize="28"
+                            Text="Reader Preferences" />
+                        <Label
+                            FontSize="13"
+                            Text="Choose a display preset or manage reader and sync settings."
+                            TextColor="{AppThemeBinding Dark={StaticResource Gray400}, Light={StaticResource Gray600}}" />
+                    </VerticalStackLayout>
 
-                    <CollectionView
-                        x:Name="ThemePreview"
-                        HeightRequest="96"
-                        ItemsLayout="HorizontalList"
-                        ItemsSource="{Binding ColorSchemes}"
-                        SelectionChanged="ThemePreview_SelectionChanged"
-                        SelectionMode="Single">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="model:ColorScheme">
-                                <Border
-                                    Margin="6"
-                                    Padding="6"
-                                    BackgroundColor="{Binding BackgroundColor}"
-                                    Stroke="Transparent"
-                                    StrokeShape="RoundRectangle 6">
-                                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
-                                        <Label
-                                            FontSize="20"
-                                            HorizontalOptions="Center"
-                                            Text="Aa"
-                                            TextColor="{Binding TextColor}" />
-                                        <Label
-                                            FontSize="11"
-                                            HorizontalOptions="Center"
-                                            Text="{Binding Name}"
-                                            TextColor="{StaticResource Gray600}" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </StackLayout>
+                    <Button
+                        Grid.Column="1"
+                        BackgroundColor="Transparent"
+                        Clicked="OnCloseClicked"
+                        FontAttributes="Bold"
+                        FontSize="13"
+                        Padding="10,6"
+                        Text="Done"
+                        TextColor="{StaticResource PrimaryColor}" />
+                </Grid>
 
-                <StackLayout
+                <Border
                     Grid.Row="1"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Picker
-                        x:Name="FontPicker"
-                        Title="Select Font"
-                        ItemDisplayBinding="{Binding FontFamily, x:DataType=model:EpubFonts}"
-                        ItemsSource="{Binding Fonts}"
-                        SelectedIndexChanged="FontPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
+                    BackgroundColor="{AppThemeBinding Dark={StaticResource Gray900}, Light={StaticResource Gray100}}"
+                    Padding="4"
+                    Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray300}}"
+                    StrokeShape="RoundRectangle 12"
+                    StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <Button
+                            BackgroundColor="Transparent"
+                            BorderColor="Transparent"
+                            BorderWidth="0"
+                            Command="{Binding SelectDisplayTabCommand}"
+                            CornerRadius="10"
+                            Padding="12,10"
+                            Text="Display">
+                            <Button.Triggers>
+                                <DataTrigger Binding="{Binding IsDisplayTabSelected}" TargetType="Button" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource PrimaryColor}" />
+                                    <Setter Property="TextColor" Value="{StaticResource White}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsDisplayTabSelected}" TargetType="Button" Value="False">
+                                    <Setter Property="BackgroundColor" Value="Transparent" />
+                                    <Setter Property="TextColor" Value="{AppThemeBinding Dark={StaticResource Gray300}, Light={StaticResource Gray700}}" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
 
-                    <Label
-                        x:Name="FontPreview"
-                        FontSize="16"
-                        HorizontalOptions="Center"
-                        LineBreakMode="NoWrap"
-                        Text="The quick brown fox jumps over the lazy dog" />
-                </StackLayout>
+                        <Button
+                            Grid.Column="1"
+                            BackgroundColor="Transparent"
+                            BorderColor="Transparent"
+                            BorderWidth="0"
+                            Command="{Binding SelectGeneralTabCommand}"
+                            CornerRadius="10"
+                            Padding="12,10"
+                            Text="General">
+                            <Button.Triggers>
+                                <DataTrigger Binding="{Binding IsGeneralTabSelected}" TargetType="Button" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource PrimaryColor}" />
+                                    <Setter Property="TextColor" Value="{StaticResource White}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsGeneralTabSelected}" TargetType="Button" Value="False">
+                                    <Setter Property="BackgroundColor" Value="Transparent" />
+                                    <Setter Property="TextColor" Value="{AppThemeBinding Dark={StaticResource Gray300}, Light={StaticResource Gray700}}" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </Grid>
+                </Border>
 
-                <Label
+                <ScrollView
                     Grid.Row="2"
-                    FontAttributes="Bold"
-                    HorizontalOptions="Center"
-                    Text="Select Font Size" />
+                    HorizontalScrollBarVisibility="Never"
+                    VerticalScrollBarVisibility="Never">
+                    <VerticalStackLayout Spacing="16">
 
-                <Slider
-                    x:Name="FontSizeSlider"
-                    Grid.Row="3"
-                    Maximum="36"
-                    Minimum="8"
-                    ValueChanged="OnFontSizeSliderChanged"
-                    WidthRequest="250" />
+                        <VerticalStackLayout IsVisible="{Binding IsDisplayTabSelected}" Spacing="16">
+                            <Border
+                                BackgroundColor="{AppThemeBinding Dark={StaticResource Gray950}, Light={StaticResource White}}"
+                                Padding="16"
+                                Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray200}}"
+                                StrokeShape="RoundRectangle 12"
+                                StrokeThickness="1">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="22"
+                                        Text="Display" />
+                                    <Label
+                                        FontSize="13"
+                                        Text="Control the theme, font, and overall reading comfort."
+                                        TextColor="{AppThemeBinding Dark={StaticResource Gray400}, Light={StaticResource Gray600}}" />
 
-                <Label
-                    x:Name="FontSizeLabel"
-                    Grid.Row="4"
-                    x:DataType="{x:Type Slider}"
-                    HorizontalOptions="Center"
-                    Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}" />
+                                    <Label FontAttributes="Bold" Text="Theme" />
+                                    <Picker
+                                        x:Name="ThemePicker"
+                                        Title="Theme"
+                                        ItemDisplayBinding="{Binding Name, x:DataType=model:ColorScheme}"
+                                        ItemsSource="{Binding ColorSchemes}"
+                                        SelectedIndexChanged="ThemePicker_SelectedIndexChanged" />
 
-                <StackLayout
-                    Grid.Row="5"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Line Spacing" />
+                                    <CollectionView
+                                        x:Name="ThemePreview"
+                                        HeightRequest="112"
+                                        ItemsLayout="HorizontalList"
+                                        ItemsSource="{Binding ColorSchemes}"
+                                        SelectionChanged="ThemePreview_SelectionChanged"
+                                        SelectionMode="Single">
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="model:ColorScheme">
+                                                <Border
+                                                    Margin="6"
+                                                    Padding="10"
+                                                    BackgroundColor="{Binding BackgroundColor}"
+                                                    Stroke="Transparent"
+                                                    StrokeShape="RoundRectangle 10">
+                                                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
+                                                        <Label
+                                                            FontSize="20"
+                                                            HorizontalOptions="Center"
+                                                            Text="Aa"
+                                                            TextColor="{Binding TextColor}" />
+                                                        <Label
+                                                            FontSize="11"
+                                                            HorizontalOptions="Center"
+                                                            Text="{Binding Name}"
+                                                            TextColor="{StaticResource Gray600}" />
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+                            </Border>
 
-                    <Picker
-                        x:Name="LineSpacingPicker"
-                        Title="Line Spacing"
-                        SelectedIndexChanged="LineSpacingPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                            <Border
+                                BackgroundColor="{AppThemeBinding Dark={StaticResource Gray950}, Light={StaticResource White}}"
+                                Padding="16"
+                                Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray200}}"
+                                StrokeShape="RoundRectangle 12"
+                                StrokeThickness="1">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="18"
+                                        Text="Typography" />
 
-                <StackLayout
-                    Grid.Row="6"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Paragraph Spacing" />
+                                    <Label FontAttributes="Bold" Text="Font" />
+                                    <Picker
+                                        x:Name="FontPicker"
+                                        Title="Select Font"
+                                        ItemDisplayBinding="{Binding DisplayName, x:DataType=model:EpubFonts}"
+                                        ItemsSource="{Binding Fonts}"
+                                        SelectedIndexChanged="FontPicker_SelectedIndexChanged" />
 
-                    <Picker
-                        x:Name="ParagraphSpacingPicker"
-                        Title="Paragraph Spacing"
-                        SelectedIndexChanged="ParagraphSpacingPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                                    <Label
+                                        x:Name="FontPreview"
+                                        FontSize="16"
+                                        HorizontalOptions="Center"
+                                        LineBreakMode="NoWrap"
+                                        Text="The quick brown fox jumps over the lazy dog" />
 
-                <StackLayout
-                    Grid.Row="7"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Text Alignment" />
+                                    <Label FontAttributes="Bold" Text="Text Size" />
+                                    <Slider
+                                        x:Name="FontSizeSlider"
+                                        Maximum="36"
+                                        Minimum="8"
+                                        ValueChanged="OnFontSizeSliderChanged" />
 
-                    <Picker
-                        x:Name="TextAlignmentPicker"
-                        Title="Text Alignment"
-                        SelectedIndexChanged="TextAlignmentPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                                    <Label
+                                        x:Name="FontSizeLabel"
+                                        x:DataType="{x:Type Slider}"
+                                        HorizontalOptions="Center"
+                                        Text="{Binding Source={x:Reference FontSizeSlider}, Path=Value, StringFormat='Font Size: {0:F0}'}" />
+                                </VerticalStackLayout>
+                            </Border>
 
-                <StackLayout
-                    Grid.Row="8"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Hyphenation" />
+                            <Border
+                                BackgroundColor="{AppThemeBinding Dark={StaticResource Gray950}, Light={StaticResource White}}"
+                                Padding="16"
+                                Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray200}}"
+                                StrokeShape="RoundRectangle 12"
+                                StrokeThickness="1">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="18"
+                                        Text="Layout" />
 
-                    <Picker
-                        x:Name="HyphenationPicker"
-                        Title="Hyphenation"
-                        SelectedIndexChanged="HyphenationPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                                    <Label FontAttributes="Bold" Text="Line Height" />
+                                    <Picker
+                                        x:Name="LineSpacingPicker"
+                                        Title="Line Height"
+                                        SelectedIndexChanged="LineSpacingPicker_SelectedIndexChanged" />
 
-                <StackLayout
-                    Grid.Row="9"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Letter Spacing" />
+                                    <Label FontAttributes="Bold" Text="Paragraph Spacing" />
+                                    <Picker
+                                        x:Name="ParagraphSpacingPicker"
+                                        Title="Paragraph Spacing"
+                                        SelectedIndexChanged="ParagraphSpacingPicker_SelectedIndexChanged" />
 
-                    <Picker
-                        x:Name="LetterSpacingPicker"
-                        Title="Letter Spacing"
-                        SelectedIndexChanged="LetterSpacingPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                                    <Label FontAttributes="Bold" Text="Text Alignment" />
+                                    <Picker
+                                        x:Name="TextAlignmentPicker"
+                                        Title="Text Alignment"
+                                        SelectedIndexChanged="TextAlignmentPicker_SelectedIndexChanged" />
 
-                <StackLayout
-                    Grid.Row="10"
-                    HorizontalOptions="Center"
-                    Spacing="6">
-                    <Label
-                        FontAttributes="Bold"
-                        HorizontalOptions="Center"
-                        Text="Word Spacing" />
+                                    <Label FontAttributes="Bold" Text="Hyphenation" />
+                                    <Picker
+                                        x:Name="HyphenationPicker"
+                                        Title="Hyphenation"
+                                        SelectedIndexChanged="HyphenationPicker_SelectedIndexChanged" />
 
-                    <Picker
-                        x:Name="WordSpacingPicker"
-                        Title="Word Spacing"
-                        SelectedIndexChanged="WordSpacingPicker_SelectedIndexChanged"
-                        WidthRequest="250" />
-                </StackLayout>
+                                    <Label FontAttributes="Bold" Text="Letter Spacing" />
+                                    <Picker
+                                        x:Name="LetterSpacingPicker"
+                                        Title="Letter Spacing"
+                                        SelectedIndexChanged="LetterSpacingPicker_SelectedIndexChanged" />
 
-                <HorizontalStackLayout
-                    x:Name="stackLayout"
-                    Grid.Row="11"
-                    HorizontalOptions="Center"
-                    IsVisible="{OnPlatform WinUI=true,
-                                           Default=false}"
-                    Spacing="100"
-                    WidthRequest="250">
-                    <Label Text="Multiple Columns" VerticalOptions="Center" />
-                    <Switch
-                        x:Name="switchControl"
-                        Toggled="switchControl_Toggled"
-                        VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                                    <Label FontAttributes="Bold" Text="Word Spacing" />
+                                    <Picker
+                                        x:Name="WordSpacingPicker"
+                                        Title="Word Spacing"
+                                        SelectedIndexChanged="WordSpacingPicker_SelectedIndexChanged" />
 
-                <!--  Authentication Section  -->
-                <Label
-                    Grid.Row="12"
-                    FontAttributes="Bold"
-                    HorizontalOptions="Center"
-                    Text="Account &amp; Sync" />
+                                    <Grid
+                                        x:Name="stackLayout"
+                                        ColumnDefinitions="*,Auto"
+                                        IsVisible="{OnPlatform WinUI=true,
+                                                           Default=false}">
+                                        <Label Text="Multiple Columns" VerticalOptions="Center" />
+                                        <Switch
+                                            x:Name="switchControl"
+                                            Grid.Column="1"
+                                            Toggled="switchControl_Toggled"
+                                            VerticalOptions="Center" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
 
-                <VerticalStackLayout Grid.Row="13" Spacing="10">
+                            <Button
+                                BackgroundColor="Transparent"
+                                BorderColor="Transparent"
+                                BorderWidth="0"
+                                Clicked="RemoveAllSettings"
+                                HorizontalOptions="Start"
+                                Padding="0"
+                                Text="Reset to publisher format"
+                                TextColor="{StaticResource PrimaryColor}" />
+                        </VerticalStackLayout>
 
-                    <!--  Auth Status Display  -->
-                    <Label
-                        FontSize="13"
-                        HorizontalOptions="Center"
-                        HorizontalTextAlignment="Center"
-                        IsVisible="{Binding IsAuthenticated}"
-                        LineBreakMode="WordWrap"
-                        Text="{Binding AuthStatusText}"
-                        TextColor="{AppThemeBinding Dark={StaticResource Gray300},
-                                                    Light={StaticResource Gray600}}" />
+                        <VerticalStackLayout IsVisible="{Binding IsGeneralTabSelected}" Spacing="16">
+                            <Border
+                                BackgroundColor="{AppThemeBinding Dark={StaticResource Gray950}, Light={StaticResource White}}"
+                                Padding="16"
+                                Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray200}}"
+                                StrokeShape="RoundRectangle 12"
+                                StrokeThickness="1">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="22"
+                                        Text="General" />
+                                    <Label
+                                        FontSize="13"
+                                        Text="Manage sign-in, sync, exports, and privacy settings."
+                                        TextColor="{AppThemeBinding Dark={StaticResource Gray400}, Light={StaticResource Gray600}}" />
 
-                    <Label
-                        FontSize="13"
-                        HorizontalOptions="Center"
-                        HorizontalTextAlignment="Center"
-                        IsVisible="{Binding IsLocalOnly}"
-                        Text="Local mode - No cloud sync"
-                        TextColor="{AppThemeBinding Dark={StaticResource Gray400},
-                                                    Light={StaticResource Gray600}}" />
+                                    <Label
+                                        FontSize="13"
+                                        HorizontalTextAlignment="Center"
+                                        IsVisible="{Binding IsAuthenticated}"
+                                        LineBreakMode="WordWrap"
+                                        Text="{Binding AuthStatusText}"
+                                        TextColor="{AppThemeBinding Dark={StaticResource Gray300}, Light={StaticResource Gray600}}" />
 
-                    <!--  Sign In Button (visible when not authenticated)  -->
-                    <Button
-                        BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
-                        Command="{Binding SignInCommand}"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        IsVisible="{Binding IsNotAuthenticated}"
-                        Text="Sign In"
-                        TextColor="{StaticResource NormalButtonTextColor}" />
+                                    <Label
+                                        FontSize="13"
+                                        HorizontalTextAlignment="Center"
+                                        IsVisible="{Binding IsLocalOnly}"
+                                        Text="Local mode - No cloud sync"
+                                        TextColor="{AppThemeBinding Dark={StaticResource Gray400}, Light={StaticResource Gray600}}" />
 
-                    <!--  Sign Out Button (visible when authenticated)  -->
-                    <Button
-                        BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
-                        Command="{Binding SignOutCommand}"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        IsVisible="{Binding IsAuthenticated}"
-                        Text="Sign Out"
-                        TextColor="{StaticResource NormalButtonTextColor}"
-                        WidthRequest="200" />
+                                    <Button
+                                        Command="{Binding SignInCommand}"
+                                        HeightRequest="40"
+                                        IsVisible="{Binding IsNotAuthenticated}"
+                                        Text="Sign In" />
 
-                    <!--  Delete Cloud Data (visible when authenticated)  -->
-                    <Button
-                        BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
-                        Clicked="OnExportDataClicked"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        Text="Export Data"
-                        TextColor="{StaticResource NormalButtonTextColor}"
-                        WidthRequest="200" />
+                                    <Button
+                                        Command="{Binding SignOutCommand}"
+                                        HeightRequest="40"
+                                        IsVisible="{Binding IsAuthenticated}"
+                                        Text="Sign Out" />
+                                </VerticalStackLayout>
+                            </Border>
 
-                    <Button
-                        Grid.Row="9"
-                        BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
-                        Clicked="OnPrivacyClicked"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        Text="Privacy Policy"
-                        TextColor="{StaticResource NormalButtonTextColor}"
-                        WidthRequest="200" />
+                            <Border
+                                BackgroundColor="{AppThemeBinding Dark={StaticResource Gray950}, Light={StaticResource White}}"
+                                Padding="16"
+                                Stroke="{AppThemeBinding Dark={StaticResource Gray700}, Light={StaticResource Gray200}}"
+                                StrokeShape="RoundRectangle 12"
+                                StrokeThickness="1">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label
+                                        FontAttributes="Bold"
+                                        FontSize="18"
+                                        Text="Data &amp; Privacy" />
 
-                    <Button
-                        Grid.Row="5"
-                        BackgroundColor="{StaticResource NormalButtonBackgroundColor}"
-                        Clicked="RemoveAllSettings"
-                        HeightRequest="45"
-                        Text="Restore Default Settings"
-                        TextColor="{StaticResource NormalButtonTextColor}"
-                        WidthRequest="200" />
+                                    <Button
+                                        Clicked="OnExportDataClicked"
+                                        HeightRequest="40"
+                                        Text="Export Data" />
 
-                    <Button
-                        BackgroundColor="{StaticResource Reset}"
-                        BorderColor="{StaticResource Reset-Dark}"
-                        Command="{Binding DeleteCloudDataCommand}"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        IsVisible="{Binding IsAuthenticated}"
-                        Text="Delete Cloud Data"
-                        TextColor="{StaticResource White}"
-                        WidthRequest="200" />
+                                    <Button
+                                        Clicked="OnPrivacyClicked"
+                                        HeightRequest="40"
+                                        Text="Privacy Policy" />
 
-                    <Button
-                        BackgroundColor="{StaticResource Reset}"
-                        BorderColor="{StaticResource Reset-Dark}"
-                        Clicked="OnDeleteLocalDataClicked"
-                        HeightRequest="40"
-                        HorizontalOptions="Center"
-                        Text="Delete Local Data"
-                        TextColor="{StaticResource White}"
-                        WidthRequest="200" />
+                                    <Button
+                                        BackgroundColor="{StaticResource Reset}"
+                                        BorderColor="{StaticResource Reset-Dark}"
+                                        Command="{Binding DeleteCloudDataCommand}"
+                                        HeightRequest="40"
+                                        IsVisible="{Binding IsAuthenticated}"
+                                        Text="Delete Cloud Data"
+                                        TextColor="{StaticResource White}" />
 
-                </VerticalStackLayout>
-
-            </VerticalStackLayout>
+                                    <Button
+                                        BackgroundColor="{StaticResource Reset}"
+                                        BorderColor="{StaticResource Reset-Dark}"
+                                        Clicked="OnDeleteLocalDataClicked"
+                                        HeightRequest="40"
+                                        Text="Delete Local Data"
+                                        TextColor="{StaticResource White}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
         </Border>
     </ScrollView>
 

@@ -6,14 +6,14 @@ class FullScreenService : IFullScreenService
 
 	public void SetFullScreen(bool enable)
 	{
-		// No implementation needed for macOS, as full-screen mode is managed by the system and can be toggled by the user.
+		// No implementation needed for Windows.
 	}
 	public void EnterFullScreen()
 	{
-		// No implementation needed for macOS, as full-screen mode is managed by the system and can be toggled by the user.
+		// No implementation needed for Windows.
 	}
 	public void ExitFullScreen()
 	{
-		// No implementation needed for macOS, as full-screen mode is managed by the system and can be toggled by the user.
+		// No implementation needed for Windows.
 	}
 }
