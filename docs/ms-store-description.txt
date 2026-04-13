@@ -1,0 +1,34 @@
+EpubReader
+
+Short description
+A modern EPUB reader for Windows with flexible reading settings, progress tracking, optional cloud sync, privacy-friendly local mode, and support for Calibre libraries.
+
+What the app does
+EpubReader is a flexible and easy-to-use EPUB reader for Windows that helps users enjoy their ebook library their way. It supports EPUB 2 and EPUB 3 books and offers a comfortable reading experience with customizable fonts, text size, color themes, chapter navigation, page navigation, and automatic reading position tracking.
+
+The app can also connect to cloud services for users who want syncing features. With optional Google sign-in, readers can sync reading progress and settings across devices in real time. For privacy-focused users, the app also supports a local-only mode that works without signing in.
+
+EpubReader also includes Calibre Server support, allowing users to browse and download books from their own library. It supports rich EPUB content such as embedded images, CSS styling, fonts, and EPUB 3 media overlays for synchronized audio and read-along experiences when available.
+
+Key features
+- EPUB 2 and EPUB 3 support
+- Custom fonts and text size
+- Light, dark, and themed reading modes
+- Chapter and page navigation
+- Automatic reading position tracking
+- Optional cloud sync for progress and settings
+- Local-only mode for privacy
+- Calibre Server browsing and downloads
+- Support for embedded images, CSS, and fonts
+- EPUB 3 media overlay and read-along support
+
+Why users should get this ebook reader
+- Comfortable reading experience with flexible display options
+- Easy to resume reading with automatic progress tracking
+- Privacy-friendly local-only mode for offline use without sign-in
+- Optional sync for readers who use multiple devices
+- Calibre Server support for personal ebook libraries
+- Broad EPUB compatibility, including rich content and media overlays
+
+Store-ready description
+EpubReader is a customizable EPUB reader for Windows that combines a smooth reading experience with powerful library features. Adjust fonts, text size, and themes, save your place automatically, connect to your Calibre library, and optionally sync your reading progress across devices. With support for EPUB 2 and EPUB 3, rich styling, embedded media, and a privacy-friendly local-only mode, EpubReader is built for readers who want both comfort and control.

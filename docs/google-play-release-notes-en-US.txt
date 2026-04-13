@@ -1,0 +1,7 @@
+Improved reading progress sync across devices.
+
+- The app now more reliably offers to move to your newest cloud reading position when opening a book.
+- Reduced unwanted repeat sync prompts while reading.
+- Improved handling when returning to the app after switching apps or unlocking your device.
+- Reading progress timestamps are updated more consistently when turning pages and changing chapters.
+- General stability improvements for cloud sync and reading position tracking.

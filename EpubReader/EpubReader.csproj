@@ -20,7 +20,7 @@
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
     <!-- Versions -->
     <ApplicationDisplayVersion>1</ApplicationDisplayVersion>
-    <ApplicationVersion>9</ApplicationVersion>
+    <ApplicationVersion>10</ApplicationVersion>
 
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
