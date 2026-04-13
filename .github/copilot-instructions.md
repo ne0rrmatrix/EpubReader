@@ -64,7 +64,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - **EbookService** (`Service/EbookService.cs`): Handles EPUB parsing via VersOne.Epub library, cover extraction, font/image embedding, and synthetic page numbering.
 - **Database** (`Database/Db.cs`): SQLite wrapper for book metadata, settings, and sync state; auto-initializes tables on first use.
 - **Authentication** (`Service/AuthenticationService.*.cs`): Platform-specific implementations for Google Firebase auth; supports local-only mode without authentication. Note: `Plugin.Firebase.Auth.Google` 3.1.2 is incompatible with `Plugin.Firebase.Auth` 5.x. For Google sign-in with `Plugin.Firebase.Auth` 5.x, implement providers directly with the native platform SDK and pass native credentials into `Plugin.Firebase.Auth`.
-- **Sync** (`Service/FirebaseSyncService.cs`): Manages reading progress sync across devices; queues offline changes, reconciles on reconnect.
+- **Sync** (`Service/FirebaseSyncService.cs`): Manages reading progress sync across devices; queues offline changes, reconciles on reconnect. When cloud progress has a newer timestamp and a different reading position, the app should always ask to switch to it on book open, without requiring a different device check.
 - **MVVM**: ViewModels inherit `ObservableObject` (MVVM Toolkit); communicate via `WeakReferenceMessenger` using message classes in `Messages/`.
 - **Platform-Specific UI**: Platform folders contain `*.android.cs`, `*.macios.cs`, `*.windows.cs` implementations for WebView handlers, auth, and file pickers.
 
@@ -198,8 +198,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
     }
 }**Platform-Specific Registration in MauiProgram**:#if ANDROID
 FirebaseConfigLoader.InjectFirebaseSecrets();
-#endif
-### Floating-Point Comparisons
+#endif### Floating-Point Comparisons
 - When comparing floating-point values, use explicit epsilon ranges and avoid equality-style fallbacks in nullable comparison helpers.
 
 ### Reader Architecture

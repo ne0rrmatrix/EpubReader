@@ -200,9 +200,9 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 				.OnceSingleAsync<ReadingProgress>();
 
 			var newest = SelectNewestProgress(local, cloudProgress);
-			if (newest is not null)
+         if (ShouldPersistToLocalCache(newest))
 			{
-				await SaveLocalProgressAsync(newest, token);
+                await SaveLocalProgressAsync(newest!, token);
 			}
 
 			return newest;
@@ -226,19 +226,12 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-			var cloudProgress = await firebaseClient
+            return await firebaseClient
 				   .Child(usersNode)
 				   .Child(userId!)
 				   .Child(booksNode)
 				   .Child(bookId)
 				   .OnceSingleAsync<ReadingProgress>();
-
-			if (cloudProgress is not null)
-			{
-				await SaveLocalProgressAsync(cloudProgress, token);
-			}
-
-			return cloudProgress;
 		}
 		catch (Exception ex)
 		{
@@ -567,7 +560,10 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			if (cloudProgress is not null && IsNewer(cloudProgress, progress))
 			{
 				var newestCloudProgress = ReconcileDateFields(cloudProgress, progress);
-				await SaveLocalProgressAsync(newestCloudProgress, token);
+               if (ShouldPersistToLocalCache(newestCloudProgress))
+				{
+					await SaveLocalProgressAsync(newestCloudProgress, token);
+				}
 				ProgressSynced?.Invoke(this, newestCloudProgress);
 				Trace.TraceInformation($"Skipped cloud overwrite for {progress.BookId}; remote position is newer.");
 				return;
@@ -603,9 +599,9 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		var localProgress = await GetLocalProgressAsync(progress.BookId, token);
 		var newest = SelectNewestProgress(localProgress, progress);
-		if (newest is not null)
+     if (ShouldPersistToLocalCache(newest))
 		{
-			await SaveLocalProgressAsync(newest, token);
+            await SaveLocalProgressAsync(newest!, token);
 		}
 
 		if (!string.Equals(progress.DeviceId, deviceId, StringComparison.Ordinal))
@@ -679,6 +675,13 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
 			? parsed
 			: DateTimeOffset.MinValue;
+	}
+
+	bool ShouldPersistToLocalCache(ReadingProgress? progress)
+	{
+		return progress is not null
+			&& (string.IsNullOrWhiteSpace(progress.DeviceId)
+				|| string.Equals(progress.DeviceId, deviceId, StringComparison.Ordinal));
 	}
 
 	void EnsureUserSet()
