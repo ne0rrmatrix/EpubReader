@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Shell
     x:Class="EpubReader.AppShell"
-    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:Views="clr-namespace:EpubReader.Views"
     x:Name="Page"
-    Title=""
     Shell.FlyoutBehavior="Disabled">
-    <ShellContent
-        Title="Library"
-        ContentTemplate="{DataTemplate LibraryPage}"
-        Route="MainPage" />
+    <TabBar>
+        <Tab Title="Library" Icon="library.png">
+            <ShellContent ContentTemplate="{DataTemplate Views:LibraryPage}" Route="MainPage" />
+        </Tab>
+        <Tab Title="Recent" Icon="book_open.png">
+            <ShellContent ContentTemplate="{DataTemplate Views:RecentBooksPage}" />
+        </Tab>
+    </TabBar>
 </Shell>
+

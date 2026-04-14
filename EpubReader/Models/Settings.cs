@@ -27,7 +27,43 @@ public class Settings
 	/// Gets or sets the font size for the text.
 	/// </summary>
 	[Column("FontSize")]
-	public int FontSize { get; set; } = 0;
+	public int FontSize { get; set; } = 16;
+
+	/// <summary>
+	/// Gets or sets the preferred line spacing for reader content.
+	/// </summary>
+	[Column("LineSpacing")]
+	public string LineSpacing { get; set; } = "1.5";
+
+	/// <summary>
+	/// Gets or sets the preferred text alignment for reader content.
+	/// </summary>
+	[Column("TextAlignment")]
+	public string TextAlignment { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the preferred paragraph spacing for reader content.
+	/// </summary>
+	[Column("ParagraphSpacing")]
+	public string ParagraphSpacing { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the preferred hyphenation mode for reader content.
+	/// </summary>
+	[Column("BodyHyphens")]
+	public string BodyHyphens { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the preferred letter spacing for reader content.
+	/// </summary>
+	[Column("LetterSpacing")]
+	public string LetterSpacing { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Gets or sets the preferred word spacing for reader content.
+	/// </summary>
+	[Column("WordSpacing")]
+	public string WordSpacing { get; set; } = string.Empty;
 
 	/// <summary>
 	/// Gets or sets the background color as a string representation.
@@ -76,4 +112,22 @@ public class Settings
 	/// </summary>
 	[Column("UrlPrefix")]
 	public string UrlPrefix { get; set; } = "http"; // Default URL prefix for Calibre server
+
+	/// <summary>
+	/// Gets or sets the user-specified Calibre server port used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualPort")]
+	public int CalibreManualPort { get; set; } = 8080;
+
+	/// <summary>
+	/// Gets or sets the user-specified Calibre server host or IP address used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualIPAddress")]
+	public string CalibreManualIPAddress { get; set; } = "localhost";
+
+	/// <summary>
+	/// Gets or sets the user-specified URL prefix used when auto discovery is disabled.
+	/// </summary>
+	[Column("CalibreManualUrlPrefix")]
+	public string CalibreManualUrlPrefix { get; set; } = "http";
 }

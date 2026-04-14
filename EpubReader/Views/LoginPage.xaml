@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.LoginPage"
-    x:DataType="LoginPageViewModel"
-      xmlns:converters="clr-namespace:EpubReader.Converter;assembly=EpubReader"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:EpubReader.Converter;assembly=EpubReader"
+    xmlns:model="clr-namespace:EpubReader.Models"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:DataType="viewModel:LoginPageViewModel"
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
     Shell.NavBarIsVisible="False">
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:StringIsNotNullOrEmptyConverter x:Key="StringIsNotNullOrEmptyConverter" />
-            <!-- other resources -->
+            <!--  other resources  -->
         </ResourceDictionary>
     </ContentPage.Resources>
     <ScrollView>

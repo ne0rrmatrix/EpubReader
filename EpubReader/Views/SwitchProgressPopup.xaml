@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="EpubReader.Views.SwitchProgressPopup"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModels="clr-namespace:EpubReader.ViewModels"
+    x:Name="CurrentPopup"
+    x:DataType="viewModels:SwitchProgressPopupViewModel"
+    x:TypeArguments="system:Boolean"
+    CanBeDismissedByTappingOutsideOfPopup="False">
+
+    <Border
+        Margin="12"
+        Padding="20"
+        BackgroundColor="{AppThemeBinding Light={StaticResource AppBackgroundLightColor},
+                                          Dark={StaticResource AppBackgroundDarkColor}}"
+        Stroke="{AppThemeBinding Light={StaticResource Gray300},
+                                 Dark={StaticResource Gray700}}"
+        StrokeShape="RoundRectangle 16">
+        <VerticalStackLayout Spacing="16">
+            <Label
+                FontAttributes="Bold"
+                FontSize="18"
+                HorizontalTextAlignment="Center"
+                Text="{Binding Title}" />
+
+            <Label
+                HorizontalTextAlignment="Center"
+                LineBreakMode="WordWrap"
+                Text="{Binding Message}" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                <Button Command="{Binding CancelCommand}" Text="{Binding CancelText}" />
+
+                <Button Command="{Binding ConfirmCommand}" Text="{Binding ConfirmText}" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+    </Border>
+</toolkit:Popup>

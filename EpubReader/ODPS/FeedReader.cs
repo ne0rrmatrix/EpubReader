@@ -13,7 +13,7 @@ namespace EpubReader.ODPS;
 /// </remarks>
 public class FeedReader(HttpClient? httpClient = null)
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FeedReader));
+	static readonly ILogger logger = AppLogger.CreateLogger<FeedReader>();
 	readonly HttpClient httpClient = httpClient ?? new HttpClient();
 
 	/// <summary>

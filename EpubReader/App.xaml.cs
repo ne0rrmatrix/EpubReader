@@ -55,8 +55,7 @@ public partial class App : Application, IDisposable
 		bool needsAuth = await AuthenticationService.NeedsAuthenticationAsync(token);
 		if (needsAuth)
 		{
-			await Shell.Current.GoToAsync("LoginPage");
-			return;
+			await AuthenticationService.SetLocalOnlyModeAsync(token);
 		}
 		await InitializeSyncAsync(token);
 	}

@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="EpubReader.Views.CalibrePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:model="clr-namespace:EpubReader.Models"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
     x:Name="CurrentPage"
-    x:DataType="CalibrePageViewModel"
+    x:DataType="viewModel:CalibrePageViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={StaticResource Blue200Accent}}">
     <ContentPage.ToolbarItems>
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=LoadBooksCommand}"
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=LoadBooksCommand}"
             IconImageSource="sync_24dp.png"
             Order="Primary" />
         <ToolbarItem
-            Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=SettingsCommand}"
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=SettingsCommand}"
             IconImageSource="settings_lightmode.png"
             Order="Primary" />
     </ContentPage.ToolbarItems>
@@ -32,13 +37,20 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <HorizontalStackLayout Grid.Row="0" Grid.Column="0">
+            <HorizontalStackLayout
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Grid.Column="0">
                 <ImageButton
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
+                    Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=AlphabeticalAuthorSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -57,7 +69,7 @@
 
                 <ImageButton
                     Margin="10,10,0,0"
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=AlphabeticalTitleSortCommand}"
+                    Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=AlphabeticalTitleSortCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -67,7 +79,7 @@
                                            Default=40}" />
                 <ImageButton
                     Margin="10,10,0,0"
-                    Command="{Binding Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}, Path=SortByDateCommand}"
+                    Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=SortByDateCommand}"
                     HeightRequest="{OnIdiom Phone=24,
                                             Default=40}"
                     HorizontalOptions="Start"
@@ -79,34 +91,59 @@
             <HorizontalStackLayout
                 Grid.Row="0"
                 Grid.Column="1"
-                HorizontalOptions="Center">
+                Margin="10,10,10,0"
+                HorizontalOptions="Fill">
+                <ImageButton
+                    Padding="12,0"
+                    BackgroundColor="Transparent"
+                    Command="{Binding NavigateBackCommand}"
+                    HeightRequest="48"
+                    IsVisible="{Binding CanNavigateBack}"
+                    Source="{AppThemeBinding Dark=arrow_back.png,
+                                             Light=arrow_back_light_mode.png}"
+                    VerticalOptions="Center"
+                    WidthRequest="48" />
                 <Label
                     FontAttributes="Bold"
-                    Text="Library"
+                    LineBreakMode="TailTruncation"
+                    Text="{Binding CurrentFeedTitle}"
                     VerticalOptions="Center" />
-                <SearchBar
+                <Picker
+                    Title="Browse feeds"
                     Margin="10,0,0,0"
-                    HorizontalOptions="Fill"
-                    Placeholder="Search books..."
-                    TextChanged="OnSearchBarTextChanged"
-                    VerticalOptions="Center"
-                    WidthRequest="{OnIdiom Desktop=300,
-                                           Tablet=300,
-                                           Phone=200}" />
+                    HorizontalOptions="FillAndExpand"
+                    ItemDisplayBinding="{Binding Title}"
+                    ItemsSource="{Binding FeedSelections}"
+                    SelectedIndexChanged="OnFeedSelectionChanged"
+                    SelectedItem="{Binding SelectedFeedSelection, Mode=TwoWay}"
+                    VerticalOptions="Center" />
             </HorizontalStackLayout>
+            <SearchBar
+                Grid.Row="1"
+                Grid.Column="1"
+                Margin="10,5,10,0"
+                HorizontalOptions="Fill"
+                Placeholder="Search books..."
+                Text="{Binding SearchText}"
+                TextChanged="OnSearchBarTextChanged"
+                VerticalOptions="Center"
+                WidthRequest="{OnIdiom Desktop=300,
+                                       Tablet=300,
+                                       Phone=200}" />
         </Grid>
         <Grid Grid.Row="1">
             <CollectionView
                 Margin="{StaticResource CollectionMargin}"
                 HorizontalScrollBarVisibility="Never"
                 ItemsSource="{Binding Books}"
+                ItemsUpdatingScrollMode="KeepScrollOffset"
                 SelectionMode="None"
                 VerticalScrollBarVisibility="Never">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="Book">
+                    <DataTemplate x:DataType="model:Book">
                         <Grid
                             Margin="8"
                             Padding="8"
@@ -119,6 +156,7 @@
                                 <Grid RowDefinitions="350,40" VerticalOptions="Center">
 
                                     <ffimageloading:CachedImage
+                                        x:Name="ImageName"
                                         Grid.Row="0"
                                         Aspect="AspectFit"
                                         HeightRequest="300"
@@ -127,7 +165,7 @@
 
                                     <Button
                                         Grid.Row="1"
-                                        Command="{Binding AddBookCommand, x:DataType=CalibrePageViewModel, Source={RelativeSource AncestorType={x:Type CalibrePageViewModel}}}"
+                                        Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:CalibrePageViewModel}}, Path=AddBookCommand}"
                                         CommandParameter="{Binding .}"
                                         HeightRequest="40"
                                         IsVisible="{Binding IsInLibrary, Converter={StaticResource InvertedBoolConverter}}"

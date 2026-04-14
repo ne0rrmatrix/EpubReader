@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="EpubReader.Views.RecentBooksPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:ffimageloading="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+    xmlns:model="clr-namespace:EpubReader.Models"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:DataType="viewModel:RecentBooksViewModel"
+    Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                            Light={StaticResource Blue200Accent}}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=CalibreCommand}"
+            IconImageSource="globe_book_24dp.png"
+            Order="Primary" />
+        <ToolbarItem
+            Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=SettingsCommand}"
+            IconImageSource="{AppThemeBinding Light={OnPlatform WinUI=settings_darkmode.png,
+                                                                Default=settings_lightmode.png},
+                                              Dark=settings_lightmode.png}"
+            Order="Primary" />
+    </ContentPage.ToolbarItems>
+    <Grid>
+        <!--  Empty State  -->
+        <VerticalStackLayout
+            x:Name="EmptyStateContainer"
+            HorizontalOptions="Center"
+            IsVisible="{Binding IsEmpty}"
+            Spacing="16"
+            VerticalOptions="Center">
+            <Label
+                FontAttributes="Bold"
+                FontSize="24"
+                HorizontalOptions="Center"
+                Text="No Recent Books"
+                TextColor="{AppThemeBinding Light={StaticResource Black},
+                                            Dark={StaticResource White}}" />
+            <Label
+                FontSize="14"
+                HorizontalOptions="Center"
+                Text="Books you open will appear here"
+                TextColor="{AppThemeBinding Light=#666666,
+                                            Dark=#CCCCCC}" />
+        </VerticalStackLayout>
+
+        <!--  Recent Books Grid  -->
+        <CollectionView
+            Margin="{StaticResource CollectionMargin}"
+            HorizontalScrollBarVisibility="Never"
+            IsVisible="{Binding IsEmpty, Converter={toolkit:InvertedBoolConverter}}"
+            ItemsSource="{Binding RecentBooks}"
+            ItemsUpdatingScrollMode="KeepScrollOffset"
+            SelectionMode="None"
+            VerticalScrollBarVisibility="Never">
+
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="{StaticResource GridSpan}" />
+            </CollectionView.ItemsLayout>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="model:Book">
+                    <Grid Margin="4" Padding="4">
+                        <Border Style="{x:StaticResource EbookCardStyle}">
+                            <VerticalStackLayout
+                                Margin="4"
+                                Padding="4"
+                                HorizontalOptions="Center">
+                                <ffimageloading:CachedImage
+                                    Aspect="AspectFit"
+                                    HeightRequest="250"
+                                    Source="{Binding CoverImagePath}">
+                                    <ffimageloading:CachedImage.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type viewModel:RecentBooksViewModel}}, Path=GotoBookDetailsCommand}" CommandParameter="{Binding .}" />
+                                    </ffimageloading:CachedImage.GestureRecognizers>
+                                </ffimageloading:CachedImage>
+
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

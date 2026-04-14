@@ -12,11 +12,14 @@ namespace EpubReader.ViewModels;
 /// including adding books from files, removing books, and navigating to a book's page. It interacts with services
 /// for file picking, database operations, and ebook processing.
 /// </remarks>
-public partial class LibraryViewModel : BaseViewModel
+/// <remarks>
+/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
+/// </remarks>
+public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibraryStateService libraryStateService, IImportStateService importStateService, ISyncService syncService) : BaseViewModel
 {
 	bool isAlphabeticalSorted = true;
 
-	Popup popup = new FolderDialogePage(new FolderDialogPageViewModel());
+	Popup? popup;
 	readonly PopupOptions options = new()
 	{
 		CanBeDismissedByTappingOutsideOfPopup = false,
@@ -28,53 +31,22 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <remarks>This field retrieves the <see cref="ProcessEpubFiles"/> service from the current application's
 	/// service provider. If the service cannot be resolved, an <see cref="InvalidOperationException"/> is
 	/// thrown.</remarks>
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
-	readonly ISyncService syncService = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ISyncService>() ?? throw new InvalidOperationException();
+	readonly ProcessEpubFiles processEpubFiles = processEpubFiles;
+	readonly ILibraryStateService libraryStateService = libraryStateService;
+	readonly IImportStateService importStateService = importStateService;
+	readonly ISyncService syncService = syncService;
 
 	/// <summary>
 	/// Gets or sets the collection of books in the library.
 	/// </summary>
 	[ObservableProperty]
-	public partial ObservableCollection<Book> Books { get; set; }
-
-	/// <summary>
-	/// Initializes a new instance of the <see cref="LibraryViewModel"/> class.
-	/// </summary>
-	public LibraryViewModel()
-	{
-		Books ??= [];
-
-		WeakReferenceMessenger.Default.Register<CalibreMessage>(this, (r, m) =>
-		{
-			if (m.Value)
-			{
-				CancellationTokenSource.Cancel();
-			}
-		});
-		WeakReferenceMessenger.Default.Register<BookMessage>(this, (r, m) =>
-		{
-			if (CancellationTokenSource.IsCancellationRequested)
-			{
-				CancellationTokenSource = new CancellationTokenSource();
-			}
-			var ebook = m.Value;
-			if (Books.Any(b => b.Title == ebook.Title))
-			{
-				Logger.Info($"Book already exists in library: {ebook.Title}");
-				return;
-			}
-			Book.IsInLibrary = true; // Ensure the book is marked as in library
-			Books.Add(ebook);
-			Logger.Info($"Book message received: {ebook.Title}");
-		});
-	}
+	public partial ObservableCollection<Book> Books { get; set; } = libraryStateService.Books;
 
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing)
 		{
 			CancellationTokenSource?.Dispose();
-			WeakReferenceMessenger.Default.UnregisterAll(this);
 		}
 		base.Dispose(disposing);
 	}
@@ -85,7 +57,7 @@ public partial class LibraryViewModel : BaseViewModel
 	/// Navigate to the book details page for the specified book.
 	/// </summary>
 	[RelayCommand]
-	public async Task GotoBookDetailsAsync(Book book)
+	public async Task GotoBookDetails(Book book)
 	{
 		try
 		{
@@ -110,17 +82,22 @@ public partial class LibraryViewModel : BaseViewModel
 	{
 		try
 		{
-			ArgumentNullException.ThrowIfNull(book);
+			Logger.Info($"Attempting to remove book: {book.Title}");
+			if (!await FileService.ArePermissionsGranted())
+			{
+				return;
+			}
+
 			Logger.Info($"Removing book: {book.Title}");
 
 			var directory = Path.GetDirectoryName(book.FilePath);
+			Logger.Info($"Book file path: {book.FilePath}");
 			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
 			{
 				Directory.Delete(directory, true);
 			}
 
-			await db.RemoveBook(book, CancellationTokenSource.Token);
-			Books.Remove(book);
+			await libraryStateService.RemoveBookAsync(book, CancellationTokenSource.Token);
 
 			Logger.Info("Book removed from library");
 		}
@@ -139,7 +116,7 @@ public partial class LibraryViewModel : BaseViewModel
 	public void AlphabeticalAuthorSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		Books = [.. SortByAuthor([.. Books], isAlphabeticalSorted)];
+		ReplaceBooks(SortByAuthor([.. Books], isAlphabeticalSorted));
 	}
 
 	/// <summary>
@@ -151,22 +128,7 @@ public partial class LibraryViewModel : BaseViewModel
 	public void AlphabeticalTitleSort()
 	{
 		isAlphabeticalSorted = !isAlphabeticalSorted;
-		Books = [.. SortByTitle([.. Books], isAlphabeticalSorted)];
-	}
-
-	/// <summary>
-	/// Initiates the Calibre integration process asynchronously.
-	/// </summary>
-	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
-	/// placeholder for future implementation.</returns>
-	[RelayCommand]
-	async Task Calibre()
-	{
-		if (CancellationTokenSource.IsCancellationRequested)
-		{
-			CancellationTokenSource = new CancellationTokenSource();
-		}
-		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
+		ReplaceBooks(SortByTitle([.. Books], isAlphabeticalSorted));
 	}
 
 	/// <summary>
@@ -174,14 +136,14 @@ public partial class LibraryViewModel : BaseViewModel
 	/// </summary>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddFolderAsync()
+	public async Task AddFolder()
 	{
-		if (CancellationTokenSource.IsCancellationRequested)
+		if (!await FileService.ArePermissionsGranted())
 		{
-			CancellationTokenSource = new CancellationTokenSource();
+			return;
 		}
 
-		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync();
+		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			Logger.Info("No folder selected");
@@ -189,26 +151,34 @@ public partial class LibraryViewModel : BaseViewModel
 		}
 
 		Logger.Info($"Selected folder: {folderUri}");
-		popup.Closed += (s, e) =>
+		importStateService.Begin();
+		await Dispatcher.DispatchAsync(() =>
 		{
-			Logger.Info("File dialog popup closed.");
-			WeakReferenceMessenger.Default.UnregisterAll(this);
-		};
-		LoadPopup();
+			popup = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<FolderDialogePage>() ?? throw new InvalidOperationException();
+			popup.Closed += (s, e) =>
+			{
+				Logger.Info("File dialog popup closed.");
+				importStateService.Complete();
+			};
+			LoadPopup();
+		}).ConfigureAwait(false);
+		var importToken = importStateService.Token;
 
-		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, CancellationTokenSource.Token).ConfigureAwait(false);
+		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, importToken).ConfigureAwait(false);
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
 
-		if (CancellationTokenSource.Token.IsCancellationRequested)
+		if (importToken.IsCancellationRequested)
 		{
 			Logger.Info("Operation cancelled by user.");
-			await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
+			await ClosePopupAsync();
+			importStateService.Complete();
 			return;
 		}
 
-		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, CancellationTokenSource.Token).ConfigureAwait(false);
-		await Dispatcher.DispatchAsync(async () => { await popup.CloseAsync(); });
+		await processEpubFiles.ProcessEpubFilesAsync(epubFiles, importToken).ConfigureAwait(false);
+		await ClosePopupAsync();
+		importStateService.Complete();
 	}
 
 	/// <summary>
@@ -218,19 +188,40 @@ public partial class LibraryViewModel : BaseViewModel
 	/// shell.</remarks>
 	void LoadPopup()
 	{
-		popup = new FolderDialogePage(new FolderDialogPageViewModel());
+		if (popup is null)
+		{
+			return;
+		}
+
 		Shell.Current.ShowPopup(popup, options);
 	}
 
-	/// <summary>
-	/// Unregisters all messages associated with this instance from the default messenger.
-	/// </summary>
-	/// <remarks>This method should be called to clean up message registrations when the page is no longer needed,
-	/// preventing potential memory leaks by ensuring that this instance is no longer referenced by the
-	/// messenger.</remarks>
-	public void UnloadPage()
+	async Task ClosePopupAsync()
 	{
-		WeakReferenceMessenger.Default.UnregisterAll(this);
+		if (popup is null)
+		{
+			return;
+		}
+
+		await Dispatcher.DispatchAsync(async () =>
+		{
+			await popup.CloseAsync();
+			popup = null;
+		});
+	}
+
+	public async Task LoadBooksAsync(CancellationToken cancellationToken = default)
+	{
+		await libraryStateService.InitializeAsync(cancellationToken);
+	}
+
+	public void ReplaceBooks(IEnumerable<Book> books)
+	{
+		Books.Clear();
+		foreach (var book in books)
+		{
+			Books.Add(book);
+		}
 	}
 
 	/// <summary>
@@ -239,8 +230,13 @@ public partial class LibraryViewModel : BaseViewModel
 	/// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
 	/// <returns>A task representing the asynchronous operation.</returns>
 	[RelayCommand]
-	public async Task AddAsync(CancellationToken cancellationToken = default)
+	public async Task Add(CancellationToken cancellationToken = default)
 	{
+		if (!await FileService.ArePermissionsGranted())
+		{
+			return;
+		}
+
 		if (CancellationTokenSource.IsCancellationRequested)
 		{
 			CancellationTokenSource = new CancellationTokenSource();
@@ -290,8 +286,14 @@ public partial class LibraryViewModel : BaseViewModel
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};
-
+			settingsPopup.Closed += async (s, e) =>
+			{
+				Logger.Info("Settings popup closed.");
+				await libraryStateService.RefreshAsync(cancellation);
+				AlphabeticalTitleSort();
+			};
 			IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(settingsPopup, settingsOptions, cancellation);
+
 			if (result.WasDismissedByTappingOutsideOfPopup)
 			{
 				Logger.Info("Settings popup dismissed by tapping outside.");

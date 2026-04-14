@@ -9,7 +9,7 @@ namespace EpubReader.Views;
 /// displayed.</remarks>
 public partial class LibraryPage : ContentPage
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(LibraryPage));
+	static readonly ILogger logger = AppLogger.CreateLogger<LibraryPage>();
 	readonly IDb db;
 	ViewModels.LibraryViewModel viewModel => (ViewModels.LibraryViewModel)BindingContext;
 
@@ -36,9 +36,7 @@ public partial class LibraryPage : ContentPage
 			logger.Info("Books already loaded, skipping database fetch");
 			return;
 		}
-		var temp = await db.GetAllBooks();
-		temp.ForEach(x => x.IsInLibrary = true); // Ensure all books are marked as in library
-		viewModel.Books = [.. temp];
+		await viewModel.LoadBooksAsync();
 		viewModel.AlphabeticalTitleSort();
 	}
 
@@ -69,7 +67,7 @@ public partial class LibraryPage : ContentPage
 				logger.Info("Search text is empty, showing all books");
 				return; // No need to update if already showing all books
 			}
-			viewModel.Books = [.. allBooks];
+			viewModel.ReplaceBooks(allBooks);
 			logger.Info("Search text is empty, showing all books");
 			return;
 		}
@@ -78,7 +76,7 @@ public partial class LibraryPage : ContentPage
 		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
 
 		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
-		viewModel.Books = [.. filteredBooks];
+		viewModel.ReplaceBooks(filteredBooks);
 
 	}
 }

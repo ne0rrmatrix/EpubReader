@@ -1,10 +1,17 @@
-/*
- * Readium CSS (v. 2.0.0-beta.17)
- * Developers: Jiminy Panoz 
- * Copyright (c) 2017. Readium Foundation. All rights reserved.
+/*!
+ * Readium CSS v.2.0.0-beta.25
+ * Copyright (c) 2017–2026. Readium Foundation. All rights reserved.
  * Use of this source code is governed by a BSD-style license which is detailed in the
  * LICENSE file present in the project repository where this source code is maintained.
-*/
+ * Core maintainer: Jiminy Panoz <jiminy.panoz@edrlab.org> 
+ * Contributors: 
+ * Daniel Weck
+ * Hadrien Gardeur
+ * Innovimax
+ * L. Le Meur
+ * Mickaël Menu
+ * k_taka
+ */
 
 @namespace url("http://www.w3.org/1999/xhtml");
 
@@ -20,7 +27,7 @@
 
   --RS__pageGutter:0;
 
-  --RS__defaultLineLength:40rem;
+  --RS__defaultLineLength:100%;
 
   --RS__colGap:0;
 
@@ -64,9 +71,12 @@
 body{
   width:100%;
   max-width:var(--RS__defaultLineLength) !important;
-  padding:0 var(--RS__pageGutter) !important;
   margin:0 auto !important;
   box-sizing:border-box;
+}
+
+:root:not([style*="readium-scroll-on"]) body{
+  padding:0 var(--RS__pageGutter) !important;
 }
 
 :root:not([style*="readium-noOverflow-on"]) body{
@@ -131,145 +141,6 @@ body{
 
 :root[style*="readium-scroll-on"][style*="--RS__scrollPaddingRight"] body{
   padding-right:var(--RS__scrollPaddingRight) !important;
-}
-
-:root[style*="readium-night-on"]{
-
-  --RS__selectionTextColor:inherit;
-
-  --RS__selectionBackgroundColor:#b4d8fe;
-
-  --RS__visitedColor:#0099E5;
-
-  --RS__linkColor:#63caff;
-
-  --RS__textColor:#FEFEFE;
-
-  --RS__backgroundColor:#000000;
-}
-
-:root[style*="readium-night-on"] *:not(a){
-  color:inherit !important;
-  background-color:transparent !important;
-  border-color:currentcolor !important;
-}
-
-:root[style*="readium-night-on"] svg text{
-  fill:currentcolor !important;
-  stroke:none !important;
-}
-
-:root[style*="readium-night-on"] a:link,
-:root[style*="readium-night-on"] a:link *{
-  color:var(--RS__linkColor) !important;
-}
-
-:root[style*="readium-night-on"] a:visited,
-:root[style*="readium-night-on"] a:visited *{
-  color:var(--RS__visitedColor) !important;
-}
-
-:root[style*="readium-night-on"] img[class*="gaiji"],
-:root[style*="readium-night-on"] *[epub\:type~="titlepage"] img:only-child,
-:root[style*="readium-night-on"] *[epub|type~="titlepage"] img:only-child{
-  -webkit-filter:invert(100%);
-  filter:invert(100%);
-}
-
-:root[style*="readium-sepia-on"]{
-
-  --RS__selectionTextColor:inherit;
-
-  --RS__selectionBackgroundColor:#b4d8fe;
-
-  --RS__visitedColor:#551A8B;
-
-  --RS__linkColor:#0000EE;
-
-  --RS__textColor:#121212;
-
-  --RS__backgroundColor:#faf4e8;
-}
-
-:root[style*="readium-sepia-on"] *:not(a){
-  color:inherit !important;
-  background-color:transparent !important;
-}
-
-:root[style*="readium-sepia-on"] a:link,
-:root[style*="readium-sepia-on"] a:link *{
-  color:var(--RS__linkColor);
-}
-
-:root[style*="readium-sepia-on"] a:visited,
-:root[style*="readium-sepia-on"] a:visited *{
-  color:var(--RS__visitedColor);
-}
-
-@media screen and (-ms-high-contrast: active){
-
-  :root{
-    color:windowText !important;
-    background-color:window !important;
-  }
-
-  :root :not(#\#):not(#\#):not(#\#),
-  :root :not(#\#):not(#\#):not(#\#) :not(#\#):not(#\#):not(#\#)
-  :root :not(#\#):not(#\#):not(#\#) :not(#\#):not(#\#):not(#\#) :not(#\#):not(#\#):not(#\#){
-    color:inherit !important;
-    background-color:inherit !important;
-  }
-
-  .readiumCSS-mo-active-default{
-    color:highlightText !important;
-    background-color:highlight !important;
-  }
-}
-
-@media screen and (-ms-high-contrast: white-on-black){
-
-  :root[style*="readium-night-on"] img[class*="gaiji"],
-  :root[style*="readium-night-on"] *[epub\:type~="titlepage"] img:only-child,
-  :root[style*="readium-night-on"] *[epub|type~="titlepage"] img:only-child{
-    -webkit-filter:none !important;
-    filter:none !important;
-  }
-
-  :root[style*="readium-night-on"][style*="readium-invert-on"] img{
-    -webkit-filter:none !important;
-    filter:none !important;
-  }
-
-  :root[style*="readium-night-on"][style*="readium-darken-on"][style*="readium-invert-on"] img{
-    -webkit-filter:brightness(80%);
-    filter:brightness(80%);
-  }
-}
-
-@media screen and (inverted-colors){
-
-  :root[style*="readium-night-on"] img[class*="gaiji"],
-  :root[style*="readium-night-on"] *[epub\:type~="titlepage"] img:only-child,
-  :root[style*="readium-night-on"] *[epub|type~="titlepage"] img:only-child{
-    -webkit-filter:none !important;
-    filter:none !important;
-  }
-
-  :root[style*="readium-night-on"][style*="readium-invert-on"] img{
-    -webkit-filter:none !important;
-    filter:none !important;
-  }
-
-  :root[style*="readium-night-on"][style*="readium-darken-on"][style*="readium-invert-on"] img{
-    -webkit-filter:brightness(80%);
-    filter:brightness(80%);
-  }
-}
-
-@media screen and (monochrome){
-}
-
-@media screen and (prefers-reduced-motion){
 }
 
 :root[style*="--USER__backgroundColor"]{
@@ -346,7 +217,15 @@ body{
 }
 
 :root[style*="--USER__textAlign"] body,
-:root[style*="--USER__textAlign"] p:not(blockquote p):not(figcaption p):not(hgroup p),
+:root[style*="--USER__textAlign"] p:not(
+  blockquote p,
+  figcaption p,
+  header p,
+  hgroup p,
+  :root[style*="readium-experimentalHeaderFiltering-on"] p[class*="title"],
+  :root[style*="readium-experimentalHeaderFiltering-on"] div:has(+ *) > h1 + p,
+  :root[style*="readium-experimentalHeaderFiltering-on"] div:has(+ *) > p:has(+ h1)
+),
 :root[style*="--USER__textAlign"] li,
 :root[style*="--USER__textAlign"] dd{
   text-align:var(--USER__textAlign) !important;
@@ -383,57 +262,40 @@ body{
   font-family:revert !important;
 }
 
-:root[style*="AccessibleDfA"]{
-  font-family:AccessibleDfA, Verdana, Tahoma, "Trebuchet MS", sans-serif !important;
-}
-
-:root[style*="IA Writer Duospace"]{
-  font-family:"IA Writer Duospace", Menlo, "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
-}
-
-:root[style*="AccessibleDfA"],:root[style*="IA Writer Duospace"],
 :root[style*="readium-a11y-on"]{
   font-style:normal !important;
   font-weight:normal !important;
 }
 
-:root[style*="AccessibleDfA"] *:not(code):not(var):not(kbd):not(samp),:root[style*="IA Writer Duospace"] *:not(code):not(var):not(kbd):not(samp),
-:root[style*="readium-a11y-on"] *:not(code):not(var):not(kbd):not(samp){
+:root[style*="readium-a11y-on"] body *:not(code):not(var):not(kbd):not(samp){
   font-family:inherit !important;
   font-style:inherit !important;
   font-weight:inherit !important;
 }
 
-:root[style*="AccessibleDfA"] *,:root[style*="IA Writer Duospace"] *,
-:root[style*="readium-a11y-on"] *{
+:root[style*="readium-a11y-on"] body *:not(a){
   text-decoration:none !important;
+}
+
+:root[style*="readium-a11y-on"] body *{
   font-variant-caps:normal !important;
   font-variant-numeric:normal !important;
   font-variant-position:normal !important;
 }
 
-:root[style*="AccessibleDfA"] sup,:root[style*="IA Writer Duospace"] sup,
 :root[style*="readium-a11y-on"] sup,
-:root[style*="AccessibleDfA"] sub,
-:root[style*="IA Writer Duospace"] sub,
 :root[style*="readium-a11y-on"] sub{
   font-size:1rem !important;
   vertical-align:baseline !important;
 }
 
-:root:not([style*="readium-deprecatedFontSize-on"])[style*="--USER__fontSize"] body{
-  zoom:var(--USER__fontSize) !important;
-}
-
-@supports not (zoom: 1){
-
-  :root[style*="--USER__fontSize"]{
-    font-size:var(--USER__fontSize) !important;
-  }
-}
-
-:root[style*="readium-deprecatedFontSize-on"][style*="--USER__fontSize"]{
+:root[style*="--USER__fontSize"]{
   font-size:var(--USER__fontSize) !important;
+  --RS__baseFontSize:100% !important;
+}
+
+:root[style*="--USER__fontSize"] body{
+  font-size:var(--RS__baseFontSize) !important;
 }
 
 :root[style*="--USER__lineHeight"]{
@@ -452,7 +314,15 @@ body{
   margin-bottom:var(--USER__paraSpacing) !important;
 }
 
-:root[style*="--USER__paraIndent"] p{
+:root[style*="--USER__paraIndent"] p:not(
+  blockquote p,
+  figcaption p,
+  header p,
+  hgroup p,
+  :root[style*="readium-experimentalHeaderFiltering-on"] p[class*="title"],
+  :root[style*="readium-experimentalHeaderFiltering-on"] div:has(+ *) > h1 + p,
+  :root[style*="readium-experimentalHeaderFiltering-on"] div:has(+ *) > p:has(+ h1)
+){
   text-indent:var(--USER__paraIndent) !important;
 }
 
@@ -488,6 +358,14 @@ body{
 :root[style*="--USER__letterSpacing"] dd{
   letter-spacing:var(--USER__letterSpacing);
   font-variant:none;
+}
+
+:root[style*="--USER__ligatures"]{
+  font-variant-ligatures:var(--USER__ligatures) !important;
+}
+
+:root[style*="--USER__ligatures"] *{
+  font-variant-ligatures:inherit !important;
 }
 
 :root[style*="--USER__fontWeight"] body{
@@ -673,4 +551,25 @@ body{
 
 :root[style*="readium-iPadOSPatch-on"] p:not(:has(b, cite, em, i, q, s, small, span, strong)):first-line{
   -webkit-text-zoom:normal;
+}
+
+:root :is(p, li, dd, blockquote, figcaption, td, th, a, h1, h2, h3, h4, h5, h6, pre, code, kbd, samp){
+  max-inline-size:100%;
+  overflow-wrap:anywhere;
+}
+
+:root :is(pre, code, kbd, samp){
+  white-space:pre-wrap !important;
+  word-break:break-word;
+}
+
+:root :is(img, svg, video, canvas, iframe, object, embed){
+  max-inline-size:100% !important;
+}
+
+:root table{
+  display:block;
+  max-inline-size:100% !important;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }

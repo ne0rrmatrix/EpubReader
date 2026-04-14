@@ -25,19 +25,20 @@ function detectPlatform() {
 
 // Helper function to send messages to parent
 function sendMessageToParent(message) {
+    const serializedMessage = typeof message === 'string' ? message : JSON.stringify(message);
     if (detectPlatform().isIOS || detectPlatform().isMac) {
         window.parent.postMessage(message, TARGET_ORIGIN_MACIOS);
-        console.log(`Sent message from ios/mac: ${message}`);
+        console.log(`Sent message from ios/mac: ${serializedMessage}`);
     }
     else {
         window.parent.postMessage(message, TARGET_ORIGIN);
-        console.log(`Sent message: ${message}`);
+        console.log(`Sent message: ${serializedMessage}`);
     }
 }
 
 // Handle link navigation
 function handleLinkClick(href) {
-    sendMessageToParent(`jump.${href}`);
+    sendMessageToParent({ action: 'jump', href: href });
     return true;
 }
 
@@ -61,13 +62,13 @@ function handleNavigationClick(event) {
 
     if (clickX < leftThreshold) {
         console.log('Clicked in the left region');
-        sendMessageToParent("prev");
+        sendMessageToParent({ action: 'prev' });
     } else if (clickX > rightThreshold) {
         console.log('Clicked in the right region');
-        sendMessageToParent("next");
+        sendMessageToParent({ action: 'next' });
     } else {
         console.log('Clicked in the center region');
-        sendMessageToParent("menu");
+        sendMessageToParent({ action: 'menu' });
     }
 }
 
@@ -131,8 +132,8 @@ globalThis.addEventListener('click', function (event) {
 // Keyboard navigation handler
 globalThis.addEventListener("keydown", function (event) {
     if (event.key === "ArrowRight") {
-        sendMessageToParent("next");
+        sendMessageToParent({ action: 'next' });
     } else if (event.key === "ArrowLeft") {
-        sendMessageToParent("prev");
+        sendMessageToParent({ action: 'prev' });
     }
 });

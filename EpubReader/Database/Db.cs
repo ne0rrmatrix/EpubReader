@@ -11,10 +11,14 @@ namespace EpubReader.Database;
 public partial class Db : IDb
 {
 	bool isInitialized = false;
+	const string textColumnType = "TEXT";
+	const string integerColumnType = "INTEGER";
+	const string realColumnType = "REAL";
+	const string dateTimeColumnType = "DATETIME";
 	static readonly string dbErrorMsg = "Database connection is not initialized.";
 	static readonly string errorMsg = "Database connection is null. Ensure that the database is initialized.";
 	public static string DbPath => Path.Combine(Util.FileService.SaveDirectory, "MyData.dataSource");
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(Db));
+	static readonly ILogger logger = AppLogger.CreateLogger<Db>();
 	SQLiteAsyncConnection? conn;
 	readonly SQLite.SQLiteOpenFlags flags =
 		// open the database in read/write mode
@@ -50,10 +54,30 @@ public partial class Db : IDb
 		logger.Info("Settings Table created");
 		await conn.CreateTableAsync<Book>().WaitAsync(cancellationToken);
 		logger.Info("Book Table created");
+		await EnsureSettingsColumnsAsync(conn, cancellationToken);
 		await EnsureSyncIdColumnAsync(cancellationToken);
 		await BackfillBookSyncIdsAsync(cancellationToken);
 		await EnsureBookMediaOverlayColumnsAsync(conn, cancellationToken);
+		await EnsureLastOpenedDateColumnAsync(conn, cancellationToken);
 		isInitialized = true;
+	}
+
+	static async Task EnsureSettingsColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		await EnsureColumnsAsync(
+			connection,
+			"settings",
+			[("LineSpacing", textColumnType), ("TextAlignment", textColumnType), ("ParagraphSpacing", textColumnType), ("BodyHyphens", textColumnType), ("LetterSpacing", textColumnType), ("WordSpacing", textColumnType), ("CalibreManualPort", integerColumnType), ("CalibreManualIPAddress", textColumnType), ("CalibreManualUrlPrefix", textColumnType)],
+			cancellationToken);
+	}
+
+	static async Task EnsureLastOpenedDateColumnAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
+	{
+		await EnsureColumnsAsync(
+			connection,
+			"Book",
+			[("LastOpenedDate", dateTimeColumnType)],
+			cancellationToken);
 	}
 
 	static async Task EnsureBookMediaOverlayColumnsAsync(SQLiteAsyncConnection connection, CancellationToken cancellationToken)
@@ -63,11 +87,11 @@ public partial class Db : IDb
 			connection,
 			"Book",
 			[
-				("MediaOverlayEnabled", "INTEGER"),
-				("MediaOverlayChapter", "INTEGER"),
-				("MediaOverlaySegmentIndex", "INTEGER"),
-				("MediaOverlayPositionSeconds", "REAL"),
-				("MediaOverlayFragmentId", "TEXT")
+				("MediaOverlayEnabled", integerColumnType),
+				("MediaOverlayChapter", integerColumnType),
+				("MediaOverlaySegmentIndex", integerColumnType),
+				("MediaOverlayPositionSeconds", realColumnType),
+				("MediaOverlayFragmentId", textColumnType)
 			],
 			cancellationToken);
 	}
@@ -214,6 +238,22 @@ public partial class Db : IDb
 		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
 		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
 		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
+	}
+
+	/// <summary>
+	/// Updates only the last opened date column for the specified book.
+	/// </summary>
+	public async Task UpdateBookLastOpenedDate(Guid bookId, DateTime lastOpenedDate, CancellationToken cancellationToken = default)
+	{
+		await InitializeAsync(cancellationToken);
+		if (conn is null)
+		{
+			logger.Error(errorMsg);
+			throw new InvalidOperationException(dbErrorMsg);
+		}
+
+		var sql = "UPDATE Book SET LastOpenedDate = ? WHERE Id = ?";
+		await conn.ExecuteAsync(sql, lastOpenedDate, bookId).WaitAsync(cancellationToken);
 	}
 
 	public async Task UpdateBookMediaOverlayProgress(

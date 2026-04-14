@@ -71,14 +71,16 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// </summary>
 	[ObservableProperty]
 	public partial string ReaderModeToolbarText { get; set; } = "Hide Interface";
+	IFullScreenService FullScreenService { get; set; }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel(AuthenticationService authenticationService)
+	public BookViewModel(AuthenticationService authenticationService, IFullScreenService fullScreenService)
 	{
 		this.authenticationService = authenticationService;
+		this.FullScreenService = fullScreenService;
 		Press();
 	}
 
@@ -142,10 +144,11 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	[RelayCommand]
 	public void Press()
 	{
-#if ANDROID
-		Service.StatusBarExtensions.SetStatusBarsHidden(IsNavMenuVisible);
-#endif
-		IsNavMenuVisible = !IsNavMenuVisible;
-		Dispatcher.Dispatch(() => Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible));
+		Dispatcher.Dispatch(() =>
+		{
+			FullScreenService.SetFullScreen(IsNavMenuVisible);
+			IsNavMenuVisible = !IsNavMenuVisible;
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+		});
 	}
 }

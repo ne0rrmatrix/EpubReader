@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
+using System.Globalization;
 using System.Text.Json;
 
 namespace EpubReader.Views;
@@ -15,14 +13,70 @@ namespace EpubReader.Views;
 /// when settings are changed.</remarks>
 public partial class SettingsPage : Popup<bool>
 {
+	const int defaultReaderFontSize = 16;
+	const int minimumReaderFontSize = 8;
+	const int maximumReaderFontSize = 36;
+	const string defaultReaderLineSpacing = "1.5";
+	const string defaultReaderTextAlignment = "";
+	const string defaultReaderParagraphSpacing = "";
+	const string defaultReaderBodyHyphens = "";
+	const string defaultReaderLetterSpacing = "";
+	const string defaultReaderWordSpacing = "";
+	const string publisherDefaultOptionLabel = "Publisher Default";
+	const string normalOptionLabel = "Normal";
+	static readonly IReadOnlyList<(string Label, string Value)> lineSpacingOptions =
+	[
+		("Tight", "1.25"),
+		(normalOptionLabel, "1.5"),
+		("Relaxed", "1.75"),
+		("Spacious", "2")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> textAlignmentOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		("Left", "left"),
+		("Justified", "justify")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> paragraphSpacingOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		("Compact", "0"),
+		(normalOptionLabel, "0.5rem"),
+		("Relaxed", "1rem"),
+		("Spacious", "1.5rem")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> hyphenationOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		("Automatic", "auto"),
+		("Manual Only", "manual"),
+		("Off", "none")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> letterSpacingOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		(normalOptionLabel, "0"),
+		("Wide", "0.02em"),
+		("Wider", "0.04em"),
+		("Extra Wide", "0.06em")
+	];
+	static readonly IReadOnlyList<(string Label, string Value)> wordSpacingOptions =
+	[
+		(publisherDefaultOptionLabel, ""),
+		(normalOptionLabel, "0"),
+		("Wide", "0.05em"),
+		("Wider", "0.1em"),
+		("Extra Wide", "0.16em")
+	];
+
 	readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(SettingsPage));
+	static readonly ILogger logger = AppLogger.CreateLogger<SettingsPage>();
 	readonly IFolderPicker folderPicker = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetService<IFolderPicker>() ?? throw new InvalidOperationException();
 	readonly IDb db = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IDb>() ?? throw new InvalidOperationException();
+	readonly IReaderSettingsStateService settingsStateService = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<IReaderSettingsStateService>() ?? throw new InvalidOperationException();
 	Settings? settings;
 	const string deleteLocalDataTitle = "Delete Local Data";
 	const string exportDataTitle = "Export Data";
-
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="SettingsPage"/> class with the specified view model and database.
@@ -34,6 +88,12 @@ public partial class SettingsPage : Popup<bool>
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		LineSpacingPicker.ItemsSource = lineSpacingOptions.Select(option => option.Label).ToList();
+		TextAlignmentPicker.ItemsSource = textAlignmentOptions.Select(option => option.Label).ToList();
+		ParagraphSpacingPicker.ItemsSource = paragraphSpacingOptions.Select(option => option.Label).ToList();
+		HyphenationPicker.ItemsSource = hyphenationOptions.Select(option => option.Label).ToList();
+		LetterSpacingPicker.ItemsSource = letterSpacingOptions.Select(option => option.Label).ToList();
+		WordSpacingPicker.ItemsSource = wordSpacingOptions.Select(option => option.Label).ToList();
 	}
 
 	/// <summary>
@@ -50,13 +110,12 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("ValueChangedEventArgs is null, cannot change font size.");
 			return;
 		}
-		if ((int)e.NewValue == 0 || settings is null)
+		if (settings is null)
 		{
 			return;
 		}
-		settings.FontSize = (int)e.NewValue;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		settings.FontSize = NormalizeFontSize((int)Math.Round(e.NewValue, MidpointRounding.AwayFromZero));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontSize);
 	}
 
 	/// <summary>
@@ -69,15 +128,162 @@ public partial class SettingsPage : Popup<bool>
 	/// <param name="e">The <see cref="EventArgs"/> containing event data.</param>
 	async void RemoveAllSettings(object? sender, EventArgs? e)
 	{
-		await db.RemoveAllSettings();
-		settings = new Settings();
-		await db.SaveSettings(settings);
+		settings = await settingsStateService.ResetAsync();
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		ThemePicker.SelectedItem = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ApplyFontPreview(settings.FontFamily);
 		FontSizeSlider.Value = settings.FontSize;
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		LineSpacingPicker.SelectedIndex = GetLineSpacingOptionIndex(settings.LineSpacing);
+		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
+		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
+		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
+		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
+		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
 		logger.Info("Settings removed");
+	}
+
+	async void LineSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change line spacing.");
+			return;
+		}
+
+		if (LineSpacingPicker.SelectedIndex < 0 || LineSpacingPicker.SelectedIndex >= lineSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeLineSpacing(lineSpacingOptions[LineSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.LineSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.LineSpacing = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.LineSpacing);
+	}
+
+	async void TextAlignmentPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change text alignment.");
+			return;
+		}
+
+		if (TextAlignmentPicker.SelectedIndex < 0 || TextAlignmentPicker.SelectedIndex >= textAlignmentOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeTextAlignment(textAlignmentOptions[TextAlignmentPicker.SelectedIndex].Value);
+		if (string.Equals(settings.TextAlignment, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.TextAlignment = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.TextAlignment);
+	}
+
+	async void ParagraphSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change paragraph spacing.");
+			return;
+		}
+
+		if (ParagraphSpacingPicker.SelectedIndex < 0 || ParagraphSpacingPicker.SelectedIndex >= paragraphSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeParagraphSpacing(paragraphSpacingOptions[ParagraphSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.ParagraphSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.ParagraphSpacing = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.ParagraphSpacing);
+	}
+
+	async void HyphenationPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change hyphenation.");
+			return;
+		}
+
+		if (HyphenationPicker.SelectedIndex < 0 || HyphenationPicker.SelectedIndex >= hyphenationOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeBodyHyphens(hyphenationOptions[HyphenationPicker.SelectedIndex].Value);
+		if (string.Equals(settings.BodyHyphens, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.BodyHyphens = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Hyphenation);
+	}
+
+	async void LetterSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change letter spacing.");
+			return;
+		}
+
+		if (LetterSpacingPicker.SelectedIndex < 0 || LetterSpacingPicker.SelectedIndex >= letterSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeLetterSpacing(letterSpacingOptions[LetterSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.LetterSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.LetterSpacing = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.LetterSpacing);
+	}
+
+	async void WordSpacingPicker_SelectedIndexChanged(object? sender, EventArgs? e)
+	{
+		if (settings is null)
+		{
+			logger.Warn("Settings are null, cannot change word spacing.");
+			return;
+		}
+		if (WordSpacingPicker is null)
+		{
+			logger.Warn("Word spacing picker is null, cannot change word spacing.");
+			return;
+		}
+
+		if (WordSpacingPicker.SelectedIndex < 0 || WordSpacingPicker.SelectedIndex >= wordSpacingOptions.Count)
+		{
+			return;
+		}
+
+		var selectedValue = NormalizeWordSpacing(wordSpacingOptions[WordSpacingPicker.SelectedIndex].Value);
+		if (string.Equals(settings.WordSpacing, selectedValue, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		settings.WordSpacing = selectedValue;
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.WordSpacing);
 	}
 
 	/// <summary>
@@ -105,8 +311,7 @@ public partial class SettingsPage : Popup<bool>
 		settings.TextColor = scheme.TextColor;
 		settings.ColorScheme = scheme.Name;
 		logger.Info($"Changing color scheme to: {scheme.Name}");
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Theme);
 	}
 
 	async void ThemePreview_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
@@ -154,25 +359,14 @@ public partial class SettingsPage : Popup<bool>
 		var family = SanitizeFontFamily(font.FontFamily);
 		settings.FontFamily = family;
 		logger.Info($"Chaging Font to: {family}");
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
-
-		if (!string.IsNullOrEmpty(family) && FontPreview is not null)
-		{
-			FontPreview.FontFamily = family;
-		}
-		else
-		{
-			System.Diagnostics.Trace.TraceWarning("Font family is null or empty, cannot update font preview.");
-		}
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontFamily);
+		ApplyFontPreview(family);
 	}
 
-#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
 		stackLayout.Remove(switchControl);
 	}
-#pragma warning restore S2325 // Restore "Methods that don't access instance data should be static" for event handlers
 
 	/// <summary>
 	/// Handles the toggle event for the switch control to update the settings for supporting multiple columns.
@@ -200,16 +394,48 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 		settings.SupportMultipleColumns = switchControl.IsToggled;
-		await db.SaveSettings(settings);
-		WeakReferenceMessenger.Default.Send(new SettingsMessage(true));
+		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Layout);
 	}
 
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
-		settings = await db.GetSettings() ?? new();
+		settings = await settingsStateService.GetCurrentAsync();
+		var normalizedFontSize = NormalizeFontSize(settings.FontSize);
+		var normalizedLineSpacing = NormalizeLineSpacing(settings.LineSpacing);
+		var normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
+		var normalizedParagraphSpacing = NormalizeParagraphSpacing(settings.ParagraphSpacing);
+		var normalizedBodyHyphens = NormalizeBodyHyphens(settings.BodyHyphens);
+		var normalizedLetterSpacing = NormalizeLetterSpacing(settings.LetterSpacing);
+		var normalizedWordSpacing = NormalizeWordSpacing(settings.WordSpacing);
+		if (settings.FontSize != normalizedFontSize
+			|| !string.Equals(settings.LineSpacing, normalizedLineSpacing, StringComparison.Ordinal)
+			|| !string.Equals(settings.TextAlignment, normalizedTextAlignment, StringComparison.Ordinal)
+			|| !string.Equals(settings.ParagraphSpacing, normalizedParagraphSpacing, StringComparison.Ordinal)
+			|| !string.Equals(settings.BodyHyphens, normalizedBodyHyphens, StringComparison.Ordinal)
+			|| !string.Equals(settings.LetterSpacing, normalizedLetterSpacing, StringComparison.Ordinal)
+			|| !string.Equals(settings.WordSpacing, normalizedWordSpacing, StringComparison.Ordinal))
+		{
+			settings.FontSize = normalizedFontSize;
+			settings.LineSpacing = normalizedLineSpacing;
+			settings.TextAlignment = normalizedTextAlignment;
+			settings.ParagraphSpacing = normalizedParagraphSpacing;
+			settings.BodyHyphens = normalizedBodyHyphens;
+			settings.LetterSpacing = normalizedLetterSpacing;
+			settings.WordSpacing = normalizedWordSpacing;
+			await db.SaveSettings(settings);
+			settings = await settingsStateService.GetCurrentAsync();
+		}
+
 		FontSizeSlider.Value = settings.FontSize;
+		LineSpacingPicker.SelectedIndex = GetLineSpacingOptionIndex(settings.LineSpacing);
+		TextAlignmentPicker.SelectedIndex = GetTextAlignmentOptionIndex(settings.TextAlignment);
+		ParagraphSpacingPicker.SelectedIndex = GetParagraphSpacingOptionIndex(settings.ParagraphSpacing);
+		HyphenationPicker.SelectedIndex = GetHyphenationOptionIndex(settings.BodyHyphens);
+		LetterSpacingPicker.SelectedIndex = GetLetterSpacingOptionIndex(settings.LetterSpacing);
+		WordSpacingPicker.SelectedIndex = GetWordSpacingOptionIndex(settings.WordSpacing);
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
+		ApplyFontPreview(settings.FontFamily);
 		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		ThemePicker.SelectedItem = scheme;
 		if (ThemePreview is not null && scheme is not null)
@@ -217,15 +443,26 @@ public partial class SettingsPage : Popup<bool>
 			ThemePreview.SelectedItem = scheme;
 		}
 
-		if (FontPreview is not null && FontPicker.SelectedItem is EpubFonts selectedFont)
-		{
-			FontPreview.FontFamily = SanitizeFontFamily(selectedFont.FontFamily);
-		}
-
 		if (BindingContext is SettingsPageViewModel viewModel)
 		{
 			await viewModel.LoadAuthStatusAsync();
 		}
+	}
+
+	void ApplyFontPreview(string? family)
+	{
+		if (FontPreview is null)
+		{
+			return;
+		}
+
+		if (string.IsNullOrEmpty(family))
+		{
+			FontPreview.ClearValue(Label.FontFamilyProperty);
+			return;
+		}
+
+		FontPreview.FontFamily = SanitizeFontFamily(family);
 	}
 
 	static string SanitizeFontFamily(string? family)
@@ -245,6 +482,203 @@ public partial class SettingsPage : Popup<bool>
 			name = Path.GetFileNameWithoutExtension(name);
 		}
 		return name;
+	}
+
+	static int NormalizeFontSize(int fontSize)
+	{
+		if (fontSize <= 0)
+		{
+			return defaultReaderFontSize;
+		}
+
+		return Math.Clamp(fontSize, minimumReaderFontSize, maximumReaderFontSize);
+	}
+
+	static string NormalizeLineSpacing(string? lineSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(lineSpacing))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+		{
+			return defaultReaderLineSpacing;
+		}
+
+		var nearest = lineSpacingOptions
+			.Select(option => option.Value)
+			.Select(value => double.Parse(value, CultureInfo.InvariantCulture))
+			.OrderBy(value => Math.Abs(value - parsedValue))
+			.FirstOrDefault();
+
+		return nearest.ToString("0.##", CultureInfo.InvariantCulture);
+	}
+
+	static string NormalizeTextAlignment(string? textAlignment)
+	{
+		if (string.IsNullOrWhiteSpace(textAlignment))
+		{
+			return defaultReaderTextAlignment;
+		}
+
+		return textAlignment.Trim().ToLowerInvariant() switch
+		{
+			"left" => "left",
+			"justify" => "justify",
+			_ => defaultReaderTextAlignment
+		};
+	}
+
+	static string NormalizeParagraphSpacing(string? paragraphSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(paragraphSpacing))
+		{
+			return defaultReaderParagraphSpacing;
+		}
+
+		return paragraphSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0rem" or "0.0" or "0.0rem" => "0",
+			"0.5rem" => "0.5rem",
+			"1rem" => "1rem",
+			"1.5rem" => "1.5rem",
+			_ => defaultReaderParagraphSpacing
+		};
+	}
+
+	static string NormalizeBodyHyphens(string? bodyHyphens)
+	{
+		if (string.IsNullOrWhiteSpace(bodyHyphens))
+		{
+			return defaultReaderBodyHyphens;
+		}
+
+		return bodyHyphens.Trim().ToLowerInvariant() switch
+		{
+			"auto" => "auto",
+			"manual" => "manual",
+			"none" => "none",
+			_ => defaultReaderBodyHyphens
+		};
+	}
+
+	static string NormalizeLetterSpacing(string? letterSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(letterSpacing))
+		{
+			return defaultReaderLetterSpacing;
+		}
+
+		return letterSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0em" or "0.0em" => "0",
+			"0.02em" => "0.02em",
+			"0.04em" => "0.04em",
+			"0.06em" => "0.06em",
+			_ => defaultReaderLetterSpacing
+		};
+	}
+
+	static string NormalizeWordSpacing(string? wordSpacing)
+	{
+		if (string.IsNullOrWhiteSpace(wordSpacing))
+		{
+			return defaultReaderWordSpacing;
+		}
+
+		return wordSpacing.Trim().ToLowerInvariant() switch
+		{
+			"0" or "0em" or "0.0em" => "0",
+			"0.05em" => "0.05em",
+			"0.1em" => "0.1em",
+			"0.16em" => "0.16em",
+			_ => defaultReaderWordSpacing
+		};
+	}
+
+	static int GetLineSpacingOptionIndex(string? lineSpacing)
+	{
+		var normalizedValue = NormalizeLineSpacing(lineSpacing);
+		for (var index = 0; index < lineSpacingOptions.Count; index++)
+		{
+			if (string.Equals(lineSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 1;
+	}
+
+	static int GetTextAlignmentOptionIndex(string? textAlignment)
+	{
+		var normalizedValue = NormalizeTextAlignment(textAlignment);
+		for (var index = 0; index < textAlignmentOptions.Count; index++)
+		{
+			if (string.Equals(textAlignmentOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetParagraphSpacingOptionIndex(string? paragraphSpacing)
+	{
+		var normalizedValue = NormalizeParagraphSpacing(paragraphSpacing);
+		for (var index = 0; index < paragraphSpacingOptions.Count; index++)
+		{
+			if (string.Equals(paragraphSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetHyphenationOptionIndex(string? bodyHyphens)
+	{
+		var normalizedValue = NormalizeBodyHyphens(bodyHyphens);
+		for (var index = 0; index < hyphenationOptions.Count; index++)
+		{
+			if (string.Equals(hyphenationOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetLetterSpacingOptionIndex(string? letterSpacing)
+	{
+		var normalizedValue = NormalizeLetterSpacing(letterSpacing);
+		for (var index = 0; index < letterSpacingOptions.Count; index++)
+		{
+			if (string.Equals(letterSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
+	}
+
+	static int GetWordSpacingOptionIndex(string? wordSpacing)
+	{
+		var normalizedValue = NormalizeWordSpacing(wordSpacing);
+		for (var index = 0; index < wordSpacingOptions.Count; index++)
+		{
+			if (string.Equals(wordSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
+			{
+				return index;
+			}
+		}
+
+		return 0;
 	}
 
 	async void OnCloseClicked(object? sender, EventArgs? e)
@@ -326,6 +760,7 @@ public partial class SettingsPage : Popup<bool>
 			}
 			await db.RemoveAllBooks();
 			await db.RemoveAllSettings();
+			await settingsStateService.GetCurrentAsync();
 			await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "Local data deleted.", "OK");
 		}
 		catch (Exception ex)

@@ -315,9 +315,19 @@ cd EpubReader
 
 The project includes several PowerShell scripts to simplify building and running the application with Firebase configuration.
 
+**Working directory:** unless noted otherwise, run these PowerShell commands from the repository root (the folder that contains `build.ps1`, `README.md`, and `EpubReader/`).
+
+```powershell
+Set-Location "C:\path\to\your\EpubReader-clone"
+```
+
+If you are not in the repository root, prefer invoking scripts with `pwsh -File` and the full script path.
+
 #### Main Build Script (`build.ps1`)
 
 The main build script handles Firebase secrets without committing them to source control. It supports multiple ways to provide Firebase configuration:
+
+For Android forks, also verify the Android signing property groups in `EpubReader/EpubReader.csproj`. The current `Debug|net10.0-android|AnyCPU` and `Release|net10.0-android|AnyCPU` blocks must point to a valid keystore file, alias, and passwords on your machine or Android builds can fail. See [`docs/firebase-fork-setup.md`](docs/firebase-fork-setup.md) for the full signing-path guidance.
 
 **Basic Usage:**
 
@@ -334,6 +344,8 @@ The main build script handles Firebase secrets without committing them to source
 .\build.ps1 -Windows -ReleaseBuild
 ```
 
+These examples assume your current directory is the repository root.
+
 **Providing Firebase Secrets:**
 
 1. **Via Parameters** (highest priority):
@@ -346,6 +358,12 @@ The main build script handles Firebase secrets without committing them to source
 2. **Via Google Services JSON**:
    ```powershell
    .\build.ps1 -Android -GoogleJsonPath "path\to\google-services.json"
+   ```
+
+   If you keep `google-services.json` under the repo, a repository-root example is:
+
+   ```powershell
+   .\build.ps1 -Android -GoogleJsonPath ".\build-secrets\google-services.json"
    ```
 
 3. **Via Environment Variables**:
@@ -386,6 +404,8 @@ Load Firebase secrets from `.env` or `.env.local` files:
    .\.vscode\build-from-env.ps1
    ```
 
+   Run that command from the repository root.
+
 **Priority Order:**
 - `.env.local` overrides `.env`
 - Environment variables already set take precedence
@@ -399,6 +419,8 @@ Launch the Windows debug build after building:
 .\build.ps1 -Windows -DebugBuild
 .\.vscode\run-app.ps1
 ```
+
+Run both commands from the repository root.
 
 This script looks for the executable at:
 ```
@@ -635,6 +657,8 @@ notepad .env.local
 
 EpubReader uses Firebase for authentication and real-time synchronization of reading progress across devices. Follow these steps to configure Firebase for your build:
 
+> If you forked this repository and want to use **your own Firebase project**, see the full step-by-step guide in [`docs/firebase-fork-setup.md`](docs/firebase-fork-setup.md). It now includes the `GoogleServicesJson` project-item behavior and separate instructions for `build.ps1`, Visual Studio, and Visual Studio Code.
+
 ### Important: App Identification and Naming
 
 **Default Configuration:**
@@ -679,6 +703,7 @@ If you want to quickly test with the default settings:
 - Use package name: `com.companyname.epubreader`
 - Download `google-services.json` configured for this package name
 - No code changes needed - everything works out of the box
+- If you want a full from-scratch walkthrough for your own fork, follow [`docs/firebase-fork-setup.md`](docs/firebase-fork-setup.md)
 
 ### Step 1: Create a Firebase Project
 
@@ -718,8 +743,8 @@ If you want to quickly test with the default settings:
 8. **Place the file in one of these locations** (for automatic detection by build scripts):
    - **Recommended**: `build-secrets/google-services.json` (project root)
    - Alternative: `build-secrets/android/google-services.json`
-   - Alternative: `EpubReader/build-secrets/google-services.json`
-   - Alternative: `EpubReader/Platforms/Android/google-services.json` (for direct builds)
+    - Alternative: `EpubReader/build-secrets/google-services.json`
+    - For direct Visual Studio / Visual Studio Code Android builds, copy it to `EpubReader/Resources/Raw/google-services.json`
 
 **Package Name Troubleshooting:**
 - If you see "Package name mismatch" errors, ensure:
@@ -739,8 +764,9 @@ If you want to quickly test with the default settings:
 **Important Notes:**
 - The `build-secrets/` directory is gitignored to prevent committing your credentials
 - The build scripts will automatically detect and use files in `build-secrets/`
-- For manual builds without scripts, place in `EpubReader/Platforms/Android/`
+- For direct IDE builds without `build.ps1`, place the file in `EpubReader/Resources/Raw/google-services.json`
 - Ensure the file is named exactly `google-services.json` (case-sensitive)
+- See [`docs/firebase-fork-setup.md`](docs/firebase-fork-setup.md) for the full direct Visual Studio and Visual Studio Code workflow
 
 #### For iOS:
 

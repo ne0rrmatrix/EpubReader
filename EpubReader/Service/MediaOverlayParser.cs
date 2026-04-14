@@ -241,19 +241,16 @@ public static class MediaOverlayParser
 
 		static bool TryParseSeconds(string[] parts, out double seconds)
 		{
-			seconds = 0;
 			return double.TryParse(parts[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
 		}
 
 		static bool TryParseMinutes(string[] parts, out int minutes)
 		{
-			minutes = 0;
 			return int.TryParse(parts[^2], NumberStyles.Integer, CultureInfo.InvariantCulture, out minutes);
 		}
 
 		static bool TryParseHours(string[] parts, out int hours)
 		{
-			hours = 0;
 			return int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out hours);
 		}
 

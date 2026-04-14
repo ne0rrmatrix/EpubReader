@@ -27,10 +27,8 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	/// <summary>
 	/// Gets the logger instance associated with the <see cref="BaseViewModel"/>.
 	/// </summary>
-	/// <remarks>This logger is used for logging messages related to the operations and state of the <see
-	/// cref="BaseViewModel"/>. It is initialized using the <see cref="LoggerFactory"/> with the name of the view
-	/// model.</remarks>
-	public readonly ILogger Logger = LoggerFactory.GetLogger(nameof(BaseViewModel));
+	/// <remarks>This logger is used for logging messages related to the operations and state of the current view model.</remarks>
+	public ILogger Logger { get; }
 	/// <summary>
 	/// Gets the dispatcher associated with the current application.
 	/// </summary>
@@ -51,6 +49,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 
 	public BaseViewModel()
 	{
+		Logger = AppLogger.CreateLogger(GetType().FullName ?? GetType().Name);
 		Book = new();
 #if ANDROID
 		ArgumentNullException.ThrowIfNull(Application.Current);
@@ -111,6 +110,20 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 		return [.. books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase)];
 	}
 
+	/// <summary>
+	/// Initiates the Calibre integration process asynchronously.
+	/// </summary>
+	/// <returns>A task that represents the asynchronous operation. Currently, this task completes immediately as the method is a
+	/// placeholder for future implementation.</returns>
+	[RelayCommand]
+	public async Task Calibre()
+	{
+		if (CancellationTokenSource.IsCancellationRequested)
+		{
+			CancellationTokenSource = new CancellationTokenSource();
+		}
+		await Shell.Current.GoToAsync("CalibrePage").WaitAsync(CancellationTokenSource.Token);
+	}
 
 
 	#region Toast Helper Methods
@@ -124,6 +137,25 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 	{
 		await Dispatcher.DispatchAsync(async () =>
 			await Toast.Make(message, ToastDuration.Short, 12).Show());
+		Logger.Info(message);
+	}
+
+	/// <summary>
+	/// Shows an informational snackbar with an optional action.
+	/// </summary>
+	/// <param name="message">The message to display.</param>
+	/// <param name="action">The action to invoke when the user selects the action button.</param>
+	/// <param name="actionButtonText">The action button text.</param>
+	/// <param name="token">Cancellation token.</param>
+	/// <returns>A task representing the asynchronous operation.</returns>
+	public async Task ShowActionSnackbarAsync(string message, Action action, string actionButtonText, CancellationToken token = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(message);
+		ArgumentNullException.ThrowIfNull(action);
+		ArgumentException.ThrowIfNullOrWhiteSpace(actionButtonText);
+
+		await Dispatcher.DispatchAsync(async () =>
+			await Snackbar.Make(message, action, actionButtonText, TimeSpan.FromSeconds(6)).Show(token));
 		Logger.Info(message);
 	}
 
@@ -148,12 +180,7 @@ public partial class BaseViewModel : ObservableObject, IDisposable
 			if (disposing)
 			{
 #if ANDROID
-#pragma warning disable S1066 // Mergeable "if" statements should be combined
-				if (Application.Current is not null)
-				{
-					Application.Current.RequestedThemeChanged -= Current_RequestedThemeChanged;
-				}
-#pragma warning restore S1066 // Mergeable "if" statements should be combined
+				Application.Current?.RequestedThemeChanged -= Current_RequestedThemeChanged;
 #endif
 			}
 

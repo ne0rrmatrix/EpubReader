@@ -45,6 +45,11 @@ public partial class LoginPageViewModel(AuthenticationService authenticationServ
 			StatusMessage = "Sign in was cancelled.";
 			Trace.TraceInformation("Google sign-in cancelled by user");
 		}
+		catch (PlatformNotSupportedException ex)
+		{
+			StatusMessage = $"{ex.Message} Use local mode for now.";
+			Trace.TraceError($"Google sign-in unsupported: {ex.Message}");
+		}
 		catch (Exception ex)
 		{
 			StatusMessage = $"Sign in failed: {ex.Message}";

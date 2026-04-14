@@ -2,10 +2,12 @@
 
 public partial class FolderDialogPageViewModel : BaseViewModel
 {
-	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
+	readonly IImportStateService importStateService;
 	[ObservableProperty]
 	public partial string Text { get; set; } = "Please wait...";
 
+	[ObservableProperty]
+	public partial string CounterText { get; set; } = "0/0";
 	/// <summary>
 	/// Gets or sets the list of EPUB file paths.
 	/// </summary>
@@ -19,14 +21,74 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	public partial int Count { get; set; } = 0;
 
 	/// <summary>
-	/// Gets or sets a value indicating whether the element should be visible.
+	/// Maximum count of items to be processed.
 	/// </summary>
 	[ObservableProperty]
-	public partial bool ShouldBeVisible { get; set; } = false;
+	public partial int MaxCount { get; set; } = 0;
 
-	public FolderDialogPageViewModel()
+	/// <summary>
+	/// Progress as integer percent (0..100).
+	/// </summary>
+	[ObservableProperty]
+	public partial int ProgressPercent { get; set; } = 0;
+
+	/// <summary>
+	/// Progress as double (0..1) for binding to ProgressBar.Progress.
+	/// </summary>
+	[ObservableProperty]
+	public partial double Progress { get; set; } = 0.0;
+
+	public FolderDialogPageViewModel(IImportStateService importStateService)
 	{
-		WeakReferenceMessenger.Default.Register<FolderMessage>(this, (r, m) => { Text = $"{m.Value.Title} ({m.Value.Count}/{m.Value.MaxCount})"; });
+		this.importStateService = importStateService;
+		this.importStateService.PropertyChanged += ImportStateService_PropertyChanged;
+		SyncFromImportState();
+	}
+
+	void ImportStateService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+	{
+		SyncFromImportState();
+	}
+
+	void SyncFromImportState()
+	{
+		Text = importStateService.Title;
+		CounterText = importStateService.CounterText;
+		Count = importStateService.Count;
+		MaxCount = importStateService.MaxCount;
+		ProgressPercent = importStateService.ProgressPercent;
+		Progress = importStateService.Progress;
+	}
+
+	partial void OnCountChanged(int value)
+	{
+		UpdateProgress();
+	}
+
+	partial void OnMaxCountChanged(int value)
+	{
+		UpdateProgress();
+	}
+
+	void UpdateProgress()
+	{
+		try
+		{
+			if (MaxCount <= 0)
+			{
+				ProgressPercent = 0;
+				Progress = 0.0;
+				return;
+			}
+			var percent = Math.Min(100, (int)Math.Floor((double)Count * 100.0 / MaxCount));
+			ProgressPercent = percent;
+			Progress = Math.Max(0.0, Math.Min(1.0, percent / 100.0));
+		}
+		catch
+		{
+			ProgressPercent = 0;
+			Progress = 0.0;
+		}
 	}
 
 	/// <summary>
@@ -38,7 +100,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	{
 		if (disposing)
 		{
-			processEpubFiles?.Dispose();
+			importStateService.PropertyChanged -= ImportStateService_PropertyChanged;
 		}
 		base.Dispose(disposing);
 	}
@@ -52,8 +114,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	[RelayCommand]
 	void Cancel()
 	{
-		WeakReferenceMessenger.Default.Send(new CalibreMessage(true));
-		ShouldBeVisible = false;
+		importStateService.Cancel();
 	}
 
 	/// <summary>
@@ -64,7 +125,6 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 	/// proper cleanup.</remarks>
 	public void OnClose()
 	{
-		ShouldBeVisible = false;
-		WeakReferenceMessenger.Default.UnregisterAll(this);
+		importStateService.PropertyChanged -= ImportStateService_PropertyChanged;
 	}
 }

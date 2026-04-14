@@ -14,7 +14,7 @@ namespace EpubReader.Util;
 /// they are local, while permitting HTTPS connections regardless of locality.</remarks>
 public class NetworkChecker
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(NetworkChecker));
+	static readonly ILogger logger = AppLogger.CreateLogger<NetworkChecker>();
 	protected NetworkChecker()
 	{
 		// This constructor is protected to prevent instantiation of this class.
@@ -51,6 +51,11 @@ public class NetworkChecker
 			logger.Info($"Network request failed: {e.Message}");
 			return false;
 		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			logger.Info($"Network request to {url} was cancelled.");
+			throw;
+		}
 		catch (TaskCanceledException)
 		{
 			logger.Info("Network request timed out.");
@@ -71,12 +76,10 @@ public class NetworkChecker
 	/// encountered.</remarks>
 	/// <param name="requestMessage">The HTTP request message associated with the server certificate.</param>
 	/// <param name="certificate">The server's SSL certificate to validate. Can be <see langword="null"/> if no certificate is provided.</param>
-	/// <param name="chain">The chain of certificate authorities associated with the server's certificate. Can be <see langword="null"/> if no
-	/// chain is provided.</param>
 	/// <param name="sslErrors">The SSL policy errors encountered during the certificate validation process.</param>
 	/// <returns><see langword="true"/> if the certificate is considered valid based on the custom logic; otherwise, <see
 	/// langword="false"/>.</returns>
-	public static bool ServerCertificateCustomValidation(HttpRequestMessage requestMessage, X509Certificate2? certificate, X509Chain? chain, SslPolicyErrors sslErrors)
+	public static bool ServerCertificateCustomValidation(HttpRequestMessage requestMessage, X509Certificate2? certificate, SslPolicyErrors sslErrors)
 	{
 		logger.Info($"Requested URI: {requestMessage.RequestUri}");
 		logger.Info($"Effective date: {certificate?.GetEffectiveDateString()}");
@@ -98,7 +101,7 @@ public class NetworkChecker
 	/// <param name="url">The URL of the server whose SSL certificate is to be validated. Must be a valid URI.</param>
 	/// <returns><see langword="true"/> if the SSL certificate is valid and the server responds successfully;  otherwise, <see
 	/// langword="false"/>. </returns>
-	public static async Task<bool> ValidateSSLCertificate(string url)
+	public static async Task<bool> ValidateSSLCertificate(string url, CancellationToken cancellationToken = default)
 	{
 		bool certificateValid = false;
 
@@ -106,7 +109,7 @@ public class NetworkChecker
 		{
 			ServerCertificateCustomValidationCallback = (request, cert, chain, errors) =>
 			{
-				certificateValid = ServerCertificateCustomValidation(request, cert, chain, errors);
+				certificateValid = ServerCertificateCustomValidation(request, cert, errors);
 				return certificateValid; // Or return true to always allow connection for testing
 			}
 		};
@@ -115,9 +118,19 @@ public class NetworkChecker
 
 		try
 		{
-			HttpResponseMessage response = await client.GetAsync(url);
+			HttpResponseMessage response = await client.GetAsync(url, cancellationToken);
 			response.EnsureSuccessStatusCode();
 			return certificateValid; // Return the actual certificate validation result
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			logger.Info($"HTTPS request to {url} was cancelled.");
+			throw;
+		}
+		catch (TaskCanceledException)
+		{
+			logger.Info("HTTPS request timed out.");
+			return false;
 		}
 		catch (HttpRequestException e)
 		{

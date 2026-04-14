@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Foundation;
+﻿using Foundation;
 using Microsoft.Maui.Handlers;
 using WebKit;
 
@@ -34,9 +33,8 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// <summary>
 	/// Determines the navigation policy for a given web view navigation action.
 	/// </summary>
-	/// <remarks>This method evaluates the URL of the navigation request. If the URL contains query parameters or 
-	/// matches a specific pattern ("https://runcsharp"), it sends a message using <see cref="WeakReferenceMessenger"/> 
-	/// and cancels the navigation. Otherwise, it allows the navigation to proceed.</remarks>
+	/// <remarks>This method evaluates the navigation request and currently allows it to proceed. Reader bridge traffic
+	/// is handled through the WK script message channel instead of URL interception.</remarks>
 	/// <param name="webView">The <see cref="WKWebView"/> instance that initiated the navigation action.</param>
 	/// <param name="navigationAction">The <see cref="WKNavigationAction"/> representing the navigation request.</param>
 	/// <param name="preferences">The <see cref="WKWebpagePreferences"/> associated with the navigation action.</param>
@@ -45,22 +43,6 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	/// <exception cref="InvalidOperationException">Thrown if the URL of the navigation request is null.</exception>
 	public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, WKWebpagePreferences preferences, Action<WKNavigationActionPolicy, WKWebpagePreferences> decisionHandler)
 	{
-		var path = navigationAction.Request.Url?.AbsoluteString ?? throw new InvalidOperationException("path is null");
-
-		// Allow the GitHub Pages site to load normally without interception
-		if (path.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
-		{
-			decisionHandler(WKNavigationActionPolicy.Allow, preferences);
-			return;
-		}
-		var url = path.Split('?');
-
-		if (url.Length > 1 || path.Contains("https://runcsharp"))
-		{
-			WeakReferenceMessenger.Default.Send(new JavaScriptMessage(path));
-			decisionHandler(WKNavigationActionPolicy.Cancel, preferences);
-			return;
-		}
 		decisionHandler(WKNavigationActionPolicy.Allow, preferences);
 	}
 
@@ -94,8 +76,10 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	}
 }
 
-public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
+public class MyWKScriptMessageHandler(IJavaScriptBridgeDispatcher dispatcher) : NSObject, IWKScriptMessageHandler
 {
+	readonly IJavaScriptBridgeDispatcher dispatcher = dispatcher;
+
 	public void DidReceiveScriptMessage(WKUserContentController userContentController, WKScriptMessage message)
 	{
 		// 'message.Body' contains the data sent from JavaScript
@@ -107,13 +91,8 @@ public class MyWKScriptMessageHandler : NSObject, IWKScriptMessageHandler
 				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 				return;
 			}
-			var bytes = Convert.FromBase64String(message.Body.ToString());
-			var json = Encoding.UTF8.GetString(bytes);
-			System.Diagnostics.Trace.TraceInformation($"Decoded message: {json}");
-			Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() =>
-			{
-				WeakReferenceMessenger.Default.Send(new JavaScriptMessage(json));
-			});
+
+			dispatcher.Dispatch(message.Body.ToString(), JavaScriptBridgeSource.Apple, isBase64Encoded: true);
 		}
 	}
 }

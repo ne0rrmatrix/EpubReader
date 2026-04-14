@@ -1,79 +1,105 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <toolkit:Popup
     x:Class="EpubReader.Views.CalibreSettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converter="clr-namespace:EpubReader.Converter"
+    xmlns:model="clr-namespace:EpubReader.Models"
     xmlns:system="clr-namespace:System;assembly=mscorlib"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    x:Name="CurrentPage"
-    x:DataType="CalibreSettingsPageViewModel"
+    xmlns:viewModel="clr-namespace:EpubReader.ViewModels"
+    x:DataType="viewModel:CalibreSettingsPageViewModel"
+    x:TypeArguments="system:Boolean"
     BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                       Light=White}"
-    Loaded="CurrentPage_Loaded"
-    Unloaded="CurrentPage_Unloaded">
+    CanBeDismissedByTappingOutsideOfPopup="False">
 
     <toolkit:Popup.Resources>
-
-        <Style x:Key="InvalidEntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="Red" />
-        </Style>
-        <Style x:Key="ValidEntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="Green" />
-        </Style>
-        <Style TargetType="Label">
-            <Setter Property="TextColor" Value="{AppThemeBinding Dark={StaticResource AppBackgroundLightColor}, Light={StaticResource AppBackgroundDarkColor}}" />
-        </Style>
         <ResourceDictionary>
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <converter:StringIsNotNullOrEmptyConverter x:Key="StringIsNotNullOrEmptyConverter" />
         </ResourceDictionary>
     </toolkit:Popup.Resources>
 
-    <Grid
-        x:Name="grid"
-        Padding="10"
+    <Border
+        Margin="8"
+        Padding="12"
         BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                           Light=White}"
-        ColumnSpacing="3"
-        RowSpacing="3">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Label
-            Grid.Row="0"
-            FontAttributes="Bold"
-            HorizontalOptions="Center"
-            Text="Calibre Settings" />
-        <HorizontalStackLayout
-            x:Name="horizontalStacklayout"
-            Grid.Row="1"
-            Margin="0,10,0,0"
-            Spacing="10">
-            <Switch
-                x:Name="switchController"
-                HorizontalOptions="Start"
-                Toggled="Switch_Toggled"
-                VerticalOptions="Center" />
-            <Label Text="Auto Discovery" VerticalOptions="Center" />
-        </HorizontalStackLayout>
-        <Label
-            Grid.Row="2"
-            Text="Calibre Url"
-            VerticalOptions="Center" />
-        <Entry
-            x:Name="EntryText"
-            Grid.Row="3"
-            Completed="Entry_Completed"
-            ReturnType="Done"
-            VerticalOptions="Center"
-            WidthRequest="200">
-            <Entry.Behaviors>
-                <toolkit:UriValidationBehavior
-                    Flags="ValidateOnValueChanged"
-                    InvalidStyle="{StaticResource InvalidEntryStyle}"
-                    UriKind="RelativeOrAbsolute"
-                    ValidStyle="{StaticResource ValidEntryStyle}" />
-            </Entry.Behaviors>
-        </Entry>
-    </Grid>
+        StrokeThickness="0">
+        <ScrollView HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
+            <VerticalStackLayout Spacing="16" WidthRequest="320">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="20"
+                        Text="Calibre Settings" />
+                    <Label
+                        FontSize="12"
+                        Opacity="0.75"
+                        Text="Auto configuration is recommended. Switch to manual only if you need a specific Calibre server address." />
+                </VerticalStackLayout>
+
+                <Border Padding="12" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="4">
+                            <Label FontAttributes="Bold" Text="Use auto configuration" />
+                            <Label
+                                FontSize="12"
+                                Opacity="0.75"
+                                Text="When enabled, EpubReader discovers your local Calibre server and stores the verified result." />
+                        </VerticalStackLayout>
+                        <Switch
+                            Grid.Column="1"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                            IsToggled="{Binding IsAutoConfigEnabled}" />
+                    </Grid>
+                </Border>
+
+                <VerticalStackLayout IsVisible="{Binding IsManualAddressVisible}" Spacing="6">
+                    <Label FontAttributes="Bold" Text="Manual server address" />
+                    <Entry
+                        ClearButtonVisibility="WhileEditing"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                        Keyboard="Url"
+                        Placeholder="http://192.168.1.10:8080"
+                        ReturnType="Done"
+                        Text="{Binding ManualServerAddress}" />
+                    <Label
+                        FontSize="12"
+                        Opacity="0.75"
+                        Text="Use the Calibre server root address only. Example: http://192.168.1.10:8080" />
+                </VerticalStackLayout>
+
+                <Label
+                    FontSize="12"
+                    IsVisible="{Binding SavedConfigurationSummary, Converter={StaticResource StringIsNotNullOrEmptyConverter}}"
+                    Text="{Binding SavedConfigurationSummary}" />
+
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ActivityIndicator
+                        IsRunning="{Binding IsBusy}"
+                        IsVisible="{Binding IsBusy}"
+                        VerticalOptions="Start" />
+                    <Label
+                        Grid.Column="1"
+                        IsVisible="{Binding HasStatusMessage}"
+                        LineBreakMode="WordWrap"
+                        Text="{Binding StatusMessage}" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <Button
+                        Command="{Binding CancelCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                        Text="Cancel" />
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding SaveSettingsCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                        Text="Verify &amp; Save" />
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Border>
 </toolkit:Popup>

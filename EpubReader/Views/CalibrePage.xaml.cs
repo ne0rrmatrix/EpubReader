@@ -2,7 +2,7 @@ namespace EpubReader.Views;
 
 public partial class CalibrePage : ContentPage
 {
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(CalibrePage));
+	static readonly ILogger logger = AppLogger.CreateLogger<CalibrePage>();
 	CalibrePageViewModel viewModel => (CalibrePageViewModel)BindingContext;
 
 	public CalibrePage(CalibrePageViewModel viewModel)
@@ -10,34 +10,39 @@ public partial class CalibrePage : ContentPage
 		InitializeComponent();
 		BindingContext = viewModel;
 	}
-	void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
+
+	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
 		if (e is null)
 		{
 			logger.Warn("TextChangedEventArgs is null, cannot process search.");
 			return;
 		}
-		var books = viewModel.Books.ToList();
-		var results = e.NewTextValue;
-		var allBooks = viewModel.BookList.ToList();
-		logger.Info($"Search results: {results}");
-		if (string.IsNullOrWhiteSpace(results))
+
+		try
 		{
-			books.Clear();
-			if (allBooks.Count == books.Count)
-			{
-				logger.Info("Search text is empty, showing all books");
-				return; // No need to update if already showing all books
-			}
-			viewModel.Books = [.. allBooks];
-			viewModel.Logger.Info("Search text is empty, showing all books");
+			await viewModel.SearchBooksAsync(e.NewTextValue);
+		}
+		catch (OperationCanceledException)
+		{
+			logger.Info("Calibre search was cancelled.");
+		}
+	}
+
+	async void OnFeedSelectionChanged(object? sender, EventArgs e)
+	{
+		if (sender is not Picker { SelectedItem: OpdsFeedSelection selection })
+		{
 			return;
 		}
-		logger.Info($"Searching for books with title containing: {results}");
-		var filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
 
-		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
-		viewModel.Books = [.. filteredBooks];
+		try
+		{
+			await viewModel.SelectFeedAsync(selection);
+		}
+		catch (OperationCanceledException)
+		{
+			logger.Info("Calibre feed selection was cancelled.");
+		}
 	}
 }

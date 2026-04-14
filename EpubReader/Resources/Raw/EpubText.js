@@ -4,10 +4,22 @@
  */
 
 // Global state
-let isPreviousPage = false;
 let currentPage = 0;
 let frame = null;
 let colCount = 1;
+let currentFrameResizeHandler = null;
+let combinedPaginationState = {
+    chapterPageCounts: [],
+    chapterOffsets: [],
+    totalPages: 0
+};
+let combinedPaginationCalculationInProgress = false;
+let scheduledVirtualColumnAdjustment = null;
+let virtualColumnAdjustmentInProgress = false;
+let lastVirtualColumnLayoutKey = null;
+let scheduledOverflowAudit = null;
+let overflowAuditInProgress = false;
+let lastOverflowAuditSignature = null;
 
 const mediaOverlayUi = {
     root: null,
@@ -193,10 +205,41 @@ function applyMediaOverlayHighlightTheme() {
  * Sets whether user interaction (scrolling, clicking) is enabled on the iframe
  * @param {any} enabled
  */
-function setInteractionEnabled(enabled) {
-    if (frame) {
-        frame.style.pointerEvents = enabled ? 'auto' : 'none';
+function ensureFrameElement() {
+    if (!frame) {
+        frame = document.getElementById('page');
     }
+    return frame;
+}
+
+function getReaderBaseUrl() {
+    const platform = domUtils.detectPlatform();
+    if (platform.isIOS || platform.isMac) {
+        return 'app://demo/';
+    }
+
+    return 'https://demo/';
+}
+
+function setInteractionEnabled(enabled) {
+    const iframe = ensureFrameElement();
+    if (iframe) {
+        iframe.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+}
+
+function parseCssPixelValue(value, fallback = 0) {
+    if (typeof value !== 'string') {
+        return fallback;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return fallback;
+    }
+
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 /**
@@ -396,12 +439,12 @@ const navigationUtils = {
      * @returns {number} The scroll amount in pixels
      */
     calculateScrollAmount(contentWindow) {
-        const gap = Number.parseInt(
-            globalThis.getComputedStyle(contentWindow.document.documentElement)
-                .getPropertyValue("column-gap")
-        ) || 0;
+        const root = contentWindow.document.documentElement;
+        const computedStyle = globalThis.getComputedStyle(root);
+        const gap = parseCssPixelValue(computedStyle.getPropertyValue("column-gap"), 0);
+        const viewportWidth = Math.max(0, Math.floor(contentWindow.innerWidth));
 
-        return contentWindow.innerWidth + gap;
+        return Math.max(1, Math.round(viewportWidth + gap));
     },
 
     /**
@@ -465,21 +508,183 @@ const layoutUtils = {
         const contentWindow = domUtils.getContentWindow();
         if (!contentWindow) {
             console.warn("Iframe contentWindow is not available for dimension setting yet.");
-            return;
+            return false;
         }
 
         const width = Math.floor(contentWindow.innerWidth);
         const height = Math.floor(contentWindow.innerHeight);
+        const nextWidth = `${width}px`;
+        const nextHeight = `${height}px`;
 
-        frame.style.width = `${width}px`;
-        body.style.width = `${width}px`;
-        body.style.height = `${height}px`;
-        frame.style.height = `${height}px`;
+        if (root.style.getPropertyValue('--root-width') === nextWidth && root.style.getPropertyValue('--root-height') === nextHeight) {
+            return false;
+        }
 
-        root.style.setProperty('--root-width', `${width}px`);
-        root.style.setProperty('--root-height', `${height}px`);
+        frame.style.width = nextWidth;
+        body.style.width = nextWidth;
+        body.style.height = nextHeight;
+        frame.style.height = nextHeight;
+
+        root.style.setProperty('--root-width', nextWidth);
+        root.style.setProperty('--root-height', nextHeight);
+        lastVirtualColumnLayoutKey = null;
+        return true;
     },
 };
+
+function getVirtualColumnLayoutKey(contentWindow) {
+    if (!contentWindow?.document?.documentElement) {
+        return null;
+    }
+
+    const doc = contentWindow.document;
+    const root = doc.documentElement;
+    const computedStyle = contentWindow.getComputedStyle(root);
+    const visibleSection = doc.querySelector('section[data-chapter-index]:not([style*="display: none"])')?.dataset.chapterIndex ?? 'body';
+    const scrollWidth = doc.scrollingElement?.scrollWidth ?? root.scrollWidth;
+    const columnCount = computedStyle.getPropertyValue('column-count').trim();
+    const lineLength = computedStyle.getPropertyValue('--USER__lineLength').trim();
+
+    return [
+        visibleSection,
+        Math.floor(contentWindow.innerWidth),
+        Math.floor(contentWindow.innerHeight),
+        Math.ceil(scrollWidth),
+        computedStyle.fontSize,
+        computedStyle.fontFamily,
+        columnCount,
+        lineLength
+    ].join('|');
+}
+
+function scheduleVirtualColumnAdjustment(reason = 'unknown', delay = 75, force = false) {
+    if (scheduledVirtualColumnAdjustment) {
+        clearTimeout(scheduledVirtualColumnAdjustment);
+    }
+
+    scheduledVirtualColumnAdjustment = setTimeout(() => {
+        scheduledVirtualColumnAdjustment = null;
+        adjustVirtualColumns({ force, reason });
+    }, delay);
+}
+
+function refreshLayout(reason = 'manual', force = false) {
+    const iframe = ensureFrameElement();
+    const body = document.getElementById('body');
+    const root = document.documentElement;
+    const contentWindow = domUtils.getContentWindow();
+    if (!iframe || !body || !root || !contentWindow) {
+        console.warn(`refreshLayout skipped (${reason}) because the reader frame is not ready.`);
+        return false;
+    }
+
+    const dimensionsChanged = layoutUtils.setDimensions(body, root);
+    if (dimensionsChanged) {
+        console.log(`refreshLayout(${reason}): dimensions updated.`);
+    }
+
+    lastVirtualColumnLayoutKey = null;
+    scheduleVirtualColumnAdjustment(reason, force ? 0 : 90, true);
+    scheduleOverflowAudit(reason, force ? 140 : 220);
+    return dimensionsChanged;
+}
+
+function describeOverflowElement(element) {
+    if (!element) {
+        return 'unknown';
+    }
+
+    const idPart = element.id ? `#${element.id}` : '';
+    const classPart = element.classList?.length ? `.${Array.from(element.classList).slice(0, 3).join('.')}` : '';
+    return `${element.tagName?.toLowerCase?.() ?? 'unknown'}${idPart}${classPart}`;
+}
+
+function scheduleOverflowAudit(reason = 'unknown', delay = 180) {
+    if (scheduledOverflowAudit) {
+        clearTimeout(scheduledOverflowAudit);
+    }
+
+    scheduledOverflowAudit = setTimeout(() => {
+        scheduledOverflowAudit = null;
+        auditOverflowingContent(reason);
+    }, delay);
+}
+
+function auditOverflowingContent(reason = 'unknown') {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+    if (!doc || !contentWindow) {
+        return [];
+    }
+
+    if (overflowAuditInProgress) {
+        scheduleOverflowAudit(`requeued:${reason}`, 180);
+        return [];
+    }
+
+    overflowAuditInProgress = true;
+
+    try {
+        const activeRoot = getActiveSectionElement(doc) ?? doc.body;
+        if (!activeRoot) {
+            return [];
+        }
+
+        const viewportWidth = Math.max(0, Math.floor(contentWindow.innerWidth));
+        const selector = 'img,svg,video,canvas,iframe,object,embed,table,pre,code,p,li,dd,blockquote,figcaption,h1,h2,h3,h4,h5,h6,a';
+        const candidates = Array.from(activeRoot.querySelectorAll(selector)).slice(0, 300);
+        const issues = [];
+
+        for (const element of candidates) {
+            const computedStyle = contentWindow.getComputedStyle(element);
+            if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
+                continue;
+            }
+
+            const rect = element.getBoundingClientRect();
+            const renderedWidth = Math.ceil(rect.width || 0);
+            const scrollWidth = Math.ceil(element.scrollWidth || 0);
+            const clientWidth = Math.ceil(element.clientWidth || 0);
+            const measuredWidth = Math.max(renderedWidth, scrollWidth, clientWidth);
+            const overflowAmount = measuredWidth - viewportWidth;
+
+            if (overflowAmount <= 2) {
+                continue;
+            }
+
+            issues.push({
+                element: describeOverflowElement(element),
+                width: measuredWidth,
+                viewportWidth: viewportWidth,
+                overflowAmount: overflowAmount,
+                chapterIndex: currentSectionIndex,
+                whiteSpace: computedStyle.whiteSpace,
+                wordBreak: computedStyle.wordBreak,
+                overflowWrap: computedStyle.overflowWrap
+            });
+
+            if (issues.length >= 5) {
+                break;
+            }
+        }
+
+        const signature = JSON.stringify(issues);
+        if (issues.length > 0 && signature !== lastOverflowAuditSignature) {
+            lastOverflowAuditSignature = signature;
+            console.warn(`[ReaderOverflow] ${reason}`, issues);
+            sendToNativeMessage({ action: 'layoutoverflow', reason: reason, issues: issues });
+        } else if (issues.length === 0) {
+            lastOverflowAuditSignature = null;
+        }
+
+        return issues;
+    } catch (error) {
+        console.error('Overflow audit failed', error);
+        return [];
+    } finally {
+        overflowAuditInProgress = false;
+    }
+}
 
 /**
  * Column management utilities
@@ -504,14 +709,20 @@ const columnUtils = {
         const columnWidth = computedStyle.getPropertyValue('column-width');
 
         if (columnCount && columnCount !== 'auto') {
-            return Number.parseInt(columnCount, 10);
+            const parsedColumnCount = Number.parseInt(columnCount, 10);
+            return Number.isFinite(parsedColumnCount) && parsedColumnCount > 0 ? parsedColumnCount : 1;
         }
 
         if (columnWidth && columnWidth !== 'auto') {
-            const width = Number.parseFloat(columnWidth);
+            const width = parseCssPixelValue(columnWidth, 0);
             const containerWidth = contentWindow.innerWidth;
-            const gap = Number.parseFloat(computedStyle.getPropertyValue('column-gap')) || 0;
-            return Math.floor((containerWidth + gap) / (width + gap));
+            const gap = parseCssPixelValue(computedStyle.getPropertyValue('column-gap'), 0);
+            const totalColumnWidth = width + gap;
+            if (totalColumnWidth <= 0) {
+                return 1;
+            }
+
+            return Math.max(1, Math.floor((containerWidth + gap) / totalColumnWidth));
         }
 
         // Default to 1 column if no column properties are set
@@ -620,18 +831,37 @@ const columnUtils = {
  * This should be called after content is loaded or when layout changes
  * @returns {boolean} True if virtual columns were adjusted
  */
-function adjustVirtualColumns() {
+function adjustVirtualColumns(options = {}) {
     const contentWindow = domUtils.getContentWindow();
     if (!contentWindow) {
         console.warn("Cannot adjust virtual columns - iframe content not available.");
         return false;
     }
 
+    const force = options.force === true;
+    const reason = options.reason || 'unspecified';
+    const layoutKey = getVirtualColumnLayoutKey(contentWindow);
+
+    if (!force && layoutKey && layoutKey === lastVirtualColumnLayoutKey) {
+        return false;
+    }
+
+    if (virtualColumnAdjustmentInProgress) {
+        scheduleVirtualColumnAdjustment(`requeued:${reason}`, 100, force);
+        return false;
+    }
+
+    virtualColumnAdjustmentInProgress = true;
+
     try {
-        return columnUtils.appendVirtualColumnIfNeeded(contentWindow);
+        const adjusted = columnUtils.appendVirtualColumnIfNeeded(contentWindow);
+        lastVirtualColumnLayoutKey = getVirtualColumnLayoutKey(contentWindow) ?? layoutKey;
+        return adjusted;
     } catch (error) {
         console.error("Error adjusting virtual columns:", error);
         return false;
+    } finally {
+        virtualColumnAdjustmentInProgress = false;
     }
 }
 
@@ -659,11 +889,10 @@ const styleUtils = {
         console.log(`Setting iframe CSS property: ${property} = ${value}`);
         root.style.setProperty(property, value);
 
-        // Adjust virtual columns after column-related property changes
-        if (property.includes('column')) {
-            setTimeout(() => {
-                adjustVirtualColumns();
-            }, 50);
+        const affectsLayout = property.includes('column') || property.includes('font') || property.includes('lineLength');
+        if (affectsLayout) {
+            lastVirtualColumnLayoutKey = null;
+            scheduleVirtualColumnAdjustment(`css-property:${property}`, 125, true);
         }
     },
 
@@ -720,36 +949,71 @@ function handleMessage(event, platform) {
         return;
     }
 
-    const { data } = event;
+    const payload = normalizeParentMessage(event.data);
+    if (!payload) {
+        console.warn('Ignoring unsupported parent bridge payload:', event.data);
+        return;
+    }
 
-    if (data.startsWith("jump.")) {
-        const href = data.substring(5);
+    if (payload.action === 'jump') {
+        const href = payload.href;
         console.log("Jumping to:", href);
-        sendToNativeMessage({ action: 'jump', href: href });
-    } else if (data === "next") {
-        if (mediaOverlayUi.state.seeking) {
-            logMediaOverlay('Ignoring next command while user is seeking');
+        if (tryHandleCombinedInternalLink(href)) {
             return;
         }
-        if (isUserNavigationLocked()) {
-            logMediaOverlay('User navigation blocked during playback', { action: 'next' });
+        sendToNativeMessage({ action: 'jump', href: href });
+    } else if (payload.action === 'next') {
+        if (shouldIgnoreManualNavigationAction('next')) {
             return;
         }
         handleNextCommand();
-    } else if (data === "prev") {
-        if (mediaOverlayUi.state.seeking) {
-            logMediaOverlay('Ignoring prev command while user is seeking');
-            return;
-        }
-        if (isUserNavigationLocked()) {
-            logMediaOverlay('User navigation blocked during playback', { action: 'prev' });
+    } else if (payload.action === 'prev') {
+        if (shouldIgnoreManualNavigationAction('prev')) {
             return;
         }
         handlePrevCommand();
-    } else if (data === "menu") {
+    } else if (payload.action === 'menu') {
         console.log("Received menu command.");
         sendToNativeMessage({ action: 'menu' });
     }
+}
+
+function shouldIgnoreManualNavigationAction(action) {
+    if (mediaOverlayUi.state.seeking) {
+        logMediaOverlay(`Ignoring ${action} command while user is seeking`);
+        return true;
+    }
+
+    if (isUserNavigationLocked()) {
+        logMediaOverlay('User navigation blocked during playback', { action: action });
+        return true;
+    }
+
+    return false;
+}
+
+function normalizeParentMessage(data) {
+    if (!data) {
+        return null;
+    }
+
+    if (typeof data === 'object' && typeof data.action === 'string') {
+        return data;
+    }
+
+    if (typeof data !== 'string') {
+        return null;
+    }
+
+    if (data.startsWith('jump.')) {
+        return { action: 'jump', href: data.substring(5) };
+    }
+
+    if (data === 'next' || data === 'prev' || data === 'menu') {
+        return { action: data };
+    }
+
+    return null;
 }
 
 function encodeForCSharp(str) {
@@ -762,7 +1026,7 @@ function encodeForCSharp(str) {
     return btoa(binary);
 }
 
-// Helper: send to native bridge on Android using base64-encoded JSON, fallback to location.href scheme
+// Helper: send to native bridge using base64-encoded JSON.
 function sendToNativeMessage(obj) {
     try {
         const payload = (typeof obj === 'string') ? { action: obj } : obj;
@@ -784,12 +1048,13 @@ function sendToNativeMessage(obj) {
         if(platform.isIOS || platform.isMac){
             console.info('Sending message to native bridge via window.webkit.messageHandlers.webwindowinterop.postMessage:', json);
             globalThis.webkit.messageHandlers.webwindowinterop.postMessage("base64:" + base64Json);
-            return;
+            return true;
         }
-        // If we reach here, bridge not found or calls failed. Use fallback URL scheme for compatibility.
-        console.info('Using fallback URL scheme for native message:', json);
+        console.warn('Native bridge unavailable for message:', json);
+        return false;
     } catch (ex) {
         console.error('sendToNativeMessage failed', ex);
+        return false;
     }
 }
 
@@ -936,7 +1201,7 @@ function buildMediaOverlayUi(root) {
         try {
             const cx = Math.floor(contentWindow.innerWidth / 2);
             const el = doc.elementFromPoint(cx, Math.floor(contentWindow.innerHeight / 2));
-            if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+            if (el?.nodeType !== Node.ELEMENT_NODE) return;
 
             clearMediaOverlayHighlight();
             if (mediaOverlayHighlight.activeClass) el.classList.add(mediaOverlayHighlight.activeClass);
@@ -1725,6 +1990,33 @@ function handlePrevCommand() {
 }
 
 
+function getActiveSectionElement(doc) {
+    if (!doc?.body) {
+        return null;
+    }
+
+    const sections = doc.querySelectorAll('section[data-chapter-index]');
+    if (sections.length === 0) {
+        return doc.body;
+    }
+
+    const targetIndex = String(currentSectionIndex);
+    for (const section of sections) {
+        if (section.dataset.chapterIndex === targetIndex) {
+            return section;
+        }
+    }
+
+    for (const section of sections) {
+        if (section.style.display !== 'none') {
+            return section;
+        }
+    }
+
+    return doc.body;
+}
+
+
 /**
  * Calculates the approximate character position based on current scroll position
  * This is used to determine which synthetic page is currently being displayed
@@ -1750,7 +2042,7 @@ function getCharacterPositionFromScroll() {
         const scrollProgress = maxScrollX > 0 ? Math.min(1, currentScrollX / maxScrollX) : 0;
 
         // Get the total text content from the document
-        const textContent = extractTextFromDocument(doc);
+        const textContent = extractTextFromDocument(doc, getActiveSectionElement(doc));
         const totalCharacters = textContent.length;
 
         // Calculate character position based on scroll progress
@@ -1770,14 +2062,15 @@ function getCharacterPositionFromScroll() {
  * @param {Document} doc - The document to extract text from
  * @returns {string} The extracted text content
  */
-function extractTextFromDocument(doc) {
-    if (!doc?.body) {
+function extractTextFromDocument(doc, root = null) {
+    const textRoot = root ?? doc?.body;
+    if (!textRoot) {
         return "";
     }
 
     try {
-        // Get the text content from the body, which automatically excludes HTML tags
-        let textContent = doc.body.textContent || doc.body.innerText || "";
+        // Get the text content from the active reading container, which automatically excludes HTML tags
+        let textContent = textRoot.textContent || textRoot.innerText || "";
 
         // Normalize whitespace while preserving paragraph breaks
         textContent = textContent.replaceAll(/\s+/g, " ").trim();
@@ -1796,6 +2089,7 @@ function extractTextFromDocument(doc) {
 function updateCharacterPosition() {
     const characterPosition = getCharacterPositionFromScroll();
     console.log(`Updating character position: ${characterPosition}`);
+    scheduleOverflowAudit('page-change', 180);
     // Notify C# code about the character position change
     sendToNativeMessage({ action: 'characterposition', position: characterPosition });
 }
@@ -1839,11 +2133,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Set initial dimensions and add resize listener
     if (!domUtils.isCssVariableSet(root, '--root-width') || !domUtils.isCssVariableSet(root, '--root-height')) {
-        console.log("Root dimensions already set, skipping initial resize.");
+        console.log("Initializing root dimensions.");
         layoutUtils.setDimensions(body, root);
     }
-
-    frame.contentWindow?.addEventListener('resize', () => layoutUtils.setDimensions(body, root));
 
     // Handle iframe load events
     frame.onload = function () {
@@ -1853,12 +2145,19 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.error("Cannot access iframe content - likely CORS restriction or iframe not fully loaded.");
                 return;
             }
-            if (!isPreviousPage) {
-                // Adjust virtual columns after content loads
-                setTimeout(() => {
-                    adjustVirtualColumns();
-                }, 100); // Small delay to ensure content is fully rendered
+
+            if (currentFrameResizeHandler) {
+                contentWindow.removeEventListener('resize', currentFrameResizeHandler);
             }
+
+            currentFrameResizeHandler = () => {
+                if (layoutUtils.setDimensions(body, root)) {
+                    scheduleVirtualColumnAdjustment('iframe-resize', 125, true);
+                }
+            };
+            contentWindow.addEventListener('resize', currentFrameResizeHandler);
+
+            refreshLayout('iframe-load', true);
 
             requestMediaOverlayHighlightThemeRefresh();
             sendToNativeMessage({ action: 'pageload', value: true });
@@ -1913,45 +2212,269 @@ function getCurrentPage() {
     return currentPage;
 }
 
-/**
- * Navigates to the end of content if previous page flag is set
- */
-function gotoEnd() {
-    if (isPreviousPage) {
-        adjustVirtualColumns();
-
-        // Adjust virtual columns after positioning content at the end
-        // This ensures virtual columns are calculated with the correct final position
-        setTimeout(() => {
-            navigationUtils.scrollToHorizontalEnd();
-            isPreviousPage = false;
-            currentPage = getPageCount();
-            updateCharacterPosition();
-        }, 200);
-    }
+function getPageSlotCount() {
+    return Math.max(1, getPageCount() + 1);
 }
 
 /**
- * Sets a flag indicating that navigation to previous page occurred
- */
-function setPreviousPage() {
-    isPreviousPage = true;
-    currentPage = 0; // Reset current page on previous navigation
-}
-
-/**
- * Loads a specified URL into the iframe
- * @param {string} page - The URL to load
+ * Loads the combined single-page HTML document into the iframe.
  * @returns {boolean} True if the page was loaded
  */
-function loadPage(page) {
-    if (!frame) {
-        console.error("Frame not found for loadPage.");
+function loadCombinedPage() {
+    const iframe = ensureFrameElement();
+    if (!iframe) {
+        console.error("Frame not found for loadCombinedPage.");
         return false;
     }
-    console.log("Frame found. Loading page:", page);
-    frame.setAttribute('src', page);
-    currentPage = 0; // Reset current page on new load
+
+    const page = getReaderBaseUrl() + 'combined.html';
+    console.log("Frame found. Loading combined page:", page);
+    iframe.setAttribute('src', page);
+    currentPage = 0;
+    currentSectionIndex = 0;
+    combinedPaginationState = {
+        chapterPageCounts: [],
+        chapterOffsets: [],
+        totalPages: 0
+    };
+    return true;
+}
+
+// --- Combined single-page view ---
+
+/** Zero-based index of the currently visible chapter section in combined.html. */
+let currentSectionIndex = 0;
+
+function calculateCombinedPaginationState() {
+    const doc = domUtils.getIframeDocument();
+    const contentWindow = domUtils.getContentWindow();
+    if (!doc || !contentWindow) {
+        console.warn('calculateCombinedPaginationState: iframe content not available');
+        return {
+            chapterPageCounts: [],
+            chapterOffsets: [],
+            totalPages: 0
+        };
+    }
+
+    if (combinedPaginationCalculationInProgress) {
+        console.warn('calculateCombinedPaginationState: skipping re-entrant calculation');
+        return combinedPaginationState;
+    }
+
+    combinedPaginationCalculationInProgress = true;
+
+    try {
+        const sections = Array.from(doc.querySelectorAll('section[data-chapter-index]'));
+        if (sections.length === 0) {
+            const totalPages = getPageSlotCount();
+            return {
+                chapterPageCounts: [totalPages],
+                chapterOffsets: [0],
+                totalPages: totalPages
+            };
+        }
+
+        const savedSectionIndex = Math.max(0, Math.min(currentSectionIndex, sections.length - 1));
+        const savedPage = currentPage;
+        const chapterPageCounts = [];
+
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            sections.forEach((section, index) => {
+                section.style.display = index === sectionIndex ? 'block' : 'none';
+            });
+
+            lastVirtualColumnLayoutKey = null;
+            try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to reset scroll during pagination measurement', error); }
+            try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to reset document scroll during pagination measurement', error); }
+
+            adjustVirtualColumns({ force: true, reason: `pagination-measure:${sectionIndex}` });
+            chapterPageCounts.push(getPageSlotCount());
+        }
+
+        sections.forEach((section, index) => {
+            section.style.display = index === savedSectionIndex ? 'block' : 'none';
+        });
+
+        lastVirtualColumnLayoutKey = null;
+        try { contentWindow.scrollTo(0, 0); } catch (error) { console.warn('Failed to restore scroll during pagination measurement', error); }
+        try { doc.documentElement.scrollLeft = 0; } catch (error) { console.warn('Failed to restore document scroll during pagination measurement', error); }
+
+        adjustVirtualColumns({ force: true, reason: 'pagination-restore' });
+
+        const currentPageCount = chapterPageCounts[savedSectionIndex] ?? 1;
+        const restoredPage = Math.max(0, Math.min(savedPage, currentPageCount - 1));
+        navigationUtils.scrollToPage(restoredPage);
+        currentPage = restoredPage;
+        currentSectionIndex = savedSectionIndex;
+
+        const chapterOffsets = [];
+        let totalPages = 0;
+        for (const pageCount of chapterPageCounts) {
+            chapterOffsets.push(totalPages);
+            totalPages += pageCount;
+        }
+
+        return {
+            chapterPageCounts: chapterPageCounts,
+            chapterOffsets: chapterOffsets,
+            totalPages: Math.max(1, totalPages)
+        };
+    } finally {
+        combinedPaginationCalculationInProgress = false;
+    }
+}
+
+/**
+ * Shows the chapter section at the given index and hides all others.
+ * Called from C# via EvaluateJavaScriptAsync after combined.html is loaded into the iframe.
+ * @param {number} sectionIndex - Zero-based chapter index matching data-chapter-index attributes.
+ * @returns {boolean} True if the section was found and made visible.
+ */
+function showSection(sectionIndex) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win) {
+        console.warn('showSection: iframe document not available');
+        return false;
+    }
+
+    const sections = doc.querySelectorAll('section[data-chapter-index]');
+    if (sections.length === 0) {
+        console.warn('showSection: no chapter sections found — is combined.html loaded?');
+        return false;
+    }
+
+    const target = String(sectionIndex);
+    sections.forEach(section => {
+        section.style.display = section.dataset.chapterIndex === target ? 'block' : 'none';
+    });
+
+    // Reset scroll so ReadiumCSS column layout starts from the beginning of the section.
+    try { win.scrollTo(0, 0); } catch (e) { console.warn("error: ", e) }
+    try { doc.documentElement.scrollLeft = 0; } catch (e) { console.warn("error: ", e) }
+
+    currentPage = 0;
+    currentSectionIndex = sectionIndex;
+    refreshLayout(`show-section:${sectionIndex}`, true);
+    console.log(`showSection: section ${sectionIndex} is now visible`);
+    return true;
+}
+
+/**
+ * Returns the zero-based index of the currently visible chapter section.
+ * @returns {number}
+ */
+function getCurrentSectionIndex() {
+    return currentSectionIndex;
+}
+
+function getCombinedPaginationInfo(refresh = false) {
+    if (refresh || combinedPaginationState.chapterPageCounts.length === 0) {
+        combinedPaginationState = calculateCombinedPaginationState();
+    }
+
+    const fallbackPageCount = getPageSlotCount();
+    const currentPageCount = combinedPaginationState.chapterPageCounts[currentSectionIndex] ?? fallbackPageCount;
+    const normalizedCurrentPage = Math.max(0, Math.min(currentPage, currentPageCount - 1));
+    const currentOffset = combinedPaginationState.chapterOffsets[currentSectionIndex] ?? 0;
+
+    currentPage = normalizedCurrentPage;
+
+    return JSON.stringify({
+        currentSectionIndex: currentSectionIndex,
+        currentPage: normalizedCurrentPage,
+        currentGlobalPage: currentOffset + normalizedCurrentPage + 1,
+        totalPages: combinedPaginationState.totalPages > 0 ? combinedPaginationState.totalPages : fallbackPageCount,
+        chapterPageCounts: combinedPaginationState.chapterPageCounts,
+        chapterOffsets: combinedPaginationState.chapterOffsets
+    });
+}
+
+function tryHandleCombinedInternalLink(href) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win || !href) {
+        return false;
+    }
+
+    let hash = '';
+    try {
+        if (href.startsWith('#')) {
+            hash = href;
+        } else {
+            const targetUrl = new URL(href, getReaderBaseUrl() + 'combined.html');
+            hash = targetUrl.hash;
+        }
+    } catch (error) {
+        console.warn('Failed parsing combined link target', href, error);
+        return false;
+    }
+
+    if (!hash || hash === '#') {
+        return false;
+    }
+
+    const targetId = decodeURIComponent(hash.substring(1));
+    const targetElement = doc.getElementById(targetId);
+    if (!targetElement) {
+        return false;
+    }
+
+    const targetSection = targetElement.matches?.('section[data-chapter-index]')
+        ? targetElement
+        : targetElement.closest('section[data-chapter-index]');
+    if (!targetSection) {
+        return false;
+    }
+
+    const sectionIndex = Number.parseInt(targetSection.dataset.chapterIndex ?? '', 10);
+    if (Number.isNaN(sectionIndex)) {
+        return false;
+    }
+
+    const sectionChanged = sectionIndex !== currentSectionIndex;
+    if (sectionChanged) {
+        showSection(sectionIndex);
+        sendToNativeMessage({ action: 'sectionchange', chapterIndex: sectionIndex });
+    }
+
+    setTimeout(() => {
+        const refreshedDoc = domUtils.getIframeDocument();
+        const refreshedWin = domUtils.getContentWindow();
+        if (!refreshedDoc || !refreshedWin) {
+            return;
+        }
+
+        const refreshedTarget = refreshedDoc.getElementById(targetId);
+        if (!refreshedTarget) {
+            return;
+        }
+
+        lastVirtualColumnLayoutKey = null;
+        adjustVirtualColumns({ force: true, reason: 'internal-link' });
+
+        if (refreshedTarget.matches?.('section[data-chapter-index]')) {
+            refreshedWin.scrollTo(0, 0);
+            currentPage = 0;
+            updateCharacterPosition();
+            return;
+        }
+
+        try {
+            refreshedTarget.scrollIntoView({ block: 'start', inline: 'start' });
+        } catch (error) {
+            console.warn('scrollIntoView with options failed for combined target', error);
+            refreshedTarget.scrollIntoView();
+        }
+
+        setTimeout(() => {
+            const scrollAmount = navigationUtils.calculateScrollAmount(refreshedWin) || refreshedWin.innerWidth;
+            currentPage = Math.max(0, Math.round(refreshedWin.scrollX / scrollAmount));
+            updateCharacterPosition();
+        }, 75);
+    }, 75);
+
     return true;
 }
 
@@ -1967,18 +2490,21 @@ function gotoPage(page) {
         currentPage = 0;
         return;
     }
-    adjustVirtualColumns();
+    lastVirtualColumnLayoutKey = null;
+    adjustVirtualColumns({ force: true, reason: 'goto-page' });
 
+    // Update currentPage synchronously so that calls to getCombinedPaginationInfo() made
+    // between now and when the deferred scroll executes see the correct page number.
+    // Without this, calculateCombinedPaginationState() would read currentPage=0 (set by
+    // showSection) and restore the scroll to page 0, overwriting the intended restore target.
+    const maxPage = getPageCount();
+    const clampedPage = Math.min(page, maxPage);
+    currentPage = clampedPage;
 
-    // Adjust virtual columns after positioning content at the end
-    // This ensures virtual columns are calculated with the correct final position
     setTimeout(() => {
-        navigationUtils.scrollToPage(page);
-        isPreviousPage = false;
-        // Track the page we navigated to so persistence matches navigation
-        const maxPage = getPageCount();
-        const clampedPage = Math.min(page, maxPage);
-        currentPage = clampedPage;
+        navigationUtils.scrollToPage(clampedPage);
+        // Re-clamp after layout may have settled post-scroll
+        currentPage = Math.min(clampedPage, getPageCount());
         updateCharacterPosition();
     }, 200);
 }
@@ -1988,6 +2514,8 @@ function gotoPage(page) {
  */
 function scrollToHorizontalEnd() {
     navigationUtils.scrollToHorizontalEnd();
+    currentPage = Math.max(0, getPageCount());
+    updateCharacterPosition();
 }
 
 /**
@@ -1997,6 +2525,10 @@ function scrollToHorizontalEnd() {
  */
 function setReadiumProperty(property, value) {
     styleUtils.setReadiumProperty(property, value);
+}
+
+function refreshReaderLayout(reason = 'manual') {
+    refreshLayout(reason, true);
 }
 
 /**

@@ -1,6 +1,4 @@
 ﻿using Windows.Storage;
-using ILogger = MetroLog.ILogger;
-using LoggerFactory = MetroLog.LoggerFactory;
 using WindowsFolderPicker = Windows.Storage.Pickers.FolderPicker;
 
 namespace EpubReader.Service;
@@ -16,7 +14,7 @@ public partial class FolderPicker : IFolderPicker
 {
 	StorageFolder? pickedFolder;
 	static Window window => App.Current?.Windows[0] ?? throw new InvalidOperationException("Current window is null");
-	static readonly ILogger logger = LoggerFactory.GetLogger(nameof(FolderPicker));
+	static readonly ILogger logger = AppLogger.CreateLogger<FolderPicker>();
 
 	/// <summary>
 	/// Prompts the user to select a folder and returns the path of the selected folder.
@@ -94,18 +92,16 @@ public partial class FolderPicker : IFolderPicker
 	/// <param name="epubFilePath">The file path of the EPUB file to be opened. Must be a valid path to an existing file.</param>
 	/// <returns>A <see cref="Stream"/> for reading the contents of the EPUB file.  Returns <see cref="Stream.Null"/> if the file is
 	/// not found or cannot be opened.</returns>
-#pragma warning disable S2325 // Suppress "Methods that don't access instance data should be static" for event handlers
 	public async Task<Stream> PerformFileOperationOnEpubAsync(string epubFilePath, CancellationToken cancellationToken = default)
 	{
 		var file = await StorageFile.GetFileFromPathAsync(epubFilePath);
 		if (file is not null)
 		{
-			return await file.OpenStreamForReadAsync();
+			return await file.OpenStreamForReadAsync().ConfigureAwait(false);
 
 		}
 		return Stream.Null; // Return an empty stream if the file is not found or cannot be opened
 	}
-#pragma warning restore S2325 // Restore S2325 warning
 
 	static IntPtr GetWindowsHandle()
 	{

@@ -1,12 +1,8 @@
 ﻿using FFImageLoading.Maui;
-using MetroLog.Operators;
-using MetroLog.Targets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.LifecycleEvents;
 using Syncfusion.Maui.Toolkit.Hosting;
-using LoggerFactory = MetroLog.LoggerFactory;
-using LogLevel = MetroLog.LogLevel;
 using Plugin.Maui.Audio;
 
 #if ANDROID
@@ -31,6 +27,14 @@ public static class MauiProgram
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.Logging.AddProvider(new TraceLoggerProvider());
+#if DEBUG
+		builder.Logging.AddDebug();
+		builder.Logging.SetMinimumLevel(LogLevel.Debug);
+#else
+		builder.Logging.SetMinimumLevel(LogLevel.Information);
+#endif
 		builder.UseMauiApp<App>().ConfigureFonts(fonts =>
 		{
 			fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -79,17 +83,29 @@ public static class MauiProgram
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) =>
 	  {
-		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler));
+		var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Android WebView setup.");
+		var streamExtensions = services.GetRequiredService<StreamExtensions>();
+		var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
+		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler, streamExtensions, dispatcher));
 	  });
 #elif WINDOWS
 		WebViewHandler.Mapper.ModifyMapping(
 	  nameof(Microsoft.UI.Xaml.Controls.WebView2),
-	  async (handler, view, args) =>{ WebViewExtensions.Initialize(handler); await handler.PlatformView.EnsureCoreWebView2Async(); });
+	  async (handler, view, args) =>
+	  {
+		var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Windows WebView setup.");
+		var streamExtensions = services.GetRequiredService<StreamExtensions>();
+		var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
+		WebViewExtensions.Initialize(handler, streamExtensions, dispatcher);
+		await handler.PlatformView.EnsureCoreWebView2Async();
+	  });
 #elif IOS || MACCATALYST
 		WebViewHandler.PlatformViewFactory = (handler) =>
 		{
+			var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Apple WebView setup.");
+			var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
 			var userContentController = new WKUserContentController();
-			var messageHandler = new MyWKScriptMessageHandler();
+			var messageHandler = new MyWKScriptMessageHandler(dispatcher);
 			userContentController.AddScriptMessageHandler(messageHandler, "webwindowinterop"); // Register the handler with the name
 			var config = new WKWebViewConfiguration { UserContentController = userContentController };
 			if (OperatingSystem.IsMacCatalystVersionAtLeast(10) || OperatingSystem.IsIOSVersionAtLeast(10))
@@ -112,45 +128,24 @@ public static class MauiProgram
 			return webView;
 		};
 #endif
-		var config = new LoggingConfiguration();
-#if RELEASE
-        config.AddTarget(
-            LogLevel.Info,
-            LogLevel.Fatal,
-            new StreamingFileTarget(retainDays: 2));
-#else
-		// Will write logs to the Debug output
-		config.AddTarget(
-			LogLevel.Trace,
-			LogLevel.Fatal,
-			new TraceTarget());
-#endif
-
-		// will write logs to the console output (Logcat for android)
-		config.AddTarget(
-			LogLevel.Info,
-			LogLevel.Fatal,
-			new ConsoleTarget());
-
-		config.AddTarget(
-			LogLevel.Info,
-			LogLevel.Fatal,
-			new MemoryTarget(2048));
-#if DEBUG
-		builder.Logging.AddDebug();
-#endif
 		// Register services
 		builder.Services.AddSingleton<IDb, Db>();
 		builder.Services.AddSingleton<AuthenticationService>();
+		builder.Services.AddSingleton<ILibraryStateService, LibraryStateService>();
+		builder.Services.AddSingleton<IImportStateService, ImportStateService>();
+		builder.Services.AddSingleton<IReaderBridgeCoordinator, ReaderBridgeCoordinator>();
+		builder.Services.AddSingleton<IJavaScriptBridgeDispatcher, JavaScriptBridgeDispatcher>();
+		builder.Services.AddSingleton<IReaderSettingsStateService, ReaderSettingsStateService>();
 		builder.Services.AddSingleton<ISyncService, FirebaseSyncService>();
 		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
-		LoggerFactory.Initialize(config);
-		builder.Services.AddSingleton(LogOperatorRetriever.Instance);
 		builder.Services.AddSingleton<StreamExtensions>();
 		builder.Services.AddSingleton<IFolderPicker, FolderPicker>();
+		builder.Services.AddSingleton<IFullScreenService, FullScreenService>();
 		builder.Services.AddSingleton<AppShell>();
 		builder.Services.AddSingleton<BaseViewModel>();
 		builder.Services.AddSingleton<ProcessEpubFiles>();
+		builder.Services.AddTransient<FolderDialogPageViewModel>();
+		builder.Services.AddTransient<FolderDialogePage>();
 
 		// Register Popup pages and their view models
 		builder.Services.AddTransientPopup<SettingsPage, SettingsPageViewModel>();
@@ -158,6 +153,7 @@ public static class MauiProgram
 
 		// Register main pages and their view models
 		builder.Services.AddTransientWithShellRoute<LibraryPage, LibraryViewModel>("LibraryPage");
+		builder.Services.AddTransientWithShellRoute<RecentBooksPage, RecentBooksViewModel>("RecentBooksPage");
 		builder.Services.AddTransientWithShellRoute<BookPage, BookViewModel>("BookPage");
 		builder.Services.AddTransientWithShellRoute<BookDetailsPage, BookDetailsViewModel>("BookDetailsPage");
 		builder.Services.AddTransientWithShellRoute<CalibrePage, CalibrePageViewModel>("CalibrePage");
@@ -187,10 +183,10 @@ public static class MauiProgram
 		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
 		try
 		{
-
 			// Build FirebaseOptions from loaded configuration
 			var appId = FirebaseConfig.AppId;
 			var apiKey = FirebaseConfig.ApiKey;
+			var projectId = FirebaseConfig.ProjectId;
 			var databaseUrl = FirebaseConfig.DatabaseUrl;
 
 			if (!string.IsNullOrWhiteSpace(appId))
@@ -203,6 +199,11 @@ public static class MauiProgram
 					optionsBuilder.SetApiKey(apiKey);
 				}
 
+				if (!string.IsNullOrWhiteSpace(projectId))
+				{
+					optionsBuilder.SetProjectId(projectId);
+				}
+
 				if (!string.IsNullOrWhiteSpace(databaseUrl))
 				{
 					optionsBuilder.SetDatabaseUrl(databaseUrl);
@@ -212,7 +213,7 @@ public static class MauiProgram
 				Firebase.FirebaseApp.InitializeApp(activity, options);
 			}
 
-			CrossFirebase.Initialize(activity);
+			CrossFirebase.Initialize(activity, () => Platform.CurrentActivity ?? activity);
 		}
 		catch (Exception ex)
 		{

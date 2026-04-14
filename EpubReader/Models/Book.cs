@@ -97,6 +97,14 @@ public partial class Book : ObservableObject
 	public List<Css> Css { get; set; } = [];
 
 	/// <summary>
+	/// Gets or sets the combined single-page HTML document produced by <see cref="EpubReader.Service.EbookService.CombineChapters"/>.
+	/// All chapters are concatenated into one document with each chapter wrapped in a
+	/// <c>&lt;section data-chapter-index="N"&gt;</c> element. Only the active section is shown at a time.
+	/// </summary>
+	[Ignore]
+	public string CombinedHtml { get; set; } = string.Empty;
+
+	/// <summary>
 	/// Gets or sets the cover image as a byte array.
 	/// </summary>
 
@@ -208,4 +216,16 @@ public partial class Book : ObservableObject
 	/// </summary>
 	[Ignore]
 	public List<string> Categories { get; set; } = [];
+
+	/// <summary>
+	/// Gets or sets the date when the book was added to the library.
+	/// </summary>
+	[Column("DateAdded")]
+	public DateTime DateAdded { get; set; } = DateTime.UtcNow;
+
+	/// <summary>
+	/// Gets or sets the date when the book was last opened for reading.
+	/// </summary>
+	[Column("LastOpenedDate")]
+	public DateTime? LastOpenedDate { get; set; }
 }

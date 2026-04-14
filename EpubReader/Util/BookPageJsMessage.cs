@@ -1,26 +1,29 @@
 namespace EpubReader.Util;
 
-using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text.Json;
+using EpubReader.Models;
 
 /// <summary>
-/// Represents a JavaScript message sent from the WebView to the native layer and
-/// provides helpers to parse it and convert it to the internal "runcsharp" URL format.
+/// Represents a structured JavaScript message sent from the WebView to the native layer and
+/// provides helpers to parse the bridge payload into a typed C# model.
 /// </summary>
 public sealed class BookPageJsMessage
 {
-	public string Action { get; init; } = string.Empty;
+	public ReaderBridgeAction Action { get; init; } = ReaderBridgeAction.Unknown;
+	public string ActionName { get; init; } = string.Empty;
+	public string RawJson { get; init; } = string.Empty;
 
 	public string? Href { get; init; }
 
 	public int? Position { get; init; }
+	public int? ChapterIndex { get; init; }
 	public double? Seconds { get; init; }
 
 	public bool? Enabled { get; init; }
 
 	public string? Message { get; init; }
+	public string? Reason { get; init; }
 
 	public static bool TryParse(string json, [NotNullWhen(true)] out BookPageJsMessage? message)
 	{
@@ -39,8 +42,7 @@ public sealed class BookPageJsMessage
 				return false;
 			}
 
-			var action = actionElem.GetString() ?? string.Empty;
-			var href = root.TryGetProperty("href", out var hrefElem) ? hrefElem.GetString() : null;
+			var href = GetStringProperty(root, "href");
 
 			// Convert HTTP to HTTPS if needed
 			if (!string.IsNullOrEmpty(href) && href.StartsWith("http://"))
@@ -48,39 +50,20 @@ public sealed class BookPageJsMessage
 				href = "https://" + href[7..];
 			}
 
-			int? pos = null;
-			if (root.TryGetProperty("position", out var posElem) && posElem.ValueKind == JsonValueKind.Number && posElem.TryGetInt32(out var p))
-			{
-				pos = p;
-			}
-
-			double? seconds = null;
-			if (root.TryGetProperty("seconds", out var secondsElem) && secondsElem.ValueKind == JsonValueKind.Number && secondsElem.TryGetDouble(out var s))
-			{
-				seconds = s;
-			}
-
-			bool? enabled = null;
-			if (root.TryGetProperty("enabled", out var enabledElem) &&
-				(enabledElem.ValueKind == JsonValueKind.True || enabledElem.ValueKind == JsonValueKind.False))
-			{
-				enabled = enabledElem.GetBoolean();
-			}
-
-			string? messageText = null;
-			if (root.TryGetProperty("message", out var messageElem))
-			{
-				messageText = messageElem.GetString();
-			}
+			var actionName = actionElem.GetString() ?? string.Empty;
 
 			message = new BookPageJsMessage
 			{
-				Action = action,
+				Action = ReaderBridgeActionParser.Parse(actionName),
+				ActionName = actionName,
+				RawJson = json,
 				Href = href,
-				Position = pos,
-				Enabled = enabled,
-				Message = messageText,
-				Seconds = seconds
+				Position = GetInt32Property(root, "position"),
+				ChapterIndex = GetInt32Property(root, "chapterIndex"),
+				Seconds = GetDoubleProperty(root, "seconds"),
+				Enabled = GetBoolProperty(root, "enabled"),
+				Message = GetStringProperty(root, "message"),
+				Reason = GetStringProperty(root, "reason"),
 			};
 			return true;
 		}
@@ -92,29 +75,18 @@ public sealed class BookPageJsMessage
 		}
 	}
 
-	/// <summary>
-	/// Converts the parsed message into the internal "runcsharp" URL used by the native handler.
-	/// Returns null if no mapping is available.
-	/// </summary>
-	public string? ToRuncsharpUrl()
-	{
-		var action = Action?.ToLowerInvariant() ?? string.Empty;
-		return action switch
-		{
-			"jump" => Href is not null ? $"https://runcsharp.jump?{Href}" : null,
-			"next" => "https://runcsharp.next?true",
-			"prev" => "https://runcsharp.prev?true",
-			"menu" => "https://runcsharp.menu?true",
-			"pageload" => "https://runcsharp.pageLoad?true",
-			"characterposition" => Position.HasValue ? $"https://runcsharp.characterposition?{Position.Value}" : null,
-			"mediaoverlaytoggle" => Enabled.HasValue ? $"https://runcsharp.mediaoverlaytoggle?{Enabled.Value}" : null,
-			"mediaoverlayplay" => "https://runcsharp.mediaoverlayplay?true",
-			"mediaoverlaypause" => "https://runcsharp.mediaoverlaypause?true",
-			"mediaoverlaynext" => "https://runcsharp.mediaoverlaynext?true",
-			"mediaoverlayprev" => "https://runcsharp.mediaoverlayprev?true",
-			"mediaoverlaylog" => !string.IsNullOrEmpty(Message) ? $"https://runcsharp.mediaoverlaylog?{Uri.EscapeDataString(Message)}" : null,
-			"mediaoverlayseek" => Seconds.HasValue ? $"https://runcsharp.mediaoverlayseek?{Seconds.Value.ToString(CultureInfo.InvariantCulture)}" : null,
-			_ => null,
-		};
-	}
+	static string? GetStringProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) ? elem.GetString() : null;
+
+	static int? GetInt32Property(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetInt32(out var val)
+			? val : null;
+
+	static double? GetDoubleProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetDouble(out var val)
+			? val : null;
+
+	static bool? GetBoolProperty(JsonElement root, string name) =>
+		root.TryGetProperty(name, out var elem) && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
+			? elem.GetBoolean() : null;
 }
