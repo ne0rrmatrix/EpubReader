@@ -82,12 +82,12 @@
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.51" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.51" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.80-dev" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.80-dev" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.51" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.51" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80-dev" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.80-dev" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
     <PackageReference Include="CommunityToolkit.Maui" Version="14.1.0" />
     <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.0" />

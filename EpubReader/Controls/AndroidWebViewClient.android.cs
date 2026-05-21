@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Android.Graphics;
 using Android.Webkit;
+using AndroidX.Core.View;
 using Microsoft.Maui.Handlers;
 
 namespace EpubReader.Controls;
@@ -15,6 +16,7 @@ namespace EpubReader.Controls;
 class CustomWebViewClient : WebViewClient
 {
 	readonly Microsoft.Maui.Controls.WebView webView;
+	readonly global::Android.Webkit.WebView platformView;
 	readonly StreamExtensions streamExtensions;
 
 	readonly CancellationTokenSource cancellationTokenSource = new();
@@ -31,36 +33,77 @@ class CustomWebViewClient : WebViewClient
 	public CustomWebViewClient(IWebViewHandler handler, StreamExtensions streamExtensions, IJavaScriptBridgeDispatcher dispatcher)
 	{
 		this.webView = handler.VirtualView as Microsoft.Maui.Controls.WebView ?? throw new ArgumentNullException(nameof(handler));
+		platformView = handler.PlatformView;
 		this.streamExtensions = streamExtensions;
-		handler.PlatformView.Settings.DomStorageEnabled = true;
-		handler.PlatformView.Settings.JavaScriptEnabled = true;
-		handler.PlatformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
-		handler.PlatformView.Settings.AllowContentAccess = true;
-		handler.PlatformView.Settings.LoadsImagesAutomatically = true;
-		handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
-		handler.PlatformView.Settings.LoadWithOverviewMode = false;
-		handler.PlatformView.Settings.UseWideViewPort = true;
-		handler.PlatformView.Settings.SetSupportZoom(false);
-		handler.PlatformView.Settings.BuiltInZoomControls = false;
-		handler.PlatformView.Settings.DisplayZoomControls = false;
-		handler.PlatformView.Settings.TextZoom = 100;
-		handler.PlatformView.SetInitialScale(0);
-		handler.PlatformView.VerticalScrollBarEnabled = false;
-		handler.PlatformView.HorizontalScrollBarEnabled = false;
-		handler.PlatformView.AddJavascriptInterface(new JSBridge(dispatcher), "jsBridge");
-		handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+		platformView.Settings.DomStorageEnabled = true;
+		platformView.Settings.JavaScriptEnabled = true;
+		platformView.Settings.JavaScriptCanOpenWindowsAutomatically = true;
+		platformView.Settings.AllowContentAccess = true;
+		platformView.Settings.LoadsImagesAutomatically = true;
+		platformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
+		platformView.Settings.LoadWithOverviewMode = false;
+		platformView.Settings.UseWideViewPort = true;
+		platformView.Settings.SetSupportZoom(false);
+		platformView.Settings.BuiltInZoomControls = false;
+		platformView.Settings.DisplayZoomControls = false;
+		platformView.Settings.TextZoom = 100;
+		platformView.SetInitialScale(0);
+		platformView.VerticalScrollBarEnabled = false;
+		platformView.HorizontalScrollBarEnabled = false;
+		platformView.AddJavascriptInterface(new JSBridge(dispatcher), "jsBridge");
+		platformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
 		Trace.TraceInformation("Configured Android WebView with density-aware initial scaling, wide viewport support, and neutral text zoom.");
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
 #pragma warning disable CA1422  // Type or member is obsolete
-		handler.PlatformView.Settings.SetAppCacheEnabled(true);
+		platformView.Settings.SetAppCacheEnabled(true);
 		var absolutePath = Platform.AppContext.CacheDir?.AbsolutePath ?? throw new InvalidOperationException();
-		handler.PlatformView.Settings.SetAppCachePath(absolutePath);
+        platformView.Settings.SetAppCachePath(absolutePath);
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
 #pragma warning disable CS0618  // Type or member is obsolete
-		handler.PlatformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
-		handler.PlatformView.Settings.CacheMode = CacheModes.Default;
+        platformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
+		platformView.Settings.CacheMode = CacheModes.Default;
 #pragma warning restore CS0618  // Type or member is obsolete
 #pragma warning restore CA1422  // Type or member is obsolete
+       platformView.Post(() => ApplyReaderSafeAreaInsets());
+	}
+
+	void ApplyReaderSafeAreaInsets()
+	{
+		var rootInsets = ViewCompat.GetRootWindowInsets(platformView);
+		if (rootInsets is null)
+		{
+			return;
+		}
+
+		var displayCutoutInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.DisplayCutout());
+		var statusBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.StatusBars());
+		var navigationBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
+
+		var displayCutoutTop = displayCutoutInsets?.Top ?? 0;
+		var displayCutoutRight = displayCutoutInsets?.Right ?? 0;
+		var displayCutoutBottom = displayCutoutInsets?.Bottom ?? 0;
+		var displayCutoutLeft = displayCutoutInsets?.Left ?? 0;
+		var statusBarTop = statusBarInsets?.Top ?? 0;
+		var navigationBarRight = navigationBarInsets?.Right ?? 0;
+		var navigationBarBottom = navigationBarInsets?.Bottom ?? 0;
+		var navigationBarLeft = navigationBarInsets?.Left ?? 0;
+
+		var topInset = Math.Max(displayCutoutTop, statusBarTop);
+		var rightInset = Math.Max(displayCutoutRight, navigationBarRight);
+		var bottomInset = Math.Max(displayCutoutBottom, navigationBarBottom);
+		var leftInset = Math.Max(displayCutoutLeft, navigationBarLeft);
+		var density = platformView.Resources?.DisplayMetrics?.Density ?? 1f;
+		if (density <= 0)
+		{
+			density = 1f;
+		}
+
+		var cssTopInset = (int)Math.Round(topInset / density, MidpointRounding.AwayFromZero);
+		var cssRightInset = (int)Math.Round(rightInset / density, MidpointRounding.AwayFromZero);
+		var cssBottomInset = (int)Math.Round(bottomInset / density, MidpointRounding.AwayFromZero);
+		var cssLeftInset = (int)Math.Round(leftInset / density, MidpointRounding.AwayFromZero);
+
+		platformView.EvaluateJavascript($"setNativeSafeAreaInsets({cssTopInset}, {cssRightInset}, {cssBottomInset}, {cssLeftInset});", null);
 	}
 
 	/// <summary>
@@ -200,5 +243,7 @@ class CustomWebViewClient : WebViewClient
 				handler.Method.Invoke(handler.Target, [webView, navigatedEventArgs]);
 			}
 		}
+
+		view?.Post(() => ApplyReaderSafeAreaInsets());
 	}
 }

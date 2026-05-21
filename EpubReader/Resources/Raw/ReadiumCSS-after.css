@@ -25,7 +25,15 @@
 
   --RS__viewportWidth:100%;
 
-  --RS__pageGutter:0;
+  --RS__pageGutter:clamp(12px, 3.5vw, 20px);
+
+  --RS__safeAreaTop:env(safe-area-inset-top, 0px);
+
+  --RS__safeAreaRight:env(safe-area-inset-right, 0px);
+
+  --RS__safeAreaBottom:env(safe-area-inset-bottom, 0px);
+
+  --RS__safeAreaLeft:env(safe-area-inset-left, 0px);
 
   --RS__defaultLineLength:100%;
 
@@ -61,7 +69,7 @@
   max-height:100vh;
   min-width:var(--RS__viewportWidth);
   min-height:100vh;
-  padding:0 !important;
+  padding:var(--RS__safeAreaTop) var(--RS__safeAreaRight) var(--RS__safeAreaBottom) var(--RS__safeAreaLeft) !important;
   margin:0 !important;
   font-size:1rem !important;
   box-sizing:border-box;
@@ -72,6 +80,7 @@ body{
   width:100%;
   max-width:var(--RS__defaultLineLength) !important;
   margin:0 auto !important;
+  padding:0 !important;
   box-sizing:border-box;
 }
 
