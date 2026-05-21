@@ -138,6 +138,9 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - **Singleton vs. Transient**: Auth/Sync services are singletons; platform-specific services registered per-platform.
 - **Firebase Integration**: Plugin.Firebase for cross-platform Firebase API.
 
+### Package Feed Support
+- Prefer optional configuration over required-by-default setup when adding package feed support in this repo.
+
 ### Avoid
 - `NotImplementedException` (indicates incomplete PR, not a feature to be done later).
 - Xamarin.Forms-specific APIs (use .NET MAUI equivalents).
