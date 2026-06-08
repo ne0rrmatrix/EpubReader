@@ -414,6 +414,8 @@ public partial class BookPage : ContentPage, IDisposable
 	async void GridArea_Tapped(object? sender, EventArgs? e)
 	{
 		ViewModel.Press();
+		bool isVisible = Shell.GetNavBarIsVisible(this);
+		Shell.SetNavBarIsVisible(this, !isVisible);
 		if (isMenuOpen)
 		{
 			isMenuOpen = false;
@@ -1078,6 +1080,8 @@ public partial class BookPage : ContentPage, IDisposable
 		isMenuOpen = false;
 		sliderContainer.IsVisible = false;
 		ViewModel.Press();
+		bool isVisible = Shell.GetNavBarIsVisible(this);
+		Shell.SetNavBarIsVisible(this, !isVisible);
 		await grid.FadeToAsync(1, animationDuration);
 		await grid.ScaleToAsync(1, animationDuration);
 	}
@@ -1087,8 +1091,10 @@ public partial class BookPage : ContentPage, IDisposable
 		ArgumentNullException.ThrowIfNull(book);
 		if (string.IsNullOrEmpty(chapter.Title))
 		{
+			Debug.WriteLine($"Skipping chapter with empty title at index {index}");
 			return;
 		}
+		/*
 #if IOS || MACCATALYST
 		Label label = new()
 		{
@@ -1119,9 +1125,11 @@ public partial class BookPage : ContentPage, IDisposable
 			Height = new GridLength(1, GridUnitType.Auto)
 		});
 #else
+*/
 		var currentShell = Shell.Current;
 		if (currentShell is null)
 		{
+			Debug.WriteLine("Shell.Current is null, cannot add toolbar item.");
 			return;
 		}
 
@@ -1130,6 +1138,7 @@ public partial class BookPage : ContentPage, IDisposable
             Text = chapter.Title,
             Order = ToolbarItemOrder.Secondary,
             Priority = index,
+			IconImageSource = ImageSource.FromFile("calibre.png"),
             Command = new Command(() =>
             {
                 Dispatcher.Dispatch(async () =>
@@ -1142,8 +1151,10 @@ public partial class BookPage : ContentPage, IDisposable
                 });
             })
         };
-		currentShell.ToolbarItems.Add(toolbarItem);
-#endif
+		//currentShell.ToolbarItems.Add(toolbarItem);
+		Shell.Current.ToolbarItems.Add(toolbarItem);
+		Debug.WriteLine($"Added toolbar item for chapter '{chapter.Title}' at index {index}");
+//#endif
 	}
 
 	// --- Slider helpers and event handlers ---

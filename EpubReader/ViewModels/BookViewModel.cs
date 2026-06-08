@@ -148,7 +148,7 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 		{
 			FullScreenService.SetFullScreen(IsNavMenuVisible);
 			IsNavMenuVisible = !IsNavMenuVisible;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
+			//Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
 		});
 	}
 }

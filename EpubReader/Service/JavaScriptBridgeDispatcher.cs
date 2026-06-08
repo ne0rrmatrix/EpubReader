@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using EpubReader.Converter;
 using EpubReader.Util;
 
 namespace EpubReader.Service;
@@ -41,21 +40,23 @@ public sealed class JavaScriptBridgeDispatcher(IReaderBridgeCoordinator coordina
 
 	static string DecodePayload(string payload)
 	{
-		var decoded = Base64Decoder.DecodeFromBase64(payload);
-		if (!string.IsNullOrWhiteSpace(decoded))
-		{
-			return decoded;
-		}
-
+		byte[]? bytes = null;
 		try
 		{
-			var bytes = Convert.FromBase64String(payload);
-			return System.Text.Encoding.UTF8.GetString(bytes);
+			bytes = Convert.FromBase64String(payload);
 		}
 		catch (FormatException)
 		{
-			return string.Empty;
+			// Payload is not base64-encoded — treat it as plain text.
 		}
+
+		if (bytes is not null)
+		{
+			return System.Text.Encoding.UTF8.GetString(bytes);
+		}
+
+		// Fallback: return the raw payload as plain text (e.g. JSON from JS bridge).
+		return payload;
 	}
 
 	static string ShortenForTrace(string payload)

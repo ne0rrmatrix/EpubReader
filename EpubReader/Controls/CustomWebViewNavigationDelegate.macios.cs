@@ -91,8 +91,17 @@ public class MyWKScriptMessageHandler(IJavaScriptBridgeDispatcher dispatcher) : 
 				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 				return;
 			}
+			var data = message.Body.ToString() ?? throw new InvalidOperationException("message.Body is null");
 
-			dispatcher.Dispatch(message.Body.ToString(), JavaScriptBridgeSource.Apple, isBase64Encoded: true);
+			// The JS bridge on Apple platforms prefixes messages with "base64:".
+			// Strip it before dispatching for base64 decoding.
+			const string base64Prefix = "base64:";
+			if (data.StartsWith(base64Prefix, StringComparison.Ordinal))
+			{
+				data = data[base64Prefix.Length..];
+			}
+
+			dispatcher.Dispatch(data, JavaScriptBridgeSource.Apple, isBase64Encoded: true);
 		}
 	}
 }

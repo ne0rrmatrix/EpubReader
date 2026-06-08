@@ -90,7 +90,7 @@ public partial class AuthenticationService : IDisposable
 		ObjectDisposedException.ThrowIf(disposed, this);
 		cancellationToken.ThrowIfCancellationRequested();
 
-#if !WINDOWS
+#if !WINDOWS && !MACCATALYST
 		if (!CrossFirebaseAuth.IsSupported)
 		{
 			Trace.TraceWarning("Google sign-in is not supported on this platform by the installed Firebase auth plugin.");
@@ -99,7 +99,7 @@ public partial class AuthenticationService : IDisposable
 #else
 		if (!CrossFirebaseAuth.IsSupported)
 		{
-			Trace.TraceInformation("Native Firebase auth plugin is unavailable on Windows; using the WebView-based Google sign-in flow.");
+			Trace.TraceInformation("Native Firebase auth plugin is unavailable on this platform; using the alternative Google sign-in flow.");
 		}
 #endif
 
@@ -139,7 +139,7 @@ public partial class AuthenticationService : IDisposable
 			}
 		}
 
-#if WINDOWS
+#if WINDOWS || MACCATALYST
 		var storedToken = await GetStoredAuthTokenAsync(cancellationToken);
 		if (!string.IsNullOrWhiteSpace(storedToken))
 		{
@@ -168,7 +168,7 @@ public partial class AuthenticationService : IDisposable
 			return true;
 		}
 
-#if WINDOWS
+#if WINDOWS || MACCATALYST
 		var storedToken = await GetStoredAuthTokenAsync(cancellationToken);
 		if (!string.IsNullOrWhiteSpace(storedToken) && authMode == authModeCloud)
 		{

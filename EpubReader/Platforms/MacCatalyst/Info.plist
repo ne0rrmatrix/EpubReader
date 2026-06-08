@@ -64,7 +64,22 @@
     <array>
         <string>fetch</string>
     </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>com.NerdNews.EpubReader</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.507277680982-mnoc4c658s34qe28tbpml1brktst7rvh</string>
+            </array>
+        </dict>
+    </array>
     <key>CFBundleIdentifier</key>
-    <string>com.companyname.epubreader</string>
+    <string>com.NerdNews.EpubReader</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
 </dict>
 </plist>
