@@ -10,6 +10,13 @@ public partial class BookDetailsPage : ContentPage
 		BindingContext = viewModel;
 	}
 
+	protected override void OnNavigatedTo(NavigatedToEventArgs args)
+	{
+		base.OnNavigatedTo(args);
+		Shell.SetNavBarIsVisible(this, true);
+		Shell.SetTabBarIsVisible(this, true);
+	}
+
 	/// <summary>
 	/// Handles the back button press event, navigating to the home page instead of using default back navigation.
 	/// </summary>
@@ -24,7 +31,8 @@ public partial class BookDetailsPage : ContentPage
 				{
 					Navigation.RemovePage(Navigation.NavigationStack[1]);
 				}
-
+				Shell.SetNavBarIsVisible(this, true);
+				Shell.SetTabBarIsVisible(this, true);
 				await Dispatcher.DispatchAsync(() => Shell.Current.GoToAsync(".."));
 			}
 			catch (Exception ex)

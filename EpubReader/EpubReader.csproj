@@ -25,7 +25,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
-    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsPackageType>MSIX</WindowsPackageType>
     <NoWarn>MCTEXP001</NoWarn>
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
@@ -82,19 +82,19 @@
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.51" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.51" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.80-ci.main.26281.1" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.80-ci.main.26281.1" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.51" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.51" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="14.1.0" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.0" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80-ci.main.26281.1" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.80-ci.main.26281.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.7" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="14.1.1" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
-    <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.9" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.5" />
+    <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.10" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.8" />
     <PackageReference Include="Plugin.Firebase.Auth" Version="5.0.1" />
     <PackageReference Include="Plugin.Firebase.Crashlytics" Version="4.0.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
