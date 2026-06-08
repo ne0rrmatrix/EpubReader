@@ -145,6 +145,18 @@ public partial class BookPage : ContentPage, IDisposable
 		syncToolbarItem = null;
 	}
 
+	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+	{
+		if(args.IsDestinationPageACommunityToolkitPopupPage())
+		{
+			// Don't treat navigating to a popup as leaving the page, since the page is still visible behind the popup and we want it to remain in reader mode with the menu hidden.
+			return;
+		}
+		base.OnNavigatedFrom(args);
+		Shell.SetNavBarIsVisible(this, true);
+		Shell.SetTabBarIsVisible(this, true);
+	}
+
 	/// <summary>
 	/// Handles the actions to be performed when the page is disappearing.
 	/// </summary>
