@@ -11,7 +11,8 @@
     Padding="12"
     x:DataType="viewModel:BookDetailsViewModel"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
-                                            Light={StaticResource Blue200Accent}}">
+                                            Light={StaticResource Blue200Accent}}"
+    Shell.TabBarIsVisible="True">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem

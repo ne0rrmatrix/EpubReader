@@ -20,6 +20,28 @@ let lastVirtualColumnLayoutKey = null;
 let scheduledOverflowAudit = null;
 let overflowAuditInProgress = false;
 let lastOverflowAuditSignature = null;
+let pendingNativeSafeAreaInsets = {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+};
+
+function logReaderSafeArea(eventName, details) {
+    const entry = {
+        event: eventName || 'unknown',
+        details: details ?? null,
+        timestamp: new Date().toISOString()
+    };
+
+    console.log('[ReaderSafeArea]', entry);
+
+    try {
+        sendToNativeMessage({ action: 'mediaoverlaylog', message: `[ReaderSafeArea] ${JSON.stringify(entry)}` });
+    } catch (error) {
+        console.warn('Failed to forward reader safe area log to native layer', error);
+    }
+}
 
 const mediaOverlayUi = {
     root: null,
@@ -240,6 +262,44 @@ function parseCssPixelValue(value, fallback = 0) {
 
     const parsed = Number.parseFloat(trimmed);
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function applyNativeSafeAreaInsetsToRoot(root) {
+    if (!root) {
+        logReaderSafeArea('apply-skipped', {
+            reason: 'iframe-root-missing',
+            pendingInsets: pendingNativeSafeAreaInsets
+        });
+        return false;
+    }
+
+    root.style.setProperty('--RS__safeAreaTop', `${pendingNativeSafeAreaInsets.top}px`);
+    root.style.setProperty('--RS__safeAreaRight', `${pendingNativeSafeAreaInsets.right}px`);
+    root.style.setProperty('--RS__safeAreaBottom', `${pendingNativeSafeAreaInsets.bottom}px`);
+    root.style.setProperty('--RS__safeAreaLeft', `${pendingNativeSafeAreaInsets.left}px`);
+
+    logReaderSafeArea('applied', {
+        pendingInsets: pendingNativeSafeAreaInsets,
+        computedInsets: {
+            top: root.style.getPropertyValue('--RS__safeAreaTop'),
+            right: root.style.getPropertyValue('--RS__safeAreaRight'),
+            bottom: root.style.getPropertyValue('--RS__safeAreaBottom'),
+            left: root.style.getPropertyValue('--RS__safeAreaLeft')
+        }
+    });
+
+    return true;
+}
+
+function applyPendingNativeSafeAreaInsets() {
+    const root = domUtils.getIframeDocument()?.documentElement;
+    if (!applyNativeSafeAreaInsetsToRoot(root)) {
+        return false;
+    }
+
+    lastVirtualColumnLayoutKey = null;
+    scheduleVirtualColumnAdjustment('native-safe-area', 125, true);
+    return true;
 }
 
 /**
@@ -2157,6 +2217,11 @@ document.addEventListener("DOMContentLoaded", function () {
             };
             contentWindow.addEventListener('resize', currentFrameResizeHandler);
 
+            logReaderSafeArea('iframe-load', {
+                pendingInsets: pendingNativeSafeAreaInsets,
+                iframeLocation: contentWindow.location?.href ?? null
+            });
+            applyPendingNativeSafeAreaInsets();
             refreshLayout('iframe-load', true);
 
             requestMediaOverlayHighlightThemeRefresh();
@@ -2525,6 +2590,21 @@ function scrollToHorizontalEnd() {
  */
 function setReadiumProperty(property, value) {
     styleUtils.setReadiumProperty(property, value);
+}
+
+function setNativeSafeAreaInsets(top, right, bottom, left) {
+    pendingNativeSafeAreaInsets = {
+        top: Math.max(0, Number(top) || 0),
+        right: Math.max(0, Number(right) || 0),
+        bottom: Math.max(0, Number(bottom) || 0),
+        left: Math.max(0, Number(left) || 0)
+    };
+
+    logReaderSafeArea('received', {
+        pendingInsets: pendingNativeSafeAreaInsets
+    });
+
+    applyPendingNativeSafeAreaInsets();
 }
 
 function refreshReaderLayout(reason = 'manual') {

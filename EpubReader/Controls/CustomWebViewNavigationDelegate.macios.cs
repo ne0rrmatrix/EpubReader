@@ -92,7 +92,7 @@ public class MyWKScriptMessageHandler(IJavaScriptBridgeDispatcher dispatcher) : 
 				return;
 			}
 
-			dispatcher.Dispatch(message.Body.ToString(), JavaScriptBridgeSource.Apple, isBase64Encoded: true);
+			dispatcher.Dispatch(message.Body.ToString() ?? string.Empty, JavaScriptBridgeSource.Apple, isBase64Encoded: true);
 		}
 	}
 }

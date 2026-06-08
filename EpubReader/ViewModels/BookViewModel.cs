@@ -137,6 +137,20 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	}
 
 	/// <summary>
+	/// Toggles the navigation menu visibility and optionally updates the fullscreen state.
+	/// </summary>
+	/// <param name="setFullScreen">Indicates whether to update the fullscreen state when toggling the navigation menu.</param>
+	public void Press(bool setFullScreen)
+	{
+		Dispatcher.Dispatch(() =>
+		{
+			FullScreenService.SetFullScreen(setFullScreen);
+			IsNavMenuVisible = !setFullScreen;
+			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, setFullScreen);
+		});
+	}
+
+	/// <summary>
 	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
 	/// </summary>
 	/// <remarks>On Android, this method also adjusts the status bar visibility to match the navigation menu's

@@ -444,9 +444,9 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <summary>
 	/// Asynchronously retrieves the width of the content and adjusts it based on the specified settings.
 	/// </summary>
-	/// <remarks>The method evaluates a JavaScript function to obtain the initial width and then adjusts it based on
-	/// the font size and whether multiple columns are supported. If multiple columns are supported, the width is divided
-	/// by three before adjusting for font size.</remarks>
+    /// <remarks>The method evaluates a JavaScript function to obtain the initial width and then adjusts it based on
+	/// the font size and whether multiple columns are supported. If multiple columns are supported, the width is based
+	/// on half of the viewport before adjusting for font size so the two-pane layout uses more of the available space.</remarks>
 	/// <param name="settings">The settings used to determine the font size and column support for the width calculation. Must not be null.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the calculated width as an integer.</returns>
 	async Task<int> GetWidthAsync(Settings settings)
@@ -456,7 +456,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 		if (settings.SupportMultipleColumns)
 		{
-			return (Convert.ToInt32(result) / 3 - fontSize);
+            return (Convert.ToInt32(result) / 2 - fontSize);
 		}
 		return (Convert.ToInt32(result) - fontSize);
 	}
