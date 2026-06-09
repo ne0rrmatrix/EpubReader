@@ -28,14 +28,7 @@ static class SecondaryToolbarHelper
 			{
 				if (weakItem.TryGetTarget(out var targetItem))
 				{
-					if (targetItem is IMenuItemController menuItemController)
-					{
-						menuItemController.Activate();
-					}
-					else
-					{
-						targetItem.Command?.Execute(targetItem.CommandParameter);
-					}
+					((IMenuItemController)targetItem).Activate();
 				}
 			});
 
