@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using AuthenticationServices;
 using Foundation;
 using UIKit;
 
@@ -332,69 +333,70 @@ public partial class AuthenticationService
 			.TrimEnd('=');
 	}
 
-	static async Task<string> GetAuthorizationCodeFromWebAuthSessionAsync(string authUrl, string callbackScheme, CancellationToken cancellationToken)
+	static Task<string> GetAuthorizationCodeFromWebAuthSessionAsync(string authUrl, string callbackScheme, CancellationToken cancellationToken)
 	{
 		var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		var windowScene = UIApplication.SharedApplication.ConnectedScenes
-			.OfType<UIWindowScene>()
-			.FirstOrDefault();
-		var rootVC = windowScene?.KeyWindow?.RootViewController
-			?? throw new InvalidOperationException("No root view controller found for presenting auth UI.");
-
-		// Walk up the presented view controller chain — MAUI Shell may already have
-		// a modal (ControlsModalWrapper) presented, and UIKit rejects presenting on
-		// a view controller that is already presenting.
-		var presenter = rootVC;
-		while (presenter.PresentedViewController is not null)
-		{
-			presenter = presenter.PresentedViewController;
-		}
-
-		var webVC = new GoogleAuthWebViewController(authUrl, callbackScheme, authCode =>
-		{
-			if (authCode is not null)
+		// Use ASWebAuthenticationSession which presents the system's secure Safari
+		// browser — required by Google's "Use secure browsers" policy. WKWebView is
+		// blocked (error 403: disallowed_useragent).
+		var session = new ASWebAuthenticationSession(
+			new NSUrl(authUrl),
+			callbackScheme,
+			(callbackUrl, error) =>
 			{
-				Trace.TraceInformation("Google sign-in: authorization code extracted from callback");
-				tcs.TrySetResult(authCode);
-			}
-			else
-			{
-				Trace.TraceInformation("Google sign-in: user cancelled or closed the auth view");
-				tcs.TrySetResult(null);
-			}
-		});
+				if (error is not null)
+				{
+					var nsError = (NSError)error;
+					if (nsError.Code == (long)ASWebAuthenticationSessionErrorCode.CanceledLogin)
+					{
+						Trace.TraceInformation("Google sign-in: user cancelled ASWebAuthenticationSession");
+						tcs.TrySetResult(null);
+					}
+					else
+					{
+						Trace.TraceError($"Google sign-in: ASWebAuthenticationSession error - {nsError.LocalizedDescription}");
+						tcs.TrySetResult(null);
+					}
+				}
+				else
+				{
+					Trace.TraceInformation("Google sign-in: ASWebAuthenticationSession callback received");
+					var authCode = ExtractAuthCodeFromCallbackUrl(callbackUrl);
+					tcs.TrySetResult(authCode);
+				}
+			});
 
-		// Wrap in a UINavigationController for the Done button.
-		var navController = new UINavigationController(webVC)
-		{
-			// Full-screen on iPad — no toolbar, no form sheet.
-			ModalPresentationStyle = UIModalPresentationStyle.FullScreen
-		};
+		session.PresentationContextProvider = new AuthPresentationContextProvider();
 
 		using var cancellationRegistration = cancellationToken.Register(() =>
 		{
-			Trace.TraceInformation("Google sign-in: cancellation requested, dismissing auth view");
-			MainThread.BeginInvokeOnMainThread(() =>
-			{
-				webVC.DismissViewController(true, null);
-			});
+			Trace.TraceInformation("Google sign-in: cancellation requested, cancelling ASWebAuthenticationSession");
+			session.Cancel();
 		});
 
+		if (!session.Start())
+		{
+			Trace.TraceError("Google sign-in: ASWebAuthenticationSession.Start() returned false");
+			tcs.TrySetException(new InvalidOperationException("Failed to start ASWebAuthenticationSession."));
+		}
+
+		return AwaitAuthCodeAsync(tcs, cancellationToken);
+	}
+
+	static async Task<string> AwaitAuthCodeAsync(TaskCompletionSource<string?> tcs, CancellationToken cancellationToken)
+	{
 		try
 		{
-			await presenter.PresentViewControllerAsync(navController, true);
-			var result = await tcs.Task;
-
-			// Dismiss is called inside the web VC callback, but ensure cleanup.
-			await navController.DismissViewControllerAsync(true);
-
-			return result ?? string.Empty;
+			await using (cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken)))
+			{
+				var result = await tcs.Task;
+				return result ?? string.Empty;
+			}
 		}
 		catch (OperationCanceledException)
 		{
 			Trace.TraceWarning("Google sign-in: operation cancelled");
-			await navController.DismissViewControllerAsync(true);
 			throw;
 		}
 	}
@@ -474,5 +476,21 @@ public partial class AuthenticationService
 
 		return string.IsNullOrWhiteSpace(responseText) ? "Unknown error." : responseText;
 	}	
+}
+
+/// <summary>
+/// Provides the presentation anchor window for ASWebAuthenticationSession,
+/// which is required to display the secure Safari-based sign-in UI on iOS.
+/// </summary>
+sealed class AuthPresentationContextProvider : NSObject, IASWebAuthenticationPresentationContextProviding
+{
+	public UIWindow GetPresentationAnchor(ASWebAuthenticationSession session)
+	{
+		var windowScene = UIApplication.SharedApplication.ConnectedScenes
+			.OfType<UIWindowScene>()
+			.FirstOrDefault();
+		return windowScene?.KeyWindow
+			?? throw new InvalidOperationException("No UIWindow found for presenting ASWebAuthenticationSession.");
+	}
 }
 #pragma warning restore S1075 // URIs should not be hardcoded

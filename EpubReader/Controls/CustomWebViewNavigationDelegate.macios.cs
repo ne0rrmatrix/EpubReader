@@ -28,6 +28,13 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	{
 		var url = webView.Url?.AbsoluteString ?? throw new InvalidOperationException("url is null");
 		handler.VirtualView?.Navigated(WebNavigationEvent.NewPage, url, WebNavigationResult.Success);
+
+		// Re-apply safe area insets after each page load so the reader JS
+		// always has the latest values (the JS is now loaded and can receive them).
+		if (webView is CustomMauiWKWebView customWebView)
+		{
+			customWebView.PostApplyReaderSafeAreaInsets();
+		}
 	}
 
 	/// <summary>

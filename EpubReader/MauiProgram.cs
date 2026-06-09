@@ -128,6 +128,9 @@ public static class MauiProgram
 			{
 				webView.Inspectable = true;
 			}
+			// Send native safe area insets to the reader JS so it can add proper
+			// bottom padding for the home indicator / notch on modern iOS devices.
+			webView.PostApplyReaderSafeAreaInsets();
 			return webView;
 		};
 #endif
@@ -173,12 +176,6 @@ public static class MauiProgram
 			events.AddAndroid(android => android.OnCreate((activity, _) =>
 			{
 				InitializeFirebaseOnAndroid(activity);
-			}));
-#elif IOS || MACCATALYST
-			events.AddiOS(ios => ios.FinishedLaunching((app, _) =>
-			{
-				InitializeFirebaseOnApple();
-				return true;
 			}));
 #endif
 		});
@@ -229,27 +226,5 @@ public static class MauiProgram
 			System.Diagnostics.Trace.TraceWarning($"DEBUG: Firebase startup error: {ex.Message}");
 		}
 	}
-#elif IOS
-	static void InitializeFirebaseOnApple()
-	{
-		try
-		{
-			// Firebase on iOS auto-configures from GoogleService-Info.plist.
-			// Explicitly call Configure to ensure Firebase is initialized before first use.
-			Firebase.Core.App.Configure();
-			System.Diagnostics.Trace.TraceInformation("Firebase initialized on iOS from GoogleService-Info.plist");
-		}
-		catch (Exception ex)
-		{
-			System.Diagnostics.Trace.TraceWarning($"Firebase startup warning on iOS: {ex.Message}");
-		}
-	}
-#elif MACCATALYST
-	static void InitializeFirebaseOnApple()
-	{
-		// On Mac Catalyst, Firebase native SDK is not available through Plugin.Firebase.
-		// Google sign-in uses the REST API fallback path.
-		System.Diagnostics.Trace.TraceInformation("Firebase on Mac Catalyst: using REST API auth fallback");
-	}
-#endif
+	#endif
 }

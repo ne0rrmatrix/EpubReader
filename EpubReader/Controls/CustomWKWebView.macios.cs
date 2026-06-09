@@ -2,6 +2,7 @@
 using Foundation;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
+using UIKit;
 using WebKit;
 
 namespace EpubReader.Controls;
@@ -19,6 +20,65 @@ public class CustomMauiWKWebView(CGRect frame, WebViewHandler handler, WKWebView
 {
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 	readonly CancellationTokenSource cancellationTokenSource = new();
+
+	/// <summary>
+	/// CSS pixel height reserved by the native page label bar below the WebView.
+	/// Added to the safe-area bottom inset so reader content in scroll mode
+	/// doesn't appear to be cut off by the label.
+	/// </summary>
+	const int nativePageLabelHeightCssPx = 40;
+
+	/// <summary>
+	/// Sends native safe area insets to the reader JavaScript so it can apply
+	/// proper padding around the home indicator and notch areas on iOS devices.
+	/// Mirrors the Android equivalent in <c>AndroidWebViewClient.ApplyReaderSafeAreaInsets()</c>.
+	/// </summary>
+	public void ApplyReaderSafeAreaInsets()
+	{
+		var window = KeyWindow;
+		if (window is null)
+		{
+			return;
+		}
+
+		var safeArea = window.SafeAreaInsets;
+		var density = (float)UIScreen.MainScreen.Scale;
+		if (density <= 0)
+		{
+			density = 1f;
+		}
+
+		var top = (int)Math.Round(safeArea.Top / density, MidpointRounding.AwayFromZero);
+		var right = (int)Math.Round(safeArea.Right / density, MidpointRounding.AwayFromZero);
+		var bottom = (int)Math.Round(safeArea.Bottom / density, MidpointRounding.AwayFromZero) + nativePageLabelHeightCssPx;
+		var left = (int)Math.Round(safeArea.Left / density, MidpointRounding.AwayFromZero);
+
+		EvaluateJavaScript(
+			new NSString($"setNativeSafeAreaInsets({top}, {right}, {bottom}, {left});"),
+			(_, _) => { });
+	}
+
+	static UIWindow? KeyWindow
+	{
+		get
+		{
+			return UIApplication.SharedApplication.ConnectedScenes
+				.OfType<UIWindowScene>()
+				.FirstOrDefault()?
+				.Windows
+				.FirstOrDefault(w => w.IsKeyWindow);
+		}
+	}
+
+	/// <summary>
+	/// Calls <see cref="ApplyReaderSafeAreaInsets"/> on the next run-loop iteration
+	/// so the web content has a chance to initialize before receiving the inset values.
+	/// </summary>
+	public void PostApplyReaderSafeAreaInsets()
+	{
+		// Delay slightly so JS setNativeSafeAreaInsets is defined before we call it.
+		MainThread.BeginInvokeOnMainThread(ApplyReaderSafeAreaInsets);
+	}
 
 	/// <summary>
 	/// Loads a web request and returns the navigation object for the request.

@@ -278,6 +278,14 @@ function applyNativeSafeAreaInsetsToRoot(root) {
     root.style.setProperty('--RS__safeAreaBottom', `${pendingNativeSafeAreaInsets.bottom}px`);
     root.style.setProperty('--RS__safeAreaLeft', `${pendingNativeSafeAreaInsets.left}px`);
 
+    // Mirror the safe area values as scroll-padding variables so that
+    // scroll-mode body padding is also applied (ReadiumCSS-after.css only
+    // uses these on the body element, not the :root element).
+    root.style.setProperty('--RS__scrollPaddingTop', `${pendingNativeSafeAreaInsets.top}px`);
+    root.style.setProperty('--RS__scrollPaddingRight', `${pendingNativeSafeAreaInsets.right}px`);
+    root.style.setProperty('--RS__scrollPaddingBottom', `${pendingNativeSafeAreaInsets.bottom}px`);
+    root.style.setProperty('--RS__scrollPaddingLeft', `${pendingNativeSafeAreaInsets.left}px`);
+
     logReaderSafeArea('applied', {
         pendingInsets: pendingNativeSafeAreaInsets,
         computedInsets: {

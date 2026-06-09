@@ -77,8 +77,6 @@
     </array>
     <key>CFBundleIdentifier</key>
     <string>com.NerdNews.EpubReader</string>
-    <key>UIViewControllerBasedStatusBarAppearance</key>
-    <false/>
     <key>UIDesignRequiresCompatibility</key>
     <true/>
 </dict>
