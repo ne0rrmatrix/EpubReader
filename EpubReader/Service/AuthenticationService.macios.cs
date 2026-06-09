@@ -337,50 +337,55 @@ public partial class AuthenticationService
 	{
 		var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		// Use ASWebAuthenticationSession which presents the system's secure Safari
-		// browser — required by Google's "Use secure browsers" policy. WKWebView is
-		// blocked (error 403: disallowed_useragent).
-		var session = new ASWebAuthenticationSession(
-			new NSUrl(authUrl),
-			callbackScheme,
-			(callbackUrl, error) =>
-			{
-				if (error is not null)
+		if (OperatingSystem.IsIOSVersionAtLeast(17, 4) || OperatingSystem.IsMacCatalystVersionAtLeast(15))
+		{
+			// Use ASWebAuthenticationSession which presents the system's secure Safari
+			// browser — required by Google's "Use secure browsers" policy. WKWebView is
+			// blocked (error 403: disallowed_useragent).
+#pragma warning disable CA1422 // Validate platform compatibility
+			ASWebAuthenticationSession session = new(
+				new NSUrl(authUrl),
+				callbackScheme,
+				(callbackUrl, error) =>
 				{
-					var nsError = (NSError)error;
-					if (nsError.Code == (long)ASWebAuthenticationSessionErrorCode.CanceledLogin)
+					if (error is not null)
 					{
-						Trace.TraceInformation("Google sign-in: user cancelled ASWebAuthenticationSession");
-						tcs.TrySetResult(null);
+						var nsError = error;
+						if (nsError.Code == (long)ASWebAuthenticationSessionErrorCode.CanceledLogin)
+						{
+							Trace.TraceInformation("Google sign-in: user cancelled ASWebAuthenticationSession");
+							tcs.TrySetResult(null);
+						}
+						else
+						{
+							Trace.TraceError($"Google sign-in: ASWebAuthenticationSession error - {nsError.LocalizedDescription}");
+							tcs.TrySetResult(null);
+						}
 					}
 					else
 					{
-						Trace.TraceError($"Google sign-in: ASWebAuthenticationSession error - {nsError.LocalizedDescription}");
-						tcs.TrySetResult(null);
+						Trace.TraceInformation("Google sign-in: ASWebAuthenticationSession callback received");
+						var authCode = ExtractAuthCodeFromCallbackUrl(callbackUrl);
+						tcs.TrySetResult(authCode);
 					}
-				}
-				else
-				{
-					Trace.TraceInformation("Google sign-in: ASWebAuthenticationSession callback received");
-					var authCode = ExtractAuthCodeFromCallbackUrl(callbackUrl);
-					tcs.TrySetResult(authCode);
-				}
+				});
+#pragma warning restore CA1422 // Validate platform compatibility
+
+			session.PresentationContextProvider = new AuthPresentationContextProvider();
+
+			using var cancellationRegistration = cancellationToken.Register(() =>
+			{
+				Trace.TraceInformation("Google sign-in: cancellation requested, cancelling ASWebAuthenticationSession");
+				session.Cancel();
 			});
 
-		session.PresentationContextProvider = new AuthPresentationContextProvider();
-
-		using var cancellationRegistration = cancellationToken.Register(() =>
-		{
-			Trace.TraceInformation("Google sign-in: cancellation requested, cancelling ASWebAuthenticationSession");
-			session.Cancel();
-		});
-
-		if (!session.Start())
-		{
-			Trace.TraceError("Google sign-in: ASWebAuthenticationSession.Start() returned false");
-			tcs.TrySetException(new InvalidOperationException("Failed to start ASWebAuthenticationSession."));
+			if (!session.Start())
+			{
+				Trace.TraceError("Google sign-in: ASWebAuthenticationSession.Start() returned false");
+				tcs.TrySetException(new InvalidOperationException("Failed to start ASWebAuthenticationSession."));
+			}
 		}
-
+		
 		return AwaitAuthCodeAsync(tcs, cancellationToken);
 	}
 
