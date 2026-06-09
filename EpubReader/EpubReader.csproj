@@ -42,7 +42,7 @@
     <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" BaseSize="128,128" />
 
     <!-- Splash Screen -->
-    <MauiSplashScreen Include="Resources\Splash\splashcreen.png" BaseSize="600,600" />
+    <MauiSplashScreen Include="Resources\Splash\splashcreen.png" BaseSize="600,600" Color="#121212" />
 
     <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
@@ -175,5 +175,16 @@
     <PropertyGroup Condition="'$(Registrar)' == 'managed-static'">
       <Registrar>static</Registrar>
     </PropertyGroup>
+  </Target>
+
+  <!-- Patch iOS splash screen storyboard to use systemBackgroundColor for automatic dark/light mode adaptation -->
+  <Target Name="PatchIOSSplashForDarkMode"
+          AfterTargets="ProcessMauiSplashScreens"
+          Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <PropertyGroup>
+      <_SplashStoryboardPath>$(_MauiIntermediateSplashScreen)MauiSplash.storyboard</_SplashStoryboardPath>
+    </PropertyGroup>
+    <Exec Command="sed -i '' 's|&lt;color key=&quot;backgroundColor&quot;.*/&gt;|&lt;color key=&quot;backgroundColor&quot; systemColor=&quot;systemBackgroundColor&quot;/&gt;|' &quot;$(_SplashStoryboardPath)&quot;"
+          Condition="Exists('$(_SplashStoryboardPath)')" />
   </Target>
 </Project>

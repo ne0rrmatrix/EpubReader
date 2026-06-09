@@ -13,15 +13,12 @@ namespace EpubReader.Handlers;
 /// The base MAUI tracker (prior to the .NET 10 Preview 7 fix) silently drops them.
 /// This subclass post-processes the toolbar to add the overflow menu button.
 /// </remarks>
-public class CustomShellPageRendererTracker : ShellPageRendererTracker
+/// <remarks>
+/// Initializes a new instance of the <see cref="CustomShellPageRendererTracker"/> class.
+/// </remarks>
+/// <param name="context">The shell context that owns this tracker.</param>
+public class CustomShellPageRendererTracker(IShellContext context) : ShellPageRendererTracker(context)
 {
-	/// <summary>
-	/// Initializes a new instance of the <see cref="CustomShellPageRendererTracker"/> class.
-	/// </summary>
-	/// <param name="context">The shell context that owns this tracker.</param>
-	public CustomShellPageRendererTracker(IShellContext context) : base(context)
-	{
-	}
 
 	/// <inheritdoc />
 	protected override void UpdateToolbarItems()
@@ -49,38 +46,42 @@ public class CustomShellPageRendererTracker : ShellPageRendererTracker
 		// Collect secondary items from the page toolbar items, then from Shell toolbar items
 		// (the base renderer uses an if-else, but we merge both so programmatically-added
 		// Shell items coexist with page-level items).
-		var secondaries = new List<UIMenuElement>();
-
-		if (Page.ToolbarItems.Count > 0)
-		{
-			foreach (var item in Page.ToolbarItems.OrderBy(x => x.Priority))
-			{
-				if (item.Order == ToolbarItemOrder.Secondary)
-				{
-					secondaries.Add(SecondaryToolbarHelper.CreateUIAction(item));
-				}
-			}
-		}
+		var secondaries = CollectSecondaryItems(Page.ToolbarItems);
 
 		// Always also scan Shell toolbar items so items added via Shell.Current.ToolbarItems.Add()
 		// are captured even when the page defines its own primary toolbar items.
-		var shellItems = Shell.Current?.ToolbarItems;
-		if (shellItems is not null && shellItems.Count > 0)
-		{
-			foreach (var item in shellItems.OrderBy(x => x.Priority))
-			{
-				if (item.Order == ToolbarItemOrder.Secondary)
-				{
-					secondaries.Add(SecondaryToolbarHelper.CreateUIAction(item));
-				}
-			}
-		}
+		secondaries.AddRange(CollectSecondaryItems(Shell.Current?.ToolbarItems));
 
 		if (secondaries.Count == 0)
 		{
 			return;
 		}
 
+		ApplyOverflowMenu(navItem, secondaries);
+	}
+
+	static List<UIMenuElement> CollectSecondaryItems(IList<ToolbarItem>? items)
+	{
+		var secondaries = new List<UIMenuElement>();
+
+		if (items is null || items.Count == 0)
+		{
+			return secondaries;
+		}
+
+		foreach (var item in items.OrderBy(x => x.Priority))
+		{
+			if (item.Order == ToolbarItemOrder.Secondary)
+			{
+				secondaries.Add(SecondaryToolbarHelper.CreateUIAction(item));
+			}
+		}
+
+		return secondaries;
+	}
+
+	static void ApplyOverflowMenu(UINavigationItem navItem, List<UIMenuElement> secondaries)
+	{
 		var menuButton = SecondaryToolbarHelper.CreateOverflowMenuButton(secondaries);
 
 		// Prepend the overflow menu button to the existing right bar button items.
