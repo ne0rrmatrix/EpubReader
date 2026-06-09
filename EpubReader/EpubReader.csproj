@@ -87,13 +87,13 @@
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80-ci.main.26281.1" />
     <PackageReference Include="Microsoft.Maui.Core" Version="10.0.80-ci.main.26281.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
     <PackageReference Include="CommunityToolkit.Maui" Version="14.2.0" />
     <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.10" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.8" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.9" />
     <PackageReference Include="Plugin.Firebase.Auth" Version="5.0.1" />
     <PackageReference Include="Plugin.Firebase.Crashlytics" Version="4.0.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
@@ -176,7 +176,7 @@
     </PropertyGroup>
   </Target>
 
-  <Target Name="PatchIOSSplashForDarkMode" AfterTargets="ProcessMauiSplashScreens"  Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst'">
+  <Target Name="PatchIOSSplashForDarkMode" AfterTargets="ProcessMauiSplashScreens" Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst'">
     <PropertyGroup>
       <_SplashStoryboardPath>$(_MauiIntermediateSplashScreen)MauiSplash.storyboard</_SplashStoryboardPath>
     </PropertyGroup>
