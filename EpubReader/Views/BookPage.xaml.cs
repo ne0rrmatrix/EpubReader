@@ -1111,38 +1111,7 @@ public partial class BookPage : ContentPage, IDisposable
 			Debug.WriteLine($"Skipping chapter with empty title at index {index}");
 			return;
 		}
-		/*
-#if IOS || MACCATALYST
-		Label label = new()
-		{
-			Text = chapter.Title,
-			TextColor = Colors.White,
-			HorizontalOptions = LayoutOptions.End,
-			Margin = new Thickness(0, 0, 10, 0),
-		};
-		label.GestureRecognizers.Add(new TapGestureRecognizer
-		{
-			Command = new Command(() =>
-			{
-				Dispatcher.Dispatch(async () =>
-				{
-					book.CurrentChapter = index;
-					book.CurrentPage = 0; // Reset current page to 0 when changing chapter
-					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-					await LoadChapterContentAsync();
-					CloseMenuAsync(this, EventArgs.Empty);
-				});
-			})
-		});
-
-		menu.Add(label);
-		menu.SetRow(label, index);
-		menu.RowDefinitions.Add(new RowDefinition
-		{
-			Height = new GridLength(1, GridUnitType.Auto)
-		});
-#else
-*/
+	
 		var currentShell = Shell.Current;
 		if (currentShell is null)
 		{
@@ -1171,7 +1140,6 @@ public partial class BookPage : ContentPage, IDisposable
 		//currentShell.ToolbarItems.Add(toolbarItem);
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 		Debug.WriteLine($"Added toolbar item for chapter '{chapter.Title}' at index {index}");
-//#endif
 	}
 
 	// --- Slider helpers and event handlers ---
