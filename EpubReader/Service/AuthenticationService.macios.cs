@@ -368,10 +368,11 @@ public partial class AuthenticationService
 						var authCode = ExtractAuthCodeFromCallbackUrl(callbackUrl);
 						tcs.TrySetResult(authCode);
 					}
-				});
+				})
+			{
+				PresentationContextProvider = new AuthPresentationContextProvider()
+			};
 #pragma warning restore CA1422 // Validate platform compatibility
-
-			session.PresentationContextProvider = new AuthPresentationContextProvider();
 
 			using var cancellationRegistration = cancellationToken.Register(() =>
 			{
