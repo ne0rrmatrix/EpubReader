@@ -26,6 +26,7 @@ public partial class BookPage : ContentPage, IDisposable
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly ISyncService syncService;
+	readonly IFullScreenService fullScreenService;
 	readonly WebViewHelper webViewHelper;
 	readonly IAudioManager audioManager;
 	MediaOverlayPlaybackManager? mediaOverlayManager;
@@ -64,12 +65,13 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <param name="db">The database interface used for data operations within the page.</param>
 	/// <param name="syncService">The sync service for managing reading progress synchronization.</param>
 	/// <param name="audioManager">The cross-platform audio manager used for narrated overlays.</param>
-	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService, IAudioManager audioManager, IReaderSettingsStateService readerSettingsStateService, IReaderBridgeCoordinator readerBridgeCoordinator)
+	public BookPage(BookViewModel viewModel, IDb db, ISyncService syncService, IFullScreenService fullScreenService, IAudioManager audioManager, IReaderSettingsStateService readerSettingsStateService, IReaderBridgeCoordinator readerBridgeCoordinator)
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
 		this.db = db;
 		this.syncService = syncService;
+		this.fullScreenService = fullScreenService;
 		this.audioManager = audioManager;
 		this.readerSettingsStateService = readerSettingsStateService;
 		this.readerBridgeCoordinator = readerBridgeCoordinator;
@@ -183,10 +185,13 @@ public partial class BookPage : ContentPage, IDisposable
 			UnsubscribeFromReaderBridge();
 			UnsubscribeFromWindowLifecycle();
 
-			if (Application.Current?.Windows is { Count: > 0 } windows && windows[0].Page is Page currentPage)
+			
+			Dispatcher.Dispatch(() =>
 			{
-				Shell.SetNavBarIsVisible(currentPage, true);
-			}
+				fullScreenService.SetFullScreen(false);
+				Shell.SetNavBarIsVisible(this, true);
+				Shell.SetTabBarIsVisible(this, true);
+			});
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
 			CancelPendingSettingsRefresh();
