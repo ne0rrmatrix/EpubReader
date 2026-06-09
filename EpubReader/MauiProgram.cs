@@ -73,6 +73,9 @@ public static class MauiProgram
 		{
 #if IOS || MACCATALYST
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
+			// Backport the secondary toolbar overflow menu fix from
+			// https://github.com/dotnet/maui/pull/30480 (shipped in .NET 10 Preview 7).
+			handlers.AddHandler<Shell, Handlers.CustomShellRenderer>();
 #endif
 		});
 #if ANDROID
