@@ -1,16 +1,17 @@
 ﻿using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AuthenticationServices;
 using Foundation;
 using UIKit;
+using WebKit;
 
 namespace EpubReader.Service;
 
 public partial class AuthenticationService
 {
-	static readonly HttpClient httpClient = new();
 
 	public async Task<string> SignInWithGooglePlatformAsync(CancellationToken cancellationToken)
 	{
@@ -23,23 +24,37 @@ public partial class AuthenticationService
 			throw new InvalidOperationException("Google sign-in requires GoogleService-Info.plist with CLIENT_ID and REVERSED_CLIENT_ID.");
 		}
 
-		var nonce = Guid.NewGuid().ToString("N");
+		// Generate PKCE code verifier and challenge (RFC 7636)
+		var codeVerifier = GenerateCodeVerifier();
+		var codeChallenge = GenerateCodeChallenge(codeVerifier);
+
 		var redirectUri = $"{reversedClientId}:/oauthredirect";
 		var authUrl = "https://accounts.google.com/o/oauth2/v2/auth"
 			+ $"?client_id={Uri.EscapeDataString(clientId)}"
 			+ $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
-			+ "&response_type=id_token"
+			+ "&response_type=code"
 			+ "&scope=" + Uri.EscapeDataString("openid email profile")
-			+ $"&nonce={Uri.EscapeDataString(nonce)}"
+			+ $"&code_challenge={Uri.EscapeDataString(codeChallenge)}"
+			+ "&code_challenge_method=S256"
 			+ "&prompt=select_account";
 
-		Trace.TraceInformation("Google sign-in: starting ASWebAuthenticationSession flow");
+		Trace.TraceInformation("Google sign-in: starting ASWebAuthenticationSession flow (PKCE)");
 
-		var idToken = await GetIdTokenFromWebAuthSessionAsync(authUrl, reversedClientId, cancellationToken);
+		var authorizationCode = await GetAuthorizationCodeFromWebAuthSessionAsync(authUrl, reversedClientId, cancellationToken);
+
+		if (string.IsNullOrEmpty(authorizationCode))
+		{
+			Trace.TraceWarning("Google sign-in: completed without authorization code");
+			return string.Empty;
+		}
+
+		Trace.TraceInformation("Google sign-in: authorization code retrieved, exchanging for ID token");
+
+		var idToken = await ExchangeCodeForIdTokenAsync(clientId, redirectUri, codeVerifier, authorizationCode, cancellationToken);
 
 		if (string.IsNullOrEmpty(idToken))
 		{
-			Trace.TraceWarning("Google sign-in: completed without ID token");
+			Trace.TraceWarning("Google sign-in: token exchange did not return an ID token");
 			return string.Empty;
 		}
 
@@ -171,17 +186,13 @@ public partial class AuthenticationService
 				return error.Error.Message;
 			}
 		}
-		catch (JsonException)
+		catch (JsonException ex)
 		{
+			Trace.TraceError($"Failed to parse Firebase error response: {ex.Message}");
 		}
 
 		return string.IsNullOrWhiteSpace(responseText) ? "Unknown Firebase error." : responseText;
 	}
-
-	static JsonSerializerOptions SerializerOptions { get; } = new()
-	{
-		PropertyNameCaseInsensitive = true
-	};
 
 	sealed class FirebaseGoogleSignInRequest
 	{
@@ -316,6 +327,12 @@ public partial class AuthenticationService
 	}
 #endif
 
+	static readonly HttpClient httpClient = new();
+	static JsonSerializerOptions SerializerOptions { get; } = new()
+	{
+		PropertyNameCaseInsensitive = true
+	};
+
 	static (string clientId, string reversedClientId) GetGoogleSignInPlistConfig()
 	{
 		try
@@ -347,78 +364,202 @@ public partial class AuthenticationService
 		}
 	}
 
-	static async Task<string> GetIdTokenFromWebAuthSessionAsync(string authUrl, string callbackScheme, CancellationToken cancellationToken)
+	static string GenerateCodeVerifier()
+	{
+		var bytes = new byte[32];
+		RandomNumberGenerator.Fill(bytes);
+		return Base64UrlEncode(bytes);
+	}
+
+	static string GenerateCodeChallenge(string codeVerifier)
+	{
+		var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
+		return Base64UrlEncode(hash);
+	}
+
+	static string Base64UrlEncode(byte[] data)
+	{
+		return Convert.ToBase64String(data)
+			.Replace('+', '-')
+			.Replace('/', '_')
+			.TrimEnd('=');
+	}
+
+	static async Task<string> GetAuthorizationCodeFromWebAuthSessionAsync(string authUrl, string callbackScheme, CancellationToken cancellationToken)
 	{
 		var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		var session = new ASWebAuthenticationSession(
-			new NSUrl(authUrl),
-			callbackScheme,
-			(callbackUrl, error) =>
+		var windowScene = UIApplication.SharedApplication.ConnectedScenes
+			.OfType<UIWindowScene>()
+			.FirstOrDefault();
+		var rootVC = windowScene?.KeyWindow?.RootViewController
+			?? throw new InvalidOperationException("No root view controller found for presenting auth UI.");
+
+		// Walk up the presented view controller chain — MAUI Shell may already have
+		// a modal (ControlsModalWrapper) presented, and UIKit rejects presenting on
+		// a view controller that is already presenting.
+		var presenter = rootVC;
+		while (presenter.PresentedViewController is not null)
+		{
+			presenter = presenter.PresentedViewController;
+		}
+
+		var webVC = new GoogleAuthWebViewController(authUrl, callbackScheme, authCode =>
+		{
+			if (authCode is not null)
 			{
-				if (error is not null)
-				{
-					if (error.Code == (int)ASWebAuthenticationSessionErrorCode.CanceledLogin)
-					{
-						Trace.TraceInformation("Google sign-in: user cancelled ASWebAuthenticationSession");
-						tcs.TrySetResult(null);
-					}
-					else
-					{
-						Trace.TraceError($"Google sign-in: ASWebAuthenticationSession error - {error.LocalizedDescription}");
-						tcs.TrySetException(new NSErrorException(error));
-					}
-					return;
-				}
+				Trace.TraceInformation("Google sign-in: authorization code extracted from callback");
+				tcs.TrySetResult(authCode);
+			}
+			else
+			{
+				Trace.TraceInformation("Google sign-in: user cancelled or closed the auth view");
+				tcs.TrySetResult(null);
+			}
+		});
 
-				var idToken = ExtractIdTokenFromCallbackUrl(callbackUrl);
-				Trace.TraceInformation(string.IsNullOrEmpty(idToken)
-					? "Google sign-in: callback URL did not contain id_token"
-					: "Google sign-in: id_token extracted from callback");
-				tcs.TrySetResult(idToken);
-			});
+		// Wrap in a UINavigationController for the Done button.
+		var navController = new UINavigationController(webVC);
 
-		var contextProvider = new AuthPresentationContextProvider();
-		session.PresentationContextProvider = contextProvider;
-		session.PrefersEphemeralWebBrowserSession = true;
+		// Full-screen on iPad — no toolbar, no form sheet.
+		navController.ModalPresentationStyle = UIModalPresentationStyle.FullScreen;
 
 		using var cancellationRegistration = cancellationToken.Register(() =>
 		{
-			Trace.TraceInformation("Google sign-in: cancellation requested, cancelling ASWebAuthenticationSession");
-			session.Cancel();
+			Trace.TraceInformation("Google sign-in: cancellation requested, dismissing auth view");
+			MainThread.BeginInvokeOnMainThread(() =>
+			{
+				webVC.DismissViewController(true, null);
+			});
 		});
 
 		try
 		{
-			session.Start();
+			await presenter.PresentViewControllerAsync(navController, true);
 			var result = await tcs.Task;
+
+			// Dismiss is called inside the web VC callback, but ensure cleanup.
+			await navController.DismissViewControllerAsync(true);
+
 			return result ?? string.Empty;
 		}
 		catch (OperationCanceledException)
 		{
 			Trace.TraceWarning("Google sign-in: operation cancelled");
+			await navController.DismissViewControllerAsync(true);
 			throw;
-		}
-		finally
-		{
-			session.Dispose();
 		}
 	}
 
-	static string? ExtractIdTokenFromCallbackUrl(NSUrl? callbackUrl)
+	/// <summary>
+	/// Custom WKWebView-based auth controller. Injects CSS to hide the Safari
+	/// toolbar buttons (Share / Refresh) that overlay web content on iPad,
+	/// and intercepts the OAuth redirect to extract the authorization code.
+	/// WKWebView fully supports WebAuthn / passkey flows.
+	/// </summary>
+	sealed class GoogleAuthWebViewController : UIViewController, IWKNavigationDelegate
 	{
-		if (callbackUrl?.Fragment is null)
+		readonly string authUrl;
+		readonly string callbackScheme;
+		readonly Action<string?> onComplete;
+		WKWebView? webView;
+		bool completed;
+
+		public GoogleAuthWebViewController(string authUrl, string callbackScheme, Action<string?> onComplete)
+		{
+			this.authUrl = authUrl;
+			this.callbackScheme = callbackScheme;
+			this.onComplete = onComplete;
+
+			Title = "Sign in with Google";
+			NavigationItem.LeftBarButtonItem = new UIBarButtonItem(
+				UIBarButtonSystemItem.Cancel,
+				(sender, e) => Finish(null));
+		}
+
+		public override void ViewDidLoad()
+		{
+			base.ViewDidLoad();
+
+			// CSS to suppress the Safari toolbar buttons within the web view.
+			const string css = @"
+				/* Hide Share and Refresh toolbar overlays injected by the system */
+				._sf_toolbar, ._sf_toolbar_container,
+				[class*='toolbar'], [class*='Toolbar'],
+				[data-original-title='Share'], [data-original-title='Refresh'],
+				[aria-label='Share'], [aria-label='Refresh'],
+				[title='Share'], [title='Refresh'] { display: none !important; }
+				/* Ensure body has enough bottom padding so no content is cut off */
+				body { padding-bottom: 0 !important; }";
+
+			var userScript = new WKUserScript(
+				new NSString(css),
+				WKUserScriptInjectionTime.AtDocumentEnd,
+				false);
+
+			var config = new WKWebViewConfiguration();
+			config.UserContentController.AddUserScript(userScript);
+
+			var bounds = View is not null ? View.Bounds : UIScreen.MainScreen.Bounds;
+			webView = new WKWebView(bounds, config)
+			{
+				AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight,
+				NavigationDelegate = this
+			};
+			View?.AddSubview(webView);
+
+			webView.LoadRequest(new NSUrlRequest(new NSUrl(authUrl)));
+		}
+
+		void Finish(string? result)
+		{
+			if (completed)
+			{
+				return;
+			}
+
+			completed = true;
+			onComplete(result);
+		}
+
+		[Export("webView:decidePolicyForNavigationAction:decisionHandler:")]
+		public void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
+		{
+			var url = navigationAction.Request.Url;
+			if (url is not null && url.Scheme == callbackScheme)
+			{
+				// Intercept the OAuth redirect.
+				decisionHandler(WKNavigationActionPolicy.Cancel);
+				var authCode = ExtractAuthCodeFromCallbackUrl(url);
+				Finish(authCode);
+				return;
+			}
+
+			// Block reload navigation (prevents the refresh button from working).
+			if (navigationAction.NavigationType == WKNavigationType.Reload)
+			{
+				decisionHandler(WKNavigationActionPolicy.Cancel);
+				return;
+			}
+
+			decisionHandler(WKNavigationActionPolicy.Allow);
+		}
+	}
+
+	static string? ExtractAuthCodeFromCallbackUrl(NSUrl? callbackUrl)
+	{
+		if (callbackUrl?.Query is null)
 		{
 			return null;
 		}
 
-		var fragment = callbackUrl.Fragment.TrimStart('#');
-		var pairs = fragment.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+		var query = callbackUrl.Query.TrimStart('?');
+		var pairs = query.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 		foreach (var pair in pairs)
 		{
 			var parts = pair.Split('=', 2);
-			if (parts.Length == 2 && string.Equals(parts[0], "id_token", StringComparison.Ordinal))
+			if (parts.Length == 2 && string.Equals(parts[0], "code", StringComparison.Ordinal))
 			{
 				return Uri.UnescapeDataString(parts[1]);
 			}
@@ -427,16 +568,80 @@ public partial class AuthenticationService
 		return null;
 	}
 
-	sealed class AuthPresentationContextProvider : NSObject, IASWebAuthenticationPresentationContextProviding
+	static async Task<string> ExchangeCodeForIdTokenAsync(string clientId, string redirectUri, string codeVerifier, string authorizationCode, CancellationToken cancellationToken)
 	{
-		public UIWindow GetPresentationAnchor(ASWebAuthenticationSession session)
-		{
-			var windowScene = UIApplication.SharedApplication.ConnectedScenes
-				.OfType<UIWindowScene>()
-				.FirstOrDefault();
+		cancellationToken.ThrowIfCancellationRequested();
 
-			return windowScene?.KeyWindow
-				?? throw new InvalidOperationException("No active UIWindowScene found for presenting authentication UI.");
+		var tokenRequestParams = new Dictionary<string, string>
+		{
+			["code"] = authorizationCode,
+			["client_id"] = clientId,
+			["redirect_uri"] = redirectUri,
+			["grant_type"] = "authorization_code",
+			["code_verifier"] = codeVerifier
+		};
+
+		using var content = new FormUrlEncodedContent(tokenRequestParams);
+		using var response = await httpClient.PostAsync("https://oauth2.googleapis.com/token", content, cancellationToken);
+		var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+
+		if (!response.IsSuccessStatusCode)
+		{
+			Trace.TraceError($"Google sign-in: token exchange failed - {responseText}");
+			throw new InvalidOperationException($"Google token exchange failed: {ExtractGoogleOAuthErrorMessage(responseText)}");
 		}
+
+		var tokenResponse = JsonSerializer.Deserialize<GoogleTokenResponse>(responseText, SerializerOptions);
+		if (tokenResponse is null || string.IsNullOrWhiteSpace(tokenResponse.IdToken))
+		{
+			Trace.TraceError("Google sign-in: token exchange response did not contain id_token");
+			throw new InvalidOperationException("Google token exchange did not return an ID token.");
+		}
+
+		Trace.TraceInformation("Google sign-in: successfully exchanged authorization code for ID token");
+		return tokenResponse.IdToken;
 	}
+
+	static string ExtractGoogleOAuthErrorMessage(string responseText)
+	{
+		try
+		{
+			var error = JsonSerializer.Deserialize<GoogleOAuthErrorResponse>(responseText, SerializerOptions);
+			if (!string.IsNullOrWhiteSpace(error?.Error))
+			{
+				return !string.IsNullOrWhiteSpace(error.ErrorDescription)
+					? $"{error.Error}: {error.ErrorDescription}"
+					: error.Error;
+			}
+		}
+		catch (JsonException ex)
+		{
+			Trace.TraceError($"Failed to parse Google OAuth error response: {ex.Message}");
+		}
+
+		return string.IsNullOrWhiteSpace(responseText) ? "Unknown error." : responseText;
+	}
+
+	sealed class GoogleTokenResponse
+	{
+		[JsonPropertyName("id_token")]
+		public string? IdToken { get; set; }
+		[JsonPropertyName("access_token")]
+		public string? AccessToken { get; set; }
+		[JsonPropertyName("refresh_token")]
+		public string? RefreshToken { get; set; }
+		[JsonPropertyName("expires_in")]
+		public int ExpiresIn { get; set; }
+		[JsonPropertyName("token_type")]
+		public string? TokenType { get; set; }
+	}
+
+	sealed class GoogleOAuthErrorResponse
+	{
+		[JsonPropertyName("error")]
+		public string? Error { get; set; }
+		[JsonPropertyName("error_description")]
+		public string? ErrorDescription { get; set; }
+	}
+	
 }

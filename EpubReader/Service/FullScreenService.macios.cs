@@ -24,9 +24,15 @@ class FullScreenService : IFullScreenService
 		{
 			return;
 		}
+		
+		if(OperatingSystem.IsIOSVersionAtLeast(15) || OperatingSystem.IsMacCatalystVersionAtLeast(15))
+		{
+			// Hide the status bar (time, battery, etc.) and home indicator.
+#pragma warning disable CA1422 // Validate platform compatibility
+			UIApplication.SharedApplication.StatusBarHidden = true;
+#pragma warning restore CA1422 // Validate platform compatibility
 
-		// Hide the status bar (time, battery, etc.) and home indicator.
-		UIApplication.SharedApplication.StatusBarHidden = true;
+		}
 
 		if (OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13))
 		{
@@ -50,9 +56,14 @@ class FullScreenService : IFullScreenService
 			return;
 		}
 
-		// Restore the status bar and home indicator.
-		UIApplication.SharedApplication.StatusBarHidden = false;
-
+		if(OperatingSystem.IsIOSVersionAtLeast(15) || OperatingSystem.IsMacCatalystVersionAtLeast(15))
+		{
+			// Restore the status bar and home indicator.
+#pragma warning disable CA1422 // Validate platform compatibility
+			UIApplication.SharedApplication.StatusBarHidden = false;
+#pragma warning restore CA1422 // Validate platform compatibility
+		}
+		
 		if (OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13))
 		{
 			var vc = Platform.GetCurrentUIViewController();
