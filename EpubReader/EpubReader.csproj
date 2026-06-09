@@ -16,7 +16,8 @@
     <ApplicationTitle>EpubReader</ApplicationTitle>
 
     <!-- App Identifier -->
-    <ApplicationId>com.NerdNews.EpubReader</ApplicationId>
+ <!--   <ApplicationId>com.NerdNews.EpubReader</ApplicationId> IOS name -->
+    <ApplicationId>com.companyname.epubreader</ApplicationId> <!--Windows / Android name --> 
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
     <!-- Versions -->
     <ApplicationDisplayVersion>1</ApplicationDisplayVersion>
@@ -106,15 +107,15 @@
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.5" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.3" />
-    <PackageReference Include="Xamarin.Google.Android.Material" Version="1.13.0.2" />
-    <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.5" />
-    <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.5" />
+    <PackageReference Include="Xamarin.Google.Android.Material" Version="1.14.0.1" />
+    <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.6.0" />
+    <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.6.0" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.13" />
-    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.5.1.1" />
-    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.0.1.2" />
+    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.6.0" />
+    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.1.0" />
     <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
-    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.10.4.1" />
-    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.10.4.1" ExcludeAssets="all" />
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.11.2" />
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.11.2" ExcludeAssets="all" />
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0.2" />
     <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
