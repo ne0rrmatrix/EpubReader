@@ -1137,7 +1137,7 @@ public partial class BookPage : ContentPage, IDisposable
                 });
             })
         };
-		//currentShell.ToolbarItems.Add(toolbarItem);
+		
 		Shell.Current.ToolbarItems.Add(toolbarItem);
 		Debug.WriteLine($"Added toolbar item for chapter '{chapter.Title}' at index {index}");
 	}

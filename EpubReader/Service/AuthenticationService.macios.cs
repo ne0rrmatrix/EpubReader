@@ -8,6 +8,8 @@ using Foundation;
 using UIKit;
 using WebKit;
 
+#pragma warning disable S1075 // URIs should not be hardcoded
+
 namespace EpubReader.Service;
 
 public partial class AuthenticationService
@@ -345,10 +347,8 @@ public partial class AuthenticationService
 			}
 
 			var plist = NSMutableDictionary.FromFile(plistPath);
-			var clientId = plist["CLIENT_ID"] as NSString;
-			var reversedClientId = plist["REVERSED_CLIENT_ID"] as NSString;
 
-			if (clientId is null || reversedClientId is null)
+			if (plist["CLIENT_ID"] is not NSString clientId || plist["REVERSED_CLIENT_ID"] is not NSString reversedClientId)
 			{
 				Trace.TraceWarning("Google sign-in: CLIENT_ID or REVERSED_CLIENT_ID missing from GoogleService-Info.plist");
 				return (string.Empty, string.Empty);
@@ -419,10 +419,11 @@ public partial class AuthenticationService
 		});
 
 		// Wrap in a UINavigationController for the Done button.
-		var navController = new UINavigationController(webVC);
-
-		// Full-screen on iPad — no toolbar, no form sheet.
-		navController.ModalPresentationStyle = UIModalPresentationStyle.FullScreen;
+		var navController = new UINavigationController(webVC)
+		{
+			// Full-screen on iPad — no toolbar, no form sheet.
+			ModalPresentationStyle = UIModalPresentationStyle.FullScreen
+		};
 
 		using var cancellationRegistration = cancellationToken.Register(() =>
 		{
@@ -462,7 +463,6 @@ public partial class AuthenticationService
 		readonly string authUrl;
 		readonly string callbackScheme;
 		readonly Action<string?> onComplete;
-		WKWebView? webView;
 		bool completed;
 
 		public GoogleAuthWebViewController(string authUrl, string callbackScheme, Action<string?> onComplete)
@@ -501,7 +501,7 @@ public partial class AuthenticationService
 			config.UserContentController.AddUserScript(userScript);
 
 			var bounds = View is not null ? View.Bounds : UIScreen.MainScreen.Bounds;
-			webView = new WKWebView(bounds, config)
+			var webView = new WKWebView(bounds, config)
 			{
 				AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight,
 				NavigationDelegate = this
@@ -645,3 +645,4 @@ public partial class AuthenticationService
 	}
 	
 }
+#pragma warning restore S1075 // URIs should not be hardcoded
