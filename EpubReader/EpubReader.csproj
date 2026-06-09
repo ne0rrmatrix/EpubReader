@@ -81,16 +81,15 @@
     <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.80-ci.main.26281.1" />
     <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.80-ci.main.26281.1" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80-ci.main.26281.1" />
     <PackageReference Include="Microsoft.Maui.Core" Version="10.0.80-ci.main.26281.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.7" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="14.1.1" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.8" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="14.2.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.10" />
@@ -105,7 +104,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
-    <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.3" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.5" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.3" />
     <PackageReference Include="Xamarin.Google.Android.Material" Version="1.13.0.2" />
     <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.5" />
@@ -132,7 +131,7 @@
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst' and $(Configuration) == 'Debug'">
     <RuntimeIdentifiers>maccatalyst-arm64;maccatalyst-x64</RuntimeIdentifiers>
   </PropertyGroup>
-<!--
+
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidKeyStore>True</AndroidKeyStore>
@@ -155,7 +154,7 @@
     <AndroidSigningKeyAlias>EpubReader</AndroidSigningKeyAlias>
     <AndroidSigningKeyPass>Jqbywx5Jqbywx5</AndroidSigningKeyPass>
   </PropertyGroup>
--->
+
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <GoogleServicesJson Include="Resources\Raw\google-services.json" />
   </ItemGroup>
@@ -177,14 +176,11 @@
     </PropertyGroup>
   </Target>
 
-  <!-- Patch iOS splash screen storyboard to use systemBackgroundColor for automatic dark/light mode adaptation -->
-  <Target Name="PatchIOSSplashForDarkMode"
-          AfterTargets="ProcessMauiSplashScreens"
-          Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+  <Target Name="PatchIOSSplashForDarkMode" AfterTargets="ProcessMauiSplashScreens"  Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst'">
     <PropertyGroup>
       <_SplashStoryboardPath>$(_MauiIntermediateSplashScreen)MauiSplash.storyboard</_SplashStoryboardPath>
     </PropertyGroup>
-    <Exec Command="sed -i '' 's|&lt;color key=&quot;backgroundColor&quot;.*/&gt;|&lt;color key=&quot;backgroundColor&quot; systemColor=&quot;systemBackgroundColor&quot;/&gt;|' &quot;$(_SplashStoryboardPath)&quot;"
-          Condition="Exists('$(_SplashStoryboardPath)')" />
+    <Exec Command="sed -i '' 's|&lt;color key=&quot;backgroundColor&quot;.*/&gt;|&lt;color key=&quot;backgroundColor&quot; systemColor=&quot;systemBackgroundColor&quot;/&gt;|' &quot;$(_SplashStoryboardPath)&quot;" Condition="Exists('$(_SplashStoryboardPath)')" />
   </Target>
+ 
 </Project>

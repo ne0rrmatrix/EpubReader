@@ -1,7 +1,6 @@
 using System.Text;
 using EpubReader.Models.MediaOverlays;
 using Microsoft.Maui.Graphics.Skia;
-using SixLabors.ImageSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;

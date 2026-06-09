@@ -2,11 +2,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using AuthenticationServices;
 using Foundation;
 using UIKit;
-using WebKit;
 
 #pragma warning disable S1075 // URIs should not be hardcoded
 
@@ -194,56 +191,6 @@ public partial class AuthenticationService
 		}
 
 		return string.IsNullOrWhiteSpace(responseText) ? "Unknown Firebase error." : responseText;
-	}
-
-	sealed class FirebaseGoogleSignInRequest
-	{
-		[JsonPropertyName("postBody")]
-		public string PostBody { get; set; } = string.Empty;
-		[JsonPropertyName("requestUri")]
-		public string RequestUri { get; set; } = string.Empty;
-		[JsonPropertyName("returnIdpCredential")]
-		public bool ReturnIdpCredential { get; set; }
-		[JsonPropertyName("returnSecureToken")]
-		public bool ReturnSecureToken { get; set; }
-	}
-
-	sealed class FirebaseGoogleSignInResponse
-	{
-		[JsonPropertyName("localId")]
-		public string LocalId { get; set; } = string.Empty;
-		[JsonPropertyName("email")]
-		public string? Email { get; set; }
-		[JsonPropertyName("idToken")]
-		public string? IdToken { get; set; }
-		[JsonPropertyName("refreshToken")]
-		public string? RefreshToken { get; set; }
-		[JsonPropertyName("expiresIn")]
-		public string? ExpiresIn { get; set; }
-	}
-
-	sealed class FirebaseErrorEnvelope
-	{
-		[JsonPropertyName("error")]
-		public FirebaseErrorBody? Error { get; set; }
-	}
-
-	sealed class FirebaseErrorBody
-	{
-		[JsonPropertyName("message")]
-		public string? Message { get; set; }
-	}
-
-	sealed class FirebaseRefreshTokenResponse
-	{
-		[JsonPropertyName("id_token")]
-		public string? IdToken { get; set; }
-		[JsonPropertyName("refresh_token")]
-		public string? RefreshToken { get; set; }
-		[JsonPropertyName("expires_in")]
-		public string? ExpiresIn { get; set; }
-		[JsonPropertyName("user_id")]
-		public string? UserId { get; set; }
 	}
 
 	internal static async Task<string> GetStoredAuthTokenAsync(CancellationToken cancellationToken)
@@ -452,101 +399,7 @@ public partial class AuthenticationService
 		}
 	}
 
-	/// <summary>
-	/// Custom WKWebView-based auth controller. Injects CSS to hide the Safari
-	/// toolbar buttons (Share / Refresh) that overlay web content on iPad,
-	/// and intercepts the OAuth redirect to extract the authorization code.
-	/// WKWebView fully supports WebAuthn / passkey flows.
-	/// </summary>
-	sealed class GoogleAuthWebViewController : UIViewController, IWKNavigationDelegate
-	{
-		readonly string authUrl;
-		readonly string callbackScheme;
-		readonly Action<string?> onComplete;
-		bool completed;
-
-		public GoogleAuthWebViewController(string authUrl, string callbackScheme, Action<string?> onComplete)
-		{
-			this.authUrl = authUrl;
-			this.callbackScheme = callbackScheme;
-			this.onComplete = onComplete;
-
-			Title = "Sign in with Google";
-			NavigationItem.LeftBarButtonItem = new UIBarButtonItem(
-				UIBarButtonSystemItem.Cancel,
-				(sender, e) => Finish(null));
-		}
-
-		public override void ViewDidLoad()
-		{
-			base.ViewDidLoad();
-
-			// CSS to suppress the Safari toolbar buttons within the web view.
-			const string css = @"
-				/* Hide Share and Refresh toolbar overlays injected by the system */
-				._sf_toolbar, ._sf_toolbar_container,
-				[class*='toolbar'], [class*='Toolbar'],
-				[data-original-title='Share'], [data-original-title='Refresh'],
-				[aria-label='Share'], [aria-label='Refresh'],
-				[title='Share'], [title='Refresh'] { display: none !important; }
-				/* Ensure body has enough bottom padding so no content is cut off */
-				body { padding-bottom: 0 !important; }";
-
-			var userScript = new WKUserScript(
-				new NSString(css),
-				WKUserScriptInjectionTime.AtDocumentEnd,
-				false);
-
-			var config = new WKWebViewConfiguration();
-			config.UserContentController.AddUserScript(userScript);
-
-			var bounds = View is not null ? View.Bounds : UIScreen.MainScreen.Bounds;
-			var webView = new WKWebView(bounds, config)
-			{
-				AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight,
-				NavigationDelegate = this
-			};
-			View?.AddSubview(webView);
-
-			webView.LoadRequest(new NSUrlRequest(new NSUrl(authUrl)));
-		}
-
-		void Finish(string? result)
-		{
-			if (completed)
-			{
-				return;
-			}
-
-			completed = true;
-			onComplete(result);
-		}
-
-		[Export("webView:decidePolicyForNavigationAction:decisionHandler:")]
-		public void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
-		{
-			var url = navigationAction.Request.Url;
-			if (url is not null && url.Scheme == callbackScheme)
-			{
-				// Intercept the OAuth redirect.
-				decisionHandler(WKNavigationActionPolicy.Cancel);
-				var authCode = ExtractAuthCodeFromCallbackUrl(url);
-				Finish(authCode);
-				return;
-			}
-
-			// Block reload navigation (prevents the refresh button from working).
-			if (navigationAction.NavigationType == WKNavigationType.Reload)
-			{
-				decisionHandler(WKNavigationActionPolicy.Cancel);
-				return;
-			}
-
-			decisionHandler(WKNavigationActionPolicy.Allow);
-		}
-	}
-
-	static string? ExtractAuthCodeFromCallbackUrl(NSUrl? callbackUrl)
+	public static string? ExtractAuthCodeFromCallbackUrl(NSUrl? callbackUrl)
 	{
 		if (callbackUrl?.Query is null)
 		{
@@ -620,29 +473,6 @@ public partial class AuthenticationService
 		}
 
 		return string.IsNullOrWhiteSpace(responseText) ? "Unknown error." : responseText;
-	}
-
-	sealed class GoogleTokenResponse
-	{
-		[JsonPropertyName("id_token")]
-		public string? IdToken { get; set; }
-		[JsonPropertyName("access_token")]
-		public string? AccessToken { get; set; }
-		[JsonPropertyName("refresh_token")]
-		public string? RefreshToken { get; set; }
-		[JsonPropertyName("expires_in")]
-		public int ExpiresIn { get; set; }
-		[JsonPropertyName("token_type")]
-		public string? TokenType { get; set; }
-	}
-
-	sealed class GoogleOAuthErrorResponse
-	{
-		[JsonPropertyName("error")]
-		public string? Error { get; set; }
-		[JsonPropertyName("error_description")]
-		public string? ErrorDescription { get; set; }
-	}
-	
+	}	
 }
 #pragma warning restore S1075 // URIs should not be hardcoded
