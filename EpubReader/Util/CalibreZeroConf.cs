@@ -74,52 +74,58 @@ public partial class CalibreZeroConf
 #if IOS || MACCATALYST
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsyncIOS(TimeSpan scanTime, CancellationToken cancellationToken)
 	{
-		IReadOnlyList<IZeroconfHost>? hosts = null;
-		List<(string IpAddress, int Port)> calibreServers = [];
-		IReadOnlyList<string> domains;
-		if (ZeroconfResolver.IsiOSWorkaroundEnabled)
+		// NSNetServiceBrowser on iOS MUST be created, configured, and used
+		// on the main thread.  Calling it from a background thread causes
+		// it to silently fail — no search results and no local network
+		// permission dialog.
+		return await MainThread.InvokeOnMainThreadAsync(async () =>
 		{
-			// Demonstrates how using ZeroconfResolver.GetiOSInfoPlistServices() is much faster than ZeroconfResolver.BrowseDomainsAsync()
-			//
-			// In real life, you'd only query the domains if you were planning on presenting the user with a choice of domains to browse,
-			//  or the app knows in advance there will be a choice and what the domain names would be
-			//
-			// This code assumes there will only be one domain returned ("local.") In general, if you don't have a requirement to handle domains,
-			//  just call GetiOSInfoPlistServices() with zero arguments
+			List<(string IpAddress, int Port)> calibreServers = [];
+			IReadOnlyList<string> domains;
 
-			var iosDomains = await ZeroconfResolver.GetiOSDomains(scanTime, cancellationToken);
-			string? selectedDomain = (iosDomains.Count > 0) ? iosDomains[0] : null;
+			if (ZeroconfResolver.IsiOSWorkaroundEnabled)
+			{
+				// Read the known Bonjour service from Info.plist
+				// (e.g. "_calibre._tcp") and append the "local."
+				// domain.  The Zeroconf library parses the
+				// domain from the service string, and
+				// Info.plist stores only the service type per
+				// Apple convention.
+				domains = ZeroconfResolver.GetiOSInfoPlistServices("local.");
+			}
+			else
+			{
+				var browseDomains = await ZeroconfResolver.BrowseDomainsAsync(cancellationToken: cancellationToken);
+				domains = [.. browseDomains.Select(g => g.Key)];
+			}
 
-			domains = ZeroconfResolver.GetiOSInfoPlistServices(selectedDomain);
-		}
-		else
-		{
-			var browseDomains = await ZeroconfResolver.BrowseDomainsAsync();
-			domains = [.. browseDomains.Select(g => g.Key)];
-		}
+			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(domains, scanTime, cancellationToken: cancellationToken);
+			calibreServers.AddRange(hosts.SelectMany(host => host.Services.Where(service => service.Value.Port == 8080 || service.Value.Port == 8081)
+					.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
+			logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
 
-		
-		hosts = await ZeroconfResolver.ResolveAsync(domains);
-		calibreServers.AddRange(hosts.SelectMany(host => host.Services.Where(service => service.Value.Port == 8080 || service.Value.Port == 8081)
-				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
-		logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
-
-		return calibreServers;
+			return calibreServers;
+		});
 	}
 #endif
 
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsync(TimeSpan scanTime, CancellationToken cancellationToken)
 	{
 		List<(string IpAddress, int Port)> calibreServers = [];
-		var aService = new List<string> { "_calibre._tcp.local." };
+		var aService = new List<string> { "_calibre._tcp" }; 
+		
 		await MainThread.InvokeOnMainThreadAsync(async () =>
 		{
 			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime).WaitAsync(cancellationToken);
-			calibreServers.AddRange(hosts.SelectMany(host => host.Services.Where(service => service.Value.Port == 8080 || service.Value.Port == 8081)
+			
+			// REMOVE strict port checking. Calibre can run on any port (e.g. 8082, 9000).
+			calibreServers.AddRange(hosts.SelectMany(host => host.Services
 				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
+				
 			logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
 		});
 
 		return calibreServers;
 	}
+
 }

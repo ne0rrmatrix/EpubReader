@@ -82,10 +82,12 @@
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
       <key>NSLocalNetworkUsageDescription</key>
-  <string>Looking for local mDNS/Bonjour services</string>
+    <string>EpubReader uses the local network to discover and connect to your Calibre server.</string>
   <key>NSBonjourServices</key>
   <array>
-    <string>_calibre._tcp.local</string>
+     <string>_calibre._tcp</string>
+    <string>_http._tcp.</string>
+    <string>_http._udp.</string>
   </array>
 </dict>
 </plist>
