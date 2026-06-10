@@ -71,6 +71,7 @@ public partial class CalibreZeroConf
 #endif
 	}
 
+#if IOS || MACCATALYST
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsyncIOS(TimeSpan scanTime, CancellationToken cancellationToken)
 	{
 		IReadOnlyList<IZeroconfHost>? hosts = null;
@@ -105,6 +106,7 @@ public partial class CalibreZeroConf
 
 		return calibreServers;
 	}
+#endif
 
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsync(TimeSpan scanTime, CancellationToken cancellationToken)
 	{
