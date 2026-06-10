@@ -79,5 +79,9 @@
     <string>com.NerdNews.EpubReader</string>
     <key>UIDesignRequiresCompatibility</key>
     <true/>
+     <key>NSBonjourServices</key>
+    <array>
+    <string>_calibre._tcp.local</string>
+  </array>
 </dict>
 </plist>

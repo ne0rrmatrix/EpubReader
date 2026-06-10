@@ -74,21 +74,44 @@ public partial class AuthenticationService
 			var credentialManager = CredentialManager.Create(activity);
 			Trace.TraceInformation("Google sign-in: invoking CredentialManager.GetCredentialAsync");
 
-			var completionSource = new TaskCompletionSource<Java.Lang.Object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+			var completionSource = new TaskCompletionSource<(Java.Lang.Object? Result, Java.Lang.Object? Error)>(TaskCreationOptions.RunContinuationsAsynchronously);
 			using var cancellationSignal = new Android.OS.CancellationSignal();
 			using var cancellationRegistration = cancellationToken.Register(cancellationSignal.Cancel);
 			using var executor = Java.Util.Concurrent.Executors.NewSingleThreadExecutor() ?? throw new InvalidOperationException("CredentialManager executor creation failed");
 			using var callback = new CredentialCallback(
-				onResult: result => completionSource.TrySetResult(result),
+				onResult: result => completionSource.TrySetResult((result, null)),
 				onError: error =>
 				{
-					Trace.TraceError($"Google sign-in: Credential error - {error}");
-					completionSource.TrySetResult(null);
+					completionSource.TrySetResult((null, error));
 				});
 
 			credentialManager.GetCredentialAsync(activity, request, cancellationSignal, executor, callback);
 
-			var resultObject = await completionSource.Task;
+			var (resultObject, errorObject) = await completionSource.Task;
+			var errorText = errorObject?.ToString() ?? string.Empty;
+			if (!string.IsNullOrWhiteSpace(errorText) &&
+				(errorText.Contains("GetCredentialCancellationException", StringComparison.Ordinal) ||
+				errorText.Contains("cancelled", StringComparison.OrdinalIgnoreCase) ||
+				errorText.Contains("canceled", StringComparison.OrdinalIgnoreCase)))
+			{
+				Trace.TraceWarning($"Google sign-in: credential request cancelled - {errorText}");
+				throw new OperationCanceledException("Google sign-in was cancelled.", cancellationToken);
+			}
+
+			if (!string.IsNullOrWhiteSpace(errorText) &&
+				(errorText.Contains("NoCredentialException", StringComparison.Ordinal) ||
+				errorText.Contains("No credentials available", StringComparison.OrdinalIgnoreCase)))
+			{
+				Trace.TraceWarning($"Google sign-in: no eligible Google credentials - {errorText}");
+				throw new InvalidOperationException("No Google credentials are available on this device. Add a Google account to the emulator or use a device with Google Play services.");
+			}
+
+			if (!string.IsNullOrWhiteSpace(errorText))
+			{
+				Trace.TraceError($"Google sign-in: credential request failed - {errorText}");
+				throw new InvalidOperationException($"Google sign-in failed to access device credentials: {errorText}");
+			}
+
 			var response = resultObject as GetCredentialResponse;
 			var credential = response?.Credential;
 			var type = credential?.Type;

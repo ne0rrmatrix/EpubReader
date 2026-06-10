@@ -64,12 +64,47 @@ public partial class CalibreZeroConf
 			}
 		}
 		return calibreServers;
-		
+#elif IOS || MACCATALYST
+		return await DiscoverCalibreServersWithZeroconfInternalAsyncIOS(scanTime, cancellationToken);
 #else
 		return await DiscoverCalibreServersWithZeroconfInternalAsync(scanTime, cancellationToken);
 #endif
 	}
 
+	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsyncIOS(TimeSpan scanTime, CancellationToken cancellationToken)
+	{
+		IReadOnlyList<IZeroconfHost>? hosts = null;
+		List<(string IpAddress, int Port)> calibreServers = [];
+		IReadOnlyList<string> domains;
+		if (ZeroconfResolver.IsiOSWorkaroundEnabled)
+		{
+			// Demonstrates how using ZeroconfResolver.GetiOSInfoPlistServices() is much faster than ZeroconfResolver.BrowseDomainsAsync()
+			//
+			// In real life, you'd only query the domains if you were planning on presenting the user with a choice of domains to browse,
+			//  or the app knows in advance there will be a choice and what the domain names would be
+			//
+			// This code assumes there will only be one domain returned ("local.") In general, if you don't have a requirement to handle domains,
+			//  just call GetiOSInfoPlistServices() with zero arguments
+
+			var iosDomains = await ZeroconfResolver.GetiOSDomains(scanTime, cancellationToken);
+			string? selectedDomain = (iosDomains.Count > 0) ? iosDomains[0] : null;
+
+			domains = ZeroconfResolver.GetiOSInfoPlistServices(selectedDomain);
+		}
+		else
+		{
+			var browseDomains = await ZeroconfResolver.BrowseDomainsAsync();
+			domains = [.. browseDomains.Select(g => g.Key)];
+		}
+
+		
+		hosts = await ZeroconfResolver.ResolveAsync(domains);
+		calibreServers.AddRange(hosts.SelectMany(host => host.Services.Where(service => service.Value.Port == 8080 || service.Value.Port == 8081)
+				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
+		logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
+
+		return calibreServers;
+	}
 
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsync(TimeSpan scanTime, CancellationToken cancellationToken)
 	{

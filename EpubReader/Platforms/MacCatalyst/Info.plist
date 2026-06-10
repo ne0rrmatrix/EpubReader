@@ -81,5 +81,11 @@
     <string>com.NerdNews.EpubReader</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+      <key>NSLocalNetworkUsageDescription</key>
+  <string>Looking for local mDNS/Bonjour services</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_calibre._tcp.local</string>
+  </array>
 </dict>
 </plist>

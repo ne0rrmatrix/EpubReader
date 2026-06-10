@@ -68,6 +68,7 @@ public static class MauiProgram
 #endif
 		.ConfigureSyncfusionToolkit()
 		.UseFFImageLoading()
+		.RegisterFirebaseServices()
 		.ConfigureMauiHandlers(handlers =>
 		{
 #if IOS || MACCATALYST
@@ -166,4 +167,78 @@ public static class MauiProgram
 		builder.Services.AddTransientWithShellRoute<PrivacyPage, PrivacyPageViewModel>("privacy");
 		return builder.Build();
 	}
+
+	static MauiAppBuilder RegisterFirebaseServices(this MauiAppBuilder builder)
+	{
+		builder.ConfigureLifecycleEvents(events =>
+		{
+#if ANDROID
+			events.AddAndroid(android => android.OnCreate((activity, _) =>
+			{
+				InitializeFirebaseOnAndroid(activity);
+			}));
+#endif
+		});
+
+		return builder;
+	}
+
+#if ANDROID
+	static void InitializeFirebaseOnAndroid(Android.App.Activity activity)
+	{
+		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
+		try
+		{
+			var defaultApp = Firebase.FirebaseApp.InitializeApp(activity);
+
+			if (defaultApp is null)
+			{
+			// Build FirebaseOptions from loaded configuration
+			var appId = FirebaseConfig.AppId;
+			var apiKey = FirebaseConfig.ApiKey;
+			var projectId = FirebaseConfig.ProjectId;
+			var databaseUrl = FirebaseConfig.DatabaseUrl;
+
+			if (!string.IsNullOrWhiteSpace(appId))
+			{
+				var optionsBuilder = new Firebase.FirebaseOptions.Builder()
+					.SetApplicationId(appId);
+
+				if (!string.IsNullOrWhiteSpace(apiKey))
+				{
+					optionsBuilder.SetApiKey(apiKey);
+				}
+
+				if (!string.IsNullOrWhiteSpace(projectId))
+				{
+					optionsBuilder.SetProjectId(projectId);
+				}
+
+				if (!string.IsNullOrWhiteSpace(databaseUrl))
+				{
+					optionsBuilder.SetDatabaseUrl(databaseUrl);
+				}
+
+				var options = optionsBuilder.Build();
+				Firebase.FirebaseApp.InitializeApp(activity, options);
+				System.Diagnostics.Trace.TraceInformation("Firebase startup: initialized default app from runtime configuration");
+			}
+			else
+			{
+				System.Diagnostics.Trace.TraceWarning("Firebase startup: default app was not available and runtime configuration was incomplete");
+			}
+			}
+			else
+			{
+				System.Diagnostics.Trace.TraceInformation("Firebase startup: using existing default app");
+			}
+
+			CrossFirebase.Initialize(activity, () => Platform.CurrentActivity ?? activity);
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Trace.TraceWarning($"DEBUG: Firebase startup error: {ex.Message}");
+		}
+	}
+	#endif
 }
