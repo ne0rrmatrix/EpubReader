@@ -486,14 +486,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	void ApplyLocalSearch(string searchText)
 	{
-		List<Book> filteredBooks = BookList.Where(book =>
+		List<Book> filteredBooks = [.. BookList.Where(book =>
 			book.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Language.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Series.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Categories.Any(category => category.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
-			.ToList();
+			book.Categories.Any(category => category.Contains(searchText, StringComparison.OrdinalIgnoreCase)))];
 
 		Books = [.. filteredBooks];
 		EmptyLabelText = $"No books found matching '{searchText}'.";
@@ -723,7 +722,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	static IEnumerable<CalibreServerAddress> GetSavedEndpoints(Settings settings)
 	{
-		HashSet<string> seenEndpoints = new(StringComparer.OrdinalIgnoreCase);
+		HashSet<string> seenEndpoints = [with(StringComparer.OrdinalIgnoreCase)];
 		foreach (CalibreServerAddress? endpoint in new[]
 		{
 			TryCreateSavedEndpoint(settings.UrlPrefix, settings.IPAddress, settings.Port),

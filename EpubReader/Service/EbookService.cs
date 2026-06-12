@@ -110,7 +110,7 @@ public static partial class EbookService
 		ArgumentNullException.ThrowIfNull(book);
 
 		StringBuilder sb = new();
-		Dictionary<string, string> chapterTargets = new(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, string> chapterTargets = [with(StringComparer.OrdinalIgnoreCase)];
 		for (int i = 0; i < book.Chapters.Count; i++)
 		{
 			Chapter? chapter = book.Chapters[i];
@@ -206,14 +206,14 @@ public static partial class EbookService
 		List<string> authors = ExtractAuthors(book);
 		MediaOverlayParseResult mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
 		List<MediaOverlayAudioResource> mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
-		List<EpubFonts> additionalFonts = sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
+		List<EpubFonts> additionalFonts = [.. sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
 														  f.FileName.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase) ?
 														  new[] { new EpubFonts
 														  {
 															  Content = f.Content ?? [],
 															  FileName = f.FileName,
 															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
-														  } } : []).ToList();
+														  } } : [])];
 		fonts.AddRange(additionalFonts);
 
 		Book resultBook = new()
@@ -276,7 +276,7 @@ public static partial class EbookService
 
 	static async Task<List<SharedEpubFiles>> GetSharedFilesAsync()
 	{
-		List<SharedEpubFiles> sharedFiles = new();
+		List<SharedEpubFiles> sharedFiles = [];
 
 		foreach (string fileName in requiredFiles)
 		{
@@ -324,7 +324,7 @@ public static partial class EbookService
 
 	static async Task<List<EpubFonts>> ExtractFontsAsync(EpubBookRef book)
 	{
-		List<EpubFonts> fonts = new();
+		List<EpubFonts> fonts = [];
 		IEnumerable<EpubLocalContentFileRef> fontFiles = book.Content.AllFiles.Local.Where(IsFontFile);
 
 		foreach (EpubLocalContentFileRef? fontFile in fontFiles)
@@ -361,7 +361,7 @@ public static partial class EbookService
 
 	static async Task<List<Css>> ExtractCssFiles(EpubBookRef book)
 	{
-		List<Css> result = new();
+		List<Css> result = [];
 		foreach (EpubLocalContentFileRef? file in book.Content.AllFiles.Local.Where(file => file.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase)))
 		{
 			Css css = new()
@@ -377,7 +377,7 @@ public static partial class EbookService
 
 	static async Task<List<Models.Image>> ExtractImages(EpubBookRef book)
 	{
-		List<Models.Image> images = new();
+		List<Models.Image> images = [];
 
 		foreach (EpubLocalByteContentFileRef image in book.Content.Images.Local)
 		{
@@ -394,14 +394,14 @@ public static partial class EbookService
 
 	static async Task<List<MediaOverlayAudioResource>> ExtractMediaOverlayAudioAsync(EpubBookRef book, IReadOnlyList<MediaOverlayDocument> documents)
 	{
-		List<MediaOverlayAudioResource> resources = new();
+		List<MediaOverlayAudioResource> resources = [];
 		if (documents.Count == 0)
 		{
 			logger.Info("No media overlay documents available for audio extraction.");
 			return resources;
 		}
 
-		HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+		HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
 		logger.Info($"Extracting media overlay audio from {documents.Count} document(s).");
 
 		foreach (MediaOverlayDocument document in documents)
@@ -552,13 +552,13 @@ public static partial class EbookService
 	static async Task<List<Chapter>> GetChaptersAsync(EpubBookRef book)
 	{
 		List<EpubLocalTextContentFileRef> readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
-		List<EpubLocalTextContentFileRef> chaptersRef = readingOrder.ToList();
+		List<EpubLocalTextContentFileRef> chaptersRef = [.. readingOrder];
 		return await GetChapters(chaptersRef, book);
 	}
 
 	static async Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
-		List<Chapter> chapters = new();
+		List<Chapter> chapters = [];
 
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))

@@ -20,7 +20,7 @@ public static class MediaOverlayParser
 		ArgumentNullException.ThrowIfNull(book);
 
 		List<EpubManifestItem> manifestItems = book.Schema.Package.Manifest.Items ?? [];
-		Dictionary<string, MediaOverlayDocument> overlayDocuments = new(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, MediaOverlayDocument> overlayDocuments = [with(StringComparer.OrdinalIgnoreCase)];
 
 		foreach (EpubManifestItem? manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
 		{
@@ -70,7 +70,7 @@ public static class MediaOverlayParser
 		XDocument document = XDocument.Parse(content);
 		XElement bodyElement = document.Root?.Element(smilNamespace + "body") ?? throw new InvalidOperationException("Media overlay SMIL document is missing the <body> element.");
 		MediaOverlaySequence bodySequence = ParseSequence(bodyElement);
-		List<MediaOverlayParallel> flattened = FlattenParallels(bodySequence).ToList();
+		List<MediaOverlayParallel> flattened = [.. FlattenParallels(bodySequence)];
 		return new MediaOverlayDocument(manifestId, href, bodySequence, flattened);
 	}
 

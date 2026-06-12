@@ -136,7 +136,7 @@ public class FeedReader(HttpClient? httpClient = null)
 	{
 		try
 		{
-			DateTime? publishedDate = default(DateTime?);
+			DateTime? publishedDate = default;
 			XNamespace atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
 			XNamespace dcNs = XNamespace.Get("http://purl.org/dc/terms/");
 			if (DateTime.TryParse(GetElementValue(entryElement, dcNs + "date"), CultureInfo.InvariantCulture, out DateTime date))

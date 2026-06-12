@@ -20,7 +20,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
 		DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
 	};
-	readonly Dictionary<string, MediaOverlayAudioResource> audioCache = new(StringComparer.OrdinalIgnoreCase);
+	readonly Dictionary<string, MediaOverlayAudioResource> audioCache = [with(StringComparer.OrdinalIgnoreCase)];
 	List<MediaOverlaySegment> segments = [];
 	int currentChapterIndex = -1;
 	int segmentIndex;
