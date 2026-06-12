@@ -78,7 +78,7 @@ public partial class BookPage : ContentPage, IDisposable
 		webViewHelper = new(webView, db, syncService);
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 		NativeLoadingOverlay.IsVisible = true;
-
+		fullScreenService.EnterFullScreen();
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
 
 	}
@@ -90,7 +90,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			return;
 		}
-
+		
 		SubscribeToSettingsState();
 		SubscribeToReaderBridge();
 		SubscribeToWindowLifecycle();
@@ -430,23 +430,24 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <param name="e">The event data associated with the tap event.</param>
 	async void GridArea_Tapped(object? sender, EventArgs? e)
 	{
-		ViewModel.Press();
 		bool isVisible = Shell.GetNavBarIsVisible(this);
+		fullScreenService.SetFullScreen(isVisible);
 		Shell.SetNavBarIsVisible(this, !isVisible);
+	
 		if (isMenuOpen)
 		{
 			isMenuOpen = false;
 			ViewModel.IsReaderModeEnabled = false;
 			sliderContainer.IsVisible = false;
-			await grid.ScaleToAsync(1, animationDuration);
-			await grid.FadeToAsync(1, animationDuration);
+			await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
+			await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
 			return;
 		}
 		isMenuOpen = true;
 		sliderContainer.IsVisible = true;
 		ViewModel.IsReaderModeEnabled = true;
-		await grid.ScaleToAsync(0.8, animationDuration);
-		await grid.FadeToAsync(0.8, animationDuration);
+		await grid.ScaleToAsync(0.8, animationDuration).ConfigureAwait(false);
+		await grid.FadeToAsync(0.8, animationDuration).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -1096,11 +1097,10 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		isMenuOpen = false;
 		sliderContainer.IsVisible = false;
-		ViewModel.Press();
-		bool isVisible = Shell.GetNavBarIsVisible(this);
-		Shell.SetNavBarIsVisible(this, !isVisible);
-		await grid.FadeToAsync(1, animationDuration);
-		await grid.ScaleToAsync(1, animationDuration);
+		fullScreenService.SetFullScreen(true);
+		Shell.SetNavBarIsVisible(this, false);
+		await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
+		await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
 	}
 
 	void CreateToolBarItem(int index, Chapter chapter)

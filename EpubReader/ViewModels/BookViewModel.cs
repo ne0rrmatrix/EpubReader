@@ -71,17 +71,14 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// </summary>
 	[ObservableProperty]
 	public partial string ReaderModeToolbarText { get; set; } = "Hide Interface";
-	IFullScreenService FullScreenService { get; set; }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel(AuthenticationService authenticationService, IFullScreenService fullScreenService)
+	public BookViewModel(AuthenticationService authenticationService)
 	{
 		this.authenticationService = authenticationService;
-		this.FullScreenService = fullScreenService;
-		Press();
 	}
 
 	/// <summary>
@@ -134,35 +131,5 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			System.Diagnostics.Debug.WriteLine("Popup was closed by other means.");
 			isPopupActive = false;
 		}
-	}
-
-	/// <summary>
-	/// Toggles the navigation menu visibility and optionally updates the fullscreen state.
-	/// </summary>
-	/// <param name="setFullScreen">Indicates whether to update the fullscreen state when toggling the navigation menu.</param>
-	public void Press(bool setFullScreen)
-	{
-		Dispatcher.Dispatch(() =>
-		{
-			FullScreenService.SetFullScreen(setFullScreen);
-			IsNavMenuVisible = !setFullScreen;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, setFullScreen);
-		});
-	}
-
-	/// <summary>
-	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
-	/// </summary>
-	/// <remarks>On Android, this method also adjusts the status bar visibility to match the navigation menu's
-	/// visibility.</remarks>
-	[RelayCommand]
-	public void Press()
-	{
-		Dispatcher.Dispatch(() =>
-		{
-			FullScreenService.SetFullScreen(IsNavMenuVisible);
-			IsNavMenuVisible = !IsNavMenuVisible;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
-		});
 	}
 }

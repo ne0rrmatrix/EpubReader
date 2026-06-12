@@ -107,8 +107,8 @@ public partial class CalibreZeroConf
 			return calibreServers;
 		});
 	}
-#endif
 
+#elif WINDOWS || ANDROID
 	static async Task<List<(string IpAddress, int Port)>> DiscoverCalibreServersWithZeroconfInternalAsync(TimeSpan scanTime, CancellationToken cancellationToken)
 	{
 		List<(string IpAddress, int Port)> calibreServers = [];
@@ -127,5 +127,5 @@ public partial class CalibreZeroConf
 
 		return calibreServers;
 	}
-
+#endif
 }
