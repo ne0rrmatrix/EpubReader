@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace EpubReader.Views;
 
 /// <summary>
@@ -55,9 +57,9 @@ public partial class LibraryPage : ContentPage
 			logger.Warn("TextChangedEventArgs is null, cannot process search.");
 			return;
 		}
-		var books = viewModel.Books;
-		var results = e.NewTextValue;
-		var allBooks = await db.GetAllBooks();
+		ObservableCollection<Book> books = viewModel.Books;
+		string results = e.NewTextValue;
+		List<Book> allBooks = await db.GetAllBooks();
 		System.Diagnostics.Debug.WriteLine($"Search results: {results}");
 		if (string.IsNullOrWhiteSpace(results))
 		{
@@ -72,10 +74,10 @@ public partial class LibraryPage : ContentPage
 			return;
 		}
 		logger.Info($"Searching for books with title containing: {results}");
-		var filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		var filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		List<Book> filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		List<Book> filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
 
-		var filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
+		List<Book> filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
 		viewModel.ReplaceBooks(filteredBooks);
 
 	}

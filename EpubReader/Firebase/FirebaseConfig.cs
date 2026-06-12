@@ -1,10 +1,7 @@
-namespace EpubReader.Service;
-
-using System;
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.Maui.Storage;
 
+namespace EpubReader.Firebase;
 /// <summary>
 /// Firebase configuration for the application generated at build from google-services.json, environment variables, or MSBuild properties.
 /// </summary>
@@ -56,9 +53,9 @@ static class FirebaseConfig
 
 		try
 		{
-			using var stream = FileSystem.OpenAppPackageFileAsync(googleServicesFileName).GetAwaiter().GetResult() ?? throw new InvalidOperationException($"Required file '{googleServicesFileName}' not found in app package. This application requires build-secrets/{googleServicesFileName} to be present and packaged.");
-			using var document = JsonDocument.Parse(stream);
-			var root = document.RootElement;
+			using Stream stream = FileSystem.OpenAppPackageFileAsync(googleServicesFileName).GetAwaiter().GetResult() ?? throw new InvalidOperationException($"Required file '{googleServicesFileName}' not found in app package. This application requires build-secrets/{googleServicesFileName} to be present and packaged.");
+			using JsonDocument document = JsonDocument.Parse(stream);
+			JsonElement root = document.RootElement;
 
 			ParseClient(root);
 			ParseProjectInfo(root);
@@ -75,12 +72,12 @@ static class FirebaseConfig
 
 	static void ParseClient(JsonElement root)
 	{
-		if (!root.TryGetProperty("client", out var clientArray) || clientArray.ValueKind != JsonValueKind.Array || clientArray.GetArrayLength() == 0)
+		if (!root.TryGetProperty("client", out JsonElement clientArray) || clientArray.ValueKind != JsonValueKind.Array || clientArray.GetArrayLength() == 0)
 		{
 			return;
 		}
 
-		var client = clientArray[0];
+		JsonElement client = clientArray[0];
 		ParseApiKeys(client);
 		ParseClientInfo(client);
 		ParseOauthClients(client);
@@ -88,13 +85,13 @@ static class FirebaseConfig
 
 	static void ParseApiKeys(JsonElement client)
 	{
-		if (!client.TryGetProperty("api_key", out var apiKeys) || apiKeys.ValueKind != JsonValueKind.Array || apiKeys.GetArrayLength() == 0)
+		if (!client.TryGetProperty("api_key", out JsonElement apiKeys) || apiKeys.ValueKind != JsonValueKind.Array || apiKeys.GetArrayLength() == 0)
 		{
 			return;
 		}
 
-		var el = apiKeys[0];
-		if (el.TryGetProperty("current_key", out var currentKey) && currentKey.ValueKind == JsonValueKind.String)
+		JsonElement el = apiKeys[0];
+		if (el.TryGetProperty("current_key", out JsonElement currentKey) && currentKey.ValueKind == JsonValueKind.String)
 		{
 			cachedApiKey = currentKey.GetString();
 		}
@@ -102,17 +99,17 @@ static class FirebaseConfig
 
 	static void ParseClientInfo(JsonElement client)
 	{
-		if (!client.TryGetProperty("client_info", out var clientInfo) || clientInfo.ValueKind != JsonValueKind.Object)
+		if (!client.TryGetProperty("client_info", out JsonElement clientInfo) || clientInfo.ValueKind != JsonValueKind.Object)
 		{
 			return;
 		}
 
-		if (clientInfo.TryGetProperty("mobilesdk_app_id", out var appIdEl) && appIdEl.ValueKind == JsonValueKind.String)
+		if (clientInfo.TryGetProperty("mobilesdk_app_id", out JsonElement appIdEl) && appIdEl.ValueKind == JsonValueKind.String)
 		{
 			cachedAppId = appIdEl.GetString();
 		}
 
-		if (clientInfo.TryGetProperty("android_client_info", out var androidInfo) && androidInfo.ValueKind == JsonValueKind.Object && androidInfo.TryGetProperty("package_name", out var pkgEl) && pkgEl.ValueKind == JsonValueKind.String)
+		if (clientInfo.TryGetProperty("android_client_info", out JsonElement androidInfo) && androidInfo.ValueKind == JsonValueKind.Object && androidInfo.TryGetProperty("package_name", out JsonElement pkgEl) && pkgEl.ValueKind == JsonValueKind.String)
 		{
 			cachedPackageName = pkgEl.GetString();
 		}
@@ -120,19 +117,19 @@ static class FirebaseConfig
 
 	static void ParseOauthClients(JsonElement client)
 	{
-		if (!client.TryGetProperty("oauth_client", out var oauthClients) || oauthClients.ValueKind != JsonValueKind.Array)
+		if (!client.TryGetProperty("oauth_client", out JsonElement oauthClients) || oauthClients.ValueKind != JsonValueKind.Array)
 		{
 			return;
 		}
 
-		foreach (var oauth in oauthClients.EnumerateArray())
+		foreach (JsonElement oauth in oauthClients.EnumerateArray())
 		{
-			if (!oauth.TryGetProperty("client_type", out var clientType) || clientType.ValueKind != JsonValueKind.Number || clientType.GetInt32() != 3)
+			if (!oauth.TryGetProperty("client_type", out JsonElement clientType) || clientType.ValueKind != JsonValueKind.Number || clientType.GetInt32() != 3)
 			{
 				continue;
 			}
 
-			if (oauth.TryGetProperty("client_id", out var cid) && cid.ValueKind == JsonValueKind.String)
+			if (oauth.TryGetProperty("client_id", out JsonElement cid) && cid.ValueKind == JsonValueKind.String)
 			{
 				cachedDefaultWebClientId = cid.GetString();
 				break;
@@ -142,12 +139,12 @@ static class FirebaseConfig
 
 	static void ParseProjectInfo(JsonElement root)
 	{
-		if (!root.TryGetProperty("project_info", out var projectInfo) || projectInfo.ValueKind != JsonValueKind.Object)
+		if (!root.TryGetProperty("project_info", out JsonElement projectInfo) || projectInfo.ValueKind != JsonValueKind.Object)
 		{
 			return;
 		}
 
-		if (projectInfo.TryGetProperty("project_id", out var pid) && pid.ValueKind == JsonValueKind.String)
+		if (projectInfo.TryGetProperty("project_id", out JsonElement pid) && pid.ValueKind == JsonValueKind.String)
 		{
 			cachedProjectId = pid.GetString();
 			if (!string.IsNullOrWhiteSpace(cachedProjectId) && string.IsNullOrWhiteSpace(cachedAuthDomain))
@@ -156,17 +153,17 @@ static class FirebaseConfig
 			}
 		}
 
-		if (projectInfo.TryGetProperty("firebase_url", out var furl) && furl.ValueKind == JsonValueKind.String)
+		if (projectInfo.TryGetProperty("firebase_url", out JsonElement furl) && furl.ValueKind == JsonValueKind.String)
 		{
 			cachedDatabaseUrl = furl.GetString();
 		}
 
-		if (projectInfo.TryGetProperty("project_number", out var pnum) && (pnum.ValueKind == JsonValueKind.String || pnum.ValueKind == JsonValueKind.Number))
+		if (projectInfo.TryGetProperty("project_number", out JsonElement pnum) && (pnum.ValueKind == JsonValueKind.String || pnum.ValueKind == JsonValueKind.Number))
 		{
 			cachedProjectNumber = pnum.GetString();
 		}
 
-		if (projectInfo.TryGetProperty("storage_bucket", out var sb) && sb.ValueKind == JsonValueKind.String)
+		if (projectInfo.TryGetProperty("storage_bucket", out JsonElement sb) && sb.ValueKind == JsonValueKind.String)
 		{
 			cachedStorageBucket = sb.GetString();
 		}
@@ -174,7 +171,7 @@ static class FirebaseConfig
 
 	static void ParseMeasurementId(JsonElement root)
 	{
-		if (root.TryGetProperty("measurement_id", out var mid) && mid.ValueKind == JsonValueKind.String)
+		if (root.TryGetProperty("measurement_id", out JsonElement mid) && mid.ValueKind == JsonValueKind.String)
 		{
 			cachedMeasurementId = mid.GetString();
 		}

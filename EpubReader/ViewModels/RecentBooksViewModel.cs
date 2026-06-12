@@ -54,7 +54,7 @@ public partial class RecentBooksViewModel : BaseViewModel
 		cancellationToken.ThrowIfCancellationRequested();
 		try
 		{
-			var navigationParams = new Dictionary<string, object>
+			Dictionary<string, object> navigationParams = new()
 			{
 				{ "Book", book }
 			};
@@ -75,17 +75,17 @@ public partial class RecentBooksViewModel : BaseViewModel
 		cancellationToken.ThrowIfCancellationRequested();
 		try
 		{
-			var allBooks = await db.GetAllBooks(cancellationToken);
+			List<Book> allBooks = await db.GetAllBooks(cancellationToken);
 
 			// Filter books with LastOpenedDate, sort by most recent descending, limit to 20
-			var recentBooks = allBooks
+			List<Book> recentBooks = allBooks
 				.Where(b => b.LastOpenedDate.HasValue)
 				.OrderByDescending(b => b.LastOpenedDate)
 				.Take(maxRecentBooks)
 				.ToList();
 
 			RecentBooks.Clear();
-			foreach (var book in recentBooks)
+			foreach (Book book in recentBooks)
 			{
 				RecentBooks.Add(book);
 			}
@@ -104,10 +104,9 @@ public partial class RecentBooksViewModel : BaseViewModel
 	{
 		try
 		{
-			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
-			var authenticationService = services.GetRequiredService<AuthenticationService>();
-			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
-			var settingsOptions = new PopupOptions
+			IServiceProvider services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
+			SettingsPage settingsPopup = new(new SettingsPageViewModel(syncService));
+			PopupOptions settingsOptions = new()
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};

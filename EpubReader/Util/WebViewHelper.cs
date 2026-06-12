@@ -59,15 +59,15 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <returns></returns>
 	public async Task OnSettingsClickedAsync()
 	{
-		var settings = await database.GetSettings() ?? new();
+		Settings settings = await database.GetSettings() ?? new();
 		await SetColorSchemeAsync(settings);
 		await SetFontDataAsync(settings);
 		await SetLayoutDataAsync(settings);
-		var colCount = settings.SupportMultipleColumns ? "2" : "1";
+		string colCount = settings.SupportMultipleColumns ? "2" : "1";
 		dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__colCount','{colCount}')"));
 		if (OperatingSystem.IsWindows())
 		{
-			var width = await GetWidthAsync(settings);
+			int width = await GetWidthAsync(settings);
 			dispatcher.Dispatch(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineLength', '{width}px');"));
 		}
 
@@ -110,7 +110,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 			// First load: put combined.html into the iframe. The pageload JS event will fire next.
 			dispatcher.Dispatch(() => PageLoadStarted?.Invoke());
-			var loadSucceeded = await EvaluateBooleanScriptAsync("loadCombinedPage();");
+			bool loadSucceeded = await EvaluateBooleanScriptAsync("loadCombinedPage();");
 			if (!loadSucceeded)
 			{
 				const string message = "Failed to load combined.html into the iframe.";
@@ -131,9 +131,9 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	async Task<bool> EvaluateBooleanScriptAsync(string script)
 	{
-		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
-		var normalized = NormalizeJavaScriptResult(result);
-		return bool.TryParse(normalized, out var parsed) && parsed;
+		string result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
+		string normalized = NormalizeJavaScriptResult(result);
+		return bool.TryParse(normalized, out bool parsed) && parsed;
 	}
 
 	static string NormalizeJavaScriptResult(string? result)
@@ -143,8 +143,8 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			return string.Empty;
 		}
 
-		var normalized = result.Trim();
-		for (var attempt = 0; attempt < 3; attempt++)
+		string normalized = result.Trim();
+		for (int attempt = 0; attempt < 3; attempt++)
 		{
 			if (normalized.Length >= 2 && normalized[0] == '"' && normalized[^1] == '"')
 			{
@@ -214,8 +214,8 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		token.ThrowIfCancellationRequested();
 
-		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getCombinedPaginationInfo(true);"));
-		var normalized = NormalizeJavaScriptResult(result);
+		string result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getCombinedPaginationInfo(true);"));
+		string normalized = NormalizeJavaScriptResult(result);
 		if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "null", StringComparison.OrdinalIgnoreCase))
 		{
 			return null;
@@ -303,13 +303,13 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		try
 		{
-			var chapterTitle = GetChapterTitle(book);
+			string chapterTitle = GetChapterTitle(book);
 			if (totalPages <= 0)
 			{
 				return chapterTitle;
 			}
 
-			var normalizedPage = Math.Clamp(currentPageNumber, 1, Math.Max(1, totalPages));
+			int normalizedPage = Math.Clamp(currentPageNumber, 1, Math.Max(1, totalPages));
 			return $"{chapterTitle} (Page {normalizedPage} of {totalPages})";
 		}
 		catch (Exception ex)
@@ -371,7 +371,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	{
 		if (!string.IsNullOrEmpty(settings.FontFamily))
 		{
-			var fontFamilyValue = JsonSerializer.Serialize(ToReaderFontFamilyValue(settings.FontFamily));
+			string fontFamilyValue = JsonSerializer.Serialize(ToReaderFontFamilyValue(settings.FontFamily));
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("setReadiumProperty('--USER__fontOverride', 'readium-font-on')"));
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontFamily', {fontFamilyValue})"));
 		}
@@ -381,17 +381,17 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__fontFamily')"));
 		}
 
-		var normalizedFontSize = GetNormalizedReaderFontSize(settings.FontSize);
-		var fontPercent = ToReaderFontPercent(normalizedFontSize, OperatingSystem.IsAndroid());
+		int normalizedFontSize = GetNormalizedReaderFontSize(settings.FontSize);
+		string fontPercent = ToReaderFontPercent(normalizedFontSize, OperatingSystem.IsAndroid());
 		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__fontSize','{fontPercent}')"));
 	}
 
 	async Task SetLayoutDataAsync(Settings settings)
 	{
-		var normalizedLineSpacing = NormalizeReaderLineSpacing(settings.LineSpacing);
+		string normalizedLineSpacing = NormalizeReaderLineSpacing(settings.LineSpacing);
 		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__lineHeight','{normalizedLineSpacing}')"));
 
-		var normalizedTextAlignment = NormalizeReaderTextAlignment(settings.TextAlignment);
+		string normalizedTextAlignment = NormalizeReaderTextAlignment(settings.TextAlignment);
 		if (string.IsNullOrEmpty(normalizedTextAlignment))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__textAlign')"));
@@ -401,7 +401,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__textAlign','{normalizedTextAlignment}')"));
 		}
 
-		var normalizedParagraphSpacing = NormalizeReaderParagraphSpacing(settings.ParagraphSpacing);
+		string normalizedParagraphSpacing = NormalizeReaderParagraphSpacing(settings.ParagraphSpacing);
 		if (string.IsNullOrEmpty(normalizedParagraphSpacing))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__paraSpacing')"));
@@ -411,7 +411,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__paraSpacing','{normalizedParagraphSpacing}')"));
 		}
 
-		var normalizedHyphenation = NormalizeReaderBodyHyphens(settings.BodyHyphens);
+		string normalizedHyphenation = NormalizeReaderBodyHyphens(settings.BodyHyphens);
 		if (string.IsNullOrEmpty(normalizedHyphenation))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__bodyHyphens')"));
@@ -421,7 +421,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__bodyHyphens','{normalizedHyphenation}')"));
 		}
 
-		var normalizedLetterSpacing = NormalizeReaderLetterSpacing(settings.LetterSpacing);
+		string normalizedLetterSpacing = NormalizeReaderLetterSpacing(settings.LetterSpacing);
 		if (string.IsNullOrEmpty(normalizedLetterSpacing))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__letterSpacing')"));
@@ -431,7 +431,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"setReadiumProperty('--USER__letterSpacing','{normalizedLetterSpacing}')"));
 		}
 
-		var normalizedWordSpacing = NormalizeReaderWordSpacing(settings.WordSpacing);
+		string normalizedWordSpacing = NormalizeReaderWordSpacing(settings.WordSpacing);
 		if (string.IsNullOrEmpty(normalizedWordSpacing))
 		{
 			await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("unsetReadiumProperty('--USER__wordSpacing')"));
@@ -444,19 +444,19 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	/// <summary>
 	/// Asynchronously retrieves the width of the content and adjusts it based on the specified settings.
 	/// </summary>
-    /// <remarks>The method evaluates a JavaScript function to obtain the initial width and then adjusts it based on
+	/// <remarks>The method evaluates a JavaScript function to obtain the initial width and then adjusts it based on
 	/// the font size and whether multiple columns are supported. If multiple columns are supported, the width is based
 	/// on half of the viewport before adjusting for font size so the two-pane layout uses more of the available space.</remarks>
 	/// <param name="settings">The settings used to determine the font size and column support for the width calculation. Must not be null.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains the calculated width as an integer.</returns>
 	async Task<int> GetWidthAsync(Settings settings)
 	{
-		var result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getWidth()"));
-		var fontSize = GetNormalizedReaderFontSize(settings.FontSize);
+		string result = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("getWidth()"));
+		int fontSize = GetNormalizedReaderFontSize(settings.FontSize);
 
 		if (settings.SupportMultipleColumns)
 		{
-            return (Convert.ToInt32(result) / 2 - fontSize);
+			return (Convert.ToInt32(result) / 2 - fontSize);
 		}
 		return (Convert.ToInt32(result) - fontSize);
 	}
@@ -473,13 +473,13 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	static string ToReaderFontFamilyValue(string fontFamily)
 	{
-		var sanitized = fontFamily.Trim();
+		string sanitized = fontFamily.Trim();
 		if (string.IsNullOrEmpty(sanitized))
 		{
 			return string.Empty;
 		}
 
-		var escapedFamily = sanitized.Replace("\\", "\\\\", StringComparison.Ordinal)
+		string escapedFamily = sanitized.Replace("\\", "\\\\", StringComparison.Ordinal)
 			.Replace("\"", "\\\"", StringComparison.Ordinal);
 
 		return sanitized switch
@@ -497,13 +497,13 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			return defaultReaderLineSpacing;
 		}
 
-		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsedValue))
 		{
 			return defaultReaderLineSpacing;
 		}
 
-		var allowedValues = new[] { 1.25d, 1.5d, 1.75d, 2d };
-		var nearest = allowedValues.OrderBy(value => Math.Abs(value - parsedValue)).First();
+		double[] allowedValues = new[] { 1.25d, 1.5d, 1.75d, 2d };
+		double nearest = allowedValues.OrderBy(value => Math.Abs(value - parsedValue)).First();
 		return nearest.ToString("0.##", CultureInfo.InvariantCulture);
 	}
 
@@ -591,12 +591,12 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	static string ToReaderFontPercent(int fontSize, bool isAndroid)
 	{
-		var normalizedFontSize = GetNormalizedReaderFontSize(fontSize);
-		var scalePercent = isAndroid
+		int normalizedFontSize = GetNormalizedReaderFontSize(fontSize);
+		int scalePercent = isAndroid
 			? normalizedFontSize * androidReaderFontPercentPerStep
 			: (int)Math.Round(normalizedFontSize / (double)defaultReaderFontSize * 100d, MidpointRounding.AwayFromZero);
 
-		var clampedScale = isAndroid
+		int clampedScale = isAndroid
 			? Math.Clamp(scalePercent, androidMinimumReaderFontPercent, androidMaximumReaderFontPercent)
 			: Math.Clamp(scalePercent, minimumReaderFontPercent, maximumReaderFontPercent);
 		return $"{clampedScale}%";
@@ -604,8 +604,8 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	async Task SaveProgressAsync(Book book)
 	{
-		var syncId = await BookIdentityService.ComputeSyncIdAsync(book, CancellationToken.None);
-		var progress = new ReadingProgress
+		string syncId = await BookIdentityService.ComputeSyncIdAsync(book, CancellationToken.None);
+		ReadingProgress progress = new()
 		{
 			BookId = syncId,
 			CurrentChapter = book.CurrentChapter,
@@ -633,7 +633,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	async Task ApplyMediaOverlayThemeAsync(Settings settings)
 	{
-		var payload = TryBuildMediaOverlayThemePayload(settings, out var theme)
+		string payload = TryBuildMediaOverlayThemePayload(settings, out MediaOverlayThemePayload? theme)
 			? JsonSerializer.Serialize(theme, mediaOverlayThemeSerializerOptions)
 			: "null";
 
@@ -643,17 +643,17 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 	static bool TryBuildMediaOverlayThemePayload(Settings settings, out MediaOverlayThemePayload payload)
 	{
 		payload = null!;
-		if (!TryParseColor(settings.BackgroundColor, out var background) || !TryParseColor(settings.TextColor, out var text))
+		if (!TryParseColor(settings.BackgroundColor, out Color? background) || !TryParseColor(settings.TextColor, out Color? text))
 		{
 			return false;
 		}
 
-		var isDarkBackground = GetRelativeLuminance(background) < 0.5;
-		var highlightBase = Mix(background, text, isDarkBackground ? 0.62 : 0.38);
-		var outlineBase = Mix(text, background, isDarkBackground ? 0.25 : 0.75);
-		var highlightBackground = ToRgba(highlightBase, isDarkBackground ? 0.58 : 0.42);
-		var highlightOutline = ToRgba(outlineBase, 0.8);
-		var highlightText = GetHigherContrastColor(highlightBase, text, background);
+		bool isDarkBackground = GetRelativeLuminance(background) < 0.5;
+		Color highlightBase = Mix(background, text, isDarkBackground ? 0.62 : 0.38);
+		Color outlineBase = Mix(text, background, isDarkBackground ? 0.25 : 0.75);
+		string highlightBackground = ToRgba(highlightBase, isDarkBackground ? 0.58 : 0.42);
+		string highlightOutline = ToRgba(outlineBase, 0.8);
+		Color highlightText = GetHigherContrastColor(highlightBase, text, background);
 
 		payload = new MediaOverlayThemePayload
 		{
@@ -685,7 +685,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	static Color Mix(Color start, Color end, double amount)
 	{
-		var t = Math.Clamp(amount, 0d, 1d);
+		double t = Math.Clamp(amount, 0d, 1d);
 		return new Color(
 			(float)(start.Red + (end.Red - start.Red) * t),
 			(float)(start.Green + (end.Green - start.Green) * t),
@@ -700,7 +700,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	static string ToRgba(Color color, double alpha)
 	{
-		var clampedAlpha = Math.Clamp(alpha, 0d, 1d);
+		double clampedAlpha = Math.Clamp(alpha, 0d, 1d);
 		return $"rgba({ToByte(color.Red)},{ToByte(color.Green)},{ToByte(color.Blue)},{clampedAlpha.ToString(CultureInfo.InvariantCulture)})";
 	}
 
@@ -711,16 +711,16 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	static Color GetHigherContrastColor(Color reference, Color optionA, Color optionB)
 	{
-		var contrastA = CalculateContrastRatio(reference, optionA);
-		var contrastB = CalculateContrastRatio(reference, optionB);
+		double contrastA = CalculateContrastRatio(reference, optionA);
+		double contrastB = CalculateContrastRatio(reference, optionB);
 		return contrastA >= contrastB ? optionA : optionB;
 	}
 
 	static double CalculateContrastRatio(Color first, Color second)
 	{
-		var luminanceFirst = GetRelativeLuminance(first);
-		var luminanceSecond = GetRelativeLuminance(second);
-		var (brighter, darker) = luminanceFirst >= luminanceSecond
+		double luminanceFirst = GetRelativeLuminance(first);
+		double luminanceSecond = GetRelativeLuminance(second);
+		(double brighter, double darker) = luminanceFirst >= luminanceSecond
 			? (luminanceFirst, luminanceSecond)
 			: (luminanceSecond, luminanceFirst);
 		return (brighter + 0.05) / (darker + 0.05);
@@ -735,9 +735,9 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 				: Math.Pow((channel + 0.055) / 1.055, 2.4);
 		}
 
-		var r = NormalizeChannel(color.Red);
-		var g = NormalizeChannel(color.Green);
-		var b = NormalizeChannel(color.Blue);
+		double r = NormalizeChannel(color.Red);
+		double g = NormalizeChannel(color.Green);
+		double b = NormalizeChannel(color.Blue);
 		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 	}
 

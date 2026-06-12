@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
 using EpubReader.ODPS;
 
@@ -16,6 +17,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	public List<Book> BookList { get; set; } = [];
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
 
+	readonly ICalibreZeroConf calibreZeroConf = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ICalibreZeroConf>() ?? throw new InvalidOperationException();
 	[ObservableProperty]
 	public partial bool Cancelled { get; set; } = false;
 
@@ -95,13 +97,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		token.ThrowIfCancellationRequested();
 
-		var popup = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<CalibreSettingsPage>() ?? throw new InvalidOperationException("Calibre settings popup is not available.");
+		CalibreSettingsPage popup = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<CalibreSettingsPage>() ?? throw new InvalidOperationException("Calibre settings popup is not available.");
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = false,
 		};
 
-		var result = await Shell.Current.ShowPopupAsync<bool>(popup, options, token);
+		IPopupResult<bool> result = await Shell.Current.ShowPopupAsync<bool>(popup, options, token);
 		if (result.Result)
 		{
 			EmptyLabelText = "Calibre settings verified. Tap refresh to load books from the saved server.";
@@ -166,8 +168,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 			SearchText = string.Empty;
 		}
 
-		using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, CancellationTokenSource.Token);
-		var feedReader = new FeedReader();
+		using CancellationTokenSource linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, CancellationTokenSource.Token);
+		FeedReader feedReader = new();
 		OpdsFeed? feed = null;
 		try
 		{
@@ -213,7 +215,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		SearchText = searchText?.Trim() ?? string.Empty;
 		ResetSearchCancellationTokenSource(token);
-		var searchToken = searchCancellationTokenSource.Token;
+		CancellationToken searchToken = searchCancellationTokenSource.Token;
 
 		if (string.IsNullOrWhiteSpace(SearchText))
 		{
@@ -231,15 +233,15 @@ public partial class CalibrePageViewModel : BaseViewModel
 				return;
 			}
 
-			var searchUrl = BuildSearchUrl(SearchText);
+			string searchUrl = BuildSearchUrl(SearchText);
 			if (string.IsNullOrWhiteSpace(searchUrl))
 			{
 				ApplyLocalSearch(SearchText);
 				return;
 			}
 
-			var searchFeed = await new FeedReader().GetFeedAsync(searchUrl, searchToken);
-			var searchResults = await BuildBooksFromFeedAsync(searchFeed);
+			OpdsFeed searchFeed = await new FeedReader().GetFeedAsync(searchUrl, searchToken);
+			List<Book> searchResults = await BuildBooksFromFeedAsync(searchFeed);
 			Books = [.. searchResults];
 			EmptyLabelText = $"No books found matching '{SearchText}'.";
 			Logger.Info($"Loaded {searchResults.Count} search results for '{SearchText}'.");
@@ -283,7 +285,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 
 		Logger.Info("Initializing Url...");
-		var settings = await db.GetSettings() ?? new Settings();
+		Settings settings = await db.GetSettings() ?? new Settings();
 
 		if (settings.CalibreAutoDiscovery)
 		{
@@ -336,8 +338,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 		}
 
 		Logger.Info("Loading books from Calibre server...");
-		var rootFeedUrl = $"{calibreServerBaseUrl}/opds";
-		var rootFeed = await new FeedReader().GetFeedAsync(rootFeedUrl, CancellationTokenSource.Token);
+		string rootFeedUrl = $"{calibreServerBaseUrl}/opds";
+		OpdsFeed rootFeed = await new FeedReader().GetFeedAsync(rootFeedUrl, CancellationTokenSource.Token);
 		ApplyFeedSelections(rootFeed, rootFeedUrl);
 		CurrentFeedTitle = rootFeed.Title ?? "Library";
 		currentFeedUrl = rootFeedUrl;
@@ -345,7 +347,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		currentFeedEmptyLabelText = "Select a Calibre feed to browse books.";
 		EmptyLabelText = currentFeedEmptyLabelText;
 
-		var defaultFeedSelection = FeedSelections.FirstOrDefault(selection => string.Equals(selection.Title, "By Newest", StringComparison.OrdinalIgnoreCase))
+		OpdsFeedSelection? defaultFeedSelection = FeedSelections.FirstOrDefault(selection => string.Equals(selection.Title, "By Newest", StringComparison.OrdinalIgnoreCase))
 			?? FeedSelections.FirstOrDefault();
 		if (defaultFeedSelection is not null)
 		{
@@ -368,7 +370,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 		Feed = feed;
 		currentFeedUrl = feedUrl;
 		CurrentFeedTitle = feedTitle ?? feed.Title ?? "Calibre";
-		var books = await BuildBooksFromFeedAsync(feed);
+		List<Book> books = await BuildBooksFromFeedAsync(feed);
 		BookList = books;
 		Books = [.. books];
 		currentFeedEmptyLabelText = $"No books found in {CurrentFeedTitle}.";
@@ -386,7 +388,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	async Task<List<Book>> BuildBooksFromFeedAsync(OpdsFeed feed)
 	{
 		List<Book> books = [];
-		foreach (var entry in feed.Entries)
+		foreach (OpdsEntry? entry in feed.Entries)
 		{
 			if (entry is null)
 			{
@@ -403,9 +405,9 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 #pragma warning disable S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
 			byte[] imageName = [];
-			var imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
-			var DownloadList = entry.Links.FindAll(l => l.Rel == "http://opds-spec.org/acquisition") ?? [];
-			var downloadUrl = DownloadList.FirstOrDefault(l => l.Type == "application/epub+zip")?.Href ?? string.Empty;
+			string imageUrl = entry.Links.FirstOrDefault(l => l.Rel == "http://opds-spec.org/image")?.Href ?? string.Empty;
+			List<OpdsLink> DownloadList = entry.Links.FindAll(l => l.Rel == "http://opds-spec.org/acquisition") ?? [];
+			string downloadUrl = DownloadList.FirstOrDefault(l => l.Type == "application/epub+zip")?.Href ?? string.Empty;
 			if (string.IsNullOrEmpty(downloadUrl))
 			{
 				Logger.Warn($"Entry '{entry.Title}' is missing download URL. Skipping...");
@@ -423,7 +425,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			}
 
 #pragma warning restore S5332 // False positive! This is not a security issue. I am filtering a string value that happens to be a URL.
-			var book = await GetBook(entry, downloadUrl, imageUrl);
+			Book book = await GetBook(entry, downloadUrl, imageUrl);
 			if (string.IsNullOrEmpty(imageUrl) && imageName.Length > 0)
 			{
 				Logger.Info($"Generated cover image for '{entry.Title}' because the entry is missing an image URL.");
@@ -453,7 +455,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		FeedSelections = [.. CalibrePageViewModel.CreateFeedSelections(feed, sourceFeedUrl)];
 		Feed = feed;
-		var searchLink = feed.Links.FirstOrDefault(link => string.Equals(link.Rel, "search", StringComparison.OrdinalIgnoreCase));
+		OpdsLink? searchLink = feed.Links.FirstOrDefault(link => string.Equals(link.Rel, "search", StringComparison.OrdinalIgnoreCase));
 		if (!string.IsNullOrWhiteSpace(searchLink?.Href))
 		{
 			searchUrlTemplate = CombineUrl(sourceFeedUrl, NormalizeOpdsHref(searchLink.Href));
@@ -467,7 +469,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	static OpdsFeedSelection? CreateFeedSelection(OpdsEntry entry, string sourceFeedUrl)
 	{
-		var link = entry.Links.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate.Href));
+		OpdsLink? link = entry.Links.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate.Href));
 		if (link is null)
 		{
 			return null;
@@ -485,7 +487,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	void ApplyLocalSearch(string searchText)
 	{
-		var filteredBooks = BookList.Where(book =>
+		List<Book> filteredBooks = BookList.Where(book =>
 			book.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
 			book.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
@@ -594,12 +596,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 			return string.Empty;
 		}
 
-		if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+		if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? baseUri))
 		{
 			return relativeOrAbsoluteUrl;
 		}
 
-		if (Uri.TryCreate(relativeOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri))
+		if (Uri.TryCreate(relativeOrAbsoluteUrl, UriKind.Absolute, out Uri? absoluteUri))
 		{
 			if (absoluteUri.Scheme is "http" or "https")
 			{
@@ -609,7 +611,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 			// Calibre/OPDS navigation links must not stay as file://
 			if (absoluteUri.Scheme == Uri.UriSchemeFile)
 			{
-				var pathAndQuery = absoluteUri.PathAndQuery;
+				string pathAndQuery = absoluteUri.PathAndQuery;
 				return $"{baseUri.Scheme}://{baseUri.Authority}{pathAndQuery}";
 			}
 
@@ -686,7 +688,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 		if (settings.CalibreAutoDiscovery)
 		{
-			List<(string IpAddress, int Port)> discoveredServers = await CalibreZeroConf.DiscoverCalibreServers(cancellationToken: token).ConfigureAwait(false);
+			List<(string IpAddress, int Port)> discoveredServers = await calibreZeroConf.DiscoverCalibreServers(TimeSpan.FromSeconds(20), cancellationToken: token).ConfigureAwait(false);
 			if (discoveredServers.Count == 0)
 			{
 				return new CalibreServerResolution(new CalibreServerAddress(string.Empty, string.Empty, 0), false);
@@ -706,7 +708,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 
 	static async Task<CalibreServerAddress?> TryGetReachableSavedEndpointAsync(Settings settings, CancellationToken token)
 	{
-		foreach (var endpoint in GetSavedEndpoints(settings))
+		foreach (CalibreServerAddress endpoint in GetSavedEndpoints(settings))
 		{
 			token.ThrowIfCancellationRequested();
 
@@ -723,7 +725,7 @@ public partial class CalibrePageViewModel : BaseViewModel
 	static IEnumerable<CalibreServerAddress> GetSavedEndpoints(Settings settings)
 	{
 		HashSet<string> seenEndpoints = new(StringComparer.OrdinalIgnoreCase);
-		foreach (var endpoint in new[]
+		foreach (CalibreServerAddress? endpoint in new[]
 		{
 			TryCreateSavedEndpoint(settings.UrlPrefix, settings.IPAddress, settings.Port),
 			TryCreateSavedEndpoint(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort),

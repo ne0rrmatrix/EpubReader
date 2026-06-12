@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 using Plugin.Firebase.Auth;
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
-public partial class AuthenticationService : IDisposable
+public partial class AuthenticationService : IDisposable, IAuthentication
 {
 	const string authModeKey = "Auth.Mode";
 	const string authModeLocal = "local";
@@ -47,26 +47,26 @@ public partial class AuthenticationService : IDisposable
 		}
 	}
 
-	public static async Task<bool> NeedsAuthenticationAsync(CancellationToken cancellationToken = default)
+	public async Task<bool> NeedsAuthenticationAsync(CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
 		// Check if user has made a choice (either signed in or chose local mode)
-		var authMode = Preferences.Get(authModeKey, string.Empty);
-		var userId = await SecureStorage.GetAsync(userIdKey);
-		var hasUserId = !string.IsNullOrWhiteSpace(userId);
+		string authMode = Preferences.Get(authModeKey, string.Empty);
+		string? userId = await SecureStorage.GetAsync(userIdKey);
+		bool hasUserId = !string.IsNullOrWhiteSpace(userId);
 
 		return string.IsNullOrWhiteSpace(authMode) && !hasUserId;
 	}
 
-	public static Task<bool> IsLocalOnlyModeAsync(CancellationToken cancellationToken = default)
+	public Task<bool> IsLocalOnlyModeAsync(CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
-		var authMode = Preferences.Get(authModeKey, string.Empty);
+		string authMode = Preferences.Get(authModeKey, string.Empty);
 		return Task.FromResult(authMode == authModeLocal);
 	}
 
-	public static async Task SetLocalOnlyModeAsync(CancellationToken cancellationToken = default)
+	public async Task SetLocalOnlyModeAsync(CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
@@ -76,7 +76,7 @@ public partial class AuthenticationService : IDisposable
 		SecureStorage.Remove(refreshTokenKey);
 		SecureStorage.Remove(authTokenExpirationKey);
 
-		var userId = await SecureStorage.GetAsync(userIdKey);
+		string? userId = await SecureStorage.GetAsync(userIdKey);
 		if (string.IsNullOrWhiteSpace(userId) || !userId.StartsWith("local-", StringComparison.Ordinal))
 		{
 			await SecureStorage.SetAsync(userIdKey, $"local-{Guid.NewGuid():N}");
@@ -130,7 +130,7 @@ public partial class AuthenticationService : IDisposable
 		{
 			try
 			{
-				var tokenResult = await firebaseAuth.CurrentUser.GetIdTokenResultAsync(false);
+				IAuthTokenResult tokenResult = await firebaseAuth.CurrentUser.GetIdTokenResultAsync(false);
 				return tokenResult.Token ?? string.Empty;
 			}
 			catch (Exception ex)
@@ -155,7 +155,7 @@ public partial class AuthenticationService : IDisposable
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		var authMode = Preferences.Get(authModeKey, string.Empty);
+		string authMode = Preferences.Get(authModeKey, string.Empty);
 
 		if (authMode == authModeLocal)
 		{
@@ -177,7 +177,7 @@ public partial class AuthenticationService : IDisposable
 #endif
 
 		// Check stored credentials
-		var userId = await SecureStorage.GetAsync(userIdKey);
+		string? userId = await SecureStorage.GetAsync(userIdKey);
 		return !string.IsNullOrWhiteSpace(userId) && authMode == authModeCloud;
 	}
 
@@ -192,7 +192,7 @@ public partial class AuthenticationService : IDisposable
 		}
 
 		// Fall back to stored user ID
-		var userId = await SecureStorage.GetAsync(userIdKey);
+		string? userId = await SecureStorage.GetAsync(userIdKey);
 		return userId ?? string.Empty;
 	}
 
@@ -207,7 +207,7 @@ public partial class AuthenticationService : IDisposable
 		}
 
 		// Fall back to stored email
-		var email = await SecureStorage.GetAsync(userEmailKey);
+		string? email = await SecureStorage.GetAsync(userEmailKey);
 		return email ?? string.Empty;
 	}
 
@@ -237,7 +237,7 @@ public partial class AuthenticationService : IDisposable
 			Preferences.Set(authModeKey, authModeLocal);
 
 			// Generate new local user ID
-			var localUserId = $"local-{Guid.NewGuid():N}";
+			string localUserId = $"local-{Guid.NewGuid():N}";
 			await SecureStorage.SetAsync(userIdKey, localUserId);
 
 			Trace.TraceInformation("User signed out, switched to local mode");
@@ -272,7 +272,7 @@ public partial class AuthenticationService : IDisposable
 
 	void OnAuthStateChanged(IFirebaseAuth auth)
 	{
-		var isAuthenticated = auth.CurrentUser is not null;
+		bool isAuthenticated = auth.CurrentUser is not null;
 		Trace.TraceInformation($"Authentication state changed. Authenticated: {isAuthenticated}");
 		AuthStateChanged?.Invoke(this, isAuthenticated);
 	}

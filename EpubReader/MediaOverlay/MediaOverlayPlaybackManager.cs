@@ -3,7 +3,7 @@ using System.Text.Json;
 using EpubReader.Models.MediaOverlays;
 using Plugin.Maui.Audio;
 
-namespace EpubReader.Service;
+namespace EpubReader.MediaOverlay;
 
 /// <summary>
 /// Coordinates media overlay playback, highlighting, and UI updates for the reader surface.
@@ -76,7 +76,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		book = newBook ?? throw new ArgumentNullException(nameof(newBook));
 		audioCache.Clear();
-		foreach (var resource in book.MediaOverlayAudio.DistinctBy(res => res.NormalizedPath, StringComparer.OrdinalIgnoreCase))
+		foreach (MediaOverlayAudioResource? resource in book.MediaOverlayAudio.DistinctBy(res => res.NormalizedPath, StringComparer.OrdinalIgnoreCase))
 		{
 			audioCache[resource.NormalizedPath] = resource;
 		}
@@ -93,11 +93,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var tasks = new List<Task>
-		{
+		List<Task> tasks =
+		[
 			InvokeScriptAsync("setMediaOverlayVisibility", true),
 			InvokeScriptAsync("setMediaOverlayReaderModeHidden", isReaderModeHidden)
-		};
+		];
 
 		if (!isUiBootstrapped)
 		{
@@ -184,11 +184,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return null;
 		}
 
-		var chapterIndex = currentChapterIndex >= 0 ? currentChapterIndex : book.CurrentChapter;
-		var fragmentId = segments.Count > 0 && segmentIndex >= 0 && segmentIndex < segments.Count
+		int chapterIndex = currentChapterIndex >= 0 ? currentChapterIndex : book.CurrentChapter;
+		string? fragmentId = segments.Count > 0 && segmentIndex >= 0 && segmentIndex < segments.Count
 			? segments[segmentIndex].FragmentId
 			: null;
-		var position = GetCurrentPositionSeconds() ?? restoredPositionSeconds;
+		double? position = GetCurrentPositionSeconds() ?? restoredPositionSeconds;
 		return new MediaOverlayPlaybackProgress(
 			Enabled: isEnabled,
 			ChapterIndex: chapterIndex,
@@ -204,7 +204,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var restore = pendingRestore;
+		MediaOverlayPlaybackProgress? restore = pendingRestore;
 		if (restore is null)
 		{
 			return;
@@ -264,10 +264,10 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	void ApplyRestoredAnchor(MediaOverlayPlaybackProgress restore)
 	{
-		var target = restore.SegmentIndex;
+		int target = restore.SegmentIndex;
 		if (!string.IsNullOrWhiteSpace(restore.FragmentId))
 		{
-			var idx = segments.FindIndex(seg => string.Equals(seg.FragmentId, restore.FragmentId, StringComparison.Ordinal));
+			int idx = segments.FindIndex(seg => string.Equals(seg.FragmentId, restore.FragmentId, StringComparison.Ordinal));
 			if (idx >= 0)
 			{
 				target = idx;
@@ -280,18 +280,18 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	bool TryApplyRestoredPosition(double positionSeconds)
 	{
-		var total = GetActiveDurationSeconds();
+		double? total = GetActiveDurationSeconds();
 		if (total is not null)
 		{
 			positionSeconds = Math.Clamp(positionSeconds, 0, total.Value);
 		}
 
-		var hasAnyDuration = false;
-		var mapped = false;
+		bool hasAnyDuration = false;
+		bool mapped = false;
 		double cumulative = 0;
 		for (int i = 0; i < segments.Count; i++)
 		{
-			var audio = segments[i].Node.Audio;
+			MediaOverlayAudio? audio = segments[i].Node.Audio;
 			if (audio?.ClipBegin is null || audio.ClipEnd is null)
 			{
 				continue;
@@ -299,11 +299,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 			hasAnyDuration = true;
 
-			var segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
+			double segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
 			if (positionSeconds < cumulative + segLen)
 			{
 				segmentIndex = i;
-				var offsetInSeg = Math.Max(0, positionSeconds - cumulative);
+				double offsetInSeg = Math.Max(0, positionSeconds - cumulative);
 				pendingSeekOverrideSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
 				restoredPositionSeconds = positionSeconds;
 				mapped = true;
@@ -336,7 +336,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var snapshot = GetPlaybackProgressSnapshot();
+		MediaOverlayPlaybackProgress? snapshot = GetPlaybackProgressSnapshot();
 		if (snapshot is null)
 		{
 			return;
@@ -408,14 +408,14 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		// If the saved/restored segment isn't visible on the current page, prefer
 		// the first visible segment on the page (and make that the new saved segment).
-		var allFragmentIds = segments.Select(s => s.FragmentId).ToList();
+		List<string> allFragmentIds = [.. segments.Select(s => s.FragmentId)];
 		// If the current segmentIndex points at a valid segment, check visibility.
 		if (segmentIndex >= 0 && segmentIndex < segments.Count)
 		{
-			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds);
+			(int visibleIndex, int _) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds);
 			if (visibleIndex < 0)
 			{
-				var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
+				int firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
 				if (firstVisible >= 0)
 				{
 					segmentIndex = firstVisible;
@@ -426,7 +426,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		else
 		{
 			// No saved segment; pick the first visible one on the page if any.
-			var firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
+			int firstVisible = await FindFirstVisibleSegmentIndexAsync(allFragmentIds);
 			if (firstVisible >= 0)
 			{
 				segmentIndex = firstVisible;
@@ -436,7 +436,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
 		// If a restore (or seek) provided an explicit position, ensure playback begins at it.
-		var forceSeek = pendingSeekOverrideSeconds is not null;
+		bool forceSeek = pendingSeekOverrideSeconds is not null;
 		await StartSegmentAsync(segments[segmentIndex], forceSeek: forceSeek);
 	}
 
@@ -536,7 +536,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	async Task UpdateChapterContextAsync(int chapterIndex)
 	{
 		currentChapterIndex = chapterIndex;
-		var chapter = book.Chapters.ElementAtOrDefault(chapterIndex);
+		Chapter? chapter = book.Chapters.ElementAtOrDefault(chapterIndex);
 		if (chapter is null)
 		{
 			segments = [];
@@ -544,12 +544,12 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var documents = ResolveDocumentsForChapter(chapter.FileName);
+		List<MediaOverlayDocument> documents = ResolveDocumentsForChapter(chapter.FileName);
 		segments = BuildSegments(documents, chapter.FileName);
 		currentChapterDurationSeconds = CalculateDurationSeconds(segments);
 		segmentIndex = 0;
 
-		var matchedDocumentSummary = documents.Count == 0
+		string matchedDocumentSummary = documents.Count == 0
 			? "none"
 			: string.Join(", ", documents.Select(document => $"{document.Id}:{document.FlattenedNodes.Count} nodes/{document.AssociatedContentDocuments.Count} refs"));
 		System.Diagnostics.Trace.TraceInformation($"Media overlay chapter context: chapterIndex={chapterIndex}, chapterFile='{chapter.FileName}', matchedDocuments={documents.Count}, segments={segments.Count}, cachedAudio={audioCache.Count}, durationSeconds={currentChapterDurationSeconds?.ToString() ?? "null"}, docs=[{matchedDocumentSummary}]");
@@ -562,8 +562,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	List<MediaOverlayDocument> ResolveDocumentsForChapter(string chapterFileName)
 	{
-		var normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
-		var chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
+		string normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
+		string chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
 		List<MediaOverlayDocument> documents = [.. book.MediaOverlays.Where(document =>
 			document.AssociatedContentDocuments.Any(content =>
 				MediaOverlayPathHelper.PathsReferToSameFile(content, normalizedChapterPath) ||
@@ -577,10 +577,10 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	static List<MediaOverlaySegment> BuildSegments(IEnumerable<MediaOverlayDocument> documents, string chapterFileName)
 	{
 		ArgumentNullException.ThrowIfNull(documents);
-		var documentList = documents.ToList();
+		List<MediaOverlayDocument> documentList = [.. documents];
 
-		var normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
-		var chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
+		string normalizedChapterPath = MediaOverlayPathHelper.Normalize(chapterFileName);
+		string chapterFileNameOnly = MediaOverlayPathHelper.ExtractFileName(chapterFileName);
 		if (string.IsNullOrWhiteSpace(chapterFileNameOnly))
 		{
 			return [];
@@ -588,22 +588,22 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		// Matches the chapterId used by EbookService when building combined.html sections,
 		// and by HtmlAgilityPackExtensions.BuildCombinedFragmentId when rewriting element IDs.
-		var chapterId = Path.GetFileNameWithoutExtension(chapterFileName);
+		string chapterId = Path.GetFileNameWithoutExtension(chapterFileName);
 
-		var list = new List<MediaOverlaySegment>();
-		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-		var candidateNodes = 0;
+		List<MediaOverlaySegment> list = [];
+		HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
+		int candidateNodes = 0;
 
-		foreach (var document in documentList)
+		foreach (MediaOverlayDocument? document in documentList)
 		{
-			foreach (var node in document.FlattenedNodes)
+			foreach (MediaOverlayParallel node in document.FlattenedNodes)
 			{
 				if (node.Text is null || node.Audio is null)
 				{
 					continue;
 				}
 
-				var (sourcePath, fragment) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
+				(string? sourcePath, string? fragment) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
 				if (string.IsNullOrWhiteSpace(fragment) || !PathsTargetChapter(sourcePath, normalizedChapterPath, chapterFileNameOnly))
 				{
 					continue;
@@ -611,7 +611,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 				candidateNodes++;
 
-				var key = $"{MediaOverlayPathHelper.Normalize(sourcePath)}#{fragment}|{MediaOverlayPathHelper.Normalize(node.Audio.Source)}|{node.Audio.ClipBegin?.Ticks ?? 0}|{node.Audio.ClipEnd?.Ticks ?? 0}";
+				string key = $"{MediaOverlayPathHelper.Normalize(sourcePath)}#{fragment}|{MediaOverlayPathHelper.Normalize(node.Audio.Source)}|{node.Audio.ClipBegin?.Ticks ?? 0}|{node.Audio.ClipEnd?.Ticks ?? 0}";
 				if (!seen.Add(key))
 				{
 					continue;
@@ -619,7 +619,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 				// Prefix the fragment with the chapter ID to match the rewritten DOM IDs in combined.html
 				// (e.g., "someId" -> "p002__someId", mirroring BuildCombinedFragmentId).
-				var combinedFragmentId = $"{chapterId}__{Uri.UnescapeDataString(fragment.Trim())}";
+				string combinedFragmentId = $"{chapterId}__{Uri.UnescapeDataString(fragment.Trim())}";
 				list.Add(new MediaOverlaySegment(node, combinedFragmentId));
 			}
 		}
@@ -636,7 +636,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return false;
 		}
 
-		var (sourcePath, _) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
+		(string? sourcePath, string? _) = MediaOverlayPathHelper.SplitSource(node.Text.Source);
 		return PathsTargetChapter(sourcePath, normalizedChapterPath, chapterFileNameOnly);
 	}
 
@@ -653,15 +653,15 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	async Task StartSegmentAsync(MediaOverlaySegment segment, bool forceSeek = false, bool preferPreviousPage = false)
 	{
-		if (!TryGetAudioResource(segment.Node.Audio?.Source, out var resource))
+		if (!TryGetAudioResource(segment.Node.Audio?.Source, out MediaOverlayAudioResource? resource))
 		{
 			System.Diagnostics.Trace.TraceWarning($"StartSegmentAsync could not resolve audio resource for source '{segment.Node.Audio?.Source}'.");
 			await HandleMissingAudioResourceAsync();
 			return;
 		}
 
-		var normalizedResourceId = resource.NormalizedPath;
-		var reuseExistingSession = string.Equals(currentAudioResourceId, normalizedResourceId, StringComparison.OrdinalIgnoreCase);
+		string normalizedResourceId = resource.NormalizedPath;
+		bool reuseExistingSession = string.Equals(currentAudioResourceId, normalizedResourceId, StringComparison.OrdinalIgnoreCase);
 
 		if (!reuseExistingSession)
 		{
@@ -671,7 +671,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		currentClipBegin = segment.Node.Audio?.ClipBegin ?? TimeSpan.Zero;
 		currentClipEnd = ResolveClipBoundary(segmentIndex, segment);
 
-		var sessionOpened = await EnsureAudioSessionAsync(normalizedResourceId, resource, reuseExistingSession);
+		bool sessionOpened = await EnsureAudioSessionAsync(normalizedResourceId, resource, reuseExistingSession);
 		if (!sessionOpened)
 		{
 			return;
@@ -710,7 +710,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			if (!audioPlaybackService.HasSession || !reuseExistingSession)
 			{
 				System.Diagnostics.Trace.TraceInformation($"Opening media overlay audio session: resource='{normalizedResourceId}', bytes={resource.Content.Length}, reuseExistingSession={reuseExistingSession}, contentType='{resource.ContentType ?? "unknown"}'");
-				var opened = await audioPlaybackService.OpenResourceAsync(normalizedResourceId, resource.Content);
+				bool opened = await audioPlaybackService.OpenResourceAsync(normalizedResourceId, resource.Content);
 				if (!opened)
 				{
 					System.Diagnostics.Trace.TraceWarning($"Audio session failed to open for resource '{normalizedResourceId}'.");
@@ -728,14 +728,14 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		await dispatcher.DispatchAsync(() =>
 		{
-			var position = audioPlaybackService.CurrentPosition;
+			double position = audioPlaybackService.CurrentPosition;
 			if (double.IsNaN(position))
 			{
 				position = 0;
 			}
 			if (forceSeek)
 			{
-				var seekSeconds = pendingSeekOverrideSeconds ?? (currentClipBegin <= TimeSpan.Zero ? 0 : currentClipBegin.TotalSeconds);
+				double seekSeconds = pendingSeekOverrideSeconds ?? (currentClipBegin <= TimeSpan.Zero ? 0 : currentClipBegin.TotalSeconds);
 				isSeekPending = true;
 				audioPlaybackService.Seek(seekSeconds);
 				pendingSeekOverrideSeconds = null;
@@ -767,7 +767,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		// Clamp to available duration
-		var total = GetActiveDurationSeconds();
+		double? total = GetActiveDurationSeconds();
 		if (total is not null)
 		{
 			seconds = Math.Clamp(seconds, 0, total.Value);
@@ -777,7 +777,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		double cumulative = 0;
 		for (int i = 0; i < segments.Count; i++)
 		{
-			var audio = segments[i].Node.Audio;
+			MediaOverlayAudio? audio = segments[i].Node.Audio;
 			if (audio?.ClipBegin is null || audio.ClipEnd is null)
 			{
 				// unknown length, treat as zero and pick this segment if we haven't found one
@@ -788,11 +788,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 				continue;
 			}
 
-			var segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
+			double segLen = (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
 			if (seconds < cumulative + segLen)
 			{
-				var offsetInSeg = Math.Max(0, seconds - cumulative);
-				var seekSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
+				double offsetInSeg = Math.Max(0, seconds - cumulative);
+				double seekSeconds = (audio.ClipBegin ?? TimeSpan.Zero).TotalSeconds + offsetInSeg;
 				pendingSeekOverrideSeconds = seekSeconds;
 				segmentIndex = i;
 				await StartSegmentAsync(segments[segmentIndex], forceSeek: true, preferPreviousPage: seconds < cumulative);
@@ -803,10 +803,10 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		// Fallback: seek to last segment
 		segmentIndex = Math.Clamp(segments.Count - 1, 0, segments.Count - 1);
-		var lastSegment = segments[segmentIndex];
+		MediaOverlaySegment lastSegment = segments[segmentIndex];
 		if (lastSegment.Node.Audio is not null)
 		{
-			var clipBegin = lastSegment.Node.Audio.ClipBegin ?? TimeSpan.Zero;
+			TimeSpan clipBegin = lastSegment.Node.Audio.ClipBegin ?? TimeSpan.Zero;
 			pendingSeekOverrideSeconds = clipBegin.TotalSeconds;
 			await StartSegmentAsync(lastSegment, forceSeek: true);
 		}
@@ -819,7 +819,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return null;
 		}
 
-		var pos = audioPlaybackService.CurrentPosition;
+		double pos = audioPlaybackService.CurrentPosition;
 		if (double.IsNaN(pos) || double.IsInfinity(pos))
 		{
 			return null;
@@ -829,7 +829,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		double cumulative = 0;
 		for (int i = 0; i < segmentIndex; i++)
 		{
-			var audio = segments[i].Node.Audio;
+			MediaOverlayAudio? audio = segments[i].Node.Audio;
 			if (audio?.ClipBegin is not null && audio.ClipEnd is not null)
 			{
 				cumulative += (audio.ClipEnd.Value - (audio.ClipBegin ?? TimeSpan.Zero)).TotalSeconds;
@@ -837,7 +837,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		// Add current playback position relative to current clip begin
-		var currentRelative = pos - (currentClipBegin.TotalSeconds);
+		double currentRelative = pos - (currentClipBegin.TotalSeconds);
 		if (currentRelative < 0)
 		{
 			currentRelative = 0;
@@ -856,14 +856,14 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return false;
 		}
 
-		var normalized = MediaOverlayPathHelper.Normalize(source);
-		if (audioCache.TryGetValue(normalized, out var cached))
+		string normalized = MediaOverlayPathHelper.Normalize(source);
+		if (audioCache.TryGetValue(normalized, out MediaOverlayAudioResource? cached))
 		{
 			resource = cached;
 			return true;
 		}
 
-		var relativeMatch = audioCache.Values.FirstOrDefault(value =>
+		MediaOverlayAudioResource? relativeMatch = audioCache.Values.FirstOrDefault(value =>
 			MediaOverlayPathHelper.PathsReferToSameFile(value.RelativePath, normalized) ||
 			MediaOverlayPathHelper.PathsReferToSameFile(value.NormalizedPath, normalized));
 		if (relativeMatch is not null)
@@ -872,8 +872,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return true;
 		}
 
-		var fileName = MediaOverlayPathHelper.ExtractFileName(source);
-		var match = audioCache.Values.FirstOrDefault(value =>
+		string fileName = MediaOverlayPathHelper.ExtractFileName(source);
+		MediaOverlayAudioResource? match = audioCache.Values.FirstOrDefault(value =>
 			string.Equals(MediaOverlayPathHelper.ExtractFileName(value.NormalizedPath), fileName, StringComparison.OrdinalIgnoreCase));
 		if (match is not null)
 		{
@@ -881,7 +881,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return true;
 		}
 
-		var sampleKeys = audioCache.Keys.Take(5).ToArray();
+		string[] sampleKeys = [.. audioCache.Keys.Take(5)];
 		System.Diagnostics.Trace.TraceWarning($"TryGetAudioResource failed: source='{source}', normalized='{normalized}', fileName='{fileName}', cachedAudio={audioCache.Count}, sampleKeys=[{string.Join(", ", sampleKeys)}]");
 
 		resource = null!;
@@ -896,11 +896,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		segmentIndex = Math.Clamp(segmentIndex, 0, segments.Count - 1);
-		var segment = segments[segmentIndex];
-		var fragmentLiteral = JsonSerializer.Serialize(segment.FragmentId, serializerOptions);
-		var activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
-		var playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
-		var navigationLiteral = JsonSerializer.Serialize(preferPreviousPage ? "prev" : "next", serializerOptions);
+		MediaOverlaySegment segment = segments[segmentIndex];
+		string fragmentLiteral = JsonSerializer.Serialize(segment.FragmentId, serializerOptions);
+		string activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
+		string playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
+		string navigationLiteral = JsonSerializer.Serialize(preferPreviousPage ? "prev" : "next", serializerOptions);
 
 		await dispatcher.DispatchAsync(async () =>
 		{
@@ -911,8 +911,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	Task<string> ClearHighlightAsync()
 	{
-		var activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
-		var playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
+		string activeLiteral = JsonSerializer.Serialize(ActiveClass, serializerOptions);
+		string playbackLiteral = JsonSerializer.Serialize(PlaybackClass, serializerOptions);
 		return dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync($"clearMediaOverlayHighlight({activeLiteral}, {playbackLiteral})"));
 	}
 
@@ -942,7 +942,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		return dispatcher.DispatchAsync(async () =>
 		{
-			var script = payload is null
+			string script = payload is null
 				? $"{functionName}();"
 				: $"{functionName}({JsonSerializer.Serialize(payload, serializerOptions)});";
 			try
@@ -974,7 +974,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		if (audioPlaybackService is not null && audioPlaybackService.HasSession)
 		{
-			var lastPosition = GetCurrentPositionSeconds();
+			double? lastPosition = GetCurrentPositionSeconds();
 			if (disposeSession && lastPosition is double pos)
 			{
 				restoredPositionSeconds = pos;
@@ -1029,12 +1029,12 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	async Task<(int index, int count)> GetVisibleSegmentPositionAsync(string fragmentId, IReadOnlyList<string> allFragmentIds)
 	{
-		var fragmentLiteral = JsonSerializer.Serialize(fragmentId, serializerOptions);
-		var listLiteral = JsonSerializer.Serialize(allFragmentIds, serializerOptions);
-		var script = $"getVisibleSegmentPosition({fragmentLiteral}, {listLiteral})";
+		string fragmentLiteral = JsonSerializer.Serialize(fragmentId, serializerOptions);
+		string listLiteral = JsonSerializer.Serialize(allFragmentIds, serializerOptions);
+		string script = $"getVisibleSegmentPosition({fragmentLiteral}, {listLiteral})";
 		try
 		{
-			var raw = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
+			string raw = await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync(script));
 
 			raw = raw.Replace("\\", "");
 			System.Diagnostics.Debug.WriteLine($"getVisibleSegmentPosition returned: {raw}");
@@ -1043,10 +1043,10 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 				System.Diagnostics.Trace.TraceWarning("getVisibleSegmentPosition returned empty result.");
 				return (-1, 0);
 			}
-			using var doc = JsonDocument.Parse(raw);
-			var root = doc.RootElement;
-			var index = root.TryGetProperty("index", out var jIndex) ? jIndex.GetInt32() : -1;
-			var count = root.TryGetProperty("count", out var jCount) ? jCount.GetInt32() : 0;
+			using JsonDocument doc = JsonDocument.Parse(raw);
+			JsonElement root = doc.RootElement;
+			int index = root.TryGetProperty("index", out JsonElement jIndex) ? jIndex.GetInt32() : -1;
+			int count = root.TryGetProperty("count", out JsonElement jCount) ? jCount.GetInt32() : 0;
 			return (index, count);
 		}
 
@@ -1061,7 +1061,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		for (int i = 0; i < segments.Count; i++)
 		{
-			var (visibleIndex, _) = await GetVisibleSegmentPositionAsync(segments[i].FragmentId, allFragmentIds);
+			(int visibleIndex, int _) = await GetVisibleSegmentPositionAsync(segments[i].FragmentId, allFragmentIds);
 			if (visibleIndex >= 0)
 			{
 				return i;
@@ -1080,7 +1080,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 			return;
 		}
 
-		var positionSeconds = audioPlaybackService.CurrentPosition;
+		double positionSeconds = audioPlaybackService.CurrentPosition;
 		if (double.IsNaN(positionSeconds) || double.IsInfinity(positionSeconds))
 		{
 			return;
@@ -1088,7 +1088,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 		if (isSeekPending)
 		{
-			var beginSeconds = currentClipBegin.TotalSeconds;
+			double beginSeconds = currentClipBegin.TotalSeconds;
 			if (positionSeconds >= beginSeconds)
 			{
 				isSeekPending = false;
@@ -1103,7 +1103,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		await HighlightCurrentSegmentAsync();
 
 		// Throttle UI payloads to ~200ms to reduce JS churn
-		var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+		long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 		if (!lastUiUpdateAtMs.HasValue || nowMs - lastUiUpdateAtMs.Value >= 200)
 		{
 			lastUiUpdateAtMs = nowMs;
@@ -1130,8 +1130,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		{
 			if (segmentIndex < segments.Count - 1)
 			{
-				var nextIndex = segmentIndex + 1;
-				var nextSegment = segments[nextIndex];
+				int nextIndex = segmentIndex + 1;
+				MediaOverlaySegment nextSegment = segments[nextIndex];
 
 				if (await IsCurrentSegmentLastOnPageAsync())
 				{
@@ -1150,8 +1150,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	async Task<bool> IsCurrentSegmentLastOnPageAsync()
 	{
-		var allFragmentIds = segments.Select(s => s.FragmentId).ToList();
-		var (visibleIndex, visibleCount) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds);
+		List<string> allFragmentIds = [.. segments.Select(s => s.FragmentId)];
+		(int visibleIndex, int visibleCount) = await GetVisibleSegmentPositionAsync(segments[segmentIndex].FragmentId, allFragmentIds);
 		return visibleIndex >= 0 && visibleIndex == visibleCount - 1 && visibleCount > 0;
 	}
 
@@ -1160,8 +1160,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		System.Diagnostics.Trace.TraceInformation($"Current segment {segmentIndex} is last on page; advancing page via JS next.");
 		await dispatcher.DispatchAsync(() => webView.EvaluateJavaScriptAsync("handleNextCommand()"));
 
-		var nextHasResourceAfter = TryGetAudioResource(nextSegment.Node.Audio?.Source, out var nextResourceAfter);
-		var sameResourceAfter = nextHasResourceAfter && string.Equals(nextResourceAfter?.NormalizedPath, currentAudioResourceId, StringComparison.OrdinalIgnoreCase);
+		bool nextHasResourceAfter = TryGetAudioResource(nextSegment.Node.Audio?.Source, out MediaOverlayAudioResource? nextResourceAfter);
+		bool sameResourceAfter = nextHasResourceAfter && string.Equals(nextResourceAfter?.NormalizedPath, currentAudioResourceId, StringComparison.OrdinalIgnoreCase);
 		segmentIndex = nextIndex;
 		if (sameResourceAfter && audioPlaybackService.HasSession)
 		{
@@ -1175,8 +1175,8 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	async Task HandleNextSegmentAsync(int nextIndex, MediaOverlaySegment nextSegment)
 	{
-		var nextHasResource = TryGetAudioResource(nextSegment.Node.Audio?.Source, out var nextResource);
-		var sameResource = nextHasResource && string.Equals(nextResource?.NormalizedPath, currentAudioResourceId, StringComparison.OrdinalIgnoreCase);
+		bool nextHasResource = TryGetAudioResource(nextSegment.Node.Audio?.Source, out MediaOverlayAudioResource? nextResource);
+		bool sameResource = nextHasResource && string.Equals(nextResource?.NormalizedPath, currentAudioResourceId, StringComparison.OrdinalIgnoreCase);
 
 		if (sameResource && audioPlaybackService.HasSession)
 		{
@@ -1194,7 +1194,7 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 	{
 		currentClipBegin = segment.Node.Audio?.ClipBegin ?? TimeSpan.Zero;
 		currentClipEnd = ResolveClipBoundary(segmentIndex, segment);
-		var pos = audioPlaybackService.CurrentPosition;
+		double pos = audioPlaybackService.CurrentPosition;
 		if (double.IsNaN(pos))
 		{
 			pos = 0;
@@ -1215,19 +1215,19 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	TimeSpan? ResolveClipBoundary(int index, MediaOverlaySegment segment)
 	{
-		var audio = segment.Node.Audio;
+		MediaOverlayAudio? audio = segment.Node.Audio;
 		if (audio is null)
 		{
 			return null;
 		}
 
-		var clipBegin = audio.ClipBegin ?? TimeSpan.Zero;
+		TimeSpan clipBegin = audio.ClipBegin ?? TimeSpan.Zero;
 		if (audio.ClipEnd is TimeSpan clipEnd && clipEnd > clipBegin)
 		{
 			return clipEnd;
 		}
 
-		var nextSegment = segments.ElementAtOrDefault(index + 1);
+		MediaOverlaySegment? nextSegment = segments.ElementAtOrDefault(index + 1);
 		if (nextSegment?.Node.Audio is MediaOverlayAudio nextAudio
 			&& !string.IsNullOrWhiteSpace(audio.Source)
 			&& !string.IsNullOrWhiteSpace(nextAudio.Source)
@@ -1260,19 +1260,19 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	bool NextChapterHasMedia()
 	{
-		var nextIndex = currentChapterIndex + 1;
+		int nextIndex = currentChapterIndex + 1;
 		if (nextIndex >= book.Chapters.Count)
 		{
 			return false;
 		}
-		var nextChapter = book.Chapters[nextIndex];
-		var docs = ResolveDocumentsForChapter(nextChapter.FileName);
+		Chapter nextChapter = book.Chapters[nextIndex];
+		List<MediaOverlayDocument> docs = ResolveDocumentsForChapter(nextChapter.FileName);
 		return BuildSegments(docs, nextChapter.FileName).Count > 0;
 	}
 
 	string GetCurrentChapterTitle()
 	{
-		var chapter = book.Chapters.ElementAtOrDefault(currentChapterIndex);
+		Chapter? chapter = book.Chapters.ElementAtOrDefault(currentChapterIndex);
 		return chapter?.Title ?? book.Title;
 	}
 
@@ -1289,23 +1289,23 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 		}
 
 		double totalSeconds = 0;
-		var hasDuration = false;
+		bool hasDuration = false;
 
-		foreach (var segment in segmentList)
+		foreach (MediaOverlaySegment segment in segmentList)
 		{
-			var audio = segment.Node.Audio;
+			MediaOverlayAudio? audio = segment.Node.Audio;
 			if (audio is null)
 			{
 				continue;
 			}
 
-			var clipBegin = audio.ClipBegin ?? TimeSpan.Zero;
+			TimeSpan clipBegin = audio.ClipBegin ?? TimeSpan.Zero;
 			if (audio.ClipEnd is not TimeSpan clipEnd)
 			{
 				continue;
 			}
 
-			var clipLength = (clipEnd - clipBegin).TotalSeconds;
+			double clipLength = (clipEnd - clipBegin).TotalSeconds;
 			if (clipLength <= 0)
 			{
 				continue;

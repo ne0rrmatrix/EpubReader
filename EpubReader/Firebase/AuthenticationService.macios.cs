@@ -8,9 +8,9 @@ using UIKit;
 
 #pragma warning disable S1075 // URIs should not be hardcoded
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
-public partial class AuthenticationService
+public partial class AuthenticationService : IAuthentication
 {
 
 	public async Task<string> SignInWithGooglePlatformAsync(CancellationToken cancellationToken)
@@ -72,14 +72,14 @@ public partial class AuthenticationService
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		var auth = Firebase.Auth.Auth.DefaultInstance;
+		var auth = global::Firebase.Auth.Auth.DefaultInstance;
 		if (auth is null)
 		{
 			Trace.TraceError("Google sign-in: Firebase Auth.DefaultInstance is null");
 			throw new InvalidOperationException("Firebase Auth is not initialized. Ensure GoogleService-Info.plist is configured.");
 		}
 
-		var authCredential = Firebase.Auth.GoogleAuthProvider.GetCredential(idToken, string.Empty);
+		var authCredential = global::Firebase.Auth.GoogleAuthProvider.GetCredential(idToken, string.Empty);
 		if (authCredential is null)
 		{
 			Trace.TraceError("Google sign-in: failed to create Firebase auth credential from ID token");

@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
-public partial class AuthenticationService
+public partial class AuthenticationService : IAuthentication
 {
 	static readonly HttpClient httpClient = new();
 

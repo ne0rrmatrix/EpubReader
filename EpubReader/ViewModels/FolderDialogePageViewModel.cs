@@ -80,7 +80,7 @@ public partial class FolderDialogPageViewModel : BaseViewModel
 				Progress = 0.0;
 				return;
 			}
-			var percent = Math.Min(100, (int)Math.Floor((double)Count * 100.0 / MaxCount));
+			int percent = Math.Min(100, (int)Math.Floor(Count * 100.0 / MaxCount));
 			ProgressPercent = percent;
 			Progress = Math.Max(0.0, Math.Min(1.0, percent / 100.0));
 		}

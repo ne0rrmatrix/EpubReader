@@ -156,7 +156,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeLineSpacing(lineSpacingOptions[LineSpacingPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeLineSpacing(lineSpacingOptions[LineSpacingPicker.SelectedIndex].Value);
 		if (string.Equals(settings.LineSpacing, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -179,7 +179,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeTextAlignment(textAlignmentOptions[TextAlignmentPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeTextAlignment(textAlignmentOptions[TextAlignmentPicker.SelectedIndex].Value);
 		if (string.Equals(settings.TextAlignment, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -202,7 +202,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeParagraphSpacing(paragraphSpacingOptions[ParagraphSpacingPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeParagraphSpacing(paragraphSpacingOptions[ParagraphSpacingPicker.SelectedIndex].Value);
 		if (string.Equals(settings.ParagraphSpacing, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -225,7 +225,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeBodyHyphens(hyphenationOptions[HyphenationPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeBodyHyphens(hyphenationOptions[HyphenationPicker.SelectedIndex].Value);
 		if (string.Equals(settings.BodyHyphens, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -248,7 +248,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeLetterSpacing(letterSpacingOptions[LetterSpacingPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeLetterSpacing(letterSpacingOptions[LetterSpacingPicker.SelectedIndex].Value);
 		if (string.Equals(settings.LetterSpacing, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -276,7 +276,7 @@ public partial class SettingsPage : Popup<bool>
 			return;
 		}
 
-		var selectedValue = NormalizeWordSpacing(wordSpacingOptions[WordSpacingPicker.SelectedIndex].Value);
+		string selectedValue = NormalizeWordSpacing(wordSpacingOptions[WordSpacingPicker.SelectedIndex].Value);
 		if (string.Equals(settings.WordSpacing, selectedValue, StringComparison.Ordinal))
 		{
 			return;
@@ -301,7 +301,7 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("Settings are null, cannot change theme.");
 			return;
 		}
-		var selectedTheme = ThemePicker.SelectedItem;
+		object selectedTheme = ThemePicker.SelectedItem;
 		if (selectedTheme is not ColorScheme scheme || settings.ColorScheme == scheme.Name)
 		{
 			return;
@@ -350,13 +350,13 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("Settings are null, cannot change font.");
 			return;
 		}
-		var selectedTheme = FontPicker.SelectedItem;
+		object selectedTheme = FontPicker.SelectedItem;
 		if (selectedTheme is not EpubFonts font || settings.FontFamily == font.FontFamily)
 		{
 			return;
 		}
 
-		var family = SanitizeFontFamily(font.FontFamily);
+		string family = SanitizeFontFamily(font.FontFamily);
 		settings.FontFamily = family;
 		logger.Info($"Chaging Font to: {family}");
 		await settingsStateService.SaveAsync(settings, SettingsChangeKind.FontFamily);
@@ -400,13 +400,13 @@ public partial class SettingsPage : Popup<bool>
 	async void CurrentPage_Loaded(object? sender, EventArgs? e)
 	{
 		settings = await settingsStateService.GetCurrentAsync();
-		var normalizedFontSize = NormalizeFontSize(settings.FontSize);
-		var normalizedLineSpacing = NormalizeLineSpacing(settings.LineSpacing);
-		var normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
-		var normalizedParagraphSpacing = NormalizeParagraphSpacing(settings.ParagraphSpacing);
-		var normalizedBodyHyphens = NormalizeBodyHyphens(settings.BodyHyphens);
-		var normalizedLetterSpacing = NormalizeLetterSpacing(settings.LetterSpacing);
-		var normalizedWordSpacing = NormalizeWordSpacing(settings.WordSpacing);
+		int normalizedFontSize = NormalizeFontSize(settings.FontSize);
+		string normalizedLineSpacing = NormalizeLineSpacing(settings.LineSpacing);
+		string normalizedTextAlignment = NormalizeTextAlignment(settings.TextAlignment);
+		string normalizedParagraphSpacing = NormalizeParagraphSpacing(settings.ParagraphSpacing);
+		string normalizedBodyHyphens = NormalizeBodyHyphens(settings.BodyHyphens);
+		string normalizedLetterSpacing = NormalizeLetterSpacing(settings.LetterSpacing);
+		string normalizedWordSpacing = NormalizeWordSpacing(settings.WordSpacing);
 		if (settings.FontSize != normalizedFontSize
 			|| !string.Equals(settings.LineSpacing, normalizedLineSpacing, StringComparison.Ordinal)
 			|| !string.Equals(settings.TextAlignment, normalizedTextAlignment, StringComparison.Ordinal)
@@ -436,7 +436,7 @@ public partial class SettingsPage : Popup<bool>
 		switchControl.IsToggled = settings.SupportMultipleColumns;
 		FontPicker.SelectedItem = ((SettingsPageViewModel)BindingContext).Fonts.Find(x => x.FontFamily == settings.FontFamily);
 		ApplyFontPreview(settings.FontFamily);
-		var scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
+		ColorScheme? scheme = ((SettingsPageViewModel)BindingContext).ColorSchemes.Find(x => x.Name == settings.ColorScheme);
 		ThemePicker.SelectedItem = scheme;
 		if (ThemePreview is not null && scheme is not null)
 		{
@@ -472,7 +472,7 @@ public partial class SettingsPage : Popup<bool>
 			return string.Empty;
 		}
 
-		var name = family;
+		string name = family;
 		if (name.Contains('/') || name.Contains('\\'))
 		{
 			name = Path.GetFileName(name);
@@ -501,12 +501,12 @@ public partial class SettingsPage : Popup<bool>
 			return defaultReaderLineSpacing;
 		}
 
-		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+		if (!double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsedValue))
 		{
 			return defaultReaderLineSpacing;
 		}
 
-		var nearest = lineSpacingOptions
+		double nearest = lineSpacingOptions
 			.Select(option => option.Value)
 			.Select(value => double.Parse(value, CultureInfo.InvariantCulture))
 			.OrderBy(value => Math.Abs(value - parsedValue))
@@ -599,8 +599,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetLineSpacingOptionIndex(string? lineSpacing)
 	{
-		var normalizedValue = NormalizeLineSpacing(lineSpacing);
-		for (var index = 0; index < lineSpacingOptions.Count; index++)
+		string normalizedValue = NormalizeLineSpacing(lineSpacing);
+		for (int index = 0; index < lineSpacingOptions.Count; index++)
 		{
 			if (string.Equals(lineSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -613,8 +613,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetTextAlignmentOptionIndex(string? textAlignment)
 	{
-		var normalizedValue = NormalizeTextAlignment(textAlignment);
-		for (var index = 0; index < textAlignmentOptions.Count; index++)
+		string normalizedValue = NormalizeTextAlignment(textAlignment);
+		for (int index = 0; index < textAlignmentOptions.Count; index++)
 		{
 			if (string.Equals(textAlignmentOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -627,8 +627,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetParagraphSpacingOptionIndex(string? paragraphSpacing)
 	{
-		var normalizedValue = NormalizeParagraphSpacing(paragraphSpacing);
-		for (var index = 0; index < paragraphSpacingOptions.Count; index++)
+		string normalizedValue = NormalizeParagraphSpacing(paragraphSpacing);
+		for (int index = 0; index < paragraphSpacingOptions.Count; index++)
 		{
 			if (string.Equals(paragraphSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -641,8 +641,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetHyphenationOptionIndex(string? bodyHyphens)
 	{
-		var normalizedValue = NormalizeBodyHyphens(bodyHyphens);
-		for (var index = 0; index < hyphenationOptions.Count; index++)
+		string normalizedValue = NormalizeBodyHyphens(bodyHyphens);
+		for (int index = 0; index < hyphenationOptions.Count; index++)
 		{
 			if (string.Equals(hyphenationOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -655,8 +655,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetLetterSpacingOptionIndex(string? letterSpacing)
 	{
-		var normalizedValue = NormalizeLetterSpacing(letterSpacing);
-		for (var index = 0; index < letterSpacingOptions.Count; index++)
+		string normalizedValue = NormalizeLetterSpacing(letterSpacing);
+		for (int index = 0; index < letterSpacingOptions.Count; index++)
 		{
 			if (string.Equals(letterSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -669,8 +669,8 @@ public partial class SettingsPage : Popup<bool>
 
 	static int GetWordSpacingOptionIndex(string? wordSpacing)
 	{
-		var normalizedValue = NormalizeWordSpacing(wordSpacing);
-		for (var index = 0; index < wordSpacingOptions.Count; index++)
+		string normalizedValue = NormalizeWordSpacing(wordSpacing);
+		for (int index = 0; index < wordSpacingOptions.Count; index++)
 		{
 			if (string.Equals(wordSpacingOptions[index].Value, normalizedValue, StringComparison.Ordinal))
 			{
@@ -716,7 +716,7 @@ public partial class SettingsPage : Popup<bool>
 				Settings = await db.GetSettings(),
 				Books = await db.GetAllBooks()
 			};
-			var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
+			string json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
 
 			// Prompt user to choose a folder to save the export
 
@@ -727,7 +727,7 @@ public partial class SettingsPage : Popup<bool>
 				return;
 			}
 
-			var folder = await folderPicker.PickFolderAsync();
+			string folder = await folderPicker.PickFolderAsync();
 			if (string.IsNullOrEmpty(folder))
 			{
 				// User cancelled folder selection
@@ -746,7 +746,7 @@ public partial class SettingsPage : Popup<bool>
 
 	async void OnDeleteLocalDataClicked(object? sender, EventArgs? e)
 	{
-		var ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
+		bool ok = await Shell.Current.DisplayAlertAsync(deleteLocalDataTitle, "This will remove local books, settings and progress from this device. This cannot be undone. Continue?", "Delete", "Cancel");
 		if (!ok)
 		{
 			return;

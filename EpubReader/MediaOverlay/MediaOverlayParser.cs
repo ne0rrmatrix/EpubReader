@@ -5,7 +5,7 @@ using EpubReader.Models.MediaOverlays;
 using VersOne.Epub;
 using VersOne.Epub.Schema;
 
-namespace EpubReader.Service;
+namespace EpubReader.MediaOverlay;
 
 /// <summary>
 /// Parses SMIL media overlay documents and associated metadata from an EPUB package.
@@ -20,43 +20,43 @@ public static class MediaOverlayParser
 	{
 		ArgumentNullException.ThrowIfNull(book);
 
-		var manifestItems = book.Schema.Package.Manifest.Items ?? [];
-		var overlayDocuments = new Dictionary<string, MediaOverlayDocument>(StringComparer.OrdinalIgnoreCase);
+		List<EpubManifestItem> manifestItems = book.Schema.Package.Manifest.Items ?? [];
+		Dictionary<string, MediaOverlayDocument> overlayDocuments = new(StringComparer.OrdinalIgnoreCase);
 
-		foreach (var manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
+		foreach (EpubManifestItem? manifestItem in manifestItems.Where(item => string.Equals(item.MediaType, mediaOverlayMimeType, StringComparison.OrdinalIgnoreCase)))
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			var smilFile = FindLocalTextFile(book, manifestItem.Href);
+			EpubLocalTextContentFileRef? smilFile = FindLocalTextFile(book, manifestItem.Href);
 			if (smilFile is null)
 			{
 				System.Diagnostics.Debug.WriteLine($"Media overlay SMIL file not found: {manifestItem.Href}");
 				continue;
 			}
 
-			var content = await smilFile.ReadContentAsTextAsync().ConfigureAwait(false);
-			var resolvedHref = MediaOverlayPathHelper.Normalize(smilFile.FilePath);
-			var overlayDocument = ParseSmil(manifestItem.Id, resolvedHref, content);
+			string content = await smilFile.ReadContentAsTextAsync().ConfigureAwait(false);
+			string resolvedHref = MediaOverlayPathHelper.Normalize(smilFile.FilePath);
+			MediaOverlayDocument overlayDocument = ParseSmil(manifestItem.Id, resolvedHref, content);
 			overlayDocuments[manifestItem.Id] = overlayDocument;
 		}
 		System.Diagnostics.Debug.WriteLine($"Parsed {overlayDocuments.Count} media overlay documents.");
-		foreach (var manifestItem in manifestItems)
+		foreach (EpubManifestItem manifestItem in manifestItems)
 		{
 			if (string.IsNullOrWhiteSpace(manifestItem.MediaOverlay))
 			{
 				continue;
 			}
 
-			if (overlayDocuments.TryGetValue(manifestItem.MediaOverlay, out var document))
+			if (overlayDocuments.TryGetValue(manifestItem.MediaOverlay, out MediaOverlayDocument? document))
 			{
 				document.AddAssociatedDocument(manifestItem.Href);
 			}
 		}
 
-		var metaItems = book.Schema.Package.Metadata.MetaItems ?? [];
-		var activeClass = ResolveMeta(metaItems, "media:active-class");
-		var playbackActiveClass = ResolveMeta(metaItems, "media:playback-active-class");
-		var narrator = ResolveMeta(metaItems, "media:narrator");
-		var duration = ParseClockValue(ResolveMeta(metaItems, "media:duration"));
+		List<EpubMetadataMeta> metaItems = book.Schema.Package.Metadata.MetaItems ?? [];
+		string? activeClass = ResolveMeta(metaItems, "media:active-class");
+		string? playbackActiveClass = ResolveMeta(metaItems, "media:playback-active-class");
+		string? narrator = ResolveMeta(metaItems, "media:narrator");
+		TimeSpan? duration = ParseClockValue(ResolveMeta(metaItems, "media:duration"));
 
 		if (overlayDocuments.Count == 0 && activeClass is null && playbackActiveClass is null && narrator is null && duration is null)
 		{
@@ -68,23 +68,23 @@ public static class MediaOverlayParser
 
 	static MediaOverlayDocument ParseSmil(string manifestId, string href, string content)
 	{
-		var document = XDocument.Parse(content);
-		var bodyElement = document.Root?.Element(smilNamespace + "body") ?? throw new InvalidOperationException("Media overlay SMIL document is missing the <body> element.");
-		var bodySequence = ParseSequence(bodyElement);
-		var flattened = FlattenParallels(bodySequence).ToList();
+		XDocument document = XDocument.Parse(content);
+		XElement bodyElement = document.Root?.Element(smilNamespace + "body") ?? throw new InvalidOperationException("Media overlay SMIL document is missing the <body> element.");
+		MediaOverlaySequence bodySequence = ParseSequence(bodyElement);
+		List<MediaOverlayParallel> flattened = FlattenParallels(bodySequence).ToList();
 		return new MediaOverlayDocument(manifestId, href, bodySequence, flattened);
 	}
 
 	static MediaOverlaySequence ParseSequence(XElement element)
 	{
-		var sequence = new MediaOverlaySequence
+		MediaOverlaySequence sequence = new()
 		{
 			Id = (string?)element.Attribute("id"),
 			EpubType = (string?)element.Attribute(epubNamespace + "type"),
 			TextReference = (string?)element.Attribute(epubNamespace + "textref")
 		};
 
-		foreach (var child in element.Elements())
+		foreach (XElement child in element.Elements())
 		{
 			if (child.Name == smilNamespace + "seq")
 			{
@@ -111,7 +111,7 @@ public static class MediaOverlayParser
 
 	static MediaOverlayText? ParseText(XElement? textElement)
 	{
-		var src = textElement?.Attribute("src")?.Value;
+		string? src = textElement?.Attribute("src")?.Value;
 		return string.IsNullOrWhiteSpace(src) ? null : new MediaOverlayText(src);
 	}
 
@@ -121,13 +121,13 @@ public static class MediaOverlayParser
 		{
 			return null;
 		}
-		var src = audioElement.Attribute("src")?.Value;
+		string? src = audioElement.Attribute("src")?.Value;
 		if (string.IsNullOrWhiteSpace(src))
 		{
 			return null;
 		}
-		var clipBegin = ParseClockValue(audioElement.Attribute("clipBegin")?.Value);
-		var clipEnd = ParseClockValue(audioElement.Attribute("clipEnd")?.Value);
+		TimeSpan? clipBegin = ParseClockValue(audioElement.Attribute("clipBegin")?.Value);
+		TimeSpan? clipEnd = ParseClockValue(audioElement.Attribute("clipEnd")?.Value);
 		return new MediaOverlayAudio(src, clipBegin, clipEnd);
 	}
 
@@ -144,9 +144,9 @@ public static class MediaOverlayParser
 			yield break;
 		}
 
-		foreach (var child in sequence.Children)
+		foreach (MediaOverlayNode child in sequence.Children)
 		{
-			foreach (var flattened in FlattenParallels(child))
+			foreach (MediaOverlayParallel flattened in FlattenParallels(child))
 			{
 				yield return flattened;
 			}
@@ -160,7 +160,7 @@ public static class MediaOverlayParser
 			return null;
 		}
 
-		var normalizedTarget = MediaOverlayPathHelper.Normalize(href);
+		string normalizedTarget = MediaOverlayPathHelper.Normalize(href);
 		return book.Content.AllFiles.Local
 			.OfType<EpubLocalTextContentFileRef>()
 			.FirstOrDefault(file => MediaOverlayPathHelper.PathsReferToSameFile(file.FilePath, normalizedTarget));
@@ -205,8 +205,8 @@ public static class MediaOverlayParser
 		static bool TryParseColonTime(string input, out TimeSpan result)
 		{
 			result = default;
-			var parts = input.Split(':');
-			if (parts.Length < 1 || parts.Length > 3)
+			string[] parts = input.Split(':');
+			if (parts.Length is < 1 or > 3)
 			{
 				return false;
 			}
@@ -258,14 +258,14 @@ public static class MediaOverlayParser
 		{
 			result = default;
 			// units: ms, s, min, h (case-insensitive)
-			var m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(2000));
+			Match m = Regex.Match(input, @"^\s*(?<num>[-+]?\d+(\.\d+)?)\s*(?<unit>ms|s|min|h)\s*$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(2000));
 			if (!m.Success)
 			{
 				return false;
 			}
 
-			var numStr = m.Groups["num"].Value;
-			var unit = m.Groups["unit"].Value.ToLowerInvariant();
+			string numStr = m.Groups["num"].Value;
+			string unit = m.Groups["unit"].Value.ToLowerInvariant();
 
 			if (!double.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
 			{

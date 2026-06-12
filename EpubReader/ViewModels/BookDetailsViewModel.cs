@@ -12,11 +12,11 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 
 	public async void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
-		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book b)
+		if (query.TryGetValue("Book", out object? bookObj) && bookObj is Book b)
 		{
 			Book = b;
 			CoverImage = b.CoverImagePath;
-			var existingBook = await db.GetBook(Book);
+			Book? existingBook = await db.GetBook(Book);
 			ArgumentNullException.ThrowIfNull(existingBook);
 			existingBook.SyncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, CancellationTokenSource.Token);
 			await db.SaveBookData(existingBook, CancellationTokenSource.Token);
@@ -46,7 +46,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 	{
 		try
 		{
-			var token = CancellationTokenSource.Token;
+			CancellationToken token = CancellationTokenSource.Token;
 			token.ThrowIfCancellationRequested();
 
 			if (Book.Chapters.Count == 0)
@@ -62,7 +62,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 				await db.UpdateBookLastOpenedDate(Book.Id, Book.LastOpenedDate.Value, token);
 			}
 
-			var navigationParams = new Dictionary<string, object>
+			Dictionary<string, object> navigationParams = new()
 			{
 				{ "Book", Book }
 			};
@@ -78,11 +78,11 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 
 	async Task RestoreProgressAsync(Book existingBook)
 	{
-		var token = CancellationTokenSource.Token;
-		var syncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, token);
+		CancellationToken token = CancellationTokenSource.Token;
+		string syncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, token);
 
 		// Get progress (sync service checks local cache first, then cloud)
-		var progress = await syncService.GetProgressAsync(syncId, token);
+		ReadingProgress? progress = await syncService.GetProgressAsync(syncId, token);
 
 		// Backfill from legacy Book fields if no progress record yet
 		if (progress is null && (existingBook.CurrentChapter > 0 || existingBook.CurrentPage > 0))
@@ -106,10 +106,8 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 	{
 		try
 		{
-			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
-			var authenticationService = services.GetRequiredService<AuthenticationService>();
-			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
-			var settingsOptions = new PopupOptions
+			SettingsPage settingsPopup = new(new SettingsPageViewModel(syncService));
+			PopupOptions settingsOptions = new()
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};

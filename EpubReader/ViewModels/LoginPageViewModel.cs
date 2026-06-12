@@ -2,9 +2,9 @@ using System.Diagnostics;
 
 namespace EpubReader.ViewModels;
 
-public partial class LoginPageViewModel(AuthenticationService authenticationService) : BaseViewModel
+public partial class LoginPageViewModel() : BaseViewModel
 {
-	readonly AuthenticationService authenticationService = authenticationService;
+	readonly IAuthentication authenticationService = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<IAuthentication>() ?? throw new InvalidOperationException();
 
 	[ObservableProperty]
 	public partial bool IsBusy { get; set; }
@@ -28,7 +28,7 @@ public partial class LoginPageViewModel(AuthenticationService authenticationServ
 			IsBusy = true;
 			IsNotBusy = false;
 			StatusMessage = "Signing in with Google...";
-			var userId = await authenticationService.SignInWithGoogleAsync(cancellationToken);
+			string userId = await authenticationService.SignInWithGoogleAsync(cancellationToken);
 
 			if (!string.IsNullOrWhiteSpace(userId))
 			{
@@ -76,7 +76,7 @@ public partial class LoginPageViewModel(AuthenticationService authenticationServ
 			IsNotBusy = false;
 			StatusMessage = "Setting up local mode...";
 #if WINDOWS
-			await AuthenticationService.SetLocalOnlyModeAsync(cancellationToken);
+			await authenticationService.SetLocalOnlyModeAsync(cancellationToken);
 #endif
 			StatusMessage = "Local mode enabled!";
 			await Shell.Current.Navigation.PopModalAsync();

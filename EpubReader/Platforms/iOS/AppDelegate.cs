@@ -13,7 +13,7 @@ public class AppDelegate : MauiUIApplicationDelegate
 		// This is the earliest possible entry point on iOS.
 		try
 		{
-			Firebase.Core.App.Configure();
+			global::Firebase.Core.App.Configure();
 			System.Diagnostics.Trace.TraceInformation("Firebase configured in AppDelegate.FinishedLaunching");
 		}
 		catch (Exception ex)

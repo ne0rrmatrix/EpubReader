@@ -39,7 +39,7 @@ public partial class FolderPicker : IFolderPicker
 
 		try
 		{
-			var documentFile = GetDocumentFileFromUri(folderUri);
+			DocumentFile? documentFile = GetDocumentFileFromUri(folderUri);
 			if (documentFile is null)
 			{
 				return Task.FromResult(epubFiles);
@@ -123,9 +123,9 @@ public partial class FolderPicker : IFolderPicker
 			{
 				Uri treeUri = data.Data;
 				// Persist the URI access permissions
-				var contentResolver = GetContentResolver() ?? throw new InvalidOperationException("ContentResolver is null.");
+				ContentResolver contentResolver = GetContentResolver() ?? throw new InvalidOperationException("ContentResolver is null.");
 				contentResolver.TakePersistableUriPermission(treeUri, ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
-				var treeTempUri = treeUri.ToString();
+				string? treeTempUri = treeUri.ToString();
 				if (string.IsNullOrEmpty(treeTempUri))
 				{
 					logger.Info("Picked folder URI is empty.");
@@ -151,20 +151,20 @@ public partial class FolderPicker : IFolderPicker
 			return Stream.Null;
 		}
 
-		var contentResolver = GetContentResolver();
+		ContentResolver? contentResolver = GetContentResolver();
 		if (contentResolver is null)
 		{
 			return Stream.Null;
 		}
 
-		using var inputStream = contentResolver.OpenInputStream(epubUri);
+		using Stream? inputStream = contentResolver.OpenInputStream(epubUri);
 		if (inputStream is null)
 		{
 			logger.Info("Could not open input stream for EPUB file.");
 			return Stream.Null;
 		}
 
-		var stream = new MemoryStream();
+		MemoryStream stream = new();
 		await inputStream.CopyToAsync(stream).ConfigureAwait(false);
 		stream.Position = 0; // Reset position to the beginning of the stream
 		return stream;
@@ -188,7 +188,7 @@ public partial class FolderPicker : IFolderPicker
 			return [];
 		}
 
-		var listFiles = documentFile.ListFiles();
+		DocumentFile[]? listFiles = documentFile.ListFiles();
 		if (listFiles is null)
 		{
 			logger.Info("No files found in the folder.");
@@ -216,7 +216,7 @@ public partial class FolderPicker : IFolderPicker
 			Uri uri = Uri.Parse(folderUri) ?? throw new InvalidOperationException("Invalid folder URI");
 			ArgumentNullException.ThrowIfNull(Platform.CurrentActivity);
 
-			var documentFile = DocumentFile.FromTreeUri(Platform.CurrentActivity.ApplicationContext, uri);
+			DocumentFile? documentFile = DocumentFile.FromTreeUri(Platform.CurrentActivity.ApplicationContext, uri);
 			if (documentFile is null)
 			{
 				logger.Info("DocumentFile is null. Check if the URI is valid and permissions are granted.");

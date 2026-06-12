@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
 sealed class FirebaseErrorBody
 {

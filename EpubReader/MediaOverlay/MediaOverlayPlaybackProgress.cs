@@ -1,4 +1,4 @@
-namespace EpubReader.Util;
+namespace EpubReader.MediaOverlay;
 
 /// <summary>
 /// Represents syncable Media Overlay playback state for a narrated EPUB section.

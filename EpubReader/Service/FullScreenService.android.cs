@@ -1,4 +1,5 @@
-﻿using Android.Util;
+﻿using Android.Content.Res;
+using Android.Util;
 using Android.Views;
 using Android.Widget;
 using AndroidX.Core.View;
@@ -52,7 +53,7 @@ class FullScreenService : IFullScreenService
 			ApplyHide(window, decorView);
 
 			// Delayed calls to work around aggressive OEMs (MIUI, etc.)
-			foreach (var delay in (int[])[150, 500, 1000])
+			foreach (int delay in (int[])[150, 500, 1000])
 			{
 				decorView.PostDelayed(() => ApplyHide(window, decorView), delay);
 			}
@@ -82,16 +83,16 @@ class FullScreenService : IFullScreenService
 
 	void ApplyHide(Window window, View decorView)
 	{
-		var controller = WindowCompat.GetInsetsController(window, decorView);
-		var barTypes = WindowInsetsCompat.Type.SystemBars() | WindowInsetsCompat.Type.NavigationBars();
+		WindowInsetsControllerCompat? controller = WindowCompat.GetInsetsController(window, decorView);
+		int barTypes = WindowInsetsCompat.Type.SystemBars() | WindowInsetsCompat.Type.NavigationBars();
 
 		// Android 35+: Hide CommunityToolkit.Maui overlays
 		if (OperatingSystem.IsAndroidVersionAtLeast(35))
 		{
-			var decorGroup = (ViewGroup)decorView;
+			ViewGroup decorGroup = (ViewGroup)decorView;
 
 			// Hide ALL StatusBar overlays (CTK bug: multiple can exist because no tag is set)
-			foreach (var overlay in FindAllStatusBarOverlays(decorGroup))
+			foreach (View overlay in FindAllStatusBarOverlays(decorGroup))
 			{
 				overlay.Visibility = ViewStates.Gone;
 				if (!statusBarOverlays.Contains(overlay))
@@ -139,8 +140,8 @@ class FullScreenService : IFullScreenService
 
 	void RestoreSystemBars(Window window, View decorView)
 	{
-		var controller = WindowCompat.GetInsetsController(window, decorView);
-		var barTypes = WindowInsetsCompat.Type.SystemBars() | WindowInsetsCompat.Type.NavigationBars();
+		WindowInsetsControllerCompat? controller = WindowCompat.GetInsetsController(window, decorView);
+		int barTypes = WindowInsetsCompat.Type.SystemBars() | WindowInsetsCompat.Type.NavigationBars();
 
 		if (OperatingSystem.IsAndroidVersionAtLeast(35))
 		{
@@ -148,7 +149,7 @@ class FullScreenService : IFullScreenService
 			window.SetFlags(WindowManagerFlags.DrawsSystemBarBackgrounds, WindowManagerFlags.DrawsSystemBarBackgrounds);
 
 			// Restore ALL StatusBar overlays
-			foreach (var overlay in statusBarOverlays)
+			foreach (View overlay in statusBarOverlays)
 			{
 				overlay.Visibility = ViewStates.Visible;
 			}
@@ -202,17 +203,17 @@ class FullScreenService : IFullScreenService
 	/// </summary>
 	static List<View> FindAllStatusBarOverlays(ViewGroup decorGroup)
 	{
-		var overlays = new List<View>();
-		var resources = Platform.CurrentActivity?.Resources;
+		List<View> overlays = new();
+		Resources? resources = Platform.CurrentActivity?.Resources;
 		if (resources is null)
 		{
 			return overlays;
 		}
 
-		var heightId = resources.GetIdentifier("status_bar_height", "dimen", "android");
-		var expectedHeight = (heightId > 0 ? resources.GetDimensionPixelSize(heightId) : 0) + 3;
+		int heightId = resources.GetIdentifier("status_bar_height", "dimen", "android");
+		int expectedHeight = (heightId > 0 ? resources.GetDimensionPixelSize(heightId) : 0) + 3;
 
-		for (var i = 0; i < decorGroup.ChildCount; i++)
+		for (int i = 0; i < decorGroup.ChildCount; i++)
 		{
 			if (decorGroup.GetChildAt(i) is { LayoutParameters: FrameLayout.LayoutParams { Gravity: GravityFlags.Top, Width: ViewGroup.LayoutParams.MatchParent } lp } child
 				&& lp.Height == expectedHeight)

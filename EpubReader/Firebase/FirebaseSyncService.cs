@@ -25,7 +25,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 	readonly string deviceName;
 	readonly Subject<ReadingProgress> saveSubject = new();
 	readonly CompositeDisposable subscriptions = [];
-	readonly AuthenticationService authenticationService;
+	readonly IAuthentication authenticationService;
 	string databaseUrl = string.Empty;
 	string? userId;
 	bool isLocalOnlyMode;
@@ -37,9 +37,9 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 	public bool IsLocalOnly => isLocalOnlyMode;
 
-	public FirebaseSyncService(AuthenticationService authenticationService)
+	public FirebaseSyncService(IAuthentication authentication)
 	{
-		this.authenticationService = authenticationService;
+		this.authenticationService = authentication;
 		deviceId = Preferences.Get(deviceIdKey, string.Empty);
 		if (string.IsNullOrWhiteSpace(deviceId))
 		{
@@ -182,7 +182,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		EnsureUserSet();
 
 		// Try local cache first
-		var local = await GetLocalProgressAsync(bookId, token);
+		ReadingProgress? local = await GetLocalProgressAsync(bookId, token);
 
 		// In local-only mode, don't attempt cloud sync
 		if (isLocalOnlyMode || !IsConfigured() || firebaseClient is null)
@@ -192,17 +192,17 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-			var cloudProgress = await firebaseClient
+			ReadingProgress cloudProgress = await firebaseClient
 				.Child(usersNode)
 				.Child(userId!)
 				.Child(booksNode)
 				.Child(bookId)
 				.OnceSingleAsync<ReadingProgress>();
 
-			var newest = SelectNewestProgress(local, cloudProgress);
-         if (ShouldPersistToLocalCache(newest))
+			ReadingProgress? newest = SelectNewestProgress(local, cloudProgress);
+			if (ShouldPersistToLocalCache(newest))
 			{
-                await SaveLocalProgressAsync(newest!, token);
+				await SaveLocalProgressAsync(newest!, token);
 			}
 
 			return newest;
@@ -226,7 +226,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-            return await firebaseClient
+			return await firebaseClient
 				   .Child(usersNode)
 				   .Child(userId!)
 				   .Child(booksNode)
@@ -298,12 +298,12 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 		try
 		{
-			var subscription = firebaseClient
+			IDisposable subscription = firebaseClient
 				 .Child(usersNode)
 				 .Child(userId!)
 				 .Child(booksNode)
 				 .AsObservable<ReadingProgress>()
-				 .Where(change => change.EventType == Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
+				 .Where(change => change.EventType == global::Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
 			  .Where(change => change.Object is not null)
 				 .SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object!, change.Key, ct)))
 				 .Subscribe(
@@ -342,10 +342,10 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return;
 		}
 
-		var queued = await GetQueuedItemsAsync(token);
-		foreach (var item in queued)
+		List<SyncQueueItem> queued = await GetQueuedItemsAsync(token);
+		foreach (SyncQueueItem item in queued)
 		{
-			var progress = new ReadingProgress
+			ReadingProgress progress = new()
 			{
 				BookId = item.BookId,
 				CurrentChapter = item.CurrentChapter,
@@ -376,7 +376,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 	public Task<bool> IsOnlineAsync(CancellationToken token = default)
 	{
 		token.ThrowIfCancellationRequested();
-		var isOnline = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
+		bool isOnline = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 		return Task.FromResult(isOnline);
 	}
 
@@ -387,10 +387,10 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return;
 		}
 
-		var dbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
+		string dbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
 
 		// Ensure the directory exists before creating the database
-		var directory = Path.GetDirectoryName(dbPath);
+		string? directory = Path.GetDirectoryName(dbPath);
 		if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
 		{
 			Directory.CreateDirectory(directory);
@@ -444,15 +444,15 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return;
 		}
 
-		var existing = new HashSet<string>(tableInfo.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
-		foreach (var (name, type) in columns)
+		HashSet<string> existing = new(tableInfo.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+		foreach ((string? name, string? type) in columns)
 		{
 			if (existing.Contains(name))
 			{
 				continue;
 			}
 			// SQLite allows ADD COLUMN without NOT NULL constraint for migrations.
-			var sql = $"ALTER TABLE {tableName} ADD COLUMN {name} {type}";
+			string sql = $"ALTER TABLE {tableName} ADD COLUMN {name} {type}";
 			await db.ExecuteAsync(sql).WaitAsync(token);
 		}
 	}
@@ -482,7 +482,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			await InitializeLocalDbAsync(token);
 		}
 
-		var queuedItem = new SyncQueueItem
+		SyncQueueItem queuedItem = new()
 		{
 			BookId = progress.BookId,
 			CurrentChapter = progress.CurrentChapter,
@@ -514,7 +514,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		{
 			return;
 		}
-		var item = await localDb.FindAsync<SyncQueueItem>(id).WaitAsync(token);
+		SyncQueueItem? item = await localDb.FindAsync<SyncQueueItem>(id).WaitAsync(token);
 		if (item is not null)
 		{
 			await localDb.DeleteAsync(item).WaitAsync(token);
@@ -559,8 +559,8 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 			if (cloudProgress is not null && IsNewer(cloudProgress, progress))
 			{
-				var newestCloudProgress = ReconcileDateFields(cloudProgress, progress);
-               if (ShouldPersistToLocalCache(newestCloudProgress))
+				ReadingProgress newestCloudProgress = ReconcileDateFields(cloudProgress, progress);
+				if (ShouldPersistToLocalCache(newestCloudProgress))
 				{
 					await SaveLocalProgressAsync(newestCloudProgress, token);
 				}
@@ -597,11 +597,11 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		token.ThrowIfCancellationRequested();
 		ArgumentNullException.ThrowIfNull(progress);
 
-		var localProgress = await GetLocalProgressAsync(progress.BookId, token);
-		var newest = SelectNewestProgress(localProgress, progress);
-     if (ShouldPersistToLocalCache(newest))
+		ReadingProgress? localProgress = await GetLocalProgressAsync(progress.BookId, token);
+		ReadingProgress? newest = SelectNewestProgress(localProgress, progress);
+		if (ShouldPersistToLocalCache(newest))
 		{
-            await SaveLocalProgressAsync(newest!, token);
+			await SaveLocalProgressAsync(newest!, token);
 		}
 
 		if (!string.Equals(progress.DeviceId, deviceId, StringComparison.Ordinal))
@@ -639,8 +639,8 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return first;
 		}
 
-		if (DateTimeOffset.TryParse(first, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var firstTime) &&
-			DateTimeOffset.TryParse(second, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var secondTime))
+		if (DateTimeOffset.TryParse(first, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset firstTime) &&
+			DateTimeOffset.TryParse(second, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset secondTime))
 		{
 			return firstTime > secondTime ? first : second;
 		}
@@ -672,7 +672,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 
 	static DateTimeOffset ParseTimestamp(string? timestamp)
 	{
-		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+		return DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed)
 			? parsed
 			: DateTimeOffset.MinValue;
 	}

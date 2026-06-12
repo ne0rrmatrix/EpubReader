@@ -32,7 +32,7 @@ public class FeedReader(HttpClient? httpClient = null)
 
 		try
 		{
-			var xmlContent = await httpClient.GetStringAsync(url, cancellationToken);
+			string xmlContent = await httpClient.GetStringAsync(url, cancellationToken);
 			return ParseFeed(xmlContent);
 		}
 		catch (HttpRequestException ex)
@@ -67,7 +67,7 @@ public class FeedReader(HttpClient? httpClient = null)
 
 		try
 		{
-			var doc = XDocument.Parse(xmlContent);
+			XDocument doc = XDocument.Parse(xmlContent);
 			return ParseFeedFromDocument(doc);
 		}
 		catch (XmlException ex)
@@ -84,12 +84,12 @@ public class FeedReader(HttpClient? httpClient = null)
 	/// <returns>A parsed OpdsFeed object.</returns>
 	OpdsFeed ParseFeedFromDocument(XDocument doc)
 	{
-		var root = doc.Root ?? throw new XmlException("Document root is null");
+		XElement root = doc.Root ?? throw new XmlException("Document root is null");
 
 		// Define namespaces
-		var atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
+		XNamespace atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
 
-		var feed = new OpdsFeed
+		OpdsFeed feed = new()
 		{
 			// Parse feed-level elements
 			Title = GetElementValue(root, atomNs + "title"),
@@ -104,7 +104,7 @@ public class FeedReader(HttpClient? httpClient = null)
 		}
 
 		// Parse author
-		var authorElement = root.Element(atomNs + "author");
+		XElement? authorElement = root.Element(atomNs + "author");
 		if (authorElement is not null)
 		{
 			feed.Author = new OpdsAuthor
@@ -136,14 +136,14 @@ public class FeedReader(HttpClient? httpClient = null)
 	{
 		try
 		{
-			var publishedDate = default(DateTime?);
-			var atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
-			var dcNs = XNamespace.Get("http://purl.org/dc/terms/");
-			if (DateTime.TryParse(GetElementValue(entryElement, dcNs + "date"), CultureInfo.InvariantCulture, out var date))
+			DateTime? publishedDate = default(DateTime?);
+			XNamespace atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
+			XNamespace dcNs = XNamespace.Get("http://purl.org/dc/terms/");
+			if (DateTime.TryParse(GetElementValue(entryElement, dcNs + "date"), CultureInfo.InvariantCulture, out DateTime date))
 			{
 				publishedDate = date;
 			}
-			var entry = new OpdsEntry
+			OpdsEntry entry = new()
 			{
 				Title = GetElementValue(entryElement, atomNs + "title"),
 				Id = GetElementValue(entryElement, atomNs + "id"),
@@ -153,12 +153,12 @@ public class FeedReader(HttpClient? httpClient = null)
 			};
 
 			// Parse dates
-			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "updated"), CultureInfo.InvariantCulture, out var updated))
+			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "updated"), CultureInfo.InvariantCulture, out DateTime updated))
 			{
 				entry.Updated = updated;
 			}
 
-			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "published"), CultureInfo.InvariantCulture, out var published))
+			if (DateTime.TryParse(GetElementValue(entryElement, atomNs + "published"), CultureInfo.InvariantCulture, out DateTime published))
 			{
 				entry.Published = published;
 			}
@@ -197,9 +197,9 @@ public class FeedReader(HttpClient? httpClient = null)
 	/// <returns>An enumerable of OpdsLink objects.</returns>
 	static IEnumerable<OpdsLink> ParseLinks(IEnumerable<XElement> linkElements)
 	{
-		foreach (var linkElement in linkElements)
+		foreach (XElement linkElement in linkElements)
 		{
-			var link = new OpdsLink
+			OpdsLink link = new()
 			{
 				Href = linkElement.Attribute("href")?.Value,
 				Type = linkElement.Attribute("type")?.Value,
@@ -237,7 +237,7 @@ public class FeedReader(HttpClient? httpClient = null)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		var searchUrl = $"{baseUrl.TrimEnd('/')}/opds/search/{Uri.EscapeDataString(searchTerms)}";
+		string searchUrl = $"{baseUrl.TrimEnd('/')}/opds/search/{Uri.EscapeDataString(searchTerms)}";
 
 		if (!string.IsNullOrEmpty(libraryId))
 		{

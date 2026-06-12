@@ -1,4 +1,4 @@
-namespace EpubReader.Util;
+namespace EpubReader.MediaOverlay;
 
 public static class MediaOverlayPathHelper
 {
@@ -9,8 +9,8 @@ public static class MediaOverlayPathHelper
 			return string.Empty;
 		}
 
-		var normalized = path.Replace('\\', '/').Trim();
-		var queryIndex = normalized.IndexOf('?', StringComparison.Ordinal);
+		string normalized = path.Replace('\\', '/').Trim();
+		int queryIndex = normalized.IndexOf('?', StringComparison.Ordinal);
 		if (queryIndex >= 0)
 		{
 			normalized = normalized[..queryIndex];
@@ -40,8 +40,8 @@ public static class MediaOverlayPathHelper
 			return (string.Empty, null);
 		}
 
-		var parts = source.Split('#', 2);
-		var fragment = parts.Length > 1 ? parts[1] : null;
+		string[] parts = source.Split('#', 2);
+		string? fragment = parts.Length > 1 ? parts[1] : null;
 		return (parts[0], string.IsNullOrWhiteSpace(fragment) ? null : fragment);
 	}
 
@@ -54,8 +54,8 @@ public static class MediaOverlayPathHelper
 
 	public static bool PathsReferToSameFile(string? candidatePath, string? targetPath)
 	{
-		var candidate = Normalize(candidatePath);
-		var target = Normalize(targetPath);
+		string candidate = Normalize(candidatePath);
+		string target = Normalize(targetPath);
 
 		if (string.IsNullOrEmpty(candidate) || string.IsNullOrEmpty(target))
 		{

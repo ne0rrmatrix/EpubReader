@@ -1,6 +1,6 @@
 using EpubReader.Models.MediaOverlays;
 
-namespace EpubReader.Util;
+namespace EpubReader.MediaOverlay;
 
 /// <summary>
 /// Represents a parsed SMIL media overlay document.

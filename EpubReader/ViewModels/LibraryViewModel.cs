@@ -61,7 +61,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 	{
 		try
 		{
-			var navigationParams = new Dictionary<string, object>
+			Dictionary<string, object> navigationParams = new()
 			{
 				{ "Book", book }
 			};
@@ -90,7 +90,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 
 			Logger.Info($"Removing book: {book.Title}");
 
-			var directory = Path.GetDirectoryName(book.FilePath);
+			string? directory = Path.GetDirectoryName(book.FilePath);
 			Logger.Info($"Book file path: {book.FilePath}");
 			if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
 			{
@@ -143,7 +143,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 			return;
 		}
 
-		var folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
+		string folderUri = await processEpubFiles.FolderPicker.PickFolderAsync().ConfigureAwait(false);
 		if (string.IsNullOrEmpty(folderUri))
 		{
 			Logger.Info("No folder selected");
@@ -162,9 +162,9 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 			};
 			LoadPopup();
 		}).ConfigureAwait(false);
-		var importToken = importStateService.Token;
+		CancellationToken importToken = importStateService.Token;
 
-		var epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, importToken).ConfigureAwait(false);
+		List<string> epubFiles = await processEpubFiles.FolderPicker.EnumerateEpubFilesInFolderAsync(folderUri, importToken).ConfigureAwait(false);
 
 		Logger.Info($"Found {epubFiles.Count} EPUB files in the selected folder");
 
@@ -218,7 +218,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 	public void ReplaceBooks(IEnumerable<Book> books)
 	{
 		Books.Clear();
-		foreach (var book in books)
+		foreach (Book book in books)
 		{
 			Books.Add(book);
 		}
@@ -244,14 +244,14 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 		try
 		{
 
-			var result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
+			FileResult? result = await processEpubFiles.PickEpubFileAsync(cancellationToken).ConfigureAwait(false);
 			if (result is null)
 			{
 				Logger.Info("No file selected");
 				return;
 			}
 
-			var ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
+			Book? ebook = await EbookService.GetListingAsync(result.FullPath).ConfigureAwait(false);
 			if (ebook is null)
 			{
 				await ShowErrorToastAsync("Error opening book. Please select a valid EPUB file.");
@@ -279,10 +279,8 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 	{
 		try
 		{
-			var services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
-			var authenticationService = services.GetRequiredService<AuthenticationService>();
-			var settingsPopup = new Views.SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
-			var settingsOptions = new PopupOptions
+			SettingsPage settingsPopup = new(new SettingsPageViewModel(syncService));
+			PopupOptions settingsOptions = new()
 			{
 				CanBeDismissedByTappingOutsideOfPopup = true,
 			};

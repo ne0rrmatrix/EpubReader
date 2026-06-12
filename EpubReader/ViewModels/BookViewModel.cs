@@ -18,7 +18,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	const string url = "app://demo/index.html";
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
-	readonly AuthenticationService authenticationService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	/// <summary>
@@ -76,9 +75,8 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel(AuthenticationService authenticationService)
+	public BookViewModel()
 	{
-		this.authenticationService = authenticationService;
 	}
 
 	/// <summary>
@@ -92,12 +90,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// image is null.</exception>
 	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
-		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
+		if (query.TryGetValue("Book", out object? bookObj) && bookObj is Book book)
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
 			BookTitle = book.Title;
-			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
+			byte[] bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
 		}
 	}
@@ -112,9 +110,9 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
-		var syncService = services.GetRequiredService<ISyncService>();
-		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
+		IServiceProvider services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
+		ISyncService syncService = services.GetRequiredService<ISyncService>();
+		SettingsPage popup = new(new SettingsPageViewModel(syncService));
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = true,

@@ -3,6 +3,7 @@
 public partial class CalibreSettingsPageViewModel : BaseViewModel
 {
 	const string defaultCalibrePrefix = "http";
+	readonly ICalibreZeroConf calibreZeroConf = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<ICalibreZeroConf>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPageViewModel>();
 	string loadedManualServerAddress = string.Empty;
 	CancellationTokenSource? settingsOperationCancellationTokenSource;
@@ -57,10 +58,10 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 			if (IsAutoConfigEnabled)
 			{
 				// Auto-discovery: use Bonjour to find Calibre servers
-				var result = await CalibreZeroConf.DiscoverCalibreServers(cancellationToken: operationCancellationTokenSource.Token);
+				List<(string IpAddress, int Port)> result = await calibreZeroConf.DiscoverCalibreServers(TimeSpan.FromSeconds(20), cancellationToken: operationCancellationTokenSource.Token);
 				if (result.Count > 0)
 				{
-					var (IpAddress, Port) = result[0];
+					(string? IpAddress, int Port) = result[0];
 					settings.CalibreManualUrlPrefix = defaultCalibrePrefix;
 					settings.CalibreManualIPAddress = IpAddress;
 					settings.CalibreManualPort = Port;

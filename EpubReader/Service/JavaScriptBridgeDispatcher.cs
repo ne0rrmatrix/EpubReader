@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using EpubReader.Util;
 
 namespace EpubReader.Service;
 
@@ -15,7 +14,7 @@ public sealed class JavaScriptBridgeDispatcher(IReaderBridgeCoordinator coordina
 			return;
 		}
 
-		var normalizedPayload = isBase64Encoded
+		string normalizedPayload = isBase64Encoded
 			? DecodePayload(payload)
 			: payload;
 		if (string.IsNullOrWhiteSpace(normalizedPayload))
@@ -23,7 +22,7 @@ public sealed class JavaScriptBridgeDispatcher(IReaderBridgeCoordinator coordina
 			return;
 		}
 
-		if (!BookPageJsMessage.TryParse(normalizedPayload, out var message))
+		if (!BookPageJsMessage.TryParse(normalizedPayload, out BookPageJsMessage? message))
 		{
 			Trace.TraceWarning($"Ignoring malformed reader bridge payload from {source}: {ShortenForTrace(normalizedPayload)}");
 			return;

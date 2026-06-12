@@ -5,20 +5,19 @@ namespace EpubReader;
 public partial class App : Application, IDisposable
 {
 	readonly AppShell appShell;
-	readonly AuthenticationService authenticationService;
+	readonly IAuthentication authenticationService;
 	readonly ISyncService syncService;
 	readonly CancellationTokenSource lifecycleCts = new();
 	bool disposed;
 
 	public App(
 		AppShell appShell,
-		AuthenticationService authenticationService,
-		ISyncService syncService)
+		ISyncService syncService, IAuthentication authenticationService)
 	{
 		InitializeComponent();
 		this.appShell = appShell;
-		this.authenticationService = authenticationService;
 		this.syncService = syncService;
+		this.authenticationService = authenticationService;
 		this.authenticationService.AuthStateChanged += OnAuthStateChanged;
 	}
 
@@ -52,18 +51,18 @@ public partial class App : Application, IDisposable
 
 	async Task InitializeAppAsync(CancellationToken token)
 	{
-		bool needsAuth = await AuthenticationService.NeedsAuthenticationAsync(token);
+		bool needsAuth = await authenticationService.NeedsAuthenticationAsync(token);
 		if (needsAuth)
 		{
-			await AuthenticationService.SetLocalOnlyModeAsync(token);
+			await authenticationService.SetLocalOnlyModeAsync(token);
 		}
 		await InitializeSyncAsync(token);
 	}
 
 	async Task InitializeSyncAsync(CancellationToken token)
 	{
-		var isAuthenticated = await authenticationService.IsAuthenticatedAsync(token);
-		var isLocalOnly = await AuthenticationService.IsLocalOnlyModeAsync(token);
+		bool isAuthenticated = await authenticationService.IsAuthenticatedAsync(token);
+		bool isLocalOnly = await authenticationService.IsLocalOnlyModeAsync(token);
 
 		if (isLocalOnly)
 		{
@@ -71,7 +70,7 @@ public partial class App : Application, IDisposable
 		}
 		else if (isAuthenticated)
 		{
-			var userId = await authenticationService.GetCurrentUserIdAsync(token);
+			string userId = await authenticationService.GetCurrentUserIdAsync(token);
 
 			await syncService.InitializeAsync(userId, token);
 			await syncService.SubscribeToRemoteChangesAsync(token);

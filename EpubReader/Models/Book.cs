@@ -155,8 +155,8 @@ public partial class Book : ObservableObject
 			return null;
 		}
 
-		var normalized = MediaOverlayPathHelper.Normalize(path);
-		var fileName = MediaOverlayPathHelper.ExtractFileName(path);
+		string normalized = MediaOverlayPathHelper.Normalize(path);
+		string fileName = MediaOverlayPathHelper.ExtractFileName(path);
 
 		return MediaOverlayAudio.FirstOrDefault(resource =>
 			string.Equals(resource.NormalizedPath, normalized, StringComparison.OrdinalIgnoreCase) ||

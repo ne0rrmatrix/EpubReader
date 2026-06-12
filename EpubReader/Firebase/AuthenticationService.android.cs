@@ -1,11 +1,12 @@
 ﻿using System.Diagnostics;
 using AndroidX.Credentials;
-using Microsoft.Maui.ApplicationModel;
+using Firebase.Auth;
+using Java.Util.Concurrent;
 using Xamarin.GoogleAndroid.Libraries.Identity.GoogleId;
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
-public partial class AuthenticationService
+public partial class AuthenticationService : IAuthentication
 {
 	public async Task<string> SignInWithGooglePlatformAsync(CancellationToken cancellationToken)
 	{
@@ -17,7 +18,7 @@ public partial class AuthenticationService
 			throw new InvalidOperationException("Current Activity is null");
 		}
 
-		var idToken = await GetGoogleIdTokenAsync(activity, cancellationToken);
+		string idToken = await GetGoogleIdTokenAsync(activity, cancellationToken);
 		Trace.TraceInformation(string.IsNullOrEmpty(idToken)
 			? "Google sign-in: Google ID token retrieval returned empty"
 			: "Google sign-in: Google ID token retrieved");
@@ -28,15 +29,15 @@ public partial class AuthenticationService
 		}
 
 		Trace.TraceInformation("Google sign-in: IdToken retrieved, exchanging with Firebase");
-		var auth = Firebase.Auth.FirebaseAuth.Instance;
-		var authCredential = Firebase.Auth.GoogleAuthProvider.GetCredential(idToken, null);
+		FirebaseAuth auth = global::Firebase.Auth.FirebaseAuth.Instance;
+		AuthCredential? authCredential = global::Firebase.Auth.GoogleAuthProvider.GetCredential(idToken, null);
 		if (authCredential is null)
 		{
 			Trace.TraceError("Google sign-in: failed to create Firebase auth credential from ID token");
 			throw new InvalidOperationException("Failed to create Firebase auth credential from ID token");
 		}
 
-		var credential = await auth.SignInWithCredentialAsync(authCredential);
+		IAuthResult credential = await auth.SignInWithCredentialAsync(authCredential);
 		if (credential?.User is null)
 		{
 			Trace.TraceError("Google sign-in: Firebase sign-in with credential returned null user");
@@ -55,8 +56,8 @@ public partial class AuthenticationService
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		var serverClientId = FirebaseConfig.DefaultWebClientId;
-		var googleOptionBuilder = new GetGoogleIdOption.Builder();
+		string serverClientId = FirebaseConfig.DefaultWebClientId;
+		GetGoogleIdOption.Builder googleOptionBuilder = new();
 		googleOptionBuilder.SetFilterByAuthorizedAccounts(false);
 		googleOptionBuilder.SetAutoSelectEnabled(false);
 		if (!string.IsNullOrEmpty(serverClientId))
@@ -64,21 +65,21 @@ public partial class AuthenticationService
 			googleOptionBuilder.SetServerClientId(serverClientId);
 		}
 
-		var googleOption = googleOptionBuilder.Build();
-		var requestBuilder = new GetCredentialRequest.Builder();
+		GetGoogleIdOption googleOption = googleOptionBuilder.Build();
+		GetCredentialRequest.Builder requestBuilder = new();
 		requestBuilder.AddCredentialOption(googleOption);
-		var request = requestBuilder.Build();
+		GetCredentialRequest request = requestBuilder.Build();
 
 		try
 		{
-			var credentialManager = CredentialManager.Create(activity);
+			ICredentialManager credentialManager = CredentialManager.Create(activity);
 			Trace.TraceInformation("Google sign-in: invoking CredentialManager.GetCredentialAsync");
 
-			var completionSource = new TaskCompletionSource<(Java.Lang.Object? Result, Java.Lang.Object? Error)>(TaskCreationOptions.RunContinuationsAsynchronously);
-			using var cancellationSignal = new Android.OS.CancellationSignal();
-			using var cancellationRegistration = cancellationToken.Register(cancellationSignal.Cancel);
-			using var executor = Java.Util.Concurrent.Executors.NewSingleThreadExecutor() ?? throw new InvalidOperationException("CredentialManager executor creation failed");
-			using var callback = new CredentialCallback(
+			TaskCompletionSource<(Java.Lang.Object? Result, Java.Lang.Object? Error)> completionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+			using Android.OS.CancellationSignal cancellationSignal = new();
+			using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(cancellationSignal.Cancel);
+			using IExecutorService executor = Java.Util.Concurrent.Executors.NewSingleThreadExecutor() ?? throw new InvalidOperationException("CredentialManager executor creation failed");
+			using CredentialCallback callback = new(
 				onResult: result => completionSource.TrySetResult((result, null)),
 				onError: error =>
 				{
@@ -87,8 +88,8 @@ public partial class AuthenticationService
 
 			credentialManager.GetCredentialAsync(activity, request, cancellationSignal, executor, callback);
 
-			var (resultObject, errorObject) = await completionSource.Task;
-			var errorText = errorObject?.ToString() ?? string.Empty;
+			(Java.Lang.Object? resultObject, Java.Lang.Object? errorObject) = await completionSource.Task;
+			string errorText = errorObject?.ToString() ?? string.Empty;
 			if (!string.IsNullOrWhiteSpace(errorText) &&
 				(errorText.Contains("GetCredentialCancellationException", StringComparison.Ordinal) ||
 				errorText.Contains("cancelled", StringComparison.OrdinalIgnoreCase) ||
@@ -112,17 +113,17 @@ public partial class AuthenticationService
 				throw new InvalidOperationException($"Google sign-in failed to access device credentials: {errorText}");
 			}
 
-			var response = resultObject as GetCredentialResponse;
-			var credential = response?.Credential;
-			var type = credential?.Type;
-			var data = credential?.Data;
+			GetCredentialResponse? response = resultObject as GetCredentialResponse;
+			Credential? credential = response?.Credential;
+			string? type = credential?.Type;
+			Android.OS.Bundle? data = credential?.Data;
 			if (type is not null && data is not null &&
 				(type.Equals(GoogleIdTokenCredential.TypeGoogleIdTokenCredential) || type.Equals(GoogleIdTokenCredential.TypeGoogleIdTokenSiwgCredential)))
 			{
 				try
 				{
-					var googleIdTokenCredential = GoogleIdTokenCredential.CreateFrom(data);
-					var idToken = googleIdTokenCredential?.IdToken;
+					GoogleIdTokenCredential googleIdTokenCredential = GoogleIdTokenCredential.CreateFrom(data);
+					string? idToken = googleIdTokenCredential?.IdToken;
 					Trace.TraceInformation(string.IsNullOrEmpty(idToken)
 						? "Google sign-in: GoogleIdTokenCredential returned empty token"
 						: "Google sign-in: GoogleIdTokenCredential returned token");

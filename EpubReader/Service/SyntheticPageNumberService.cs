@@ -24,12 +24,12 @@ public partial class SyntheticPageNumberService
 	/// <returns>A list of synthetic page information for each resource.</returns>
 	public static List<SyntheticPageInfo> GenerateSyntheticPages(Book book)
 	{
-		var syntheticPages = new List<SyntheticPageInfo>();
+		List<SyntheticPageInfo> syntheticPages = new();
 
 		// Process each chapter/resource in the spine
-		foreach (var chapter in book.Chapters)
+		foreach (Chapter chapter in book.Chapters)
 		{
-			var pageInfo = GeneratePageInfoForResource(chapter);
+			SyntheticPageInfo pageInfo = GeneratePageInfoForResource(chapter);
 			syntheticPages.Add(pageInfo);
 		}
 
@@ -43,7 +43,7 @@ public partial class SyntheticPageNumberService
 	/// <returns>Synthetic page information for the resource.</returns>
 	static SyntheticPageInfo GeneratePageInfoForResource(Chapter resource)
 	{
-		var pageInfo = new SyntheticPageInfo
+		SyntheticPageInfo pageInfo = new()
 		{
 			ResourceFileName = resource.FileName
 		};
@@ -73,7 +73,7 @@ public partial class SyntheticPageNumberService
 		// Step 3: Count Unicode characters and distribute page breaks
 		if (!string.IsNullOrEmpty(resource.HtmlFile))
 		{
-			var textContent = ExtractTextFromHtml(resource.HtmlFile);
+			string textContent = ExtractTextFromHtml(resource.HtmlFile);
 			pageInfo.TotalCharacters = textContent.Length;
 
 			if (pageInfo.TotalCharacters > 0)
@@ -102,8 +102,8 @@ public partial class SyntheticPageNumberService
 		}
 
 		// Remove HTML tags using regex
-		var htmlTagPattern = @"<[^>]*>";
-		var textContent = Regex.Replace(htmlContent, htmlTagPattern, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(20));
+		string htmlTagPattern = @"<[^>]*>";
+		string textContent = Regex.Replace(htmlContent, htmlTagPattern, string.Empty, RegexOptions.None, TimeSpan.FromSeconds(20));
 
 		// Decode HTML entities
 		textContent = System.Net.WebUtility.HtmlDecode(textContent);
@@ -123,7 +123,7 @@ public partial class SyntheticPageNumberService
 	/// <returns>List of character positions where page breaks should occur.</returns>
 	static List<int> GeneratePageBreakPositions(int totalCharacters, int pageCount)
 	{
-		var pageBreakPositions = new List<int>();
+		List<int> pageBreakPositions = new();
 
 		if (pageCount <= 1 || totalCharacters <= 0)
 		{
