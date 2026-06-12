@@ -10,6 +10,7 @@ global using EpubReader.Interfaces;
 global using EpubReader.MediaOverlay;
 global using EpubReader.Models;
 global using EpubReader.Service;
+global using EpubReader.OPDS;
 global using EpubReader.Util;
 global using EpubReader.ViewModels;
 global using EpubReader.Views;

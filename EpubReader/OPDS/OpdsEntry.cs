@@ -1,4 +1,4 @@
-﻿namespace EpubReader.Models;
+﻿namespace EpubReader.OPDS;
 
 /// <summary>
 /// Represents an individual entry in an OPDS feed.

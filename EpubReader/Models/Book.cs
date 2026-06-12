@@ -1,5 +1,4 @@
-﻿using EpubReader.Models.MediaOverlays;
-using SQLite;
+﻿using SQLite;
 
 namespace EpubReader.Models;
 

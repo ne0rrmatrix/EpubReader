@@ -1,6 +1,5 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using EpubReader.Models.MediaOverlays;
 using Plugin.Maui.Audio;
 
 namespace EpubReader.MediaOverlay;

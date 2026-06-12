@@ -1,4 +1,4 @@
-namespace EpubReader.Models;
+namespace EpubReader.OPDS;
 
 /// <summary>
 /// Represents a selectable OPDS feed entry for navigation and filtering.

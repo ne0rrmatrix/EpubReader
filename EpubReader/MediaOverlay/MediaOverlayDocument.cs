@@ -1,5 +1,3 @@
-using EpubReader.Models.MediaOverlays;
-
 namespace EpubReader.MediaOverlay;
 
 /// <summary>

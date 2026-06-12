@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
-using EpubReader.ODPS;
 
 namespace EpubReader.ViewModels;
 

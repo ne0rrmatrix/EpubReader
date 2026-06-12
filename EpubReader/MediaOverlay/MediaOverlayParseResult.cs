@@ -1,4 +1,4 @@
-namespace EpubReader.Models.MediaOverlays;
+namespace EpubReader.MediaOverlay;
 
 public sealed class MediaOverlayParseResult(IReadOnlyList<MediaOverlayDocument> documents, string? activeClass, string? playbackActiveClass, string? narrator, TimeSpan? duration)
 {

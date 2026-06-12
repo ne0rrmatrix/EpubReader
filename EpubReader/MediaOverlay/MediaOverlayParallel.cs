@@ -1,4 +1,4 @@
-namespace EpubReader.Models.MediaOverlays;
+namespace EpubReader.MediaOverlay;
 
 public sealed class MediaOverlayParallel : MediaOverlayNode
 {

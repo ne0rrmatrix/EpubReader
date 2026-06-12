@@ -2,7 +2,7 @@
 using System.Xml;
 using System.Xml.Linq;
 
-namespace EpubReader.ODPS;
+namespace EpubReader.OPDS;
 
 /// <summary>
 /// Provides functionality to parse OPDS (Open Publication Distribution System) feeds from Calibre servers.

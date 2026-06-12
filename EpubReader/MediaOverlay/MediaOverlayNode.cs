@@ -1,4 +1,4 @@
-namespace EpubReader.Models.MediaOverlays;
+namespace EpubReader.MediaOverlay;
 
 /// <summary>
 /// Base node for SMIL sequences and parallels.

@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using EpubReader.Models.MediaOverlays;
 using VersOne.Epub;
 using VersOne.Epub.Schema;
 
