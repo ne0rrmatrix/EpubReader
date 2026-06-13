@@ -65,21 +65,6 @@ public sealed partial class ImportStateService : ObservableObject, IImportStateS
 		dispatcher.Dispatch(() => ApplyProgress(title, count, maxCount));
 	}
 
-	void ApplyProgress(string title, int count, int maxCount)
-	{
-		Current = new FolderInfo
-		{
-			Title = title,
-			Count = count,
-			MaxCount = maxCount,
-		};
-		Title = string.IsNullOrWhiteSpace(title) ? "Please wait..." : title;
-		Count = count;
-		MaxCount = maxCount;
-		CounterText = $"{count}/{maxCount}";
-		UpdateProgress();
-	}
-
 	public void Cancel()
 	{
 		if (!cancellationTokenSource.IsCancellationRequested)
@@ -97,6 +82,21 @@ public sealed partial class ImportStateService : ObservableObject, IImportStateS
 		}
 
 		dispatcher.Dispatch(() => IsRunning = false);
+	}
+
+	void ApplyProgress(string title, int count, int maxCount)
+	{
+		Current = new FolderInfo
+		{
+			Title = title,
+			Count = count,
+			MaxCount = maxCount,
+		};
+		Title = string.IsNullOrWhiteSpace(title) ? "Please wait..." : title;
+		Count = count;
+		MaxCount = maxCount;
+		CounterText = $"{count}/{maxCount}";
+		UpdateProgress();
 	}
 
 	void Dispose(bool disposing)

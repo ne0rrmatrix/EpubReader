@@ -24,7 +24,7 @@ public partial class SyntheticPageNumberService
 	/// <returns>A list of synthetic page information for each resource.</returns>
 	public static List<SyntheticPageInfo> GenerateSyntheticPages(Book book)
 	{
-		List<SyntheticPageInfo> syntheticPages = new();
+		List<SyntheticPageInfo> syntheticPages = [];
 
 		// Process each chapter/resource in the spine
 		foreach (Chapter chapter in book.Chapters)
@@ -34,6 +34,69 @@ public partial class SyntheticPageNumberService
 		}
 
 		return syntheticPages;
+	}
+
+	/// <summary>
+	/// Gets the page number for a given character position within a resource.
+	/// </summary>
+	/// <param name="pageInfo">The synthetic page information for the resource.</param>
+	/// <param name="characterPosition">The character position to find the page for.</param>
+	/// <returns>The page number (1-based) for the given character position.</returns>
+	public static int GetPageNumberForPosition(SyntheticPageInfo pageInfo, int characterPosition)
+	{
+		if (pageInfo.PageBreakPositions.Count == 0 || characterPosition <= 0)
+		{
+			return 1;
+		}
+
+		// Find which page this position falls into
+		for (int i = 0; i < pageInfo.PageBreakPositions.Count; i++)
+		{
+			if (characterPosition < pageInfo.PageBreakPositions[i])
+			{
+				return i + 1;
+			}
+		}
+
+		// Position is in the last page
+		return pageInfo.PageCount;
+	}
+
+	/// <summary>
+	/// Gets the total number of pages across all resources in the book.
+	/// </summary>
+	/// <param name="syntheticPages">List of synthetic page information for all resources.</param>
+	/// <returns>Total number of pages in the book.</returns>
+	public static int GetTotalPageCount(List<SyntheticPageInfo> syntheticPages)
+	{
+		return syntheticPages.Sum(p => p.PageCount);
+	}
+
+	/// <summary>
+	/// Gets the global page number for a specific chapter and character position.
+	/// </summary>
+	/// <param name="syntheticPages">List of synthetic page information for all resources.</param>
+	/// <param name="chapterIndex">Zero-based index of the chapter.</param>
+	/// <param name="characterPosition">Character position within the chapter.</param>
+	/// <returns>Global page number (1-based) across the entire book.</returns>
+	public static int GetGlobalPageNumber(List<SyntheticPageInfo> syntheticPages, int chapterIndex, int characterPosition)
+	{
+		if (chapterIndex < 0 || chapterIndex >= syntheticPages.Count)
+		{
+			return 1;
+		}
+
+		// Calculate page offset from previous chapters
+		int pageOffset = 0;
+		for (int i = 0; i < chapterIndex; i++)
+		{
+			pageOffset += syntheticPages[i].PageCount;
+		}
+
+		// Get page number within current chapter
+		int localPageNumber = GetPageNumberForPosition(syntheticPages[chapterIndex], characterPosition);
+
+		return pageOffset + localPageNumber;
 	}
 
 	/// <summary>
@@ -123,7 +186,7 @@ public partial class SyntheticPageNumberService
 	/// <returns>List of character positions where page breaks should occur.</returns>
 	static List<int> GeneratePageBreakPositions(int totalCharacters, int pageCount)
 	{
-		List<int> pageBreakPositions = new();
+		List<int> pageBreakPositions = [];
 
 		if (pageCount <= 1 || totalCharacters <= 0)
 		{
@@ -146,69 +209,6 @@ public partial class SyntheticPageNumberService
 		}
 
 		return pageBreakPositions;
-	}
-
-	/// <summary>
-	/// Gets the page number for a given character position within a resource.
-	/// </summary>
-	/// <param name="pageInfo">The synthetic page information for the resource.</param>
-	/// <param name="characterPosition">The character position to find the page for.</param>
-	/// <returns>The page number (1-based) for the given character position.</returns>
-	public static int GetPageNumberForPosition(SyntheticPageInfo pageInfo, int characterPosition)
-	{
-		if (pageInfo.PageBreakPositions.Count == 0 || characterPosition <= 0)
-		{
-			return 1;
-		}
-
-		// Find which page this position falls into
-		for (int i = 0; i < pageInfo.PageBreakPositions.Count; i++)
-		{
-			if (characterPosition < pageInfo.PageBreakPositions[i])
-			{
-				return i + 1;
-			}
-		}
-
-		// Position is in the last page
-		return pageInfo.PageCount;
-	}
-
-	/// <summary>
-	/// Gets the total number of pages across all resources in the book.
-	/// </summary>
-	/// <param name="syntheticPages">List of synthetic page information for all resources.</param>
-	/// <returns>Total number of pages in the book.</returns>
-	public static int GetTotalPageCount(List<SyntheticPageInfo> syntheticPages)
-	{
-		return syntheticPages.Sum(p => p.PageCount);
-	}
-
-	/// <summary>
-	/// Gets the global page number for a specific chapter and character position.
-	/// </summary>
-	/// <param name="syntheticPages">List of synthetic page information for all resources.</param>
-	/// <param name="chapterIndex">Zero-based index of the chapter.</param>
-	/// <param name="characterPosition">Character position within the chapter.</param>
-	/// <returns>Global page number (1-based) across the entire book.</returns>
-	public static int GetGlobalPageNumber(List<SyntheticPageInfo> syntheticPages, int chapterIndex, int characterPosition)
-	{
-		if (chapterIndex < 0 || chapterIndex >= syntheticPages.Count)
-		{
-			return 1;
-		}
-
-		// Calculate page offset from previous chapters
-		int pageOffset = 0;
-		for (int i = 0; i < chapterIndex; i++)
-		{
-			pageOffset += syntheticPages[i].PageCount;
-		}
-
-		// Get page number within current chapter
-		int localPageNumber = GetPageNumberForPosition(syntheticPages[chapterIndex], characterPosition);
-
-		return pageOffset + localPageNumber;
 	}
 
 	[GeneratedRegex(@"\s+", RegexOptions.None, 2000)]

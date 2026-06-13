@@ -665,9 +665,11 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return local;
 		}
 
+#pragma warning disable S2234
 		return IsNewer(cloud, local)
 			? ReconcileDateFields(cloud, local)
 			: ReconcileDateFields(local, cloud);
+#pragma warning restore S2234
 	}
 
 	static DateTimeOffset ParseTimestamp(string? timestamp)

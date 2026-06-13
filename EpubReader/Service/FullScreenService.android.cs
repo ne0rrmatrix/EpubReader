@@ -203,7 +203,7 @@ class FullScreenService : IFullScreenService
 	/// </summary>
 	static List<View> FindAllStatusBarOverlays(ViewGroup decorGroup)
 	{
-		List<View> overlays = new();
+		List<View> overlays = [];
 		Resources? resources = Platform.CurrentActivity?.Resources;
 		if (resources is null)
 		{
