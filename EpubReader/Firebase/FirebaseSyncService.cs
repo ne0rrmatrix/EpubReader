@@ -7,7 +7,7 @@ using Firebase.Database;
 using Firebase.Database.Query;
 using SQLite;
 
-namespace EpubReader.Service;
+namespace EpubReader.Firebase;
 
 /// <summary>
 /// Firebase-based sync implementation with real-time updates and offline queue management.
