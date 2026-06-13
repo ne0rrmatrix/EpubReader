@@ -19,14 +19,7 @@ public partial class CalibrePage : ContentPage
 			return;
 		}
 
-		try
-		{
-			await viewModel.SearchBooksAsync(e.NewTextValue);
-		}
-		catch (OperationCanceledException)
-		{
-			logger.Info("Calibre search was cancelled.");
-		}
+		viewModel.SearchBooks(e.NewTextValue);
 	}
 
 	async void OnFeedSelectionChanged(object? sender, EventArgs e)

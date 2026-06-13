@@ -202,7 +202,7 @@ public static partial class EbookService
 		byte[] coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		List<Css> cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
 		List<Chapter> chapters = await GetChaptersAsync(book).ConfigureAwait(false);
-		List<Models.Image> images = await ExtractImages(book);
+		List<Models.Image> images = await ExtractImages(book).ConfigureAwait(false);
 		List<string> authors = ExtractAuthors(book);
 		MediaOverlayParseResult mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
 		List<MediaOverlayAudioResource> mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
@@ -563,19 +563,19 @@ public static partial class EbookService
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
-			await ProcessSplitChapters(chaptersRef, book, chapters);
+			await ProcessSplitChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 			return chapters;
 		}
 
 		// Handle books with few non-split chapters
 		if (HasFewNonSplitChapters(chaptersRef))
 		{
-			await ProcessAllChapters(chaptersRef, book, chapters);
+			await ProcessAllChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 			return chapters;
 		}
 
 		// Handle standard books with multiple non-split chapters
-		await ProcessNonSplitChapters(chaptersRef, book, chapters);
+		await ProcessNonSplitChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 		return chapters;
 	}
 

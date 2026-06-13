@@ -8,10 +8,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 {
 	bool isAlphabeticalSorted = false;
 	string calibreServerBaseUrl = string.Empty;
-	string searchUrlTemplate = string.Empty;
 	string currentFeedUrl = string.Empty;
 	string currentFeedEmptyLabelText = "No books found in Calibre library.\nPlease load books from your Calibre server.";
-	CancellationTokenSource searchCancellationTokenSource = new();
 	readonly Stack<CalibreFeedNavigationState> feedNavigationStack = [];
 	public List<Book> BookList { get; set; } = [];
 	readonly ProcessEpubFiles processEpubFiles = Application.Current?.Handler.MauiContext?.Services.GetRequiredService<ProcessEpubFiles>() ?? throw new InvalidOperationException();
@@ -161,7 +159,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 			return;
 		}
 
-		CancelSearchRequests();
 		if (!string.IsNullOrWhiteSpace(SearchText))
 		{
 			SearchText = string.Empty;
@@ -210,51 +207,29 @@ public partial class CalibrePageViewModel : BaseViewModel
 		SelectedFeedSelection = null;
 	}
 
-	public async Task SearchBooksAsync(string? searchText, CancellationToken token = default)
+	public void SearchBooks(string? searchText)
 	{
-		SearchText = searchText?.Trim() ?? string.Empty;
-		ResetSearchCancellationTokenSource(token);
-		CancellationToken searchToken = searchCancellationTokenSource.Token;
+		SearchText = searchText ?? string.Empty;
 
-		if (string.IsNullOrWhiteSpace(SearchText))
+		if (string.IsNullOrWhiteSpace(SearchText) || searchText is null)
 		{
-			RestoreCurrentBookResults();
+			Books = [.. BookList];
+			EmptyLabelText = currentFeedEmptyLabelText;
 			return;
 		}
 
-		try
-		{
-			await Task.Delay(300, searchToken);
+		List<Book> filteredTitles = [.. Books.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		List<Book> filteredAuthors = [.. Books.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
+		List<Book> filteredBooks = [.. filteredTitles.Union(filteredAuthors)];
 
-			if (string.IsNullOrWhiteSpace(searchUrlTemplate))
-			{
-				ApplyLocalSearch(SearchText);
-				return;
-			}
-
-			string searchUrl = BuildSearchUrl(SearchText);
-			if (string.IsNullOrWhiteSpace(searchUrl))
-			{
-				ApplyLocalSearch(SearchText);
-				return;
-			}
-
-			OpdsFeed searchFeed = await new FeedReader().GetFeedAsync(searchUrl, searchToken);
-			List<Book> searchResults = await BuildBooksFromFeedAsync(searchFeed);
-			Books = [.. searchResults];
-			EmptyLabelText = $"No books found matching '{SearchText}'.";
-			Logger.Info($"Loaded {searchResults.Count} search results for '{SearchText}'.");
-		}
-		catch (OperationCanceledException)
-		{
-			Logger.Info("Calibre search request cancelled.");
-		}
+		Books = [.. filteredBooks];
+		EmptyLabelText = $"No books found matching '{SearchText}'.";
+		Logger.Info($"Applied local Calibre exact search for '{SearchText}' with {Books.Count} results.");
 	}
 
 	[RelayCommand]
 	public void NavigateBack()
 	{
-		CancelSearchRequests();
 		SearchText = string.Empty;
 
 		if (feedNavigationStack.Count == 0)
@@ -454,11 +429,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		FeedSelections = [.. CalibrePageViewModel.CreateFeedSelections(feed, sourceFeedUrl)];
 		Feed = feed;
-		OpdsLink? searchLink = feed.Links.FirstOrDefault(link => string.Equals(link.Rel, "search", StringComparison.OrdinalIgnoreCase));
-		if (!string.IsNullOrWhiteSpace(searchLink?.Href))
-		{
-			searchUrlTemplate = CombineUrl(sourceFeedUrl, NormalizeOpdsHref(searchLink.Href));
-		}
 	}
 
 	static List<OpdsFeedSelection> CreateFeedSelections(OpdsFeed feed, string sourceFeedUrl)
@@ -484,30 +454,8 @@ public partial class CalibrePageViewModel : BaseViewModel
 		};
 	}
 
-	void ApplyLocalSearch(string searchText)
-	{
-		List<Book> filteredBooks = [.. BookList.Where(book =>
-			book.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Language.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Series.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-			book.Categories.Any(category => category.Contains(searchText, StringComparison.OrdinalIgnoreCase)))];
-
-		Books = [.. filteredBooks];
-		EmptyLabelText = $"No books found matching '{searchText}'.";
-		Logger.Info($"Applied local Calibre search for '{searchText}' with {filteredBooks.Count} results.");
-	}
-
-	void RestoreCurrentBookResults()
-	{
-		Books = [.. BookList];
-		EmptyLabelText = currentFeedEmptyLabelText;
-	}
-
 	void ResetFeedState()
 	{
-		CancelSearchRequests();
 		feedNavigationStack.Clear();
 		UpdateNavigationState();
 		FeedSelections = [];
@@ -518,28 +466,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 		CurrentFeedTitle = "Browse feeds";
 		SearchText = string.Empty;
 		calibreServerBaseUrl = string.Empty;
-		searchUrlTemplate = string.Empty;
 		currentFeedUrl = string.Empty;
 		currentFeedEmptyLabelText = "No books found in Calibre library.\nPlease load books from your Calibre server.";
 		EmptyLabelText = currentFeedEmptyLabelText;
 		Cancelled = false;
-	}
-
-	void ResetSearchCancellationTokenSource(CancellationToken token)
-	{
-		CancelSearchRequests();
-		searchCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
-	}
-
-	void CancelSearchRequests()
-	{
-		if (!searchCancellationTokenSource.IsCancellationRequested)
-		{
-			searchCancellationTokenSource.Cancel();
-		}
-
-		searchCancellationTokenSource.Dispose();
-		searchCancellationTokenSource = new();
 	}
 
 	void RestoreNavigationState(CalibreFeedNavigationState state)
@@ -547,7 +477,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		CurrentFeedTitle = state.CurrentFeedTitle;
 		currentFeedUrl = state.CurrentFeedUrl;
 		currentFeedEmptyLabelText = state.EmptyLabelText;
-		searchUrlTemplate = state.SearchUrlTemplate;
 		FeedSelections = [.. state.FeedSelections];
 		BookList = [.. state.BookList];
 		Books = [.. state.VisibleBooks];
@@ -560,16 +489,12 @@ public partial class CalibrePageViewModel : BaseViewModel
 			CurrentFeedTitle,
 			currentFeedUrl,
 			currentFeedEmptyLabelText,
-			searchUrlTemplate,
 			[.. FeedSelections],
 			[.. BookList],
 			[.. Books]);
 
 	void UpdateNavigationState()
 		=> CanNavigateBack = feedNavigationStack.Count > 0;
-
-	string BuildSearchUrl(string searchText)
-		=> searchUrlTemplate.Replace("{searchTerms}", Uri.EscapeDataString(searchText), StringComparison.Ordinal);
 
 	static bool IsNavigationFeed(OpdsFeed feed)
 		=> feed.Entries.Count > 0 && feed.Entries.All(entry => !HasAcquisitionLink(entry));
@@ -768,7 +693,6 @@ public partial class CalibrePageViewModel : BaseViewModel
 		  string CurrentFeedTitle,
 		  string CurrentFeedUrl,
 		  string EmptyLabelText,
-		  string SearchUrlTemplate,
 		  List<OpdsFeedSelection> FeedSelections,
 		  List<Book> BookList,
 		  List<Book> VisibleBooks);
@@ -791,6 +715,10 @@ public partial class CalibrePageViewModel : BaseViewModel
 				"?",
 				href.AsSpan(encodedQueryIndex + 3));
 		}
+
+		href = href
+			.Replace("%7B", "{", StringComparison.OrdinalIgnoreCase)
+			.Replace("%7D", "}", StringComparison.OrdinalIgnoreCase);
 
 		int queryIndex = href.IndexOf('?');
 		if (queryIndex >= 0)

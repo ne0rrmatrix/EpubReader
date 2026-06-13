@@ -38,17 +38,32 @@ public class FeedReader(HttpClient? httpClient = null)
 		catch (HttpRequestException ex)
 		{
 			logger.Error($"HTTP error fetching feed from {url}: {ex.Message}");
-			throw;
+			//throw;
+			return new OpdsFeed
+			{
+				Title = "Error Fetching Feed",
+				Entries = []
+			};
 		}
 		catch (XmlException ex)
 		{
 			logger.Error($"XML parsing error for feed from {url}: {ex.Message}");
-			throw;
+			//throw;
+			return new OpdsFeed
+			{
+				Title = "Invalid Feed",
+				Entries = []
+			};
 		}
 		catch (Exception ex)
 		{
 			logger.Error($"Unexpected error fetching feed from {url}: {ex.Message}");
-			throw;
+			//throw;
+			return new OpdsFeed
+			{
+				Title = "Error Fetching Feed",
+				Entries = []
+			};
 		}
 	}
 
@@ -62,7 +77,11 @@ public class FeedReader(HttpClient? httpClient = null)
 	{
 		if (string.IsNullOrWhiteSpace(xmlContent))
 		{
-			throw new ArgumentException("XML content cannot be null or empty", nameof(xmlContent));
+			return new OpdsFeed
+			{
+				Title = "Empty Feed",
+				Entries = []
+			};
 		}
 
 		try
@@ -73,7 +92,11 @@ public class FeedReader(HttpClient? httpClient = null)
 		catch (XmlException ex)
 		{
 			logger.Error($"Error parsing XML content: {ex.Message}");
-			throw;
+			return new OpdsFeed
+			{
+				Title = "Invalid Feed",
+				Entries = []
+			};
 		}
 	}
 
@@ -84,7 +107,15 @@ public class FeedReader(HttpClient? httpClient = null)
 	/// <returns>A parsed OpdsFeed object.</returns>
 	OpdsFeed ParseFeedFromDocument(XDocument doc)
 	{
-		XElement root = doc.Root ?? throw new XmlException("Document root is null");
+		if(doc.Root is not XElement root)
+		{
+			logger.Error("Document root is null");
+			return new OpdsFeed
+			{
+				Title = "Invalid Feed",
+				Entries = []
+			};
+		}
 
 		// Define namespaces
 		XNamespace atomNs = XNamespace.Get("http://www.w3.org/2005/Atom");
