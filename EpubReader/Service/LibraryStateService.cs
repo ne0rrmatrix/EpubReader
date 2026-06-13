@@ -24,7 +24,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 	public async Task RefreshAsync(CancellationToken token = default)
 	{
 		token.ThrowIfCancellationRequested();
-		var books = await db.GetAllBooks(token);
+		List<Book> books = await db.GetAllBooks(token);
 		books.ForEach(book => book.IsInLibrary = true);
 		if (!dispatcher.IsDispatchRequired)
 		{
@@ -47,7 +47,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 			return Books.Any(existing => string.Equals(existing.Title, book.Title, StringComparison.OrdinalIgnoreCase));
 		}
 
-		var containsCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		TaskCompletionSource<bool> containsCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 		if (!dispatcher.Dispatch(() =>
 		{
 			try
@@ -99,7 +99,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 		}
 		else
 		{
-			var existingCompletionSource = new TaskCompletionSource<Book?>(TaskCreationOptions.RunContinuationsAsynchronously);
+			TaskCompletionSource<Book?> existingCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 			if (!dispatcher.Dispatch(() =>
 			{
 				try
@@ -133,7 +133,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 	void ReplaceBooks(IEnumerable<Book> books)
 	{
 		Books.Clear();
-		foreach (var book in books)
+		foreach (Book book in books)
 		{
 			Books.Add(book);
 		}

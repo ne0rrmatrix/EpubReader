@@ -1,6 +1,3 @@
-using CommunityToolkit.Maui.Views;
-using EpubReader.ViewModels;
-
 namespace EpubReader.Views;
 
 /// <summary>

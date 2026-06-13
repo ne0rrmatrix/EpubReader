@@ -1,7 +1,5 @@
 using System.Text;
-using EpubReader.Models.MediaOverlays;
 using Microsoft.Maui.Graphics.Skia;
-using SixLabors.ImageSharp;
 using VersOne.Epub;
 using VersOne.Epub.Options;
 using VersOne.Epub.Schema;
@@ -65,7 +63,7 @@ public static partial class EbookService
 	/// langword="null"/> if the book cannot be opened or an error occurs.</returns>
 	public static async Task<Book?> GetListingAsync(string path)
 	{
-		var book = await OpenEpubBookAsync(path);
+		EpubBookRef? book = await OpenEpubBookAsync(path);
 		return book is null ? null : await CreateBookListingAsync(book, path).ConfigureAwait(false);
 	}
 
@@ -78,7 +76,7 @@ public static partial class EbookService
 	/// langword="null"/> if the EPUB file cannot be opened or processed.</returns>
 	public static async Task<Book?> GetListingAsync(Stream stream, string path)
 	{
-		var book = await OpenEpubBook(stream).ConfigureAwait(false);
+		EpubBookRef? book = await OpenEpubBook(stream).ConfigureAwait(false);
 		return book is null ? null : await CreateBookListingAsync(book, path).ConfigureAwait(false);
 	}
 
@@ -91,7 +89,7 @@ public static partial class EbookService
 	/// eBook's metadata, content, and resources. Returns <see langword="null"/> if the eBook cannot be opened.</returns>
 	public static async Task<Book?> OpenEbookAsync(string path)
 	{
-		var book = await OpenEpubBookAsync(path).ConfigureAwait(false);
+		EpubBookRef? book = await OpenEpubBookAsync(path).ConfigureAwait(false);
 		return book is null ? null : await CreateFullBookAsync(book, path).ConfigureAwait(false);
 	}
 
@@ -111,8 +109,8 @@ public static partial class EbookService
 	{
 		ArgumentNullException.ThrowIfNull(book);
 
-		var sb = new StringBuilder();
-		Dictionary<string, string> chapterTargets = new(StringComparer.OrdinalIgnoreCase);
+		StringBuilder sb = new();
+		Dictionary<string, string> chapterTargets = [with(StringComparer.OrdinalIgnoreCase)];
 		for (int i = 0; i < book.Chapters.Count; i++)
 		{
 			Chapter? chapter = book.Chapters[i];
@@ -121,7 +119,7 @@ public static partial class EbookService
 				continue;
 			}
 
-			var chapterFileName = Path.GetFileName(chapter.FileName);
+			string chapterFileName = Path.GetFileName(chapter.FileName);
 			if (string.IsNullOrWhiteSpace(chapterFileName) || chapterTargets.ContainsKey(chapterFileName))
 			{
 				continue;
@@ -140,7 +138,7 @@ public static partial class EbookService
 		// ReadiumCSS must bracket the book's own CSS so properties cascade correctly.
 		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReadiumCSS-before.css\"/>");
 		sb.AppendLine("<link rel=\"stylesheet\" href=\"ReaderFonts.css\"/>");
-		foreach (var css in book.Css)
+		foreach (Css css in book.Css)
 		{
 			sb.AppendLine($"<link rel=\"stylesheet\" href=\"{css.FileName}\"/>");
 		}
@@ -155,15 +153,15 @@ public static partial class EbookService
 		sb.AppendLine("</head>");
 		sb.AppendLine("<body>");
 
-		for (var i = 0; i < book.Chapters.Count; i++)
+		for (int i = 0; i < book.Chapters.Count; i++)
 		{
-			var chapter = book.Chapters[i];
+			Chapter chapter = book.Chapters[i];
 			if (string.IsNullOrEmpty(chapter.HtmlFile))
 			{
 				continue;
 			}
 
-			var chapterId = Path.GetFileNameWithoutExtension(chapter.FileName);
+			string chapterId = Path.GetFileNameWithoutExtension(chapter.FileName);
 			sb.AppendLine($"<section id=\"{chapterId}\"");
 			sb.AppendLine($"         data-chapter-index=\"{i}\"");
 			sb.AppendLine($"         data-chapter-title=\"{System.Net.WebUtility.HtmlEncode(chapter.Title)}\"");
@@ -184,8 +182,8 @@ public static partial class EbookService
 
 	static async Task<Book> CreateBookListingAsync(EpubBookRef book, string path)
 	{
-		var Authors = ExtractAuthors(book);
-		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
+		List<string> Authors = ExtractAuthors(book);
+		byte[] coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		return new Book
 		{
 			Author = Authors[0],
@@ -198,27 +196,27 @@ public static partial class EbookService
 
 	static async Task<Book> CreateFullBookAsync(EpubBookRef book, string path)
 	{
-		var sharedFiles = await GetSharedFilesAsync().ConfigureAwait(false);
-		var fonts = await ExtractFontsAsync(book).ConfigureAwait(false);
-		var description = ProcessDescription(book.Description);
-		var coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
-		var cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
-		var chapters = await GetChaptersAsync(book).ConfigureAwait(false);
-		var images = await ExtractImages(book);
-		var authors = ExtractAuthors(book);
-		var mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
-		var mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
-		var additionalFonts = sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
+		List<SharedEpubFiles> sharedFiles = await GetSharedFilesAsync().ConfigureAwait(false);
+		List<EpubFonts> fonts = await ExtractFontsAsync(book).ConfigureAwait(false);
+		string description = ProcessDescription(book.Description);
+		byte[] coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
+		List<Css> cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
+		List<Chapter> chapters = await GetChaptersAsync(book).ConfigureAwait(false);
+		List<Models.Image> images = await ExtractImages(book).ConfigureAwait(false);
+		List<string> authors = ExtractAuthors(book);
+		MediaOverlayParseResult mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
+		List<MediaOverlayAudioResource> mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
+		List<EpubFonts> additionalFonts = [.. sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
 														  f.FileName.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase) ?
 														  new[] { new EpubFonts
 														  {
 															  Content = f.Content ?? [],
 															  FileName = f.FileName,
 															  FontFamily = Path.GetFileNameWithoutExtension(f.FileName)
-														  } } : []).ToList();
+														  } } : [])];
 		fonts.AddRange(additionalFonts);
 
-		var resultBook = new Book
+		Book resultBook = new()
 		{
 			Title = book.Title.Trim(),
 			Author = authors[0],
@@ -278,11 +276,11 @@ public static partial class EbookService
 
 	static async Task<List<SharedEpubFiles>> GetSharedFilesAsync()
 	{
-		var sharedFiles = new List<SharedEpubFiles>();
+		List<SharedEpubFiles> sharedFiles = [];
 
-		foreach (var fileName in requiredFiles)
+		foreach (string fileName in requiredFiles)
 		{
-			var sharedFile = await GetSharedFileAsync(fileName).ConfigureAwait(false);
+			SharedEpubFiles? sharedFile = await GetSharedFileAsync(fileName).ConfigureAwait(false);
 			if (sharedFile is not null)
 			{
 				sharedFiles.Add(sharedFile);
@@ -294,19 +292,19 @@ public static partial class EbookService
 
 	static async Task<SharedEpubFiles?> GetSharedFileAsync(string fileName, CancellationToken cancellation = default)
 	{
-		var exists = await FileSystem.AppPackageFileExistsAsync(fileName).ConfigureAwait(false);
+		bool exists = await FileSystem.AppPackageFileExistsAsync(fileName).ConfigureAwait(false);
 		if (!exists)
 		{
 			return null;
 		}
 
-		await using var stream = await FileSystem.OpenAppPackageFileAsync(fileName).ConfigureAwait(false);
-		using var reader = new StreamReader(stream);
-		using var memoryStream = new MemoryStream();
+		await using Stream stream = await FileSystem.OpenAppPackageFileAsync(fileName).ConfigureAwait(false);
+		using StreamReader reader = new(stream);
+		using MemoryStream memoryStream = new();
 		await reader.BaseStream.CopyToAsync(memoryStream, cancellation).ConfigureAwait(false);
-		var bytes = memoryStream.ToArray();
+		byte[] bytes = memoryStream.ToArray();
 
-		var sharedFile = new SharedEpubFiles { FileName = fileName };
+		SharedEpubFiles sharedFile = new() { FileName = fileName };
 
 		if (StreamExtensions.IsText(fileName))
 		{
@@ -326,12 +324,12 @@ public static partial class EbookService
 
 	static async Task<List<EpubFonts>> ExtractFontsAsync(EpubBookRef book)
 	{
-		var fonts = new List<EpubFonts>();
-		var fontFiles = book.Content.AllFiles.Local.Where(IsFontFile);
+		List<EpubFonts> fonts = [];
+		IEnumerable<EpubLocalContentFileRef> fontFiles = book.Content.AllFiles.Local.Where(IsFontFile);
 
-		foreach (var fontFile in fontFiles)
+		foreach (EpubLocalContentFileRef? fontFile in fontFiles)
 		{
-			var font = new EpubFonts
+			EpubFonts font = new()
 			{
 				Content = await fontFile.ReadContentAsBytesAsync().ConfigureAwait(false),
 				FileName = Path.GetFileName(fontFile.FilePath),
@@ -363,10 +361,10 @@ public static partial class EbookService
 
 	static async Task<List<Css>> ExtractCssFiles(EpubBookRef book)
 	{
-		var result = new List<Css>();
-		foreach (var file in book.Content.AllFiles.Local.Where(file => file.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase)))
+		List<Css> result = [];
+		foreach (EpubLocalContentFileRef? file in book.Content.AllFiles.Local.Where(file => file.FilePath.EndsWith(".css", StringComparison.InvariantCultureIgnoreCase)))
 		{
-			var css = new Css
+			Css css = new()
 			{
 				FileName = Path.GetFileName(file.FilePath),
 				Content = ProcessCssFiles(await file.ReadContentAsTextAsync().ConfigureAwait(false)),
@@ -379,11 +377,11 @@ public static partial class EbookService
 
 	static async Task<List<Models.Image>> ExtractImages(EpubBookRef book)
 	{
-		var images = new List<Models.Image>();
+		List<Models.Image> images = [];
 
-		foreach (var image in book.Content.Images.Local)
+		foreach (EpubLocalByteContentFileRef image in book.Content.Images.Local)
 		{
-			var img = new Models.Image
+			Models.Image img = new()
 			{
 				FileName = Path.GetFileName(image.FilePath),
 				Content = await image.ReadContentAsBytesAsync().ConfigureAwait(false)
@@ -396,25 +394,25 @@ public static partial class EbookService
 
 	static async Task<List<MediaOverlayAudioResource>> ExtractMediaOverlayAudioAsync(EpubBookRef book, IReadOnlyList<MediaOverlayDocument> documents)
 	{
-		var resources = new List<MediaOverlayAudioResource>();
+		List<MediaOverlayAudioResource> resources = [];
 		if (documents.Count == 0)
 		{
 			logger.Info("No media overlay documents available for audio extraction.");
 			return resources;
 		}
 
-		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		HashSet<string> seen = [with(StringComparer.OrdinalIgnoreCase)];
 		logger.Info($"Extracting media overlay audio from {documents.Count} document(s).");
 
-		foreach (var document in documents)
+		foreach (MediaOverlayDocument document in documents)
 		{
-			var extractedForDocument = 0;
-			var missingForDocument = 0;
-			foreach (var source in document.FlattenedNodes
+			int extractedForDocument = 0;
+			int missingForDocument = 0;
+			foreach (string? source in document.FlattenedNodes
 												.Select(node => node.Audio?.Source)
 												.Where(src => !string.IsNullOrWhiteSpace(src)))
 			{
-				if (!TryResolveMediaOverlayAudioFile(book, document, source!, out var file, out var normalized))
+				if (!TryResolveMediaOverlayAudioFile(book, document, source!, out EpubLocalContentFileRef? file, out string? normalized))
 				{
 					logger.Warn($"Missing media overlay audio resource: {source}");
 					missingForDocument++;
@@ -427,7 +425,7 @@ public static partial class EbookService
 				}
 				try
 				{
-					var bytes = await file.ReadContentAsBytesAsync().ConfigureAwait(false);
+					byte[] bytes = await file.ReadContentAsBytesAsync().ConfigureAwait(false);
 					resources.Add(new MediaOverlayAudioResource
 					{
 						RelativePath = source!,
@@ -469,9 +467,9 @@ public static partial class EbookService
 		ArgumentNullException.ThrowIfNull(book);
 		ArgumentNullException.ThrowIfNull(document);
 
-		foreach (var candidate in BuildMediaOverlayPathCandidates(document, source))
+		foreach (string candidate in BuildMediaOverlayPathCandidates(document, source))
 		{
-			var match = FindLocalContentFile(book, candidate);
+			EpubLocalContentFileRef? match = FindLocalContentFile(book, candidate);
 			if (match is null)
 			{
 				continue;
@@ -489,20 +487,20 @@ public static partial class EbookService
 
 	static IEnumerable<string> BuildMediaOverlayPathCandidates(MediaOverlayDocument document, string source)
 	{
-		var normalizedSource = CollapseRelativeSegments(MediaOverlayPathHelper.Normalize(source));
+		string normalizedSource = CollapseRelativeSegments(MediaOverlayPathHelper.Normalize(source));
 		if (!string.IsNullOrEmpty(normalizedSource))
 		{
 			yield return normalizedSource;
 		}
 
-		var normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
-		var directory = ExtractDirectory(normalizedDocumentHref);
+		string normalizedDocumentHref = MediaOverlayPathHelper.Normalize(document.Href);
+		string directory = ExtractDirectory(normalizedDocumentHref);
 		if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(normalizedSource))
 		{
 			yield break;
 		}
 
-		var combined = CollapseRelativeSegments($"{directory}{normalizedSource}");
+		string combined = CollapseRelativeSegments($"{directory}{normalizedSource}");
 		if (!string.Equals(combined, normalizedSource, StringComparison.OrdinalIgnoreCase))
 		{
 			yield return combined;
@@ -511,7 +509,7 @@ public static partial class EbookService
 
 	static string ExtractDirectory(string normalizedPath)
 	{
-		var lastSlash = normalizedPath.LastIndexOf('/') + 1;
+		int lastSlash = normalizedPath.LastIndexOf('/') + 1;
 		return lastSlash <= 0 ? string.Empty : normalizedPath[..lastSlash];
 	}
 
@@ -522,10 +520,10 @@ public static partial class EbookService
 			return string.Empty;
 		}
 
-		var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-		var stack = new Stack<string>();
+		string[] segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		Stack<string> stack = new();
 
-		foreach (var segment in segments)
+		foreach (string segment in segments)
 		{
 			if (segment == ".")
 			{
@@ -553,31 +551,31 @@ public static partial class EbookService
 
 	static async Task<List<Chapter>> GetChaptersAsync(EpubBookRef book)
 	{
-		var readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
-		var chaptersRef = readingOrder.ToList();
+		List<EpubLocalTextContentFileRef> readingOrder = await book.GetReadingOrderAsync().ConfigureAwait(false);
+		List<EpubLocalTextContentFileRef> chaptersRef = [.. readingOrder];
 		return await GetChapters(chaptersRef, book);
 	}
 
 	static async Task<List<Chapter>> GetChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book)
 	{
-		var chapters = new List<Chapter>();
+		List<Chapter> chapters = [];
 
 		// Handle books with split chapters (e.g., Calibre-generated books)
 		if (HasSplitChapters(chaptersRef))
 		{
-			await ProcessSplitChapters(chaptersRef, book, chapters);
+			await ProcessSplitChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 			return chapters;
 		}
 
 		// Handle books with few non-split chapters
 		if (HasFewNonSplitChapters(chaptersRef))
 		{
-			await ProcessAllChapters(chaptersRef, book, chapters);
+			await ProcessAllChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 			return chapters;
 		}
 
 		// Handle standard books with multiple non-split chapters
-		await ProcessNonSplitChapters(chaptersRef, book, chapters);
+		await ProcessNonSplitChapters(chaptersRef, book, chapters).ConfigureAwait(false);
 		return chapters;
 	}
 
@@ -593,20 +591,20 @@ public static partial class EbookService
 
 	static async Task ProcessSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
-		var split000Chapters = chaptersRef
+		IEnumerable<EpubLocalTextContentFileRef> split000Chapters = chaptersRef
 			.Where(x => x is not null && x.FilePath.Contains("_split_000"));
 
-		foreach (var item in split000Chapters)
+		foreach (EpubLocalTextContentFileRef? item in split000Chapters)
 		{
-			var replacementChapter = FindReplacementChapter(chaptersRef, item);
-			var htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
+			EpubLocalTextContentFileRef? replacementChapter = FindReplacementChapter(chaptersRef, item);
+			string htmlContent = replacementChapter is not null ? await replacementChapter.ReadContentAsync().ConfigureAwait(false) : string.Empty;
 
 			if (string.IsNullOrEmpty(htmlContent))
 			{
 				continue;
 			}
 
-			var chapter = CreateChapter(book, htmlContent, item);
+			Chapter chapter = CreateChapter(book, htmlContent, item);
 			if (string.IsNullOrEmpty(chapter.Title))
 			{
 				chapter.Title = GetTitle(book, replacementChapter) ?? string.Empty;
@@ -618,32 +616,32 @@ public static partial class EbookService
 
 	static async Task ProcessAllChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
-		foreach (var item in chaptersRef)
+		foreach (EpubLocalTextContentFileRef item in chaptersRef)
 		{
-			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
+			string htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
 			chapters.Add(CreateChapter(book, htmlContent, item));
 		}
 	}
 
 	static async Task ProcessNonSplitChapters(List<EpubLocalTextContentFileRef> chaptersRef, EpubBookRef book, List<Chapter> chapters)
 	{
-		var nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
+		IEnumerable<EpubLocalTextContentFileRef> nonSplitChapters = chaptersRef.Where(item => !item.FilePath.Contains("_split_"));
 		if (nonSplitChapters.Count() != chaptersRef.Count)
 		{
 			nonSplitChapters = chaptersRef;
 		}
-		foreach (var item in nonSplitChapters)
+		foreach (EpubLocalTextContentFileRef? item in nonSplitChapters)
 		{
-			var htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
+			string htmlContent = await item.ReadContentAsync().ConfigureAwait(false);
 			chapters.Add(CreateChapter(book, htmlContent, item));
 		}
 	}
 
 	static Chapter CreateChapter(EpubBookRef book, string htmlContent, EpubLocalTextContentFileRef item)
 	{
-		var processedHtml = ProcessHtml(htmlContent);
-		var fileName = Path.GetFileName(item.FilePath);
-		var title = GetTitle(book, item) ?? fileName;
+		string processedHtml = ProcessHtml(htmlContent);
+		string fileName = Path.GetFileName(item.FilePath);
+		string title = GetTitle(book, item) ?? fileName;
 
 		return new Chapter
 		{
@@ -655,7 +653,7 @@ public static partial class EbookService
 
 	static EpubLocalTextContentFileRef? FindReplacementChapter(List<EpubLocalTextContentFileRef> chaptersRef, EpubLocalContentFileRef item)
 	{
-		var replacementPath = item.FilePath.Replace("_split_000", "_split_001");
+		string replacementPath = item.FilePath.Replace("_split_000", "_split_001");
 		return chaptersRef.Find(x => x.FilePath == replacementPath);
 	}
 
@@ -670,13 +668,13 @@ public static partial class EbookService
 			return null;
 		}
 
-		var fileName = Path.GetFileName(item.FilePath);
+		string fileName = Path.GetFileName(item.FilePath);
 		if (string.IsNullOrEmpty(fileName))
 		{
 			return null;
 		}
 
-		var title = book.Schema.Package.EpubVersion switch
+		string? title = book.Schema.Package.EpubVersion switch
 		{
 			EpubVersion.EPUB_2 => GetEpub2Title(book, fileName),
 			EpubVersion.EPUB_3 => GetEpub3Title(book, fileName),
@@ -689,7 +687,7 @@ public static partial class EbookService
 
 	static string? GetEpub2Title(EpubBookRef book, string fileName)
 	{
-		var epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items ?? [];
+		List<Epub2NcxNavigationPoint> epub2Nav = book.Schema.Epub2Ncx?.NavMap?.Items ?? [];
 
 		return epub2Nav.Find(x => x.Content.Source == fileName)?.NavigationLabels[0]?.Text ??
 			   epub2Nav.Find(x => Path.GetFileName(x.Content.Source?.Split('#')[0]) == fileName)?.NavigationLabels[0]?.Text;
@@ -697,7 +695,7 @@ public static partial class EbookService
 
 	static string? GetEpub3Title(EpubBookRef book, string fileName)
 	{
-		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
+		List<Epub3NavLi> epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
 
 		return epub3Nav.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text ??
 			   epub3Nav.Find(x => Path.GetFileName(x.Anchor?.Href)?.Split('#')[0] == fileName)?.Anchor?.Text;
@@ -705,7 +703,7 @@ public static partial class EbookService
 
 	static string? GetEpub31Title(EpubBookRef book, string fileName)
 	{
-		var epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
+		List<Epub3NavLi> epub3Nav = book.Schema.Epub3NavDocument?.Navs[0]?.Ol?.Lis?.ToList() ?? [];
 		return epub3Nav.Find(x => x.Anchor?.Href == fileName)?.Anchor?.Text;
 	}
 
@@ -739,7 +737,7 @@ public static partial class EbookService
 
 	static string ProcessHtml(string htmlFile)
 	{
-		var cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
+		List<string> cssFiles = HtmlAgilityPackExtensions.GetCssFiles(htmlFile);
 
 		htmlFile = HtmlAgilityPackExtensions.RemoveCssLinks(htmlFile);
 		htmlFile = HtmlAgilityPackExtensions.AddCssLink(htmlFile, "ReadiumCSS-before.css");
@@ -769,7 +767,7 @@ public static partial class EbookService
 
 	public static byte[] GenerateCoverImage(string title)
 	{
-		using var bmp = new SkiaBitmapExportContext(coverImageWidth, coverImageHeight, 1.0f);
+		using SkiaBitmapExportContext bmp = new(coverImageWidth, coverImageHeight, 1.0f);
 		ICanvas canvas = bmp.Canvas;
 
 		DrawCoverBackground(canvas, bmp.Width, bmp.Height);
@@ -780,7 +778,7 @@ public static partial class EbookService
 
 	static void DrawCoverBackground(ICanvas canvas, int width, int height)
 	{
-		var backgroundRectangle = new Rect(0, 0, width, height);
+		Rect backgroundRectangle = new(0, 0, width, height);
 		canvas.FillColor = Colors.White;
 		canvas.FillRectangle(backgroundRectangle);
 		canvas.StrokeColor = Colors.Black;
@@ -790,15 +788,15 @@ public static partial class EbookService
 
 	static void DrawCoverTitle(ICanvas canvas, string title, int width, int height)
 	{
-		var font = new Microsoft.Maui.Graphics.Font("Arial");
+		Microsoft.Maui.Graphics.Font font = new("Arial");
 		const float fontSize = 20;
 		canvas.FontSize = fontSize;
-		var textSize = canvas.GetStringSize(title, font, fontSize);
+		SizeF textSize = canvas.GetStringSize(title, font, fontSize);
 
-		var point = new Point(
+		Point point = new(
 			x: (width - textSize.Width) / 2,
 			y: (height - textSize.Height) / 2);
-		var textRectangle = new Rect(point, textSize);
+		Rect textRectangle = new(point, textSize);
 
 		// Draw background rectangle for text
 		canvas.FillColor = Colors.Black.WithAlpha(.5f);

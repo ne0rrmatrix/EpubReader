@@ -24,7 +24,7 @@ public static class BookIdentityService
 			if (!string.IsNullOrWhiteSpace(book.FilePath) && File.Exists(book.FilePath))
 			{
 				fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
-				var fileName = Path.GetFileName(book.FilePath);
+				string fileName = Path.GetFileName(book.FilePath);
 				book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
 				return book.SyncId;
 			}
@@ -41,15 +41,15 @@ public static class BookIdentityService
 
 	static async Task<string> ComputeFileHashAsync(string path, CancellationToken token)
 	{
-		await using var stream = File.OpenRead(path);
-		var hash = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
+		await using FileStream stream = File.OpenRead(path);
+		byte[] hash = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
 		return Convert.ToHexString(hash).ToLowerInvariant();
 	}
 
 	static string ComputeTextHash(string text)
 	{
-		var bytes = Encoding.UTF8.GetBytes(text?.ToLowerInvariant() ?? string.Empty);
-		var hash = SHA256.HashData(bytes);
+		byte[] bytes = Encoding.UTF8.GetBytes(text?.ToLowerInvariant() ?? string.Empty);
+		byte[] hash = SHA256.HashData(bytes);
 		return Convert.ToHexString(hash).ToLowerInvariant();
 	}
 }

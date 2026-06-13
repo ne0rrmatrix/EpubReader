@@ -16,7 +16,8 @@
     <ApplicationTitle>EpubReader</ApplicationTitle>
 
     <!-- App Identifier -->
-    <ApplicationId>com.companyname.epubreader</ApplicationId>
+ <!--   <ApplicationId>com.NerdNews.EpubReader</ApplicationId> IOS name -->
+    <ApplicationId>com.companyname.epubreader</ApplicationId> <!--Windows / Android name --> 
     <ApplicationIdGuid>75ae042c-2737-4d9f-8df1-019273e1be72</ApplicationIdGuid>
     <!-- Versions -->
     <ApplicationDisplayVersion>1</ApplicationDisplayVersion>
@@ -42,7 +43,7 @@
     <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" BaseSize="128,128" />
 
     <!-- Splash Screen -->
-    <MauiSplashScreen Include="Resources\Splash\splashcreen.png" BaseSize="600,600" />
+    <MauiSplashScreen Include="Resources\Splash\splashcreen.png" BaseSize="600,600" Color="#121212" />
 
     <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
@@ -81,20 +82,19 @@
     <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.80-ci.main.26281.1" />
-    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.80-ci.main.26281.1" />
+    <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.90-ci.main.26311.6" />
+    <PackageReference Include="Microsoft.Maui.Graphics.Skia" Version="10.0.90-ci.main.26311.6" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80-ci.main.26281.1" />
-    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.80-ci.main.26281.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.7" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="14.1.1" />
-    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.1.1" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90-ci.main.26311.6" />
+    <PackageReference Include="Microsoft.Maui.Core" Version="10.0.90-ci.main.26311.6" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="14.2.0" />
+    <PackageReference Include="CommunityToolkit.Maui.Core" Version="14.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Plugin.Firebase.Core" Version="4.2.0" />
     <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.10" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.8" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.9" />
     <PackageReference Include="Plugin.Firebase.Auth" Version="5.0.1" />
     <PackageReference Include="Plugin.Firebase.Crashlytics" Version="4.0.0" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
@@ -105,17 +105,17 @@
   </ItemGroup>
 
   <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
-    <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.3" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Android" Version="8.3.1.5" />
     <PackageReference Include="Xamarin.AndroidX.DocumentFile" Version="1.1.0.3" />
-    <PackageReference Include="Xamarin.Google.Android.Material" Version="1.13.0.2" />
-    <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.5.0.5" />
-    <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.5.0.5" />
+    <PackageReference Include="Xamarin.Google.Android.Material" Version="1.14.0.1" />
+    <PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.6.0" />
+    <PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.6.0" />
     <PackageReference Include="Xamarin.GoogleAndroid.Libraries.Identity.GoogleId" Version="1.1.0.13" />
-    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.5.1.1" />
-    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.0.1.2" />
+    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.6.0" />
+    <PackageReference Include="Xamarin.Firebase.Auth" Version="124.1.0" />
     <!-- Pin Compose runtime-annotation to Android only to avoid duplicate Immutable.class -->
-    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.10.4.1" />
-    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.10.4.1" ExcludeAssets="all" />
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Android" Version="1.11.2" />
+    <PackageReference Include="Xamarin.AndroidX.Compose.Runtime.Annotation.Jvm" Version="1.11.2" ExcludeAssets="all" />
     <!-- Pin transitive AndroidX runtime packages to resolved versions to avoid NU1608 warnings -->
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.10.0.2" />
     <PackageReference Update="Xamarin.AndroidX.Lifecycle.Runtime" Version="2.10.0" />
@@ -160,10 +160,28 @@
     <GoogleServicesJson Include="Resources\Raw\google-services.json" />
   </ItemGroup>
 
+  <PropertyGroup Condition="$(TargetFramework.Contains('-maccatalyst')) and '$(Configuration)' == 'Debug'">
+    <EnableCodeSigning>false</EnableCodeSigning>
+    <CodesignKey>-</CodesignKey>
+</PropertyGroup>
+<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-ios|AnyCPU'">
+  <ProvisioningType>automatic</ProvisioningType>
+  <CodesignKey>iPhone Developer</CodesignKey>
+  <CodesignProvision>Automatic</CodesignProvision>
+</PropertyGroup>
+
   <!-- Fixes Static Registrar causing Linker error: https://github.com/xamarin/xamarin-macios/blob/main/docs/managed-static-registrar.md -->
   <Target Name="SelectStaticRegistrar" AfterTargets="SelectRegistrar">
     <PropertyGroup Condition="'$(Registrar)' == 'managed-static'">
       <Registrar>static</Registrar>
     </PropertyGroup>
   </Target>
+
+  <Target Name="PatchIOSSplashForDarkMode" AfterTargets="ProcessMauiSplashScreens" Condition="$([MSBuild]::IsOSPlatform('windows'))=='false' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))=='maccatalyst'">
+    <PropertyGroup>
+      <_SplashStoryboardPath>$(_MauiIntermediateSplashScreen)MauiSplash.storyboard</_SplashStoryboardPath>
+    </PropertyGroup>
+    <Exec Command="sed -i '' 's|&lt;color key=&quot;backgroundColor&quot;.*/&gt;|&lt;color key=&quot;backgroundColor&quot; systemColor=&quot;systemBackgroundColor&quot;/&gt;|' &quot;$(_SplashStoryboardPath)&quot;" Condition="Exists('$(_SplashStoryboardPath)')" />
+  </Target>
+ 
 </Project>

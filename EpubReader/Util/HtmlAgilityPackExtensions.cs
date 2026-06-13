@@ -20,9 +20,9 @@ public static partial class HtmlAgilityPackExtensions
 	/// <returns>The inner HTML of the <c>&lt;body&gt;</c> element, or the original string if no body is found.</returns>
 	public static string ExtractBodyContent(string html)
 	{
-		var doc = new HtmlDocument();
+		HtmlDocument doc = new();
 		doc.LoadHtml(html);
-		var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
+		HtmlNode bodyNode = doc.DocumentNode.SelectSingleNode("//body");
 		return bodyNode?.InnerHtml ?? html;
 	}
 
@@ -39,9 +39,9 @@ public static partial class HtmlAgilityPackExtensions
 		ArgumentException.ThrowIfNullOrWhiteSpace(chapterId);
 		ArgumentNullException.ThrowIfNull(chapterTargets);
 
-		var doc = new HtmlDocument();
+		HtmlDocument doc = new();
 		doc.LoadHtml(html);
-		var bodyNode = doc.DocumentNode.SelectSingleNode("//body") ?? doc.DocumentNode;
+		HtmlNode bodyNode = doc.DocumentNode.SelectSingleNode("//body") ?? doc.DocumentNode;
 
 		RewriteCombinedAnchorTargets(bodyNode, chapterId);
 		RewriteCombinedChapterLinks(bodyNode, chapterId, chapterTargets);
@@ -59,22 +59,22 @@ public static partial class HtmlAgilityPackExtensions
 	/// files are found.</returns>
 	public static List<string> GetCssFiles(string htmlFile)
 	{
-		var doc = new HtmlDocument();
+		HtmlDocument doc = new();
 		doc.LoadHtml(htmlFile);
 		List<string> cssFiles = [];
 
 		// XPath to find all <link> tags with rel="stylesheet"
-		var linkNodes = doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']");
+		HtmlNodeCollection? linkNodes = doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']");
 
 		if (linkNodes is not null)
 		{
-			foreach (var linkNode in linkNodes)
+			foreach (HtmlNode linkNode in linkNodes)
 			{
 				// Get the value of the href attribute
-				var hrefAttribute = linkNode.Attributes["href"];
+				HtmlAttribute? hrefAttribute = linkNode.Attributes["href"];
 				if (hrefAttribute is not null)
 				{
-					var fileName = Path.GetFileName(hrefAttribute.Value);
+					string fileName = Path.GetFileName(hrefAttribute.Value);
 					cssFiles.Add(fileName);
 				}
 			}
@@ -99,10 +99,10 @@ public static partial class HtmlAgilityPackExtensions
 			{
 				return xhtml;
 			}
-			var doc = XDocument.Parse(xhtml, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
+			XDocument doc = XDocument.Parse(xhtml, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
 
 			// Get the root element (usually <html>)
-			var root = doc.Root;
+			XElement? root = doc.Root;
 			if (root is null)
 			{
 				return xhtml;
@@ -110,7 +110,7 @@ public static partial class HtmlAgilityPackExtensions
 
 			// Check for xml:lang attribute (must use the XML namespace)
 			XNamespace xmlNs = XNamespace.Xml;
-			var xmlLangAttr = root.Attribute(xmlNs + "lang");
+			XAttribute? xmlLangAttr = root.Attribute(xmlNs + "lang");
 
 			if (xmlLangAttr is null)
 			{
@@ -320,7 +320,7 @@ public static partial class HtmlAgilityPackExtensions
 			XDocument doc = XDocument.Parse(html);
 			XNamespace xlink = "http://www.w3.org/1999/xlink";
 
-			var imageElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "image");
+			XElement? imageElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "image");
 			if (imageElement is not null)
 			{
 				string? originalUrl = imageElement.Attribute(xlink + "href")?.Value;
@@ -358,12 +358,12 @@ public static partial class HtmlAgilityPackExtensions
 
 	static void RewriteCombinedAnchorTargets(HtmlNode rootNode, string chapterId)
 	{
-		var idNodes = rootNode.SelectNodes(".//*[@id]");
+		HtmlNodeCollection? idNodes = rootNode.SelectNodes(".//*[@id]");
 		if (idNodes is not null)
 		{
-			foreach (var node in idNodes)
+			foreach (HtmlNode node in idNodes)
 			{
-				var id = node.GetAttributeValue("id", string.Empty);
+				string id = node.GetAttributeValue("id", string.Empty);
 				if (string.IsNullOrWhiteSpace(id))
 				{
 					continue;
@@ -373,21 +373,21 @@ public static partial class HtmlAgilityPackExtensions
 			}
 		}
 
-		var nameNodes = rootNode.SelectNodes(".//*[@name]");
+		HtmlNodeCollection? nameNodes = rootNode.SelectNodes(".//*[@name]");
 		if (nameNodes is null)
 		{
 			return;
 		}
 
-		foreach (var node in nameNodes)
+		foreach (HtmlNode node in nameNodes)
 		{
-			var name = node.GetAttributeValue("name", string.Empty);
+			string name = node.GetAttributeValue("name", string.Empty);
 			if (string.IsNullOrWhiteSpace(name))
 			{
 				continue;
 			}
 
-			var rewrittenId = BuildCombinedFragmentId(chapterId, name);
+			string rewrittenId = BuildCombinedFragmentId(chapterId, name);
 			node.SetAttributeValue("name", rewrittenId);
 			if (!node.Attributes.Contains("id"))
 			{
@@ -398,13 +398,13 @@ public static partial class HtmlAgilityPackExtensions
 
 	static void RewriteCombinedChapterLinks(HtmlNode rootNode, string chapterId, IReadOnlyDictionary<string, string> chapterTargets)
 	{
-		var linkNodes = rootNode.SelectNodes(".//a[@href]");
+		HtmlNodeCollection? linkNodes = rootNode.SelectNodes(".//a[@href]");
 		if (linkNodes is null)
 		{
 			return;
 		}
 
-		foreach (var linkNode in linkNodes)
+		foreach (HtmlNode linkNode in linkNodes)
 		{
 			RewriteSingleChapterLink(linkNode, chapterId, chapterTargets);
 		}
@@ -412,15 +412,15 @@ public static partial class HtmlAgilityPackExtensions
 
 	static void RewriteSingleChapterLink(HtmlNode linkNode, string chapterId, IReadOnlyDictionary<string, string> chapterTargets)
 	{
-		var href = linkNode.GetAttributeValue("href", string.Empty).Trim();
+		string href = linkNode.GetAttributeValue("href", string.Empty).Trim();
 		if (string.IsNullOrWhiteSpace(href) || IsExternalOrUnsupportedHref(href))
 		{
 			return;
 		}
 
-		var hashIndex = href.IndexOf('#');
-		var path = hashIndex >= 0 ? href[..hashIndex] : href;
-		var fragment = hashIndex >= 0 ? href[(hashIndex + 1)..] : string.Empty;
+		int hashIndex = href.IndexOf('#');
+		string path = hashIndex >= 0 ? href[..hashIndex] : href;
+		string fragment = hashIndex >= 0 ? href[(hashIndex + 1)..] : string.Empty;
 
 		if (string.IsNullOrWhiteSpace(path))
 		{
@@ -428,8 +428,8 @@ public static partial class HtmlAgilityPackExtensions
 			return;
 		}
 
-		var targetFileName = Path.GetFileName(path);
-		if (string.IsNullOrWhiteSpace(targetFileName) || !chapterTargets.TryGetValue(targetFileName, out var targetChapterId))
+		string targetFileName = Path.GetFileName(path);
+		if (string.IsNullOrWhiteSpace(targetFileName) || !chapterTargets.TryGetValue(targetFileName, out string? targetChapterId))
 		{
 			return;
 		}
@@ -454,7 +454,7 @@ public static partial class HtmlAgilityPackExtensions
 			return true;
 		}
 
-		if (!Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
+		if (!Uri.TryCreate(href, UriKind.Absolute, out Uri? absoluteUri))
 		{
 			return false;
 		}
@@ -517,7 +517,7 @@ public static partial class HtmlAgilityPackExtensions
 	/// </returns>
 	public static List<ChapterMarker> FindChapterMarkers(string combinedHtml)
 	{
-		var doc = new HtmlDocument();
+		HtmlDocument doc = new();
 		doc.LoadHtml(combinedHtml);
 
 		return [.. doc.DocumentNode
@@ -550,7 +550,7 @@ public static partial class HtmlAgilityPackExtensions
 
 	static string RemoveEmptyLines(string input)
 	{
-		var lines = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+		string[] lines = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 		return string.Join(Environment.NewLine, lines);
 	}
 

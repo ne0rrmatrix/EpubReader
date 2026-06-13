@@ -28,6 +28,13 @@ class CustomWebViewNavigationDelegate(IWebViewHandler handler) : WKNavigationDel
 	{
 		var url = webView.Url?.AbsoluteString ?? throw new InvalidOperationException("url is null");
 		handler.VirtualView?.Navigated(WebNavigationEvent.NewPage, url, WebNavigationResult.Success);
+
+		// Re-apply safe area insets after each page load so the reader JS
+		// always has the latest values (the JS is now loaded and can receive them).
+		if (webView is CustomMauiWKWebView customWebView)
+		{
+			customWebView.PostApplyReaderSafeAreaInsets();
+		}
 	}
 
 	/// <summary>
@@ -91,8 +98,17 @@ public class MyWKScriptMessageHandler(IJavaScriptBridgeDispatcher dispatcher) : 
 				System.Diagnostics.Trace.TraceWarning("JSBridge.postMessage called with null or empty message");
 				return;
 			}
+			var data = message.Body.ToString() ?? throw new InvalidOperationException("message.Body is null");
 
-			dispatcher.Dispatch(message.Body.ToString() ?? string.Empty, JavaScriptBridgeSource.Apple, isBase64Encoded: true);
+			// The JS bridge on Apple platforms prefixes messages with "base64:".
+			// Strip it before dispatching for base64 decoding.
+			const string base64Prefix = "base64:";
+			if (data.StartsWith(base64Prefix, StringComparison.Ordinal))
+			{
+				data = data[base64Prefix.Length..];
+			}
+
+			dispatcher.Dispatch(data, JavaScriptBridgeSource.Apple, isBase64Encoded: true);
 		}
 	}
 }

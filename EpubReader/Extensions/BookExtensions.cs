@@ -22,7 +22,7 @@ public static class BookExtensions
 	/// <returns>Total number of pages.</returns>
 	public static int GetTotalPageCount(this Book book)
 	{
-		var syntheticPages = book.GenerateSyntheticPages();
+		List<SyntheticPageInfo> syntheticPages = book.GenerateSyntheticPages();
 		return SyntheticPageNumberService.GetTotalPageCount(syntheticPages);
 	}
 
@@ -34,7 +34,7 @@ public static class BookExtensions
 	/// <returns>Current global page number.</returns>
 	public static int GetCurrentPageNumber(this Book book, int characterPosition = 0)
 	{
-		var syntheticPages = book.GenerateSyntheticPages();
+		List<SyntheticPageInfo> syntheticPages = book.GenerateSyntheticPages();
 		return SyntheticPageNumberService.GetGlobalPageNumber(syntheticPages, book.CurrentChapter, characterPosition);
 	}
 
@@ -46,7 +46,7 @@ public static class BookExtensions
 	/// <returns>Synthetic page information for the chapter, or null if not found.</returns>
 	public static SyntheticPageInfo? GetChapterPageInfo(this Book book, int chapterIndex)
 	{
-		var syntheticPages = book.GenerateSyntheticPages();
+		List<SyntheticPageInfo> syntheticPages = book.GenerateSyntheticPages();
 		return chapterIndex >= 0 && chapterIndex < syntheticPages.Count
 			? syntheticPages[chapterIndex]
 			: null;

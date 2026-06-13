@@ -42,9 +42,9 @@ public class StreamExtensions
 	/// Returns <see cref="Stream.Null"/> if the content cannot be retrieved or the file type is unsupported.</returns>
 	public async Task<Stream> GetStream(string url, CancellationToken cancellation = default)
 	{
-		var resourcePath = NormalizeResourcePath(url);
-		var fileName = Path.GetFileName(resourcePath);
-		var text = Content(resourcePath, fileName);
+		string resourcePath = NormalizeResourcePath(url);
+		string fileName = Path.GetFileName(resourcePath);
+		string? text = Content(resourcePath, fileName);
 		if (text is not null && IsText(resourcePath))
 		{
 			UTF8Encoding utfEncoding = new();
@@ -55,7 +55,7 @@ public class StreamExtensions
 			postDataStream.Seek(0, SeekOrigin.Begin);
 			return postDataStream;
 		}
-		var bytes = ByteContent(resourcePath, fileName);
+		byte[]? bytes = ByteContent(resourcePath, fileName);
 		if (bytes is not null)
 		{
 			MemoryStream postDataStream = new(bytes.Length);
@@ -76,7 +76,7 @@ public class StreamExtensions
 	/// returns "application/octet-stream".</returns>
 	public static string GetMimeType(string fileName)
 	{
-		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		string extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 
 		return extension switch
 		{
@@ -122,7 +122,7 @@ public class StreamExtensions
 	/// langword="false"/>.</returns>
 	public static bool IsText(string fileName)
 	{
-		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		string extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 		return extension switch
 		{
 			".xhtml" => true,
@@ -146,7 +146,7 @@ public class StreamExtensions
 	/// <returns><see langword="true"/> if the file is considered binary based on its extension; otherwise, <see langword="false"/>.</returns>
 	public static bool IsBinary(string fileName)
 	{
-		var extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
+		string extension = Path.GetExtension(NormalizeResourcePath(fileName)).ToLowerInvariant();
 		return extension switch
 		{
 			".png" => true,
@@ -179,13 +179,13 @@ public class StreamExtensions
 			return string.Empty;
 		}
 
-		var value = resource.Trim();
-		if (Uri.TryCreate(value, UriKind.Absolute, out var absoluteUri))
+		string value = resource.Trim();
+		if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absoluteUri))
 		{
 			value = absoluteUri.AbsolutePath;
 		}
 
-		var queryIndex = value.IndexOfAny(['?', '#']);
+		int queryIndex = value.IndexOfAny(['?', '#']);
 		if (queryIndex >= 0)
 		{
 			value = value[..queryIndex];
@@ -266,7 +266,7 @@ public class StreamExtensions
 
 		if (!string.IsNullOrWhiteSpace(resourcePath))
 		{
-			var normalizedCandidate = NormalizeResourcePath(candidate);
+			string normalizedCandidate = NormalizeResourcePath(candidate);
 			if (string.Equals(normalizedCandidate, resourcePath, StringComparison.OrdinalIgnoreCase) ||
 				normalizedCandidate.EndsWith($"/{resourcePath}", StringComparison.OrdinalIgnoreCase) ||
 				resourcePath.EndsWith($"/{normalizedCandidate}", StringComparison.OrdinalIgnoreCase))

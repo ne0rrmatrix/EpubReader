@@ -49,6 +49,14 @@ body {
     margin-bottom: 0;
     overflow: hidden;
     width: 100vw;
+
+     /* Optimizes font rendering for high-DPI Retina screens */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    /* Disables unexpected sub-pixel scaling glitches */
+    -webkit-perspective: 0px !important;
+    -webkit-backface-visibility: visible !important;
 }
 
 iframe {

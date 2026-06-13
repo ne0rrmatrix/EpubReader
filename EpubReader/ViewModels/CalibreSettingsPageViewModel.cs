@@ -3,6 +3,7 @@
 public partial class CalibreSettingsPageViewModel : BaseViewModel
 {
 	const string defaultCalibrePrefix = "http";
+	readonly ICalibreZeroConf calibreZeroConf = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<ICalibreZeroConf>() ?? throw new InvalidOperationException();
 	static readonly ILogger logger = AppLogger.CreateLogger<CalibreSettingsPageViewModel>();
 	string loadedManualServerAddress = string.Empty;
 	CancellationTokenSource? settingsOperationCancellationTokenSource;
@@ -54,32 +55,60 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 			Settings settings = await db.GetSettings(operationCancellationTokenSource.Token) ?? new Settings();
 			settings.CalibreAutoDiscovery = IsAutoConfigEnabled;
 
-			var result = await CalibreZeroConf.DiscoverCalibreServers(cancellationToken: operationCancellationTokenSource.Token); // Start discovery early to populate cache for faster verification, even if auto config is not enabled
-			if (result.Count > 0)
+			if (IsAutoConfigEnabled)
 			{
-				var (IpAddress, Port) = result[0];
-				settings.CalibreManualUrlPrefix = defaultCalibrePrefix;
-				settings.CalibreManualIPAddress = IpAddress;
-				settings.CalibreManualPort = Port;
+				// Auto-discovery: use Bonjour to find Calibre servers
+				List<(string IpAddress, int Port)> result = await calibreZeroConf.DiscoverCalibreServers(TimeSpan.FromSeconds(20), cancellationToken: operationCancellationTokenSource.Token);
+				if (result.Count > 0)
+				{
+					(string? IpAddress, int Port) = result[0];
+					settings.CalibreManualUrlPrefix = defaultCalibrePrefix;
+					settings.CalibreManualIPAddress = IpAddress;
+					settings.CalibreManualPort = Port;
 
-				await db.SaveSettings(settings, operationCancellationTokenSource.Token);
-				loadedManualServerAddress = BuildAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
-				SavedConfigurationSummary = $"Saved connection: {BuildAddress("http", settings.CalibreManualIPAddress, settings.CalibreManualPort)}";
-				StatusMessage = "Connection verified and settings saved.";
-				logger.Info($"Calibre settings saved successfully using {(IsAutoConfigEnabled ? "auto configuration" : "manual configuration")}: {SavedConfigurationSummary}");
-				await ShowInfoToastAsync("Calibre connection verified and settings saved.");
-				SavedConfigurationSummary = $"Saved connection: ";
-				logger.Info($"Discovered Calibre server at http://{settings.CalibreManualIPAddress}:{settings.CalibreManualPort} during settings save.");
-				logger.Info($"Calibre settings saved successfully using {(IsAutoConfigEnabled ? "auto configuration" : "manual configuration")}: {SavedConfigurationSummary}");
-				await ShowInfoToastAsync("Calibre connection verified and settings saved.");
+					await db.SaveSettings(settings, operationCancellationTokenSource.Token);
+					loadedManualServerAddress = BuildAddress(settings.CalibreManualUrlPrefix, settings.CalibreManualIPAddress, settings.CalibreManualPort);
+					SavedConfigurationSummary = $"Saved connection: {BuildAddress("http", settings.CalibreManualIPAddress, settings.CalibreManualPort)}";
+					StatusMessage = "Connection verified and settings saved.";
+					logger.Info($"Calibre settings saved successfully using auto configuration: {SavedConfigurationSummary}");
+					await ShowInfoToastAsync("Calibre connection verified and settings saved.");
+				}
+				else
+				{
+					// No servers found — still persist the auto-discovery preference
+					await db.SaveSettings(settings, operationCancellationTokenSource.Token);
+					SavedConfigurationSummary = string.Empty;
+					StatusMessage = "No Calibre servers discovered on the local network. Please ensure your Calibre server is running and connected to the same network, then try again.";
+					logger.Warn(StatusMessage);
+				}
 			}
 			else
 			{
-				settings.CalibreManualUrlPrefix = string.Empty;
-				settings.CalibreManualIPAddress = string.Empty;
-				settings.CalibreManualPort = 0;
-				SavedConfigurationSummary = "No Calibre servers discovered on the local network. Please ensure your Calibre server is running and connected to the same network, then try again.";
+				// Manual configuration: parse the user-entered address
+				if (TryParseServerAddress(ManualServerAddress, out string? parsedPrefix, out string? parsedHost, out int parsedPort))
+				{
+					settings.CalibreManualUrlPrefix = parsedPrefix!;
+					settings.CalibreManualIPAddress = parsedHost!;
+					settings.CalibreManualPort = parsedPort;
+
+					await db.SaveSettings(settings, operationCancellationTokenSource.Token);
+					loadedManualServerAddress = ManualServerAddress;
+					SavedConfigurationSummary = $"Saved connection: {ManualServerAddress}";
+					StatusMessage = "Manual connection verified and settings saved.";
+					logger.Info($"Calibre settings saved successfully using manual configuration: {ManualServerAddress}");
+					await ShowInfoToastAsync("Calibre connection verified and settings saved.");
+				}
+				else
+				{
+					// Invalid manual address format — still persist the auto-discovery off preference
+					await db.SaveSettings(settings, operationCancellationTokenSource.Token);
+					SavedConfigurationSummary = string.Empty;
+					StatusMessage = "Invalid server address format. Please use http://host:port or https://host:port.";
+					logger.Warn($"Invalid manual Calibre address: {ManualServerAddress}");
+					await ShowInfoToastAsync("Invalid server address format.");
+				}
 			}
+
 			CloseRequested?.Invoke(this, true);
 		}
 		catch (OperationCanceledException)
@@ -161,5 +190,42 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 		}
 
 		StatusMessage = "Manual Calibre server updated. Verify & Save to validate the connection and store the settings.";
+	}
+
+	/// <summary>
+	/// Parses a server address string like "http://192.168.1.10:8080" into its components.
+	/// </summary>
+	/// <returns><see langword="true"/> if parsing succeeded; otherwise <see langword="false"/>.</returns>
+	static bool TryParseServerAddress(string address, out string? prefix, out string? host, out int port)
+	{
+		prefix = null;
+		host = null;
+		port = 0;
+
+		if (string.IsNullOrWhiteSpace(address))
+		{
+			return false;
+		}
+
+		// Try parsing as a URI
+		if (!Uri.TryCreate(address.Trim(), UriKind.Absolute, out Uri? uri))
+		{
+			return false;
+		}
+
+		if (uri.Scheme is not ("http" or "https"))
+		{
+			return false;
+		}
+
+		if (string.IsNullOrWhiteSpace(uri.Host))
+		{
+			return false;
+		}
+
+		prefix = uri.Scheme;
+		host = uri.Host;
+		port = uri.Port > 0 ? uri.Port : (uri.Scheme == "https" ? 443 : 8080);
+		return true;
 	}
 }

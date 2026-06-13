@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EpubReader.Util;
@@ -36,8 +35,8 @@ public static class AppLogger
 			return loggerFactory;
 		}
 
-		var services = Application.Current?.Handler?.MauiContext?.Services;
-		var resolvedFactory = services?.GetService<ILoggerFactory>();
+		IServiceProvider? services = Application.Current?.Handler?.MauiContext?.Services;
+		ILoggerFactory? resolvedFactory = services?.GetService<ILoggerFactory>();
 		if (resolvedFactory is not null)
 		{
 			loggerFactory = resolvedFactory;
@@ -103,7 +102,7 @@ public sealed partial class TraceLoggerProvider : ILoggerProvider
 				return;
 			}
 
-			var message = formatter(state, exception);
+			string message = formatter(state, exception);
 			if (string.IsNullOrWhiteSpace(message) && exception is null)
 			{
 				return;

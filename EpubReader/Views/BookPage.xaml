@@ -12,6 +12,7 @@
     x:DataType="viewModel:BookViewModel"
     Loaded="CurrentPage_Loaded"
     SafeAreaEdges="None"
+    Shell.NavBarIsVisible="False"
     Shell.BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                             Light={OnPlatform WinUI={StaticResource White},
                                                               Default={StaticResource Blue200Accent}}}"

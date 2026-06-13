@@ -102,10 +102,10 @@ public partial class Db : IDb
 		IReadOnlyList<(string ColumnName, string SqlType)> columns,
 		CancellationToken cancellationToken)
 	{
-		var tableInfo = await connection.GetTableInfoAsync(tableName).WaitAsync(cancellationToken);
-		var existing = tableInfo.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+		List<SQLiteConnection.ColumnInfo> tableInfo = await connection.GetTableInfoAsync(tableName).WaitAsync(cancellationToken);
+		HashSet<string> existing = tableInfo.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-		foreach (var (columnName, sqlType) in columns)
+		foreach ((string? columnName, string? sqlType) in columns)
 		{
 			if (existing.Contains(columnName))
 			{
@@ -147,8 +147,8 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		var results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
-		foreach (var result in results)
+		List<Book> results = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
+		foreach (Book result in results)
 		{
 			await EnsureBookSyncIdAsync(result, cancellationToken);
 		}
@@ -168,7 +168,7 @@ public partial class Db : IDb
 			logger.Error(errorMsg);
 			throw new InvalidOperationException(dbErrorMsg);
 		}
-		var result = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
+		Book? result = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		if (result is not null)
 		{
 			await EnsureBookSyncIdAsync(result, cancellationToken);
@@ -212,7 +212,7 @@ public partial class Db : IDb
 
 		book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
 
-		var item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
+		Book? item = await conn.Table<Book>().FirstOrDefaultAsync(x => x.Id == book.Id).WaitAsync(cancellationToken);
 		if (item is null)
 		{
 			logger.Info("Inserting book");
@@ -236,7 +236,7 @@ public partial class Db : IDb
 		}
 
 		// Use parameterized SQL to update only the progress columns to avoid overwriting other data.
-		var sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
+		string sql = "UPDATE Book SET CurrentChapter = ?, CurrentPage = ? WHERE Id = ?";
 		await conn.ExecuteAsync(sql, currentChapter, currentPage, bookId).WaitAsync(cancellationToken);
 	}
 
@@ -252,7 +252,7 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 
-		var sql = "UPDATE Book SET LastOpenedDate = ? WHERE Id = ?";
+		string sql = "UPDATE Book SET LastOpenedDate = ? WHERE Id = ?";
 		await conn.ExecuteAsync(sql, lastOpenedDate, bookId).WaitAsync(cancellationToken);
 	}
 
@@ -347,8 +347,8 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 
-		var tableInfo = await conn.GetTableInfoAsync(nameof(Book)).WaitAsync(cancellationToken) ?? [];
-		var hasSyncId = tableInfo.Any(column => column.Name.Equals("SyncId", StringComparison.OrdinalIgnoreCase));
+		List<SQLiteConnection.ColumnInfo> tableInfo = await conn.GetTableInfoAsync(nameof(Book)).WaitAsync(cancellationToken) ?? [];
+		bool hasSyncId = tableInfo.Any(column => column.Name.Equals("SyncId", StringComparison.OrdinalIgnoreCase));
 		if (!hasSyncId)
 		{
 			await conn.ExecuteAsync("ALTER TABLE Book ADD COLUMN SyncId TEXT").WaitAsync(cancellationToken);
@@ -364,8 +364,8 @@ public partial class Db : IDb
 			throw new InvalidOperationException(dbErrorMsg);
 		}
 
-		var books = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
-		foreach (var book in books)
+		List<Book> books = await conn.Table<Book>().ToListAsync().WaitAsync(cancellationToken) ?? [];
+		foreach (Book book in books)
 		{
 			if (!string.IsNullOrWhiteSpace(book.SyncId))
 			{

@@ -28,7 +28,7 @@ public class ReaderSettingsStateService(IDb db) : IReaderSettingsStateService
 	{
 		token.ThrowIfCancellationRequested();
 		await db.RemoveAllSettings(CancellationToken.None);
-		var settings = new Settings();
+		Settings settings = new();
 		await db.SaveSettings(settings, CancellationToken.None);
 		CurrentSettings = settings;
 		SettingsChanged?.Invoke(this, new ReaderSettingsChangedEventArgs(SettingsChangeKind.Reset));
