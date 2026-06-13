@@ -38,7 +38,6 @@ public class FeedReader(HttpClient? httpClient = null)
 		catch (HttpRequestException ex)
 		{
 			logger.Error($"HTTP error fetching feed from {url}: {ex.Message}");
-			//throw;
 			return new OpdsFeed
 			{
 				Title = "Error Fetching Feed",
@@ -48,7 +47,6 @@ public class FeedReader(HttpClient? httpClient = null)
 		catch (XmlException ex)
 		{
 			logger.Error($"XML parsing error for feed from {url}: {ex.Message}");
-			//throw;
 			return new OpdsFeed
 			{
 				Title = "Invalid Feed",
@@ -58,7 +56,6 @@ public class FeedReader(HttpClient? httpClient = null)
 		catch (Exception ex)
 		{
 			logger.Error($"Unexpected error fetching feed from {url}: {ex.Message}");
-			//throw;
 			return new OpdsFeed
 			{
 				Title = "Error Fetching Feed",
