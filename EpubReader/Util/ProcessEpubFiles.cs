@@ -257,7 +257,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 
 			string cacheDirectory = FileSystem.Current.CacheDirectory;
 			char[] invalidPathChars = Path.GetInvalidFileNameChars();
-			char[] extraInvalidChars = new char[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+' };
+			char[] extraInvalidChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+'];
 			string emptySpaces = " ";
 			invalidPathChars = [.. invalidPathChars, .. emptySpaces];
 			invalidPathChars = [.. invalidPathChars, .. extraInvalidChars];

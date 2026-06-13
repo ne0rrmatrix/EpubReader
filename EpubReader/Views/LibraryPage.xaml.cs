@@ -74,10 +74,10 @@ public partial class LibraryPage : ContentPage
 			return;
 		}
 		logger.Info($"Searching for books with title containing: {results}");
-		List<Book> filteredTitles = allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
-		List<Book> filteredAuthors = allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase)).ToList();
+		List<Book> filteredTitles = [.. allBooks.Where(b => b.Title.Contains(results, StringComparison.OrdinalIgnoreCase))];
+		List<Book> filteredAuthors = [.. allBooks.Where(b => b.Author.Contains(results, StringComparison.OrdinalIgnoreCase))];
 
-		List<Book> filteredBooks = filteredTitles.Union(filteredAuthors).ToList();
+		List<Book> filteredBooks = [.. filteredTitles.Union(filteredAuthors)];
 		viewModel.ReplaceBooks(filteredBooks);
 
 	}

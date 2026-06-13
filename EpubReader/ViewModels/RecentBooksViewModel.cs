@@ -78,11 +78,10 @@ public partial class RecentBooksViewModel : BaseViewModel
 			List<Book> allBooks = await db.GetAllBooks(cancellationToken);
 
 			// Filter books with LastOpenedDate, sort by most recent descending, limit to 20
-			List<Book> recentBooks = allBooks
+			List<Book> recentBooks = [.. allBooks
 				.Where(b => b.LastOpenedDate.HasValue)
 				.OrderByDescending(b => b.LastOpenedDate)
-				.Take(maxRecentBooks)
-				.ToList();
+				.Take(maxRecentBooks)];
 
 			RecentBooks.Clear();
 			foreach (Book book in recentBooks)
@@ -104,7 +103,6 @@ public partial class RecentBooksViewModel : BaseViewModel
 	{
 		try
 		{
-			IServiceProvider services = Application.Current?.Handler.MauiContext?.Services ?? throw new InvalidOperationException();
 			SettingsPage settingsPopup = new(new SettingsPageViewModel(syncService));
 			PopupOptions settingsOptions = new()
 			{

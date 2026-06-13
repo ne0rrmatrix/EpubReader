@@ -502,7 +502,7 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			return defaultReaderLineSpacing;
 		}
 
-		double[] allowedValues = new[] { 1.25d, 1.5d, 1.75d, 2d };
+		double[] allowedValues = [1.25d, 1.5d, 1.75d, 2d];
 		double nearest = allowedValues.OrderBy(value => Math.Abs(value - parsedValue)).First();
 		return nearest.ToString("0.##", CultureInfo.InvariantCulture);
 	}
