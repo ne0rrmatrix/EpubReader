@@ -211,20 +211,13 @@ public partial class CalibrePageViewModel : BaseViewModel
 	{
 		SearchText = searchText ?? string.Empty;
 
-		if (string.IsNullOrWhiteSpace(SearchText) || searchText is null)
+		if (string.IsNullOrWhiteSpace(SearchText))
 		{
-			Books = [.. BookList];
-			EmptyLabelText = currentFeedEmptyLabelText;
+			RestoreCurrentBookResults();
 			return;
 		}
 
-		List<Book> filteredTitles = [.. Books.Where(b => b.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		List<Book> filteredAuthors = [.. Books.Where(b => b.Author.Contains(searchText, StringComparison.OrdinalIgnoreCase))];
-		List<Book> filteredBooks = [.. filteredTitles.Union(filteredAuthors)];
-
-		Books = [.. filteredBooks];
-		EmptyLabelText = $"No books found matching '{SearchText}'.";
-		Logger.Info($"Applied local Calibre exact search for '{SearchText}' with {Books.Count} results.");
+		ApplyLocalSearch(SearchText);
 	}
 
 	[RelayCommand]
@@ -452,6 +445,23 @@ public partial class CalibrePageViewModel : BaseViewModel
 			Id = entry.Id ?? string.Empty,
 			FeedType = DetermineFeedType(entry),
 		};
+	}
+
+	void ApplyLocalSearch(string searchText)
+	{
+		List<Book> filteredBooks = [.. BookList.Where(book =>
+			string.Equals(book.Title, searchText, StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(book.Author, searchText, StringComparison.OrdinalIgnoreCase))];
+
+		Books = [.. filteredBooks];
+		EmptyLabelText = $"No books found matching '{searchText}'.";
+		Logger.Info($"Applied local Calibre exact search for '{searchText}' with {filteredBooks.Count} results.");
+	}
+
+	void RestoreCurrentBookResults()
+	{
+		Books = [.. BookList];
+		EmptyLabelText = currentFeedEmptyLabelText;
 	}
 
 	void ResetFeedState()

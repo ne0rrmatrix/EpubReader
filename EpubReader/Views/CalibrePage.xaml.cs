@@ -13,7 +13,7 @@ public partial class CalibrePage : ContentPage
 
 	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
-		if (e is null)
+		if (e is null || string.IsNullOrEmpty(e.NewTextValue))
 		{
 			logger.Warn("TextChangedEventArgs is null, cannot process search.");
 			return;
