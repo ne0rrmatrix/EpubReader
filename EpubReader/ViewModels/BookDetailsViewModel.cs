@@ -36,8 +36,6 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			Book.CurrentPage = existingBook.CurrentPage;
 			// Populate sync cache / cloud progress if available, but do NOT overwrite the Book's local position here.
 			await RestoreProgressAsync(existingBook);
-
-			StreamExtensions.Instance?.SetBook(Book);
 		}
 	}
 
