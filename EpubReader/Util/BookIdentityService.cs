@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -8,42 +9,41 @@ namespace EpubReader.Util;
 /// </summary>
 public static class BookIdentityService
 {
-	public static async Task<string> ComputeSyncIdAsync(Book book, CancellationToken token)
+	public static Task<string> ComputeSyncIdAsync(Book book, CancellationToken token)
 	{
 		ArgumentNullException.ThrowIfNull(book);
 		token.ThrowIfCancellationRequested();
 
-		if (!string.IsNullOrWhiteSpace(book.SyncId))
-		{
-			return book.SyncId;
-		}
-
-		string fileHash;
 		try
 		{
-			if (!string.IsNullOrWhiteSpace(book.FilePath) && File.Exists(book.FilePath))
+			string title = (book.Title ?? string.Empty).Trim();
+			string author = (book.Author ?? string.Empty).Trim();
+
+			if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(author))
 			{
-				fileHash = await ComputeFileHashAsync(book.FilePath, token).ConfigureAwait(false);
+				if (string.IsNullOrWhiteSpace(book.FilePath))
+				{
+					throw new FileNotFoundException("Book file path is null or empty, and title/author metadata is also missing.");
+				}
+
+				// Fallback: use filename when EPUB metadata is missing.
 				string fileName = Path.GetFileName(book.FilePath);
-				book.SyncId = $"file-{ComputeTextHash($"{fileName}|{fileHash}")}";
-				return book.SyncId;
+				book.SyncId = $"file-{ComputeTextHash(fileName)}";
 			}
 			else
 			{
-				throw new FileNotFoundException("Book file not found", book.FilePath);
+				// Use title + author for cross-device consistency. Filenames differ across platforms.
+				string identity = $"{title}|{author}";
+				book.SyncId = $"book-{ComputeTextHash(identity)}";
 			}
+
+			Trace.WriteLine($"[BookIdentity] SyncId={book.SyncId} for '{book.Title}' by '{book.Author}' (file={book.FilePath})");
+			return Task.FromResult(book.SyncId);
 		}
 		catch (Exception ex)
 		{
-			throw new InvalidOperationException($"Failed to compute file hash for book '{book.Title}': {ex.Message}", ex);
+			throw new InvalidOperationException($"Failed to compute sync id for book '{book.Title}': {ex.Message}", ex);
 		}
-	}
-
-	static async Task<string> ComputeFileHashAsync(string path, CancellationToken token)
-	{
-		await using FileStream stream = File.OpenRead(path);
-		byte[] hash = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
-		return Convert.ToHexString(hash).ToLowerInvariant();
 	}
 
 	static string ComputeTextHash(string text)

@@ -24,6 +24,9 @@ public partial class BookPage : ContentPage, IDisposable
 	const string switchProgressConfirmText = "Switch";
 	const string switchProgressCancelText = "Stay here";
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
+#if ANDROID
+	readonly UnlockReceiver receiver = new();
+#endif
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly IAuthentication authenticationService = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<IAuthentication>() ?? throw new InvalidOperationException();
@@ -82,12 +85,12 @@ public partial class BookPage : ContentPage, IDisposable
 		NativeLoadingOverlay.IsVisible = true;
 		fullScreenService.EnterFullScreen();
 		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
-
 	}
 
 	protected override async void OnAppearing()
 	{
 		base.OnAppearing();
+		
 		if (!await EnsureReadableBookStateAsync())
 		{
 			return;
@@ -151,12 +154,12 @@ public partial class BookPage : ContentPage, IDisposable
 
 	protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
 	{
+		base.OnNavigatedFrom(args);
 		if (args.IsDestinationPageACommunityToolkitPopupPage())
 		{
 			// Don't treat navigating to a popup as leaving the page, since the page is still visible behind the popup and we want it to remain in reader mode with the menu hidden.
 			return;
 		}
-		base.OnNavigatedFrom(args);
 		Shell.SetNavBarIsVisible(this, true);
 		Shell.SetTabBarIsVisible(this, true);
 	}
@@ -217,6 +220,10 @@ public partial class BookPage : ContentPage, IDisposable
 
 		// detach webview handlers we attached on appearing
 		webView?.Navigated -= webView_Navigated;
+#if ANDROID
+		receiver.ScreenUnlocked -= Receiver_ScreenUnlocked;
+		Application.Current?.Handler?.MauiContext?.Context?.UnregisterReceiver(receiver);
+#endif
 		base.OnDisappearing();
 	}
 
@@ -309,6 +316,8 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			return;
 		}
+
+		lastPromptedRemoteProgressTimestamp = DateTimeOffset.MinValue;
 
 		DateTimeOffset now = DateTimeOffset.UtcNow;
 		if (isForegroundProgressCheckInFlight || now - lastForegroundProgressCheckStartedAt < foregroundProgressCheckCooldown)
@@ -473,6 +482,13 @@ public partial class BookPage : ContentPage, IDisposable
 		});
 	}
 
+#if ANDROID
+	async void Receiver_ScreenUnlocked(object? sender, EventArgs e)
+	{
+		await CheckForIncomingSyncedProgressOnForegroundAsync("A newer synced position is available.");
+	}
+#endif
+
 	async Task StartLoadSequenceAsync()
 	{
 		Dispatcher.Dispatch(() =>
@@ -497,6 +513,11 @@ public partial class BookPage : ContentPage, IDisposable
 		pageSlider.Minimum = 0;
 		pageSlider.Maximum = 0;
 		pageSlider.Value = 0;
+#if ANDROID
+		var filter = new Android.Content.IntentFilter(Android.Content.Intent.ActionUserPresent);
+		Application.Current?.Handler?.MauiContext?.Context?.RegisterReceiver(receiver, filter);
+		receiver.ScreenUnlocked += Receiver_ScreenUnlocked;
+#endif
 	}
 
 	/// <summary>
@@ -1369,7 +1390,7 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		return pageLoaded;
 	}
-
+	
 	async Task BackfillLegacyProgressIfNeededAsync(string bookId, CancellationToken token)
 	{
 		if (book.CurrentChapter <= 0 && book.CurrentPage <= 0)
@@ -1448,12 +1469,17 @@ public partial class BookPage : ContentPage, IDisposable
 			return false;
 		}
 
-		if (incomingTimestamp <= localTimestamp || incomingTimestamp <= lastPromptedRemoteProgressTimestamp)
+		if (incomingTimestamp <= localTimestamp)
 		{
 			TrackResolvedProgress(localProgress);
 			return false;
 		}
 
+		if (incomingTimestamp <= lastPromptedRemoteProgressTimestamp)
+		{
+			TrackResolvedProgress(localProgress);
+			return false;
+		}
 
 		return await PromptToSwitchToIncomingProgressAsync(cloud, promptMessage, token);
 	}
