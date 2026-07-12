@@ -2592,6 +2592,78 @@ function scrollToHorizontalEnd() {
 }
 
 /**
+ * Scrolls to a device-independent character position within the current chapter,
+ * then recalculates the page number for the current device layout.
+ * @param {number} characterPosition - The target character position (0-based)
+ * @returns {string} JSON with the resulting page and character position
+ */
+function scrollToCharacterPosition(characterPosition) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win) {
+        console.warn('scrollToCharacterPosition: iframe content not available');
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    const targetPosition = Math.max(0, Number(characterPosition) || 0);
+    if (targetPosition <= 0) {
+        win.scrollTo(0, 0);
+        currentPage = 0;
+        updateCharacterPosition();
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    lastVirtualColumnLayoutKey = null;
+    adjustVirtualColumns({ force: true, reason: 'scroll-to-char-pos' });
+
+    const textContent = extractTextFromDocument(doc, getActiveSectionElement(doc));
+    const totalCharacters = textContent.length;
+
+    if (totalCharacters <= 0) {
+        console.warn('scrollToCharacterPosition: no text content in active section');
+        win.scrollTo(0, 0);
+        currentPage = 0;
+        updateCharacterPosition();
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    // Calculate the scroll progress as the fraction through the text
+    const scrollProgress = Math.min(1, targetPosition / totalCharacters);
+    const totalScrollWidth = doc.documentElement.scrollWidth;
+    const viewportWidth = win.innerWidth;
+    const maxScrollX = Math.max(0, totalScrollWidth - viewportWidth);
+    const targetScrollX = Math.floor(scrollProgress * maxScrollX);
+
+    console.log(
+        'scrollToCharacterPosition: targetPos=' + targetPosition +
+        ' totalChars=' + totalCharacters +
+        ' scrollProgress=' + scrollProgress.toFixed(4) +
+        ' maxScrollX=' + maxScrollX +
+        ' targetScrollX=' + targetScrollX
+    );
+
+    try {
+        win.scrollTo(targetScrollX, 0);
+    } catch (error) {
+        console.warn('scrollToCharacterPosition: scrollTo failed', error);
+    }
+
+    // Allow layout to settle, then recalculate the page
+    setTimeout(() => {
+        const scrollAmount = navigationUtils.calculateScrollAmount(win) || win.innerWidth;
+        currentPage = Math.max(0, Math.round(win.scrollX / scrollAmount));
+        updateCharacterPosition();
+        console.log('scrollToCharacterPosition: settled at page=' + currentPage);
+    }, 150);
+
+    return JSON.stringify({
+        page: currentPage,
+        characterPosition: targetPosition,
+        totalCharacters: totalCharacters
+    });
+}
+
+/**
  * Sets a CSS custom property on the iframe's document element
  * @param {string} property - The CSS property name
  * @param {string} value - The CSS property value

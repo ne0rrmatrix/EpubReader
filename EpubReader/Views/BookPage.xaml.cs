@@ -62,6 +62,18 @@ public partial class BookPage : ContentPage, IDisposable
 	static readonly TimeSpan foregroundProgressCheckCooldown = TimeSpan.FromSeconds(2);
 
 	/// <summary>
+	/// Tracks the last persisted reading position so <see cref="CreateProgressSnapshotForSave"/>
+	/// can detect genuine position changes and apply a fresh timestamp.
+	/// </summary>
+	(int Chapter, int Page, int CharacterPosition) lastSavedProgressPosition;
+
+	/// <summary>
+	/// Device-independent character position within the current chapter, updated by JS
+	/// via the <c>characterposition</c> bridge action. Used for cross-device sync.
+	/// </summary>
+	int latestCharacterPosition;
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="BookPage"/> class with the specified view model and database.
 	/// </summary>
 	/// <remarks>This constructor sets up the page's data binding context and initializes necessary components. It
@@ -220,10 +232,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 		// detach webview handlers we attached on appearing
 		webView?.Navigated -= webView_Navigated;
-#if ANDROID
-		receiver.ScreenUnlocked -= Receiver_ScreenUnlocked;
-		Application.Current?.Handler?.MauiContext?.Context?.UnregisterReceiver(receiver);
-#endif
 		base.OnDisappearing();
 	}
 
@@ -343,6 +351,9 @@ public partial class BookPage : ContentPage, IDisposable
 		finally
 		{
 			isForegroundProgressCheckInFlight = false;
+			fullScreenService.EnterFullScreen();
+			Shell.SetNavBarIsVisible(this, false);
+			Shell.SetTabBarIsVisible(this, false);
 		}
 	}
 
@@ -443,7 +454,7 @@ public partial class BookPage : ContentPage, IDisposable
 		bool isVisible = Shell.GetNavBarIsVisible(this);
 		fullScreenService.SetFullScreen(isVisible);
 		Shell.SetNavBarIsVisible(this, !isVisible);
-
+		Shell.SetTabBarIsVisible(this, false);
 		if (isMenuOpen)
 		{
 			isMenuOpen = false;
@@ -653,7 +664,7 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandlePageLoadAsync(int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int currentPageOnLoad) ? currentPageOnLoad : 0);
 				break;
 			case ReaderBridgeAction.CharacterPosition:
-				await HandleCharacterPositionAsync(int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int currentCharacterPage) ? currentCharacterPage : 0);
+				await HandleCharacterPositionAsync(message.Position ?? 0);
 				break;
 			case ReaderBridgeAction.SectionChange:
 				HandleSectionChange(message);
@@ -805,9 +816,22 @@ public partial class BookPage : ContentPage, IDisposable
 		});
 	}
 
-	async Task HandleCharacterPositionAsync(int currentPage)
+	async Task HandleCharacterPositionAsync(int characterPosition)
 	{
-		Trace.TraceInformation($"[PageRestore] HandleCharacterPositionAsync: jsPage={currentPage} book.Ch={book.CurrentChapter}");
+		// When the combined HTML is not yet loaded (e.g. during a cross-device
+		// restore where ScrollToCharacterPositionAsync triggers this callback
+		// before the iframe renders), the JS returns 0 for both characterPosition
+		// and getCurrentPage(). Ignore these transient zeroes so they don't
+		// overwrite the cloud-synced position.
+		if (characterPosition <= 0 && !webViewHelper.CombinedHtmlIsLoaded)
+		{
+			Trace.TraceInformation($"[PageRestore] HandleCharacterPositionAsync: ignoring charPos=0 (combined HTML not loaded yet, latestCharPos={latestCharacterPosition})");
+			return;
+		}
+
+		latestCharacterPosition = characterPosition;
+		int currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int cp) ? cp : 0;
+		Trace.TraceInformation($"[PageRestore] HandleCharacterPositionAsync: charPos={characterPosition} jsPage={currentPage} book.Ch={book.CurrentChapter}");
 		book.CurrentPage = currentPage;
 		await Dispatcher.DispatchAsync(async () =>
 		{
@@ -1121,6 +1145,7 @@ public partial class BookPage : ContentPage, IDisposable
 		sliderContainer.IsVisible = false;
 		fullScreenService.SetFullScreen(true);
 		Shell.SetNavBarIsVisible(this, false);
+		Shell.SetTabBarIsVisible(this, false);
 		await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
 		await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
 	}
@@ -1177,7 +1202,15 @@ public partial class BookPage : ContentPage, IDisposable
 			book.CurrentChapter = pagination.CurrentSectionIndex;
 		}
 
-		book.CurrentPage = pagination.CurrentPage;
+		// During restore, gotoPage() triggers a scrolling animation that may
+		// not have settled when the pagination is next read. The pagination
+		// then returns page=0, which would overwrite the synced page. Only
+		// accept a page=0 from pagination when the book doesn't already have
+		// a valid page (i.e., nothing to lose).
+		if (pagination.CurrentPage > 0 || book.CurrentPage <= 0)
+		{
+			book.CurrentPage = pagination.CurrentPage;
+		}
 		Trace.TraceInformation($"[PageRestore] ApplyPaginationInfo: AFTER  book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage} totalPages={sliderTotalPages}");
 
 		pageSlider.Minimum = 0;
@@ -1402,6 +1435,7 @@ public partial class BookPage : ContentPage, IDisposable
 			BookId = bookId,
 			CurrentChapter = book.CurrentChapter,
 			CurrentPage = book.CurrentPage,
+			CharacterPosition = latestCharacterPosition,
 			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
 			DeviceId = string.Empty,
 			DeviceName = string.Empty,
@@ -1509,13 +1543,22 @@ public partial class BookPage : ContentPage, IDisposable
 
 		if (lastResolvedProgressTimestamp <= DateTimeOffset.MinValue)
 		{
+			lastSavedProgressPosition = (progress.CurrentChapter, progress.CurrentPage, progress.CharacterPosition);
 			return progress;
 		}
 
-		ReadingProgress resolvedSnapshot = CreateCurrentReadingProgressSnapshot(lastResolvedProgressTimestamp.ToString("o"));
-		if (HasSameReadingPosition(progress, resolvedSnapshot))
+		// Compare against the last persisted position (not another snapshot of the
+		// current state) to detect genuine position changes. When the position is
+		// unchanged, preserve the resolved timestamp to avoid unnecessary cloud churn.
+		if (progress.CurrentChapter == lastSavedProgressPosition.Chapter
+			&& progress.CurrentPage == lastSavedProgressPosition.Page
+			&& progress.CharacterPosition == lastSavedProgressPosition.CharacterPosition)
 		{
-			progress.LastUpdated = resolvedSnapshot.LastUpdated;
+			progress.LastUpdated = lastResolvedProgressTimestamp.ToString("o");
+		}
+		else
+		{
+			lastSavedProgressPosition = (progress.CurrentChapter, progress.CurrentPage, progress.CharacterPosition);
 		}
 
 		return progress;
@@ -1528,6 +1571,7 @@ public partial class BookPage : ContentPage, IDisposable
 			BookId = book.SyncId,
 			CurrentChapter = book.CurrentChapter,
 			CurrentPage = book.CurrentPage,
+			CharacterPosition = latestCharacterPosition,
 			LastUpdated = string.IsNullOrWhiteSpace(lastUpdated) ? DateTimeOffset.UtcNow.ToString("o") : lastUpdated,
 			DeviceId = string.Empty,
 			DeviceName = string.Empty,
@@ -1638,10 +1682,19 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task ApplyProgressToUiAsync(ReadingProgress progress, CancellationToken token)
 	{
-		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: applying Ch={progress.CurrentChapter} Pg={progress.CurrentPage} (was book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage})");
+		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: applying Ch={progress.CurrentChapter} Pg={progress.CurrentPage} CharPos={progress.CharacterPosition} (was book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage})");
 		book.CurrentChapter = progress.CurrentChapter;
 		book.CurrentPage = progress.CurrentPage;
 		TrackResolvedProgress(progress);
+
+		// Store the character position for fine-tuning after the chapter loads.
+		// Keep book.CurrentPage at the cloud value so gotoPage() can position to the
+		// right page before ScrollToCharacterPositionAsync fine-tunes the position.
+		bool useCharacterPosition = progress.CharacterPosition > 0;
+		if (useCharacterPosition)
+		{
+			latestCharacterPosition = progress.CharacterPosition;
+		}
 
 		// Prime Media Overlay restore before loading the chapter so the manager can
 		// apply it on the next page load (restoring timeline + highlight).
@@ -1688,11 +1741,60 @@ public partial class BookPage : ContentPage, IDisposable
 			Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: calling LoadChapterContentAsync Ch={book.CurrentChapter} Pg={book.CurrentPage}");
 			await LoadChapterContentAsync();
 			Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: LoadChapterContentAsync done, book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
+
+			if (useCharacterPosition && progress.CharacterPosition > 0)
+			{
+				await ScrollToCharacterPositionAsync(progress.CharacterPosition, token);
+			}
 		}
 
 		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: before GetCurrentPageInfoAsync book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
 		sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
 		Trace.TraceInformation($"[PageRestore] ApplyProgressToUiAsync: EXIT book.Ch={book.CurrentChapter} book.Pg={book.CurrentPage}");
+	}
+
+	async Task ScrollToCharacterPositionAsync(int characterPosition, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+		try
+		{
+			Trace.TraceInformation($"[PageRestore] ScrollToCharacterPositionAsync: scrolling to charPos={characterPosition}");
+			string result = await webView.EvaluateJavaScriptAsync($"scrollToCharacterPosition({characterPosition});");
+			Trace.TraceInformation($"[PageRestore] ScrollToCharacterPositionAsync: JS returned '{result}'");
+
+			// scrollToCharacterPosition defers the actual scroll by 150ms via setTimeout.
+			// Wait for the deferred scroll + layout to settle before reading the page number.
+			await Task.Delay(250, token);
+
+			// Re-read the page number after JS has repositioned.
+			int currentPage = int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int cp) ? cp : 0;
+
+			// Only update book.CurrentPage when JS actually returns a valid page.
+			// During restore, getCurrentPage() may return 0 because the section
+			// hasn't been shown yet (Android) — in that case, keep the synced
+			// page from the cloud rather than overwriting with 0.
+			if (currentPage > 0)
+			{
+				book.CurrentPage = currentPage;
+			}
+			Trace.TraceInformation($"[PageRestore] ScrollToCharacterPositionAsync: settled at page={currentPage}");
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"ScrollToCharacterPositionAsync failed: {ex.Message} — falling back to synced page {book.CurrentPage}");
+			return;
+		}
+
+		// Persist the corrected page (outside the main try-catch so a DB failure
+		// doesn't look like a scroll failure).
+		try
+		{
+			await db.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, token);
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Failed persisting character-position-derived page: {ex.Message}");
+		}
 	}
 
 	async Task PersistAppliedProgressLocallyAsync(ReadingProgress progress, CancellationToken token)
@@ -1820,6 +1922,7 @@ public partial class BookPage : ContentPage, IDisposable
 	void TrackResolvedProgress(ReadingProgress progress)
 	{
 		lastResolvedProgressTimestamp = TryParseTimestamp(progress.LastUpdated);
+		lastSavedProgressPosition = (progress.CurrentChapter, progress.CurrentPage, progress.CharacterPosition);
 	}
 
 	static bool HasSameReadingPosition(ReadingProgress first, ReadingProgress second)
@@ -1827,8 +1930,21 @@ public partial class BookPage : ContentPage, IDisposable
 		ArgumentNullException.ThrowIfNull(first);
 		ArgumentNullException.ThrowIfNull(second);
 
-		return first.CurrentChapter == second.CurrentChapter
-			&& first.CurrentPage == second.CurrentPage
+		// When both records have a character position, use that as the
+		// device-independent position comparison instead of CurrentPage.
+		bool sameChapter = first.CurrentChapter == second.CurrentChapter;
+		bool samePosition;
+		if (first.CharacterPosition > 0 && second.CharacterPosition > 0)
+		{
+			samePosition = first.CharacterPosition == second.CharacterPosition;
+		}
+		else
+		{
+			samePosition = first.CurrentPage == second.CurrentPage;
+		}
+
+		return sameChapter
+			&& samePosition
 			&& first.MediaOverlayEnabled == second.MediaOverlayEnabled
 			&& first.MediaOverlayChapter == second.MediaOverlayChapter
 			&& first.MediaOverlaySegmentIndex == second.MediaOverlaySegmentIndex
@@ -1882,6 +1998,10 @@ public partial class BookPage : ContentPage, IDisposable
 				mediaOverlayManager.Dispose();
 			}
 			mediaOverlayManager = null;
+#if ANDROID
+		receiver.ScreenUnlocked -= Receiver_ScreenUnlocked;
+		Application.Current?.Handler?.MauiContext?.Context?.UnregisterReceiver(receiver);
+#endif
 		}
 		disposedValue = true;
 	}

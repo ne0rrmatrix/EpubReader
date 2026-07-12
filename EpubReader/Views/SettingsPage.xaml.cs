@@ -365,6 +365,7 @@ public partial class SettingsPage : Popup<bool>
 
 	void CurrentPage_Unloaded(object? sender, EventArgs e)
 	{
+		switchControl.Toggled -= switchControl_Toggled;
 		stackLayout.Remove(switchControl);
 	}
 
@@ -393,7 +394,14 @@ public partial class SettingsPage : Popup<bool>
 			logger.Warn("Switch control is null, cannot toggle multiple columns.");
 			return;
 		}
-		settings.SupportMultipleColumns = switchControl.IsToggled;
+
+		bool newValue = switchControl.IsToggled;
+		if (settings.SupportMultipleColumns == newValue)
+		{
+			return;
+		}
+
+		settings.SupportMultipleColumns = newValue;
 		await settingsStateService.SaveAsync(settings, SettingsChangeKind.Layout);
 	}
 

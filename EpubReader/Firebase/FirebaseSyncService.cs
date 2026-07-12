@@ -5,7 +5,7 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Firebase.Database;
 using Firebase.Database.Query;
-using SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace EpubReader.Firebase;
 
@@ -20,17 +20,18 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 	const string usersNode = "users";
 	const string booksNode = "books";
 	const string sqlInteger = "INTEGER";
-	readonly SQLite.SQLiteOpenFlags flags = SQLite.SQLiteOpenFlags.ReadWrite | SQLite.SQLiteOpenFlags.Create | SQLite.SQLiteOpenFlags.SharedCache;
 	readonly string deviceId;
 	readonly string deviceName;
 	readonly Subject<ReadingProgress> saveSubject = new();
 	readonly CompositeDisposable subscriptions = [];
 	readonly IAuthentication authenticationService;
+	readonly SemaphoreSlim dbInitLock = new(1, 1);
 	string databaseUrl = string.Empty;
 	string? userId;
 	bool isLocalOnlyMode;
 	FirebaseClient? firebaseClient;
-	SQLiteAsyncConnection? localDb;
+	string? localDbPath;
+	bool isLocalDbInitialized;
 	bool disposed;
 
 	public event EventHandler<ReadingProgress>? ProgressSynced;
@@ -64,12 +65,18 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		// Best-effort: clear local sync cache/queue so old items don't re-upload
 		try
 		{
-			if (localDb is null)
+			await InitializeLocalDbAsync(token);
+			using var conn = await OpenLocalDbAsync(token);
+			using (var cmd = conn.CreateCommand())
 			{
-				await InitializeLocalDbAsync(token);
+				cmd.CommandText = "DELETE FROM ReadingProgress";
+				await cmd.ExecuteNonQueryAsync(token);
 			}
-			await localDb!.DeleteAllAsync<ReadingProgress>().WaitAsync(token);
-			await localDb!.DeleteAllAsync<SyncQueueItem>().WaitAsync(token);
+			using (var cmd = conn.CreateCommand())
+			{
+				cmd.CommandText = "DELETE FROM SyncQueue";
+				await cmd.ExecuteNonQueryAsync(token);
+			}
 			Trace.TraceInformation("Local sync cache cleared");
 		}
 		catch (Exception ex)
@@ -350,6 +357,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 				BookId = item.BookId,
 				CurrentChapter = item.CurrentChapter,
 				CurrentPage = item.CurrentPage,
+				CharacterPosition = item.CharacterPosition,
 				MediaOverlayEnabled = item.MediaOverlayEnabled,
 				MediaOverlayChapter = item.MediaOverlayChapter,
 				MediaOverlaySegmentIndex = item.MediaOverlaySegmentIndex,
@@ -380,30 +388,107 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		return Task.FromResult(isOnline);
 	}
 
+	static string LocalDbConnectionString(string dbPath) => new SqliteConnectionStringBuilder
+	{
+		DataSource = dbPath,
+		Mode = SqliteOpenMode.ReadWriteCreate,
+		Cache = SqliteCacheMode.Shared
+	}.ToString();
+
+	async Task<SqliteConnection> OpenLocalDbAsync(CancellationToken token)
+	{
+		await InitializeLocalDbAsync(token);
+		token.ThrowIfCancellationRequested();
+		var conn = new SqliteConnection(LocalDbConnectionString(localDbPath!));
+		await conn.OpenAsync(token);
+		return conn;
+	}
+
 	async Task InitializeLocalDbAsync(CancellationToken token)
 	{
-		if (localDb is not null)
+		if (isLocalDbInitialized)
 		{
 			return;
 		}
 
-		string dbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
-
-		// Ensure the directory exists before creating the database
-		string? directory = Path.GetDirectoryName(dbPath);
-		if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+		await dbInitLock.WaitAsync(token);
+		try
 		{
-			Directory.CreateDirectory(directory);
-		}
+			if (isLocalDbInitialized)
+			{
+				return;
+			}
 
-		localDb = new SQLiteAsyncConnection(dbPath, flags);
-		await localDb.CreateTableAsync<ReadingProgress>().WaitAsync(token);
-		await localDb.CreateTableAsync<SyncQueueItem>().WaitAsync(token);
-		await EnsureLocalDbSchemaAsync(localDb, token).ConfigureAwait(false);
-		Trace.TraceInformation("Local sync database initialized");
+			localDbPath = Path.Combine(Database.Db.DbPath, "..", "SyncCache.db");
+
+			// Ensure the directory exists before creating the database
+			string? directory = Path.GetDirectoryName(localDbPath);
+			if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+			{
+				Directory.CreateDirectory(directory);
+			}
+
+			using var conn = new SqliteConnection(LocalDbConnectionString(localDbPath));
+			await conn.OpenAsync(token);
+
+			using (var cmd = conn.CreateCommand())
+			{
+				cmd.CommandText = """
+					CREATE TABLE IF NOT EXISTS ReadingProgress (
+						BookId TEXT PRIMARY KEY NOT NULL,
+						CurrentPage INTEGER NOT NULL DEFAULT 0,
+						CurrentChapter INTEGER NOT NULL DEFAULT 0,
+						CharacterPosition INTEGER NOT NULL DEFAULT 0,
+						LastUpdated TEXT NOT NULL,
+						DeviceId TEXT NOT NULL DEFAULT '',
+						DeviceName TEXT NOT NULL DEFAULT '',
+						IsSynced INTEGER NOT NULL DEFAULT 0,
+						MediaOverlayEnabled INTEGER,
+						MediaOverlayChapter INTEGER,
+						MediaOverlaySegmentIndex INTEGER,
+						MediaOverlayPositionSeconds REAL,
+						MediaOverlayFragmentId TEXT,
+						DateAdded TEXT,
+						LastOpenedDate TEXT
+					)
+					""";
+				await cmd.ExecuteNonQueryAsync(token);
+			}
+
+			using (var cmd = conn.CreateCommand())
+			{
+				cmd.CommandText = """
+					CREATE TABLE IF NOT EXISTS SyncQueue (
+						Id INTEGER PRIMARY KEY AUTOINCREMENT,
+						BookId TEXT NOT NULL DEFAULT '',
+						CurrentPage INTEGER NOT NULL DEFAULT 0,
+						CurrentChapter INTEGER NOT NULL DEFAULT 0,
+						CharacterPosition INTEGER NOT NULL DEFAULT 0,
+						Timestamp TEXT NOT NULL,
+						RetryCount INTEGER NOT NULL DEFAULT 0,
+						MediaOverlayEnabled INTEGER,
+						MediaOverlayChapter INTEGER,
+						MediaOverlaySegmentIndex INTEGER,
+						MediaOverlayPositionSeconds REAL,
+						MediaOverlayFragmentId TEXT,
+						DateAdded TEXT,
+						LastOpenedDate TEXT
+					)
+					""";
+				await cmd.ExecuteNonQueryAsync(token);
+			}
+
+			await EnsureLocalDbSchemaAsync(conn, token).ConfigureAwait(false);
+			isLocalDbInitialized = true;
+			Trace.TraceInformation("Local sync database initialized");
+		}
+		finally
+		{
+			dbInitLock.Release();
+		}
 	}
 
-	static async Task EnsureLocalDbSchemaAsync(SQLiteAsyncConnection db, CancellationToken token)
+	static async Task EnsureLocalDbSchemaAsync(SqliteConnection db, CancellationToken token)
 	{
 		token.ThrowIfCancellationRequested();
 
@@ -415,7 +500,8 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			["MediaOverlayPositionSeconds"] = "REAL",
 			["MediaOverlayFragmentId"] = "TEXT",
 			["DateAdded"] = "TEXT",
-			["LastOpenedDate"] = "TEXT"
+			["LastOpenedDate"] = "TEXT",
+			["CharacterPosition"] = sqlInteger
 		}, token).ConfigureAwait(false);
 
 		await EnsureColumnsAsync(db, "SyncQueue", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -426,17 +512,26 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			["MediaOverlayPositionSeconds"] = "REAL",
 			["MediaOverlayFragmentId"] = "TEXT",
 			["DateAdded"] = "TEXT",
-			["LastOpenedDate"] = "TEXT"
+			["LastOpenedDate"] = "TEXT",
+			["CharacterPosition"] = sqlInteger
 		}, token).ConfigureAwait(false);
 	}
 
-	static async Task EnsureColumnsAsync(SQLiteAsyncConnection db, string tableName, IReadOnlyDictionary<string, string> columns, CancellationToken token)
+	static async Task EnsureColumnsAsync(SqliteConnection db, string tableName, IReadOnlyDictionary<string, string> columns, CancellationToken token)
 	{
 		token.ThrowIfCancellationRequested();
-		List<SQLiteConnection.ColumnInfo> tableInfo;
+		var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		try
 		{
-			tableInfo = await db.GetTableInfoAsync(tableName).WaitAsync(token);
+			using var pragmaCmd = db.CreateCommand();
+#pragma warning disable S2077
+			pragmaCmd.CommandText = $"PRAGMA table_info({tableName})";
+#pragma warning restore S2077
+			using var reader = await pragmaCmd.ExecuteReaderAsync(token);
+			while (await reader.ReadAsync(token))
+			{
+				existingNames.Add(reader.GetString(1));
+			}
 		}
 		catch (Exception)
 		{
@@ -444,49 +539,57 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			return;
 		}
 
-		HashSet<string> existing = new(tableInfo.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
 		foreach ((string? name, string? type) in columns)
 		{
-			if (existing.Contains(name))
+			if (existingNames.Contains(name))
 			{
 				continue;
 			}
 			// SQLite allows ADD COLUMN without NOT NULL constraint for migrations.
-			string sql = $"ALTER TABLE {tableName} ADD COLUMN {name} {type}";
-			await db.ExecuteAsync(sql).WaitAsync(token);
+			using var alterCmd = db.CreateCommand();
+#pragma warning disable S2077
+			alterCmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {name} {type}";
+#pragma warning restore S2077
+			await alterCmd.ExecuteNonQueryAsync(token);
 		}
 	}
 
 	public async Task<ReadingProgress?> GetLocalProgressAsync(string bookId, CancellationToken token = default)
 	{
-		if (localDb is null)
+		using var conn = await OpenLocalDbAsync(token);
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = "SELECT BookId, CurrentPage, CurrentChapter, CharacterPosition, LastUpdated, DeviceId, DeviceName, IsSynced, MediaOverlayEnabled, MediaOverlayChapter, MediaOverlaySegmentIndex, MediaOverlayPositionSeconds, MediaOverlayFragmentId, DateAdded, LastOpenedDate FROM ReadingProgress WHERE BookId = @bookId";
+		cmd.Parameters.AddWithValue("@bookId", bookId);
+		using var reader = await cmd.ExecuteReaderAsync(token);
+		if (await reader.ReadAsync(token))
 		{
-			await InitializeLocalDbAsync(token);
+			return ReadReadingProgress(reader);
 		}
-		return await localDb!.Table<ReadingProgress>().FirstOrDefaultAsync(x => x.BookId == bookId).WaitAsync(token);
+		return null;
 	}
 
 	async Task SaveLocalProgressAsync(ReadingProgress progress, CancellationToken token)
 	{
-		if (localDb is null)
-		{
-			await InitializeLocalDbAsync(token);
-		}
-		await localDb!.InsertOrReplaceAsync(progress).WaitAsync(token);
+		using var conn = await OpenLocalDbAsync(token);
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = """
+			INSERT OR REPLACE INTO ReadingProgress (BookId, CurrentPage, CurrentChapter, CharacterPosition, LastUpdated, DeviceId, DeviceName, IsSynced, MediaOverlayEnabled, MediaOverlayChapter, MediaOverlaySegmentIndex, MediaOverlayPositionSeconds, MediaOverlayFragmentId, DateAdded, LastOpenedDate)
+			VALUES (@bookId, @currentPage, @currentChapter, @characterPosition, @lastUpdated, @deviceId, @deviceName, @isSynced, @mediaOverlayEnabled, @mediaOverlayChapter, @mediaOverlaySegmentIndex, @mediaOverlayPositionSeconds, @mediaOverlayFragmentId, @dateAdded, @lastOpenedDate)
+			""";
+		BindReadingProgressParameters(cmd, progress);
+		await cmd.ExecuteNonQueryAsync(token);
 	}
 
 	async Task QueueProgressAsync(ReadingProgress progress, CancellationToken token)
 	{
-		if (localDb is null)
-		{
-			await InitializeLocalDbAsync(token);
-		}
+		using var conn = await OpenLocalDbAsync(token);
 
 		SyncQueueItem queuedItem = new()
 		{
 			BookId = progress.BookId,
 			CurrentChapter = progress.CurrentChapter,
 			CurrentPage = progress.CurrentPage,
+			CharacterPosition = progress.CharacterPosition,
 			MediaOverlayEnabled = progress.MediaOverlayEnabled,
 			MediaOverlayChapter = progress.MediaOverlayChapter,
 			MediaOverlaySegmentIndex = progress.MediaOverlaySegmentIndex,
@@ -495,30 +598,37 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			Timestamp = progress.LastUpdated,
 			RetryCount = 0
 		};
-		await localDb!.InsertAsync(queuedItem).WaitAsync(token);
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = """
+			INSERT INTO SyncQueue (BookId, CurrentPage, CurrentChapter, CharacterPosition, Timestamp, RetryCount, MediaOverlayEnabled, MediaOverlayChapter, MediaOverlaySegmentIndex, MediaOverlayPositionSeconds, MediaOverlayFragmentId, DateAdded, LastOpenedDate)
+			VALUES (@bookId, @currentPage, @currentChapter, @characterPosition, @timestamp, @retryCount, @mediaOverlayEnabled, @mediaOverlayChapter, @mediaOverlaySegmentIndex, @mediaOverlayPositionSeconds, @mediaOverlayFragmentId, @dateAdded, @lastOpenedDate)
+			""";
+		BindSyncQueueItemParameters(cmd, queuedItem);
+		await cmd.ExecuteNonQueryAsync(token);
 		Trace.TraceInformation($"Queued progress for {progress.BookId}");
 	}
 
 	async Task<List<SyncQueueItem>> GetQueuedItemsAsync(CancellationToken token)
 	{
-		if (localDb is null)
+		using var conn = await OpenLocalDbAsync(token);
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = "SELECT Id, BookId, CurrentPage, CurrentChapter, CharacterPosition, Timestamp, RetryCount, MediaOverlayEnabled, MediaOverlayChapter, MediaOverlaySegmentIndex, MediaOverlayPositionSeconds, MediaOverlayFragmentId, DateAdded, LastOpenedDate FROM SyncQueue";
+		using var reader = await cmd.ExecuteReaderAsync(token);
+		var results = new List<SyncQueueItem>();
+		while (await reader.ReadAsync(token))
 		{
-			await InitializeLocalDbAsync(token);
+			results.Add(ReadSyncQueueItem(reader));
 		}
-		return await localDb!.Table<SyncQueueItem>().ToListAsync().WaitAsync(token) ?? [];
+		return results;
 	}
 
 	async Task RemoveQueueItemAsync(int id, CancellationToken token)
 	{
-		if (localDb is null)
-		{
-			return;
-		}
-		SyncQueueItem? item = await localDb.FindAsync<SyncQueueItem>(id).WaitAsync(token);
-		if (item is not null)
-		{
-			await localDb.DeleteAsync(item).WaitAsync(token);
-		}
+		using var conn = await OpenLocalDbAsync(token);
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = "DELETE FROM SyncQueue WHERE Id = @id";
+		cmd.Parameters.AddWithValue("@id", id);
+		await cmd.ExecuteNonQueryAsync(token);
 	}
 
 	async Task PushToCloudAsync(ReadingProgress progress, CancellationToken token)
@@ -695,6 +805,87 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 	}
 
 	bool IsConfigured() => !string.IsNullOrWhiteSpace(databaseUrl);
+
+	// ── Mapping helpers for sync local database ──
+
+	static ReadingProgress ReadReadingProgress(SqliteDataReader reader)
+	{
+		return new ReadingProgress
+		{
+			BookId = reader.GetString(0),
+			CurrentPage = reader.GetInt32(1),
+			CurrentChapter = reader.GetInt32(2),
+			CharacterPosition = reader.GetInt32(3),
+			LastUpdated = reader.GetString(4),
+			DeviceId = reader.GetString(5),
+			DeviceName = reader.GetString(6),
+			IsSynced = reader.GetInt32(7) != 0,
+			MediaOverlayEnabled = reader.IsDBNull(8) ? null : reader.GetBoolean(8),
+			MediaOverlayChapter = reader.IsDBNull(9) ? null : reader.GetInt32(9),
+			MediaOverlaySegmentIndex = reader.IsDBNull(10) ? null : reader.GetInt32(10),
+			MediaOverlayPositionSeconds = reader.IsDBNull(11) ? null : reader.GetDouble(11),
+			MediaOverlayFragmentId = reader.IsDBNull(12) ? null : reader.GetString(12),
+			DateAdded = reader.IsDBNull(13) ? null : reader.GetString(13),
+			LastOpenedDate = reader.IsDBNull(14) ? null : reader.GetString(14)
+		};
+	}
+
+	static SyncQueueItem ReadSyncQueueItem(SqliteDataReader reader)
+	{
+		return new SyncQueueItem
+		{
+			Id = reader.GetInt32(0),
+			BookId = reader.GetString(1),
+			CurrentPage = reader.GetInt32(2),
+			CurrentChapter = reader.GetInt32(3),
+			CharacterPosition = reader.GetInt32(4),
+			Timestamp = reader.GetString(5),
+			RetryCount = reader.GetInt32(6),
+			MediaOverlayEnabled = reader.IsDBNull(7) ? null : reader.GetBoolean(7),
+			MediaOverlayChapter = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+			MediaOverlaySegmentIndex = reader.IsDBNull(9) ? null : reader.GetInt32(9),
+			MediaOverlayPositionSeconds = reader.IsDBNull(10) ? null : reader.GetDouble(10),
+			MediaOverlayFragmentId = reader.IsDBNull(11) ? null : reader.GetString(11),
+			DateAdded = reader.IsDBNull(12) ? null : reader.GetString(12),
+			LastOpenedDate = reader.IsDBNull(13) ? null : reader.GetString(13)
+		};
+	}
+
+	static void BindReadingProgressParameters(SqliteCommand cmd, ReadingProgress progress)
+	{
+		cmd.Parameters.AddWithValue("@bookId", progress.BookId);
+		cmd.Parameters.AddWithValue("@currentPage", progress.CurrentPage);
+		cmd.Parameters.AddWithValue("@currentChapter", progress.CurrentChapter);
+		cmd.Parameters.AddWithValue("@characterPosition", progress.CharacterPosition);
+		cmd.Parameters.AddWithValue("@lastUpdated", progress.LastUpdated);
+		cmd.Parameters.AddWithValue("@deviceId", progress.DeviceId);
+		cmd.Parameters.AddWithValue("@deviceName", progress.DeviceName);
+		cmd.Parameters.AddWithValue("@isSynced", progress.IsSynced ? 1 : 0);
+		cmd.Parameters.AddWithValue("@mediaOverlayEnabled", (object?)progress.MediaOverlayEnabled ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayChapter", (object?)progress.MediaOverlayChapter ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlaySegmentIndex", (object?)progress.MediaOverlaySegmentIndex ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayPositionSeconds", (object?)progress.MediaOverlayPositionSeconds ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayFragmentId", (object?)progress.MediaOverlayFragmentId ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@dateAdded", (object?)progress.DateAdded ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@lastOpenedDate", (object?)progress.LastOpenedDate ?? DBNull.Value);
+	}
+
+	static void BindSyncQueueItemParameters(SqliteCommand cmd, SyncQueueItem item)
+	{
+		cmd.Parameters.AddWithValue("@bookId", item.BookId);
+		cmd.Parameters.AddWithValue("@currentPage", item.CurrentPage);
+		cmd.Parameters.AddWithValue("@currentChapter", item.CurrentChapter);
+		cmd.Parameters.AddWithValue("@characterPosition", item.CharacterPosition);
+		cmd.Parameters.AddWithValue("@timestamp", item.Timestamp);
+		cmd.Parameters.AddWithValue("@retryCount", item.RetryCount);
+		cmd.Parameters.AddWithValue("@mediaOverlayEnabled", (object?)item.MediaOverlayEnabled ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayChapter", (object?)item.MediaOverlayChapter ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlaySegmentIndex", (object?)item.MediaOverlaySegmentIndex ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayPositionSeconds", (object?)item.MediaOverlayPositionSeconds ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@mediaOverlayFragmentId", (object?)item.MediaOverlayFragmentId ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@dateAdded", (object?)item.DateAdded ?? DBNull.Value);
+		cmd.Parameters.AddWithValue("@lastOpenedDate", (object?)item.LastOpenedDate ?? DBNull.Value);
+	}
 
 	public void Dispose()
 	{

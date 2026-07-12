@@ -37,7 +37,7 @@ public static class BookIdentityService
 				book.SyncId = $"book-{ComputeTextHash(identity)}";
 			}
 
-			Trace.WriteLine($"[BookIdentity] SyncId={book.SyncId} for '{book.Title}' by '{book.Author}' (file={book.FilePath})");
+			Trace.TraceInformation($"[BookIdentity] SyncId={book.SyncId} for '{book.Title}' by '{book.Author}' (file={book.FilePath})");
 			return Task.FromResult(book.SyncId);
 		}
 		catch (Exception ex)
