@@ -186,6 +186,7 @@ public static partial class EbookService
 		byte[] coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		return new Book
 		{
+			Id = Guid.NewGuid(),
 			Author = Authors[0],
 			Title = book.Title,
 			FilePath = path,
@@ -218,6 +219,7 @@ public static partial class EbookService
 
 		Book resultBook = new()
 		{
+			Id = Guid.NewGuid(),
 			Title = book.Title.Trim(),
 			Author = authors[0],
 			FilePath = path,
