@@ -343,3 +343,4 @@ EpubReader/Platforms/Android/google-services.json
 EpubReader/Platforms/Android/Resources/values/google-services.xml
 /EpubReader/Build.ps1
 /EpubReader/RunDevice.ps1
+.DS_Store
