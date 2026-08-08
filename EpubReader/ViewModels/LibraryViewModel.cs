@@ -205,7 +205,7 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 
 		await Dispatcher.DispatchAsync(async () =>
 		{
-			await popup.CloseAsync();
+			await popup.CloseAsync(importStateService.Token);
 			popup = null;
 		});
 	}

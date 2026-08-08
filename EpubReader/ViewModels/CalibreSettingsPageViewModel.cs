@@ -225,7 +225,7 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 
 		prefix = uri.Scheme;
 		host = uri.Host;
-		port = uri.Port > 0 ? uri.Port : (uri.Scheme == "https" ? 443 : 8080);
+		port = uri.Port;
 		return true;
 	}
 }

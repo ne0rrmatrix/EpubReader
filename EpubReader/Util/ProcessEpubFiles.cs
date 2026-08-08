@@ -194,7 +194,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	/// <returns>True if the book already exists in the library, false otherwise.</returns>
 	public async Task<bool> IsBookAlreadyInLibrary(Book ebook)
 	{
-		return await libraryStateService.ContainsAsync(ebook);
+		return await libraryStateService.ContainsAsync(ebook, importStateService.Token);
 	}
 
 	/// <summary>

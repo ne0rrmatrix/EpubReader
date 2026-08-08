@@ -93,6 +93,7 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		InitializeComponent();
 		BindingContext = viewModel;
+		settingsRefreshCancellationTokenSource = new();
 		this.db = db;
 		this.syncService = syncService;
 		this.fullScreenService = fullScreenService;
@@ -138,8 +139,8 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			return;
 		}
-
-		bool isLocalAuth = await authenticationService.IsLocalOnlyModeAsync();
+		settingsRefreshCancellationTokenSource ??= new();
+		bool isLocalAuth = await authenticationService.IsLocalOnlyModeAsync(settingsRefreshCancellationTokenSource.Token);
 		if (syncService.IsLocalOnly || isLocalAuth)
 		{
 			return;
@@ -1201,7 +1202,8 @@ public partial class BookPage : ContentPage, IDisposable
 	async Task UpdateUiAppearance()
 	{
 		sliderPageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
-		Settings settings = await db.GetSettings() ?? new();
+		settingsRefreshCancellationTokenSource ??= new();
+		Settings settings = await db.GetSettings(settingsRefreshCancellationTokenSource.Token) ?? new();
 		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
 			settings.BackgroundColor = "#FFFFFF"; // Default background color
@@ -1975,7 +1977,10 @@ public partial class BookPage : ContentPage, IDisposable
 			UnsubscribeFromSettingsState();
 			UnsubscribeFromReaderBridge();
 			UnsubscribeFromWindowLifecycle();
-			CancelPendingSettingsRefresh();
+
+			settingsRefreshCancellationTokenSource?.Cancel();
+			settingsRefreshCancellationTokenSource?.Dispose();
+			settingsRefreshCancellationTokenSource = null;
 
 			webView.Navigated -= webView_Navigated;
 			ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
