@@ -225,6 +225,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 		// detach webview handlers we attached on appearing
 		webView?.Navigated -= webView_Navigated;
+		Shell.Current?.ToolbarItems.Clear();
 		base.OnDisappearing();
 	}
 
