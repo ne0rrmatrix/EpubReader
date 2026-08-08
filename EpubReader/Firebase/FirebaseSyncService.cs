@@ -312,7 +312,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 				 .AsObservable<ReadingProgress>()
 				 .Where(change => change.EventType == global::Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate)
 			  .Where(change => change.Object is not null)
-				 .SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object!, change.Key, ct)))
+				 .SelectMany(change => Observable.FromAsync(ct => HandleRemoteProgressChangeAsync(change.Object, change.Key, ct)))
 				 .Subscribe(
 					 onNext: _ => { },
 					 onError: ex => Trace.TraceError($"Remote subscription error: {ex.Message}"));

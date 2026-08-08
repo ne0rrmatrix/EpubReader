@@ -2554,12 +2554,13 @@ function tryHandleCombinedInternalLink(href) {
 /**
  * Goes to a specific page in the iframe content
  * @param {number} page property - The page number to navigate to
+ * @param {boolean} immediate - Scroll immediately when true; otherwise allow layout to settle first.
  * @returns {void}
  */
-function gotoPage(page) {
+function gotoPage(page, immediate = false) {
     console.log("Jumping to page:", page);
-    if (page < 1) {
-        console.warn("Page number must be 1 or greater. Current page:", page);
+    if (page < 0) {
+        console.warn("Page number must be 0 or greater. Current page:", page);
         currentPage = 0;
         return;
     }
@@ -2574,12 +2575,18 @@ function gotoPage(page) {
     const clampedPage = Math.min(page, maxPage);
     currentPage = clampedPage;
 
-    setTimeout(() => {
+    const navigate = () => {
         navigationUtils.scrollToPage(clampedPage);
         // Re-clamp after layout may have settled post-scroll
         currentPage = Math.min(clampedPage, getPageCount());
         updateCharacterPosition();
-    }, 200);
+    };
+
+    if (immediate) {
+        navigate();
+    } else {
+        setTimeout(navigate, 200);
+    }
 }
 
 /**

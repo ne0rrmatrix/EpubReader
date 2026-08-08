@@ -1,4 +1,5 @@
 using System.Text;
+using HtmlAgilityPack;
 using Microsoft.Maui.Graphics.Skia;
 using VersOne.Epub;
 using VersOne.Epub.Options;
@@ -50,6 +51,9 @@ public static partial class EbookService
 
 	const int coverImageWidth = 200;
 	const int coverImageHeight = 400;
+	const int combinedHtmlCacheVersion = 1;
+	const string combinedHtmlFileName = "combined.html";
+	const string combinedHtmlMarkerFileName = "combined.html.cache";
 
 	#endregion
 
@@ -87,10 +91,11 @@ public static partial class EbookService
 	/// <param name="path">The file path to the eBook to be opened. Must be a valid path to an ePub file.</param>
 	/// <returns>A task that represents the asynchronous operation. The task result contains a <see cref="Book"/> object with the
 	/// eBook's metadata, content, and resources. Returns <see langword="null"/> if the eBook cannot be opened.</returns>
-	public static async Task<Book?> OpenEbookAsync(string path)
+	public static async Task<Book?> OpenEbookAsync(string path, CancellationToken cancellationToken = default)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
 		EpubBookRef? book = await OpenEpubBookAsync(path).ConfigureAwait(false);
-		return book is null ? null : await CreateFullBookAsync(book, path).ConfigureAwait(false);
+		return book is null ? null : await CreateFullBookAsync(book, path, cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -195,17 +200,24 @@ public static partial class EbookService
 		};
 	}
 
-	static async Task<Book> CreateFullBookAsync(EpubBookRef book, string path)
+	static async Task<Book> CreateFullBookAsync(EpubBookRef book, string path, CancellationToken cancellationToken)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
 		List<SharedEpubFiles> sharedFiles = await GetSharedFilesAsync().ConfigureAwait(false);
 		List<EpubFonts> fonts = await ExtractFontsAsync(book).ConfigureAwait(false);
 		string description = ProcessDescription(book.Description);
 		byte[] coverImage = await book.ReadCoverAsync().ConfigureAwait(false) ?? GenerateCoverImage(book.Title);
 		List<Css> cssFiles = await ExtractCssFiles(book).ConfigureAwait(false);
-		List<Chapter> chapters = await GetChaptersAsync(book).ConfigureAwait(false);
+		string? cachedCombinedHtml = await LoadCachedCombinedHtmlAsync(path, cancellationToken).ConfigureAwait(false);
+		logger.Info(cachedCombinedHtml is null
+			? $"Combined HTML cache miss; processing chapters for {Path.GetFileName(path)}"
+			: $"Combined HTML cache hit; skipping chapter processing for {Path.GetFileName(path)}");
+		List<Chapter> chapters = cachedCombinedHtml is null
+			? await GetChaptersAsync(book).ConfigureAwait(false)
+			: ExtractCachedChapters(cachedCombinedHtml);
 		List<Models.Image> images = await ExtractImages(book).ConfigureAwait(false);
 		List<string> authors = ExtractAuthors(book);
-		MediaOverlayParseResult mediaOverlayResult = await MediaOverlayParser.ParseAsync(book).ConfigureAwait(false);
+		MediaOverlayParseResult mediaOverlayResult = await MediaOverlayParser.ParseAsync(book, cancellationToken).ConfigureAwait(false);
 		List<MediaOverlayAudioResource> mediaOverlayAudio = await ExtractMediaOverlayAudioAsync(book, mediaOverlayResult.Documents).ConfigureAwait(false);
 		List<EpubFonts> additionalFonts = [.. sharedFiles.SelectMany(f => f.FileName.EndsWith(".ttf", StringComparison.InvariantCultureIgnoreCase) ||
 														  f.FileName.EndsWith(".otf", StringComparison.InvariantCultureIgnoreCase) ?
@@ -238,8 +250,98 @@ public static partial class EbookService
 			MediaOverlayDuration = mediaOverlayResult.Duration,
 		};
 
-		resultBook.CombinedHtml = CombineChapters(resultBook);
+		resultBook.CombinedHtml = cachedCombinedHtml
+			?? await CreateAndCacheCombinedHtmlAsync(resultBook, path, cancellationToken).ConfigureAwait(false);
 		return resultBook;
+	}
+
+	static List<Chapter> ExtractCachedChapters(string combinedHtml)
+	{
+		HtmlDocument document = new();
+		document.LoadHtml(combinedHtml);
+		HtmlNodeCollection? sections = document.DocumentNode.SelectNodes("//section[@data-chapter-index]");
+		if (sections is null)
+		{
+			return [];
+		}
+
+		return [.. sections.Select(section => new Chapter
+		{
+			FileName = section.GetAttributeValue("data-chapter-filename", string.Empty),
+			Title = section.GetAttributeValue("data-chapter-title", string.Empty),
+			HtmlFile = section.InnerHtml,
+		})];
+	}
+
+	static async Task<string?> LoadCachedCombinedHtmlAsync(string epubPath, CancellationToken cancellationToken)
+	{
+		string combinedPath = GetCombinedHtmlPath(epubPath);
+		string markerPath = GetCombinedHtmlMarkerPath(epubPath);
+		if (!File.Exists(combinedPath) || !File.Exists(markerPath) || !File.Exists(epubPath))
+		{
+			return null;
+		}
+
+		string marker = await File.ReadAllTextAsync(markerPath, cancellationToken).ConfigureAwait(false);
+		System.IO.FileInfo sourceInfo = new(epubPath);
+		string expectedMarker = CreateCombinedHtmlMarker(sourceInfo);
+		if (!string.Equals(marker, expectedMarker, StringComparison.Ordinal))
+		{
+			return null;
+		}
+
+		return await File.ReadAllTextAsync(combinedPath, cancellationToken).ConfigureAwait(false);
+	}
+
+	static async Task<string> CreateAndCacheCombinedHtmlAsync(Book book, string epubPath, CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		string combinedHtml = CombineChapters(book);
+		string combinedPath = GetCombinedHtmlPath(epubPath);
+		string markerPath = GetCombinedHtmlMarkerPath(epubPath);
+		string temporaryCombinedPath = $"{combinedPath}.{Guid.NewGuid():N}.tmp";
+		string temporaryMarkerPath = $"{markerPath}.{Guid.NewGuid():N}.tmp";
+
+		try
+		{
+			await File.WriteAllTextAsync(temporaryCombinedPath, combinedHtml, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+			System.IO.FileInfo sourceInfo = new(epubPath);
+			await File.WriteAllTextAsync(temporaryMarkerPath, CreateCombinedHtmlMarker(sourceInfo), Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+			File.Move(temporaryCombinedPath, combinedPath, true);
+			File.Move(temporaryMarkerPath, markerPath, true);
+			logger.Info($"Combined HTML cache created: {combinedPath}");
+			return combinedHtml;
+		}
+		finally
+		{
+			DeleteTemporaryFile(temporaryCombinedPath);
+			DeleteTemporaryFile(temporaryMarkerPath);
+		}
+	}
+
+	static string GetCombinedHtmlPath(string epubPath)
+	{
+		string? directory = Path.GetDirectoryName(epubPath);
+		return string.IsNullOrWhiteSpace(directory) ? combinedHtmlFileName : Path.Combine(directory, combinedHtmlFileName);
+	}
+
+	static string GetCombinedHtmlMarkerPath(string epubPath)
+	{
+		string? directory = Path.GetDirectoryName(epubPath);
+		return string.IsNullOrWhiteSpace(directory) ? combinedHtmlMarkerFileName : Path.Combine(directory, combinedHtmlMarkerFileName);
+	}
+
+	static string CreateCombinedHtmlMarker(System.IO.FileInfo sourceInfo)
+	{
+		return $"{combinedHtmlCacheVersion}|{sourceInfo.Length}|{sourceInfo.LastWriteTimeUtc.Ticks}";
+	}
+
+	static void DeleteTemporaryFile(string path)
+	{
+		if (File.Exists(path))
+		{
+			File.Delete(path);
+		}
 	}
 
 	#endregion

@@ -1,11 +1,14 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Extensions;
 using Plugin.Maui.Audio;
 
 namespace EpubReader.Views;
+
+sealed record ChapterNavigationItem(int Index, string Title);
 
 /// <summary>
 /// Represents a page in a book application, providing functionality for displaying and interacting with book content.
@@ -44,8 +47,12 @@ public partial class BookPage : ContentPage, IDisposable
 
 	// Slider-related state
 	readonly List<int> chapterOffsets = [];
+	readonly List<ChapterNavigationItem> allChapterItems = [];
+	readonly ObservableCollection<ChapterNavigationItem> visibleChapterItems = [];
 	int sliderTotalPages = 0;
 	bool isSliderActive = false;
+	int pendingSliderPage;
+	bool isChapterSelectionInProgress;
 	CancellationTokenSource? settingsRefreshCancellationTokenSource;
 	readonly IReaderSettingsStateService readerSettingsStateService;
 	readonly IReaderBridgeCoordinator readerBridgeCoordinator;
@@ -96,7 +103,7 @@ public partial class BookPage : ContentPage, IDisposable
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 		NativeLoadingOverlay.IsVisible = true;
 		fullScreenService.EnterFullScreen();
-		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync());
+		Dispatcher.Dispatch(async () => await UpdateSyncToolbarAsync().ConfigureAwait(false));
 	}
 
 	protected override async void OnAppearing()
@@ -111,15 +118,15 @@ public partial class BookPage : ContentPage, IDisposable
 		SubscribeToSettingsState();
 		SubscribeToReaderBridge();
 		SubscribeToWindowLifecycle();
-		await UpdateSyncToolbarAsync();
+		await UpdateSyncToolbarAsync().ConfigureAwait(false);
 		if (!loadSequenceStarted)
 		{
-			await EnsureMediaOverlayManagerInitialized();
-			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled);
+			await EnsureMediaOverlayManagerInitialized().ConfigureAwait(false);
+			await UpdateReaderModeOverlayAsync(ViewModel.IsReaderModeEnabled).ConfigureAwait(false);
 			loadSequenceStarted = true;
 			webView.Navigated -= webView_Navigated;
 			webView.Navigated += webView_Navigated;
-			await StartLoadSequenceAsync();
+			await StartLoadSequenceAsync().ConfigureAwait(false);
 		}
 	}
 
@@ -209,21 +216,6 @@ public partial class BookPage : ContentPage, IDisposable
 			CancelPendingSettingsRefresh();
 			// Allow a fresh combined.html load next time the book is opened.
 			webViewHelper.ResetCombinedState();
-
-			Shell? currentShell = Shell.Current;
-			if (currentShell is null)
-			{
-				return;
-			}
-			if (currentShell.ToolbarItems is null)
-			{
-				return;
-			}
-			if (currentShell.ToolbarItems.Count == 0)
-			{
-				return;
-			}
-			currentShell.ToolbarItems.Clear();
 
 			fullScreenService.SetFullScreen(false);
 			Shell.SetNavBarIsVisible(this, true);
@@ -451,22 +443,12 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <param name="e">The event data associated with the tap event.</param>
 	async void GridArea_Tapped(object? sender, EventArgs? e)
 	{
-		bool isVisible = Shell.GetNavBarIsVisible(this);
-		fullScreenService.SetFullScreen(isVisible);
-		Shell.SetNavBarIsVisible(this, !isVisible);
-		Shell.SetTabBarIsVisible(this, false);
 		if (isMenuOpen)
 		{
-			isMenuOpen = false;
-			ViewModel.IsReaderModeEnabled = false;
-			sliderContainer.IsVisible = false;
-			await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
-			await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
+			CloseMenuAsync(this, EventArgs.Empty);
 			return;
 		}
-		isMenuOpen = true;
-		sliderContainer.IsVisible = true;
-		ViewModel.IsReaderModeEnabled = true;
+		OpenReaderControls();
 		await grid.ScaleToAsync(0.8, animationDuration).ConfigureAwait(false);
 		await grid.FadeToAsync(0.8, animationDuration).ConfigureAwait(false);
 	}
@@ -520,7 +502,7 @@ public partial class BookPage : ContentPage, IDisposable
 			return;
 		}
 
-		book.Chapters.ForEach(chapter => CreateToolBarItem(book.Chapters.IndexOf(chapter), chapter));
+		InitializeChapterNavigation();
 		pageSlider.Minimum = 0;
 		pageSlider.Maximum = 0;
 		pageSlider.Value = 0;
@@ -658,7 +640,7 @@ public partial class BookPage : ContentPage, IDisposable
 				await HandlePrevAsync();
 				break;
 			case ReaderBridgeAction.Menu:
-				HandleMenu();
+				 GridArea_Tapped(this, EventArgs.Empty);
 				break;
 			case ReaderBridgeAction.PageLoad:
 				await HandlePageLoadAsync(int.TryParse(await webView.EvaluateJavaScriptAsync("getCurrentPage()"), out int currentPageOnLoad) ? currentPageOnLoad : 0);
@@ -767,21 +749,123 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		if (message.ChapterIndex is not int chapterIndex)
 		{
+			Debug.WriteLine($"ChapterIndex is null in sectionchange bridge message: {message.RawJson}");
 			return;
 		}
 
 		if (chapterIndex < 0 || chapterIndex >= book.Chapters.Count)
 		{
+			Debug.WriteLine($"ChapterIndex {chapterIndex} is out of bounds for book with {book.Chapters.Count} chapters.");
 			return;
 		}
 
 		book.CurrentChapter = chapterIndex;
 		book.CurrentPage = 0;
+		SelectCurrentChapter();
 	}
 
-	void HandleMenu()
+	void ToggleChapterDrawer(object? sender, EventArgs? e)
 	{
-		GridArea_Tapped(this, EventArgs.Empty);
+		if (chapterDrawer.IsVisible)
+		{
+			CloseChapterDrawer();
+			return;
+		}
+
+		isChapterSelectionInProgress = true;
+		try
+		{
+			InitializeChapterNavigation();
+			chapterDrawer.IsVisible = true;
+			SelectCurrentChapter();
+		}
+		finally
+		{
+			isChapterSelectionInProgress = false;
+		}
+	}
+
+	void OpenReaderControls()
+	{
+		if (isMenuOpen)
+		{
+			return;
+		}
+
+		isMenuOpen = true;
+		fullScreenService.ExitFullScreen();
+		Shell.SetNavBarIsVisible(this, true);
+		Shell.SetTabBarIsVisible(this, false);
+		sliderContainer.IsVisible = true;
+		pageLabel.IsVisible = false;
+		menu.IsVisible = true; 
+	}
+
+	void InitializeChapterNavigation()
+	{
+		if (allChapterItems.Count > 0)
+		{
+			return;
+		}
+
+		foreach ((Chapter chapter, int index) in book.Chapters.Select((chapter, index) => (chapter, index)))
+		{
+			allChapterItems.Add(new ChapterNavigationItem(index, string.IsNullOrWhiteSpace(chapter.Title) ? $"Chapter {index + 1}" : chapter.Title));
+		}
+
+		PopulateChapterList();
+		SelectCurrentChapter();
+	}
+
+	void PopulateChapterList()
+	{
+		visibleChapterItems.Clear();
+		foreach (ChapterNavigationItem item in allChapterItems)
+		{
+			visibleChapterItems.Add(item);
+		}
+		chapterList.ItemsSource = visibleChapterItems;
+		chapterCountLabel.Text = $"{visibleChapterItems.Count} of {allChapterItems.Count} chapters";
+		SelectCurrentChapter();
+	}
+
+	void SelectCurrentChapter()
+	{
+		ChapterNavigationItem? currentItem = allChapterItems.FirstOrDefault(item => item.Index == book.CurrentChapter);
+		chapterList.SelectedItem = currentItem is not null && visibleChapterItems.Contains(currentItem) ? currentItem : null;
+		currentChapterLabel.Text = currentItem?.Title ?? string.Empty;
+	}
+
+	async void ChapterList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+	{
+		if (isChapterSelectionInProgress
+			|| e.CurrentSelection.Count == 0
+			|| e.CurrentSelection[0] is not ChapterNavigationItem selectedItem)
+		{
+			return;
+		}
+
+		if (selectedItem.Index == book.CurrentChapter)
+		{
+			CloseChapterDrawer();
+			return;
+		}
+
+		isChapterSelectionInProgress = true;
+		book.CurrentChapter = selectedItem.Index;
+		book.CurrentPage = 0;
+		await LoadChapterContentAsync();
+		await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+		CloseChapterDrawer();
+		isChapterSelectionInProgress = false;
+	}
+
+	void CloseChapterDrawer()
+	{
+		chapterDrawer.IsVisible = false;
+		menu.IsVisible = false;
+		chapterList.SelectedItem = null;
+		CloseMenuAsync(this, EventArgs.Empty);
 	}
 
 	async Task HandlePageLoadAsync(int currentPage)
@@ -1065,7 +1149,6 @@ public partial class BookPage : ContentPage, IDisposable
 			Trace.TraceWarning("[PageRestore] GetCurrentPageInfoAsync: book has no readable chapters.");
 			return string.Empty;
 		}
-
 		// Guard: combined.html sections are not available until the pageload JS event fires and
 		// MarkCombinedHtmlLoaded() is called. Querying JS before that returns stale defaults
 		// (Ch=0, Pg=0) which would corrupt the restored book position.
@@ -1117,7 +1200,7 @@ public partial class BookPage : ContentPage, IDisposable
 
 	async Task UpdateUiAppearance()
 	{
-		sliderPageLabel.IsVisible = pageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
+		sliderPageLabel.IsVisible = !string.IsNullOrEmpty(pageLabel.Text);
 		Settings settings = await db.GetSettings() ?? new();
 		if (string.IsNullOrEmpty(settings.BackgroundColor))
 		{
@@ -1126,8 +1209,10 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 		if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
 		{
-			grid.BackgroundColor = Color.FromArgb(settings.BackgroundColor);
-			pageLabel.TextColor = Color.FromArgb(settings.TextColor);
+			Color backgroundColor = Color.FromArgb(settings.BackgroundColor);
+			Color textColor = Color.FromArgb(settings.TextColor);
+			grid.BackgroundColor = backgroundColor;
+			pageLabel.TextColor = textColor;
 		}
 	}
 
@@ -1142,53 +1227,17 @@ public partial class BookPage : ContentPage, IDisposable
 	async void CloseMenuAsync(object? sender, EventArgs? e)
 	{
 		isMenuOpen = false;
+		chapterDrawer.IsVisible = false;
+		menu.IsVisible = false;
 		sliderContainer.IsVisible = false;
+		sliderPageLabel.IsVisible = false;
+		pageLabel.IsVisible = true;
 		fullScreenService.SetFullScreen(true);
 		Shell.SetNavBarIsVisible(this, false);
 		Shell.SetTabBarIsVisible(this, false);
 		await grid.FadeToAsync(1, animationDuration).ConfigureAwait(false);
 		await grid.ScaleToAsync(1, animationDuration).ConfigureAwait(false);
 	}
-
-	void CreateToolBarItem(int index, Chapter chapter)
-	{
-		ArgumentNullException.ThrowIfNull(book);
-		if (string.IsNullOrEmpty(chapter.Title))
-		{
-			Debug.WriteLine($"Skipping chapter with empty title at index {index}");
-			return;
-		}
-
-		Shell? currentShell = Shell.Current;
-		if (currentShell is null)
-		{
-			Debug.WriteLine("Shell.Current is null, cannot add toolbar item.");
-			return;
-		}
-
-		ToolbarItem toolbarItem = new()
-		{
-			Text = chapter.Title,
-			Order = ToolbarItemOrder.Secondary,
-			Priority = index,
-			IconImageSource = ImageSource.FromFile("calibre.png"),
-			Command = new Command(() =>
-			{
-				Dispatcher.Dispatch(async () =>
-				{
-					book.CurrentChapter = index;
-					book.CurrentPage = 0; // Reset current page when changing chapter
-					await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
-					await LoadChapterContentAsync();
-					CloseMenuAsync(this, EventArgs.Empty);
-				});
-			})
-		};
-
-		Shell.Current.ToolbarItems.Add(toolbarItem);
-		Debug.WriteLine($"Added toolbar item for chapter '{chapter.Title}' at index {index}");
-	}
-
 	// --- Slider helpers and event handlers ---
 
 	void ApplyPaginationInfo(WebViewHelper.CombinedPaginationInfo pagination)
@@ -1287,41 +1336,10 @@ public partial class BookPage : ContentPage, IDisposable
 		return last;
 	}
 
-	async void PageSlider_DragStarted(object? sender, EventArgs e)
+	void PageSlider_DragStarted(object? sender, EventArgs e)
 	{
-		try
-		{
-			isSliderActive = true;
-			// Make webview non-interactive on both native and JS sides
-			Dispatcher.Dispatch(() =>
-			{
-				webView.InputTransparent = true;
-				webView.IsEnabled = false;
-			});
-
-			// Inject small JS wrapper to force instant scroll during sliding and call setInteractionEnabled(false)
-			// This keeps the change transient (we restore on DragCompleted)
-			string js = @"
-                try {
-                    window.__sliderInstant = true;
-                    if (typeof navigationUtils !== 'undefined' && !window.__origAnimateTo) {
-                        window.__origAnimateTo = navigationUtils.animateTo;
-                        navigationUtils.animateTo = function(contentWindow, targetLeft, platform) {
-                            try { contentWindow.scrollTo(targetLeft, 0); } catch(e) {}
-                            return Promise.resolve();
-                        };
-                    }
-                    if (typeof setInteractionEnabled === 'function') {
-                        try { setInteractionEnabled(false); } catch(e) {}
-                    }
-                } catch(e) { console.warn('slider start inject failed', e); }
-            ";
-			await webView.EvaluateJavaScriptAsync(js);
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"PageSlider_DragStarted failed: {ex.Message}");
-		}
+		isSliderActive = true;
+		pendingSliderPage = (int)Math.Round(pageSlider.Value);
 	}
 
 	async void PageSlider_ValueChanged(object? sender, ValueChangedEventArgs e)
@@ -1331,29 +1349,20 @@ public partial class BookPage : ContentPage, IDisposable
 			// only act when slider is being actively dragged
 			return;
 		}
+		pendingSliderPage = Math.Clamp((int)Math.Round(e.NewValue), 0, Math.Max(0, sliderTotalPages - 1));
+		int targetChapter = MapGlobalPageToChapter(pendingSliderPage, out int localPage);
+		bool chapterChanged = targetChapter != book.CurrentChapter;
+		book.CurrentChapter = targetChapter;
+		book.CurrentPage = localPage;
+		int displayedPage = pendingSliderPage + 1;
+		sliderPageLabel.Text = pageLabel.Text = WebViewHelper.FormatPageLabel(book, displayedPage, sliderTotalPages);
+
 		try
 		{
-			int targetGlobal = (int)Math.Round(e.NewValue);
-
-			int targetChapter = MapGlobalPageToChapter(targetGlobal, out int localPage);
-
-			if (targetChapter == book.CurrentChapter)
-			{
-				// Fast in-chapter move: use JS gotoPage for instant navigation
-				await webView.EvaluateJavaScriptAsync($"gotoPage({localPage});");
-				// update local model so label and save logic remain consistent
-				book.CurrentPage = localPage;
-				int globalPageNumber = GetCurrentGlobalPageNumber(localPage);
-				sliderPageLabel.Text = pageLabel.Text = WebViewHelper.FormatPageLabel(book, globalPageNumber, sliderTotalPages);
-			}
-			else
-			{
-				// Changing chapter: update model and load that chapter (existing LoadChapterContentAsync will cause JS to goto page)
-				book.CurrentChapter = targetChapter;
-				book.CurrentPage = localPage;
-				// Do not SaveProgress for each intermediate change (too frequent) — Save on DragCompleted
-				await LoadChapterContentAsync();
-			}
+			string seekScript = chapterChanged
+				? $"showSection({targetChapter}); gotoPage({localPage}, true);"
+				: $"gotoPage({localPage}, true);";
+			await webView.EvaluateJavaScriptAsync(seekScript);
 		}
 		catch (Exception ex)
 		{
@@ -1366,29 +1375,9 @@ public partial class BookPage : ContentPage, IDisposable
 		try
 		{
 			isSliderActive = false;
-			// restore native interaction
-			Dispatcher.Dispatch(() =>
-			{
-				webView.InputTransparent = false;
-				webView.IsEnabled = true;
-			});
-
-			// Restore original animateTo and re-enable interaction in JS
-			string js = @"
-                try {
-                    window.__sliderInstant = false;
-                    if (typeof navigationUtils !== 'undefined' && window.__origAnimateTo) {
-                        navigationUtils.animateTo = window.__origAnimateTo;
-                        window.__origAnimateTo = null;
-                    }
-                    if (typeof setInteractionEnabled === 'function') {
-                        try { setInteractionEnabled(true); } catch(e) {}
-                    }
-                } catch(e) { console.warn('slider end inject failed', e); }
-            ";
-			await webView.EvaluateJavaScriptAsync(js);
-
-			// Persist final position
+			int targetChapter = MapGlobalPageToChapter(pendingSliderPage, out int localPage);
+			book.CurrentChapter = targetChapter;
+			book.CurrentPage = localPage;
 			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 			await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
 		}
@@ -2012,6 +2001,3 @@ public partial class BookPage : ContentPage, IDisposable
 		GC.SuppressFinalize(this);
 	}
 }
-
-
-

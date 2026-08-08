@@ -51,11 +51,11 @@ public partial class MediaOverlayPlaybackManager : IDisposable
 
 	string ActiveClass => string.IsNullOrWhiteSpace(book.MediaOverlayActiveClass)
 		? "-epub-media-overlay-active"
-		: book.MediaOverlayActiveClass!;
+		: book.MediaOverlayActiveClass;
 
 	string PlaybackClass => string.IsNullOrWhiteSpace(book.MediaOverlayPlaybackActiveClass)
 		? "-epub-media-overlay-playing"
-		: book.MediaOverlayPlaybackActiveClass!;
+		: book.MediaOverlayPlaybackActiveClass;
 
 	public bool IsSupported => book.HasNarratedMedia;
 

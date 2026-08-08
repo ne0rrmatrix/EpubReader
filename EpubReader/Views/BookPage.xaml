@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
+    xmlns:local="clr-namespace:EpubReader.Views"
     xmlns:model="clr-namespace:EpubReader.Models"
     xmlns:system="clr-namespace:System;assembly=mscorlib"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
@@ -25,6 +26,11 @@
                                                                 Default=settings_lightmode.png},
                                               Dark=settings_lightmode.png}"
             Order="Primary" />
+        <ToolbarItem
+            Clicked="ToggleChapterDrawer"
+            IconImageSource="{AppThemeBinding Light=book_open_light_mode.png,
+                                              Dark=book_open_dark_mode.png}"
+            Order="Primary"/>
     </ContentPage.ToolbarItems>
 
     <Grid SafeAreaEdges="None">
@@ -33,40 +39,26 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!--  Overlay/menu (remains in content row so it can overlay the WebView if needed)  -->
+        <!--  Reader controls remain behind the scaled page so the top options are revealed when controls open.  -->
         <ScrollView
+            x:Name="menu"
             Grid.Row="0"
             HorizontalScrollBarVisibility="Never"
+            IsVisible="False"
             SafeAreaEdges="None"
-            VerticalScrollBarVisibility="Never">
-            <ScrollView.GestureRecognizers>
-                <TapGestureRecognizer BindingContext="{Binding Path=BindingContext, Source={x:Reference CurrentPage}, x:DataType=ContentPage}" Tapped="CloseMenuAsync" />
-            </ScrollView.GestureRecognizers>
+            VerticalScrollBarVisibility="Never"
+            ZIndex="0">
             <Grid
-                x:Name="menu"
                 BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                                   Light={StaticResource White}}"
                 SafeAreaEdges="None">
-
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-
-                <ImageButton
-                    x:Name="BackButton"
-                    Grid.Row="0"
-                    Margin="0,10,10,0"
-                    Clicked="CloseMenuAsync"
-                    HeightRequest="45"
-                    HorizontalOptions="{OnPlatform WinUI=End,
-                                                   MacCatalyst=End,
-                                                   Default=Start}"
-                    Source="close.png"
-                    VerticalOptions="Start"
-                    WidthRequest="45" />
+               
                 <Label
                     x:Name="BookTitle"
                     Grid.Row="0"
@@ -83,13 +75,90 @@
             </Grid>
         </ScrollView>
 
+        <!--  Virtualized chapter drawer. The CollectionView only creates visible rows.  -->
+        <Grid
+            x:Name="chapterDrawer"
+            Grid.Row="0"
+            BackgroundColor="#66000000"
+            IsVisible="False"
+            SafeAreaEdges="None"
+            ZIndex="10"
+            VerticalOptions="Fill">
+            <BoxView BackgroundColor="Transparent">
+                <BoxView.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="CloseMenuAsync" />
+                </BoxView.GestureRecognizers>
+            </BoxView>
+            <Border
+                Margin="0"
+                Padding="16,18"
+                BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
+                                                  Light={StaticResource White}}"
+                HorizontalOptions="End"
+                MaximumWidthRequest="360"
+                StrokeThickness="0"
+                ZIndex="1"
+                VerticalOptions="Fill">
+                <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label
+                                FontAttributes="Bold"
+                                FontSize="{OnPlatform Android=20,
+                                                      iOS=20,
+                                                      WinUI=24,
+                                                      MacCatalyst=24}"
+                                Text="{Binding BookTitle}"
+                                TextColor="{AppThemeBinding Dark={StaticResource White},
+                                                            Light={StaticResource Black}}"
+                                LineBreakMode="TailTruncation" />
+                            <Label
+                                x:Name="currentChapterLabel"
+                                FontSize="13"
+                                TextColor="{AppThemeBinding Dark={StaticResource Gray300},
+                                                            Light={StaticResource Gray600}}"
+                                LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label
+                        x:Name="chapterCountLabel"
+                        Grid.Row="1"
+                        FontSize="13"
+                        TextColor="{AppThemeBinding Dark={StaticResource Gray300},
+                                                    Light={StaticResource Gray600}}" />
+                    <CollectionView
+                        x:Name="chapterList"
+                        Grid.Row="2"
+                        SelectionChanged="ChapterList_SelectionChanged"
+                        SelectionMode="Single">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="{x:Type local:ChapterNavigationItem}">
+                                <Border
+                                    Margin="0,2"
+                                    Padding="12,10"
+                                    StrokeShape="RoundRectangle 8"
+                                    StrokeThickness="0">
+                                    <Label
+                                        FontSize="16"
+                                        Text="{Binding Title}"
+                                        TextColor="{AppThemeBinding Dark={StaticResource White},
+                                                                    Light={StaticResource Black}}" />
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!--  Main content grid holding WebView and page info  -->
         <Grid
             x:Name="grid"
             Grid.Row="0"
             BackgroundColor="{AppThemeBinding Dark={StaticResource AppBackgroundDarkColor},
                                               Light={StaticResource White}}"
-            SafeAreaEdges="None">
+            SafeAreaEdges="None"
+            ZIndex="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -114,17 +183,8 @@
                                       WinUI=20,
                                       MacCatalyst=20}"
                 HeightRequest="30"
-                HorizontalOptions="Center">
-                <Label.Triggers>
-                    <DataTrigger
-                        Binding="{Binding IsReaderModeEnabled}"
-                        TargetType="Label"
-                        Value="True">
-                        <Setter Property="IsVisible" Value="False" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
-
+                HorizontalOptions="Center"/>
+           
             <!--  Native loading overlay shown while chapter renders and native settings apply  -->
             <Grid
                 x:Name="NativeLoadingOverlay"

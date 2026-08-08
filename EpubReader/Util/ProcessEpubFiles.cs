@@ -75,10 +75,11 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
 					return;
 				}
-				importStateService.ReportProgress(ebook.Title, count, maxCount ?? 0);
+				importStateService.ReportProgress($"Preparing {ebook.Title}...", Math.Max(0, count - 1), maxCount ?? 0);
 				logger.Info($"Processing file {Path.GetFileName(filePath)} ({count}/{maxCount})");
 				stream.Seek(0, SeekOrigin.Begin);
 				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken).ConfigureAwait(false);
+				importStateService.ReportProgress(ebook.Title, count, maxCount ?? 0);
 			}
 		}
 		catch (Exception ex)
@@ -103,6 +104,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 			// Prefer a human-friendly title as the saved filename when available (sanitized inside FileService).
 			string bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
 			ebook.FilePath = await FileService.SaveFileAsync(stream, bookName, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook, cancellationToken).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
@@ -212,6 +214,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 				: Path.GetFileNameWithoutExtension(fileResult.FileName);
 
 			ebook.FilePath = await FileService.SaveFileAsync(fileResult, bookName, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook, cancellationToken).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
@@ -230,6 +233,16 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 			logger.Error($"Error saving book to library: {ex.Message}");
 			await ShowErrorToastAsync("Error saving book to library");
 		}
+	}
+
+	static async Task<Book> PrepareBookForImportAsync(Book listing, CancellationToken cancellationToken)
+	{
+		Guid bookId = listing.Id;
+		Book processedBook = await EbookService.OpenEbookAsync(listing.FilePath, cancellationToken).ConfigureAwait(false)
+			?? throw new InvalidOperationException($"Unable to preprocess EPUB '{listing.FilePath}'.");
+		processedBook.Id = bookId;
+		processedBook.IsInLibrary = true;
+		return processedBook;
 	}
 
 	#endregion

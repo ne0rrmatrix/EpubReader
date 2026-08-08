@@ -6,21 +6,13 @@ This file tells an AI coding agent how to be immediately productive in the EpubR
 
 - **Big picture**: .NET MAUI app with MVVM. Core responsibilities are split into:
   - UI & platform shims: `Platforms/`, `Views/`, and `Controls/` (platform files use suffixes like `.android.cs`, `.macios.cs`).
-  - Business logic & parsing: `Service/EbookService.cs` (VersOne.Epub + SixLabors.ImageSharp integrations).
-  - Persistence & sync: `Database/Db.cs`, `Service/FirebaseSyncService.cs`, and secrets in `build-secrets/`.
-  - Messaging & state: `ViewModels/` (MVVM Toolkit attributes) and `Messages/` (WeakReferenceMessenger).
 
 - **Key files to inspect for most tasks**:
   - `Service/EbookService.cs` — EPUB parsing, cover extraction
   - `Database/Db.cs` — SQLite initialization and models
   - `MauiProgram.cs` — DI registration and platform wiring
   - `ViewModels/` — look for `[ObservableProperty]` and `[RelayCommand]`
-  - `Messages/` — message classes used with `WeakReferenceMessenger`
-
-- **Build / Run**
-  - Primary build script: `build.ps1`. Example debug build: `pwsh -File ./build.ps1 -ApiKey <key> -AuthDomain <domain> -DatabaseUrl <url> -Configuration Debug` - VS Code tasks available: "Build with Firebase Secrets", "Build (Release) with Firebase Secrets", "Build from .env file", and "Run app (Windows)".
-  - Secrets live in `build-secrets/google-services.json` or are passed via `build.ps1` flags. Do not commit secrets.
-
+ 
 - **Repository conventions (must follow)**
   - File-scoped namespaces (e.g., `namespace EpubReader.Service;`).
   - Fields use camelCase, no underscore prefix.
@@ -43,7 +35,6 @@ This file tells an AI coding agent how to be immediately productive in the EpubR
 - **When modifying code**
   - Make focused, minimal edits. Preserve style and public APIs.
   - Prefer using repository source-generator patterns (`[ObservableProperty]`, `[RelayCommand]`) over hand-rolled implementations.
-  - Run `build.ps1` (or the VS Code tasks) after changes that affect the build.
 
 - **Helpful examples to copy from**
   - `ViewModels/BookViewModel` — shows `[ObservableProperty]`, `[RelayCommand]`, and messenger usage.
@@ -61,10 +52,6 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 ## Architecture Overview
 
 ### Core Layers
-- **EbookService** (`Service/EbookService.cs`): Handles EPUB parsing via VersOne.Epub library, cover extraction, font/image embedding, and synthetic page numbering.
-- **Database** (`Database/Db.cs`): SQLite wrapper for book metadata, settings, and sync state; auto-initializes tables on first use.
-- **Authentication** (`Service/AuthenticationService.*.cs`): Platform-specific implementations for Google Firebase auth; supports local-only mode without authentication. Note: `Plugin.Firebase.Auth.Google` 3.1.2 is incompatible with `Plugin.Firebase.Auth` 5.x. For Google sign-in with `Plugin.Firebase.Auth` 5.x, implement providers directly with the native platform SDK and pass native credentials into `Plugin.Firebase.Auth`.
-- **Sync** (`Service/FirebaseSyncService.cs`): Manages reading progress sync across devices; queues offline changes, reconciles on reconnect. When cloud progress has a newer timestamp and a different reading position, the app should always ask to switch to it on book open, without requiring a different device check.
 - **MVVM**: ViewModels inherit `ObservableObject` (MVVM Toolkit); communicate via `WeakReferenceMessenger` using message classes in `Messages/`.
 - **Platform-Specific UI**: Platform folders contain `*.android.cs`, `*.macios.cs`, `*.windows.cs` implementations for WebView handlers, auth, and file pickers.
 
@@ -73,17 +60,6 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - `Settings`: Theme, font, text size, color scheme preferences; synced across devices.
 - `ReadingProgress`: Chapter/page position, timestamp for multi-device sync.
 - `SyncQueueItem`: Tracks offline changes awaiting upload when reconnected.
-
-## Build & Firebase Secrets
-
-**Build Script**: `build.ps1` (PowerShell)
-- Accepts Firebase secrets via CLI parameters (`-ApiKey`, `-AuthDomain`, `-DatabaseUrl`) or `google-services.json`.
-- Sets environment variables: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_DATABASE_URL`.
-- Loads via `FirebaseConfig.cs` at runtime; **never** writes secrets to source code.
-- Validation: `FirebaseConfigLoader.IsConfigValid()` checks if config is present.
-
-**Android**: Injects secrets early in `MauiProgram.cs` via `FirebaseConfigLoader.InjectFirebaseSecrets()`.
-**Windows/iOS/macOS**: Load from environment variables or assets as fallback.
 
 ## Best Practices
 
@@ -110,11 +86,6 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - Include units only if platforms differ (e.g., `PressureInHectopascals` because iOS uses kPa while Android uses hPa).
 - Standard units: prefer Hectopascals, degrees implied in names like `HeadingMagneticNorth`.
 
-### Database & Models
-- **Initialization**: `Db.InitializeAsync()` auto-creates tables on first use (Settings, Book).
-- **Sync IDs**: Books auto-generate sync IDs for cloud tracking via `EnsureBookSyncIdAsync()`.
-- **Attributes**: SQLite-NET uses `[PrimaryKey]`, `[NotNull]`, `[Indexed]` for schema.
-
 ### MVVM & Messaging
 - **ViewModels**: Inherit `BaseViewModel : ObservableObject` (MVVM Toolkit).
 - **Properties**: Use `[ObservableProperty]` attribute for auto-generated bindable properties with PropertyChanged events.
@@ -127,55 +98,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - **Conditional Compilation**: Use `#if ANDROID`, `#if IOS || MACCATALYST`, `#if WINDOWS` directives in shared files.
 - **Platform Handlers**: Register in `MauiProgram.cs` under platform-specific sections (WebViewHandler, etc.).
 
-### EPUB Reading
-- **VersOne.Epub**: Use `VersOne.Epub` NuGet package; configure via `EpubReaderOptions` in `EbookService`.
-- **Cover Extraction**: Default 200x400px; handled in `EbookService.GetListingAsync()`.
-- **Content Delivery**: HTML/CSS/JS injected into WebView via `Container.js`, `ReadiumCSS`, and `EpubText.js`.
-- **Image Processing**: SixLabors.ImageSharp for manipulation; FFImageLoading for WebView display.
 
-### Service Registration
-- **DI Container**: Configured in `MauiProgram.cs` using MAUI's service builder.
-- **Singleton vs. Transient**: Auth/Sync services are singletons; platform-specific services registered per-platform.
-- **Firebase Integration**: Plugin.Firebase for cross-platform Firebase API.
-
-### Package Feed Support
-- Prefer optional configuration over required-by-default setup when adding package feed support in this repo.
-
-### Avoid
-- `NotImplementedException` (indicates incomplete PR, not a feature to be done later).
-- Xamarin.Forms-specific APIs (use .NET MAUI equivalents).
-- `Debug.WriteLine()` for logging (use `Trace.WriteLine()`).
-- Uncommitted Firebase secrets in source code.
-
-## Developer Workflows
-
-### Building
-**Prerequisites**: .NET 10 SDK, Visual Studio 2026 with .NET MAUI workload, platform-specific SDKs (Android API 34+, Windows SDK, Xcode 16+ for iOS/macOS).
-
-**With Firebase Secrets**:
-- # Debug build
-  `./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Debug`
-
-- # Release build
-  `./build.ps1 -ApiKey "key" -AuthDomain "domain" -DatabaseUrl "url" -Configuration Release`
-
-- # From google-services.json
-  `./build.ps1 -GoogleJsonPath "./build-secrets/google-services.json"`
-
-- # From .env file (via .vscode/build-from-env.ps1)
-  `./build.ps1`
-
-**Secrets Management**:
-- **Never** commit Firebase secrets to source code.
-- Place secrets in `build-secrets/google-services.json` (not in repo).
-- Environment variables: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_DATABASE_URL`.
-- CI/CD injects via build parameters; local development uses .env or google-services.json.
-
-### Testing & Debugging
-- Use Visual Studio's built-in debugger or remote debugging for Android/iOS.
-- Console output via `Trace.WriteLine()` visible in Visual Studio Output window.
-- Database file location: `Db.DbPath` (platform-specific user directory).
-- Firebase config validation: `FirebaseConfigLoader.IsConfigValid()` before publishing.
 
 ### Common Patterns
 **Async Service Method**:public async Task<Book?> GetBookAsync(string path, CancellationToken token = default)
@@ -206,3 +129,6 @@ FirebaseConfigLoader.InjectFirebaseSecrets();
 
 ### Reader Architecture
 - Keep `index.html` plus the iframe, but use only one readiness event for the initial iframe load path.
+
+### Exception Handling
+- Do not add try/catch by default. Use exception handling only when it is required to prevent an app crash or handle a known expected failure; avoid unnecessary try/catch blocks for performance and clarity.

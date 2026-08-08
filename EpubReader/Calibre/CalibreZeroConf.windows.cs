@@ -15,7 +15,7 @@ public partial class CalibreZeroConf : ICalibreZeroConf
 
 		await MainThread.InvokeOnMainThreadAsync(async () =>
 		{
-			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime).WaitAsync(cancellationToken);
+			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime, 2, 2000, null, cancellationToken).WaitAsync(cancellationToken);
 
 			// REMOVE strict port checking. Calibre can run on any port (e.g. 8082, 9000).
 			calibreServers.AddRange(hosts.SelectMany(host => host.Services
