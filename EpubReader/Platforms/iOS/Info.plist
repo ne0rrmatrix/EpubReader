@@ -84,8 +84,8 @@
    <key>NSBonjourServices</key>
 <array>
     <string>_calibre._tcp</string>
-    <string>_http._tcp.</string>
-    <string>_http._udp.</string>
+    <string>_http._tcp</string>
+    <string>_http._udp</string>
 </array>
 
 </dict>
