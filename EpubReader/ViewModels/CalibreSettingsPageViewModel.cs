@@ -1,4 +1,6 @@
-﻿namespace EpubReader.ViewModels;
+﻿using System.Diagnostics;
+
+namespace EpubReader.ViewModels;
 
 public partial class CalibreSettingsPageViewModel : BaseViewModel
 {
@@ -49,7 +51,7 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 		using CancellationTokenSource operationCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
 		settingsOperationCancellationTokenSource = operationCancellationTokenSource;
 		IsBusy = true;
-
+		StatusMessage = "Auto configuration will discover and verify your Calibre server before saving.";
 		try
 		{
 			Settings settings = await db.GetSettings(operationCancellationTokenSource.Token) ?? new Settings();
@@ -123,8 +125,12 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 		}
 		finally
 		{
+			settingsOperationCancellationTokenSource?.Dispose();
 			settingsOperationCancellationTokenSource = null;
+			settingsOperationCancellationTokenSource = new();
 			IsBusy = false;
+			SaveSettingsCommand.NotifyCanExecuteChanged();
+			CancelCommand.NotifyCanExecuteChanged();
 		}
 	}
 
@@ -145,7 +151,7 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 		=> !IsBusy && (IsAutoConfigEnabled || !string.IsNullOrWhiteSpace(ManualServerAddress));
 
 	bool CanCancel()
-		=> !IsBusy;
+		=> true;
 
 	void ApplySettings(Settings settings)
 	{

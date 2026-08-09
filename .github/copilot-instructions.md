@@ -12,11 +12,11 @@ This file tells an AI coding agent how to be immediately productive in the EpubR
   - `Database/Db.cs` — SQLite initialization and models
   - `MauiProgram.cs` — DI registration and platform wiring
   - `ViewModels/` — look for `[ObservableProperty]` and `[RelayCommand]`
- 
+
 - **Repository conventions (must follow)**
   - File-scoped namespaces (e.g., `namespace EpubReader.Service;`).
   - Fields use camelCase, no underscore prefix.
-  - Public async methods accept `CancellationToken token = default` and call `token.ThrowIfCancellationRequested()` early.
+  - Public async methods accept `CancellationToken token = default` and handle cancellation gracefully without explicitly throwing exceptions when possible.
   - Use `Trace.WriteLine()` for logging (not `Debug.WriteLine()`).
   - Enums: index 0 should be `Unknown`/`Default` for safe deserialization.
 
@@ -74,7 +74,7 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 
 ### Async/Task Patterns
 - **CancellationToken**: Required for all `Task`/`ValueTask` methods; provide default value `= default` for public methods, no default for internal.
-- **CancellationToken Verification**: Use `CancellationToken.ThrowIfCancellationRequested()` in XAML-invoked methods (exceptions cannot be caught in XAML).
+- **Cancellation Handling**: Handle cancellation gracefully without explicitly throwing exceptions when the operation can manage cancellation smoothly.
 - **Logging**: Use `Trace.WriteLine()`, not `Debug.WriteLine()` (Release builds strip Debug output).
 
 ### Enums
@@ -98,14 +98,13 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
 - **Conditional Compilation**: Use `#if ANDROID`, `#if IOS || MACCATALYST`, `#if WINDOWS` directives in shared files.
 - **Platform Handlers**: Register in `MauiProgram.cs` under platform-specific sections (WebViewHandler, etc.).
 
-
-
 ### Common Patterns
-**Async Service Method**:public async Task<Book?> GetBookAsync(string path, CancellationToken token = default)
+**Async Service Method**: public async Task<Book?> GetBookAsync(string path, CancellationToken token = default)
 {
-    token.ThrowIfCancellationRequested();
+    // Handle cancellation gracefully
     // implementation
-}**ViewModel with Messaging**:public partial class BookViewModel : BaseViewModel
+}
+**ViewModel with Messaging**: public partial class BookViewModel : BaseViewModel
 {
     [ObservableProperty] Book? currentBook;
     
@@ -122,9 +121,11 @@ Guidelines for AI agents contributing to **EpubReader**, a cross-platform .NET M
         WeakReferenceMessenger.Default.Unregister<BookMessage>(this);
         base.Dispose();
     }
-}**Platform-Specific Registration in MauiProgram**:#if ANDROID
+}
+**Platform-Specific Registration in MauiProgram**: #if ANDROID
 FirebaseConfigLoader.InjectFirebaseSecrets();
-#endif### Floating-Point Comparisons
+#endif
+### Floating-Point Comparisons
 - When comparing floating-point values, use explicit epsilon ranges and avoid equality-style fallbacks in nullable comparison helpers.
 
 ### Reader Architecture

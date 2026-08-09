@@ -15,18 +15,15 @@ public partial class CalibreZeroConf : ICalibreZeroConf
 	{
 
 		List<(string IpAddress, int Port)> calibreServers = [];
-		List<string> aService = ["_calibre._tcp"];
+		List<string> aService = ["_calibre._tcp.local."];
 
-		await MainThread.InvokeOnMainThreadAsync(async () =>
-		{
-			IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime).WaitAsync(cancellationToken);
+		IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(aService, scanTime, 2, 2000, null, cancellationToken).WaitAsync(cancellationToken);
 
-			// REMOVE strict port checking. Calibre can run on any port (e.g. 8082, 9000).
-			calibreServers.AddRange(hosts.SelectMany(host => host.Services
-				.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
+		// REMOVE strict port checking. Calibre can run on any port (e.g. 8082, 9000).
+		calibreServers.AddRange(hosts.SelectMany(host => host.Services
+			.Select(service => (IpAddress: host.IPAddress, service.Value.Port))));
 
-			logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
-		});
+		logger.Info($"Zeroconf discovery completed. {hosts.Count} hosts found.");
 
 		return calibreServers;
 	}

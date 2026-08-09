@@ -91,7 +91,6 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <Button
                         Command="{Binding CancelCommand}"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
                         Text="Cancel" />
                     <Button
                         Grid.Column="1"
