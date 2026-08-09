@@ -134,7 +134,7 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 		}
 	}
 
-	[RelayCommand(CanExecute = nameof(CanCancel))]
+	[RelayCommand]
 	void Cancel()
 	{
 		if (IsBusy)
@@ -149,9 +149,6 @@ public partial class CalibreSettingsPageViewModel : BaseViewModel
 
 	bool CanSaveSettings()
 		=> !IsBusy && (IsAutoConfigEnabled || !string.IsNullOrWhiteSpace(ManualServerAddress));
-
-	bool CanCancel()
-		=> true;
 
 	void ApplySettings(Settings settings)
 	{
