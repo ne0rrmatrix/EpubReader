@@ -21,7 +21,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 			existingBook.SyncId = await BookIdentityService.ComputeSyncIdAsync(existingBook, CancellationTokenSource.Token);
 			await db.SaveBookData(existingBook, CancellationTokenSource.Token);
 
-			Book = await EbookService.OpenEbookAsync(Book.FilePath, CancellationTokenSource.Token)
+			Book = await EbookService.OpenEbookAsync(Book.FilePath)
 				?? throw new InvalidOperationException("Error opening ebook");
 
 			// Ensure the Book has the existing DB Id immediately so any background saves

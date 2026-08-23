@@ -104,7 +104,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 			// Prefer a human-friendly title as the saved filename when available (sanitized inside FileService).
 			string bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
 			ebook.FilePath = await FileService.SaveFileAsync(stream, bookName, cancellationToken).ConfigureAwait(false);
-			ebook = await PrepareBookForImportAsync(ebook, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
@@ -214,7 +214,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 				: Path.GetFileNameWithoutExtension(fileResult.FileName);
 
 			ebook.FilePath = await FileService.SaveFileAsync(fileResult, bookName, cancellationToken).ConfigureAwait(false);
-			ebook = await PrepareBookForImportAsync(ebook, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
@@ -235,10 +235,10 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 		}
 	}
 
-	static async Task<Book> PrepareBookForImportAsync(Book listing, CancellationToken cancellationToken)
+	static async Task<Book> PrepareBookForImportAsync(Book listing)
 	{
 		Guid bookId = listing.Id;
-		Book processedBook = await EbookService.OpenEbookAsync(listing.FilePath, cancellationToken).ConfigureAwait(false)
+		Book processedBook = await EbookService.OpenEbookAsync(listing.FilePath).ConfigureAwait(false)
 			?? throw new InvalidOperationException($"Unable to preprocess EPUB '{listing.FilePath}'.");
 		processedBook.Id = bookId;
 		processedBook.IsInLibrary = true;
