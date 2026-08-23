@@ -44,7 +44,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 		await InitializeAsync(token);
 		if (!dispatcher.IsDispatchRequired)
 		{
-			return Books.Any(existing => string.Equals(existing.Title, book.Title, StringComparison.OrdinalIgnoreCase));
+			return Books.Any(existing => MatchesBook(existing, book));
 		}
 
 		TaskCompletionSource<bool> containsCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -52,7 +52,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 		{
 			try
 			{
-				containsCompletionSource.SetResult(Books.Any(existing => string.Equals(existing.Title, book.Title, StringComparison.OrdinalIgnoreCase)));
+				containsCompletionSource.SetResult(Books.Any(existing => MatchesBook(existing, book)));
 			}
 			catch (Exception ex)
 			{
@@ -65,6 +65,15 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 
 		return await containsCompletionSource.Task;
 	}
+
+	/// <summary>
+	/// Matches strictly by SHA-1 file hash (<see cref="Book.SyncId"/>). A candidate with no hash
+	/// computed yet (e.g. a remote catalog entry that hasn't been downloaded) never matches — file
+	/// content is the only signal used for duplicate detection.
+	/// </summary>
+	static bool MatchesBook(Book existing, Book candidate) =>
+		!string.IsNullOrWhiteSpace(candidate.SyncId) &&
+		string.Equals(existing.SyncId, candidate.SyncId, StringComparison.Ordinal);
 
 	public async Task AddBookAsync(Book book, CancellationToken token = default)
 	{

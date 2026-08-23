@@ -269,7 +269,7 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 		}
 		try
 		{
-			// Queue for cloud sync (debounced)
+			// Push to cloud immediately when online; otherwise queue for later delivery.
 			if (await IsOnlineAsync(token))
 			{
 				saveSubject.OnNext(progress);
@@ -789,11 +789,12 @@ public partial class FirebaseSyncService : ISyncService, IDisposable
 			: DateTimeOffset.MinValue;
 	}
 
-	bool ShouldPersistToLocalCache(ReadingProgress? progress)
+	static bool ShouldPersistToLocalCache(ReadingProgress? progress)
 	{
-		return progress is not null
-			&& (string.IsNullOrWhiteSpace(progress.DeviceId)
-				|| string.Equals(progress.DeviceId, deviceId, StringComparison.Ordinal));
+		// The local cache mirrors the best known progress for this book, regardless of
+		// which device produced it — it must be refreshed even when the newest position
+		// came from another device.
+		return progress is not null;
 	}
 
 	void EnsureUserSet()

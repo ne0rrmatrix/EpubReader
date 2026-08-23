@@ -464,6 +464,13 @@ public partial class Db : IDb, IDisposable
 		}
 	}
 
+	/// <summary>
+	/// Determines whether a stored SyncId needs to be (re)computed — either because it's missing, or
+	/// because it predates the switch to hashing the book file's content (see <see cref="BookIdentityService"/>).
+	/// </summary>
+	static bool RequiresSyncIdRecompute(string? syncId) =>
+		string.IsNullOrWhiteSpace(syncId) || !syncId.StartsWith(BookIdentityService.SyncIdPrefix, StringComparison.Ordinal);
+
 	static async Task BackfillBookSyncIdsAsync(SqliteConnection conn, CancellationToken cancellationToken)
 	{
 		using var selectCmd = conn.CreateCommand();
@@ -473,7 +480,7 @@ public partial class Db : IDb, IDisposable
 		while (await reader.ReadAsync(cancellationToken))
 		{
 			string existingSyncId = await reader.IsDBNullAsync(1, cancellationToken) ? string.Empty : reader.GetString(1);
-			if (string.IsNullOrWhiteSpace(existingSyncId))
+			if (RequiresSyncIdRecompute(existingSyncId))
 			{
 				idsToBackfill.Add(Guid.Parse(reader.GetString(0)));
 			}
@@ -488,7 +495,15 @@ public partial class Db : IDb, IDisposable
 			if (await loadReader.ReadAsync(cancellationToken))
 			{
 				Book book = ReadBook(loadReader);
-				book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
+				try
+				{
+					book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
+				}
+				catch (Exception ex) when (ex is not OperationCanceledException)
+				{
+					logger.Error($"Failed to backfill sync id for book '{book.Title}': {ex.Message}");
+					continue;
+				}
 				using var updateCmd = conn.CreateCommand();
 				updateCmd.CommandText = "UPDATE Book SET SyncId = @syncId WHERE Id = @id";
 				updateCmd.Parameters.AddWithValue("@syncId", book.SyncId);
@@ -500,15 +515,26 @@ public partial class Db : IDb, IDisposable
 
 	static async Task EnsureBookSyncIdAsync(SqliteConnection conn, Book book, CancellationToken cancellationToken)
 	{
-		if (string.IsNullOrWhiteSpace(book.SyncId))
+		if (!RequiresSyncIdRecompute(book.SyncId))
+		{
+			return;
+		}
+
+		try
 		{
 			book.SyncId = await BookIdentityService.ComputeSyncIdAsync(book, cancellationToken);
-			using var cmd = conn.CreateCommand();
-			cmd.CommandText = "UPDATE Book SET SyncId = @syncId WHERE Id = @id";
-			cmd.Parameters.AddWithValue("@syncId", book.SyncId);
-			cmd.Parameters.AddWithValue("@id", book.Id.ToString());
-			await cmd.ExecuteNonQueryAsync(cancellationToken);
 		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			logger.Error($"Failed to compute sync id for book '{book.Title}': {ex.Message}");
+			return;
+		}
+
+		using var cmd = conn.CreateCommand();
+		cmd.CommandText = "UPDATE Book SET SyncId = @syncId WHERE Id = @id";
+		cmd.Parameters.AddWithValue("@syncId", book.SyncId);
+		cmd.Parameters.AddWithValue("@id", book.Id.ToString());
+		await cmd.ExecuteNonQueryAsync(cancellationToken);
 	}
 
 	// ── Mapping helpers ──

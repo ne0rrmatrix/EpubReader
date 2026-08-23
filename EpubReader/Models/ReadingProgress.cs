@@ -48,4 +48,23 @@ public class ReadingProgress : Shared
 
 	public override string ToString()
 		=> $"{BookId}: chapter {CurrentChapter}, page {CurrentPage}, charPos {CharacterPosition} at {LastUpdated} on {DeviceId} (MO: {MediaOverlayChapter}/{MediaOverlaySegmentIndex}@{MediaOverlayPositionSeconds})";
+
+	/// <summary>
+	/// Builds a minimal <see cref="ReadingProgress"/> snapshot from a known chapter/page
+	/// position, for backfilling a progress record for a book that predates progress tracking.
+	/// </summary>
+	public static ReadingProgress FromBookPosition(string bookId, int currentChapter, int currentPage, int characterPosition = 0, string? lastUpdated = null)
+	{
+		return new ReadingProgress
+		{
+			BookId = bookId,
+			CurrentChapter = currentChapter,
+			CurrentPage = currentPage,
+			CharacterPosition = characterPosition,
+			LastUpdated = string.IsNullOrWhiteSpace(lastUpdated) ? DateTimeOffset.UtcNow.ToString("o") : lastUpdated,
+			DeviceId = string.Empty,
+			DeviceName = string.Empty,
+			IsSynced = false
+		};
+	}
 }

@@ -258,6 +258,10 @@ public partial class LibraryViewModel(ProcessEpubFiles processEpubFiles, ILibrar
 				return;
 			}
 
+			// Fingerprint the file's contents up front so duplicate detection is accurate
+			// even when the same book was imported under a different file name.
+			await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
+
 			if (await processEpubFiles.IsBookAlreadyInLibrary(ebook))
 			{
 				await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");

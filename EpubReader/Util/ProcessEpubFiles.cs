@@ -70,6 +70,10 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 					return;
 				}
 
+				// Fingerprint the file's contents up front so duplicate detection is accurate
+				// even when the same book was imported under a different file name.
+				await BookIdentityService.ComputeSyncIdFromStreamAsync(ebook, stream, cancellationToken).ConfigureAwait(false);
+
 				if (await IsBookAlreadyInLibrary(ebook))
 				{
 					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
@@ -297,6 +301,9 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 				logger.Error("Error opening book after download.");
 				return false;
 			}
+
+			// The file is already on disk at this point (just downloaded), so hash it directly.
+			await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 
 			if (await IsBookAlreadyInLibrary(ebook))
 			{

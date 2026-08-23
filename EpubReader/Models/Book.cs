@@ -50,7 +50,9 @@ public partial class Book : ObservableObject
 	public string CoverImagePath { get; set; } = string.Empty;
 
 	/// <summary>
-	/// Gets or sets the deterministic identifier used for cross-device sync.
+	/// Gets or sets the deterministic identifier used for duplicate detection and cross-device sync.
+	/// Computed from the SHA-1 hash of the EPUB file's contents by <see cref="Util.BookIdentityService"/>,
+	/// so it stays stable even when the file name differs across devices/platforms.
 	/// </summary>
 	public string SyncId { get; set; } = string.Empty;
 

@@ -27,9 +27,6 @@ public partial class BookPage : ContentPage, IDisposable
 	const string switchProgressConfirmText = "Switch";
 	const string switchProgressCancelText = "Stay here";
 	BookViewModel ViewModel => (BookViewModel)BindingContext;
-#if ANDROID
-	readonly UnlockReceiver receiver = new();
-#endif
 	Book book => ViewModel.Book;
 	readonly IDb db;
 	readonly IAuthentication authenticationService = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<IAuthentication>() ?? throw new InvalidOperationException();
@@ -59,14 +56,9 @@ public partial class BookPage : ContentPage, IDisposable
 	bool isSettingsStateSubscribed;
 	bool isReaderBridgeSubscribed;
 	bool invalidBookStateHandled;
-	bool isWindowLifecycleSubscribed;
-	bool hasWindowBeenDeactivated;
-	bool isForegroundProgressCheckInFlight;
-	Window? subscribedWindow;
 	DateTimeOffset lastResolvedProgressTimestamp = DateTimeOffset.MinValue;
-	DateTimeOffset lastPromptedRemoteProgressTimestamp = DateTimeOffset.MinValue;
-	DateTimeOffset lastForegroundProgressCheckStartedAt = DateTimeOffset.MinValue;
-	static readonly TimeSpan foregroundProgressCheckCooldown = TimeSpan.FromSeconds(2);
+	CancellationTokenSource? pageSettleSaveCancellationTokenSource;
+	static readonly TimeSpan pageSettleSaveDelay = TimeSpan.FromMilliseconds(400);
 
 	/// <summary>
 	/// Tracks the last persisted reading position so <see cref="CreateProgressSnapshotForSave"/>
@@ -100,7 +92,7 @@ public partial class BookPage : ContentPage, IDisposable
 		this.audioManager = audioManager;
 		this.readerSettingsStateService = readerSettingsStateService;
 		this.readerBridgeCoordinator = readerBridgeCoordinator;
-		webViewHelper = new(webView, db, syncService);
+		webViewHelper = new(webView, db);
 		ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 		NativeLoadingOverlay.IsVisible = true;
 		fullScreenService.EnterFullScreen();
@@ -118,7 +110,6 @@ public partial class BookPage : ContentPage, IDisposable
 
 		SubscribeToSettingsState();
 		SubscribeToReaderBridge();
-		SubscribeToWindowLifecycle();
 		await UpdateSyncToolbarAsync().ConfigureAwait(false);
 		if (!loadSequenceStarted)
 		{
@@ -190,27 +181,15 @@ public partial class BookPage : ContentPage, IDisposable
 	/// <remarks>This method unregisters all messages for the current instance and clears the toolbar items if the
 	/// popup is not active. It also ensures the navigation bar is visible. Overrides the base <see cref="OnDisappearing"/>
 	/// method.</remarks>
-	protected override async void OnDisappearing()
+	protected override void OnDisappearing()
 	{
 		BookViewModel? viewModel = BindingContext as BookViewModel;
 		bool isPopupActive = viewModel?.isPopupActive == true;
 		if (!isPopupActive)
 		{
-			// Persist reading position before the page is torn down so reopening restores correctly.
-			try
-			{
-				await SaveProgressAsync(CancellationToken.None);
-			}
-			catch (Exception ex)
-			{
-				Trace.TraceWarning($"Failed saving progress on page disappear: {ex.Message}");
-			}
-
+			CancelPendingPageSettleSave();
 			UnsubscribeFromSettingsState();
 			UnsubscribeFromReaderBridge();
-			UnsubscribeFromWindowLifecycle();
-
-
 
 			// Reset load sequence when the page is truly disappearing (not just a popup)
 			loadSequenceStarted = false;
@@ -251,105 +230,6 @@ public partial class BookPage : ContentPage, IDisposable
 		isReaderBridgeSubscribed = false;
 	}
 
-	void SubscribeToWindowLifecycle()
-	{
-		Window? currentWindow = Window;
-		if (currentWindow is null)
-		{
-			return;
-		}
-
-		if (isWindowLifecycleSubscribed && ReferenceEquals(subscribedWindow, currentWindow))
-		{
-			return;
-		}
-
-		UnsubscribeFromWindowLifecycle();
-		subscribedWindow = currentWindow;
-		subscribedWindow.Activated += Window_Activated;
-		subscribedWindow.Deactivated += Window_Deactivated;
-		subscribedWindow.Resumed += Window_Resumed;
-		isWindowLifecycleSubscribed = true;
-	}
-
-	void UnsubscribeFromWindowLifecycle()
-	{
-		if (!isWindowLifecycleSubscribed || subscribedWindow is null)
-		{
-			subscribedWindow = null;
-			isWindowLifecycleSubscribed = false;
-			hasWindowBeenDeactivated = false;
-			return;
-		}
-
-		subscribedWindow.Activated -= Window_Activated;
-		subscribedWindow.Deactivated -= Window_Deactivated;
-		subscribedWindow.Resumed -= Window_Resumed;
-		subscribedWindow = null;
-		isWindowLifecycleSubscribed = false;
-		hasWindowBeenDeactivated = false;
-	}
-
-	void Window_Deactivated(object? sender, EventArgs e)
-	{
-		hasWindowBeenDeactivated = true;
-	}
-
-	async void Window_Activated(object? sender, EventArgs e)
-	{
-		if (!hasWindowBeenDeactivated)
-		{
-			return;
-		}
-
-		hasWindowBeenDeactivated = false;
-		await CheckForIncomingSyncedProgressOnForegroundAsync("A newer synced position is available.");
-	}
-
-	async void Window_Resumed(object? sender, EventArgs e)
-	{
-		hasWindowBeenDeactivated = false;
-		await CheckForIncomingSyncedProgressOnForegroundAsync("A newer synced position is available.");
-	}
-
-	async Task CheckForIncomingSyncedProgressOnForegroundAsync(string promptMessage)
-	{
-		if (!loadSequenceStarted || syncService.IsLocalOnly)
-		{
-			return;
-		}
-
-		lastPromptedRemoteProgressTimestamp = DateTimeOffset.MinValue;
-
-		DateTimeOffset now = DateTimeOffset.UtcNow;
-		if (isForegroundProgressCheckInFlight || now - lastForegroundProgressCheckStartedAt < foregroundProgressCheckCooldown)
-		{
-			return;
-		}
-
-		isForegroundProgressCheckInFlight = true;
-		lastForegroundProgressCheckStartedAt = now;
-
-		try
-		{
-			await TryResolveSyncedProgressAsync(promptMessage, ViewModel.CancellationTokenSource.Token);
-		}
-		catch (OperationCanceledException)
-		{
-			Trace.TraceInformation("Foreground progress check canceled.");
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"Foreground progress check failed: {ex.Message}");
-		}
-		finally
-		{
-			isForegroundProgressCheckInFlight = false;
-			fullScreenService.EnterFullScreen();
-			Shell.SetNavBarIsVisible(this, false);
-			Shell.SetTabBarIsVisible(this, false);
-		}
-	}
 
 	async void ReaderBridgeCoordinator_MessageReceived(object? sender, ReaderBridgeMessageEventArgs e)
 	{
@@ -477,13 +357,6 @@ public partial class BookPage : ContentPage, IDisposable
 		});
 	}
 
-#if ANDROID
-	async void Receiver_ScreenUnlocked(object? sender, EventArgs e)
-	{
-		await CheckForIncomingSyncedProgressOnForegroundAsync("A newer synced position is available.");
-	}
-#endif
-
 	async Task StartLoadSequenceAsync()
 	{
 		Dispatcher.Dispatch(() =>
@@ -508,11 +381,6 @@ public partial class BookPage : ContentPage, IDisposable
 		pageSlider.Minimum = 0;
 		pageSlider.Maximum = 0;
 		pageSlider.Value = 0;
-#if ANDROID
-		var filter = new Android.Content.IntentFilter(Android.Content.Intent.ActionUserPresent);
-		Application.Current?.Handler?.MauiContext?.Context?.RegisterReceiver(receiver, filter);
-		receiver.ScreenUnlocked += Receiver_ScreenUnlocked;
-#endif
 	}
 
 	/// <summary>
@@ -584,7 +452,6 @@ public partial class BookPage : ContentPage, IDisposable
 		Trace.TraceInformation($"Found chapter: {chapter.Title}");
 		book.CurrentChapter = book.Chapters.IndexOf(chapter);
 		await LoadChapterContentAsync();
-		await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 		return true;
 	}
 
@@ -857,7 +724,6 @@ public partial class BookPage : ContentPage, IDisposable
 		book.CurrentChapter = selectedItem.Index;
 		book.CurrentPage = 0;
 		await LoadChapterContentAsync();
-		await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
 		CloseChapterDrawer();
 		isChapterSelectionInProgress = false;
 	}
@@ -921,7 +787,7 @@ public partial class BookPage : ContentPage, IDisposable
 		book.CurrentPage = currentPage;
 		await Dispatcher.DispatchAsync(async () =>
 		{
-			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+			SchedulePageSettleSave();
 			if (sliderTotalPages <= 0 || book.CurrentChapter < 0 || book.CurrentChapter >= chapterOffsets.Count)
 			{
 				await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
@@ -940,6 +806,49 @@ public partial class BookPage : ContentPage, IDisposable
 				pageSlider.Value = Math.Max(pageSlider.Minimum, Math.Min(pageSlider.Maximum, globalPageNumber - 1));
 			}
 		});
+	}
+
+	/// <summary>
+	/// Schedules a debounced progress save after a page turn settles. Rapid successive
+	/// page turns (e.g. holding an arrow key) collapse into a single write for the final
+	/// settled page instead of one write per intermediate page.
+	/// </summary>
+	void SchedulePageSettleSave()
+	{
+		CancelPendingPageSettleSave();
+		pageSettleSaveCancellationTokenSource = new CancellationTokenSource();
+		CancellationToken token = pageSettleSaveCancellationTokenSource.Token;
+		_ = DebouncedSaveProgressAsync(token);
+	}
+
+	async Task DebouncedSaveProgressAsync(CancellationToken token)
+	{
+		try
+		{
+			await Task.Delay(pageSettleSaveDelay, token);
+			token.ThrowIfCancellationRequested();
+			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+		}
+		catch (OperationCanceledException)
+		{
+			// Superseded by a newer page turn before this one settled.
+		}
+		catch (Exception ex)
+		{
+			Trace.TraceWarning($"Debounced progress save failed: {ex.Message}");
+		}
+	}
+
+	void CancelPendingPageSettleSave()
+	{
+		if (pageSettleSaveCancellationTokenSource is null)
+		{
+			return;
+		}
+
+		pageSettleSaveCancellationTokenSource.Cancel();
+		pageSettleSaveCancellationTokenSource.Dispose();
+		pageSettleSaveCancellationTokenSource = null;
 	}
 
 	static void HandleMediaOverlayLog(BookPageJsMessage message)
@@ -1343,6 +1252,10 @@ public partial class BookPage : ContentPage, IDisposable
 	{
 		isSliderActive = true;
 		pendingSliderPage = (int)Math.Round(pageSlider.Value);
+
+		// Scrubbing never persists (see PageSlider_DragCompleted); cancel any save still
+		// pending from a page turn so it can't fire mid-drag and capture the scrub preview.
+		CancelPendingPageSettleSave();
 	}
 
 	async void PageSlider_ValueChanged(object? sender, ValueChangedEventArgs e)
@@ -1381,7 +1294,9 @@ public partial class BookPage : ContentPage, IDisposable
 			int targetChapter = MapGlobalPageToChapter(pendingSliderPage, out int localPage);
 			book.CurrentChapter = targetChapter;
 			book.CurrentPage = localPage;
-			await SaveProgressAsync(ViewModel.CancellationTokenSource.Token);
+
+			// Scrubbing to a position is a preview only; it is never persisted here.
+			// The position is saved the next time the reader actually turns a page.
 			await RefreshPaginationStateAsync(ViewModel.CancellationTokenSource.Token);
 		}
 		catch (Exception ex)
@@ -1422,17 +1337,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			return;
 		}
-		ReadingProgress progress = new()
-		{
-			BookId = bookId,
-			CurrentChapter = book.CurrentChapter,
-			CurrentPage = book.CurrentPage,
-			CharacterPosition = latestCharacterPosition,
-			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
-			DeviceId = string.Empty,
-			DeviceName = string.Empty,
-			IsSynced = false
-		};
+		ReadingProgress progress = ReadingProgress.FromBookPosition(bookId, book.CurrentChapter, book.CurrentPage, latestCharacterPosition);
 		await syncService.SaveProgressAsync(progress, token);
 	}
 
@@ -1441,13 +1346,13 @@ public partial class BookPage : ContentPage, IDisposable
 		token.ThrowIfCancellationRequested();
 
 		string bookId = await BookIdentityService.ComputeSyncIdAsync(book, token);
-		ReadingProgress? local = await GetLocalProgressForComparisonAsync(bookId, token);
 		ReadingProgress? cloud = await syncService.GetCloudProgressAsync(bookId, token);
+		await PrimeLocalMediaOverlayRestoreAsync();
 
 		if (cloud is null)
 		{
-			Trace.TraceInformation("[PageRestore] TryResolveSyncedProgressAsync: cloud=null, using local-only path");
-			await PrimeLocalMediaOverlayRestoreAsync();
+			Trace.TraceInformation("[PageRestore] TryResolveSyncedProgressAsync: no remote progress, nothing to offer");
+			ReadingProgress? local = await syncService.GetLocalProgressAsync(bookId, token);
 			if (local is null)
 			{
 				await BackfillLegacyProgressIfNeededAsync(bookId, token);
@@ -1460,50 +1365,20 @@ public partial class BookPage : ContentPage, IDisposable
 		}
 
 		Trace.TraceInformation($"[PageRestore] TryResolveSyncedProgressAsync: cloud found Ch={cloud.CurrentChapter} Pg={cloud.CurrentPage}");
-		return await ResolveProgressAsync(local, cloud, promptMessage, token);
+		return await OfferRemoteProgressIfDifferentAsync(cloud, promptMessage, token);
 	}
 
-	async Task<ReadingProgress?> GetLocalProgressForComparisonAsync(string bookId, CancellationToken token)
+	/// <summary>
+	/// Compares the remote position directly against the actual on-screen position
+	/// (no cached or synthesized "local" state, no timestamp comparison) and offers
+	/// to switch to it only when the two genuinely differ.
+	/// </summary>
+	async Task<bool> OfferRemoteProgressIfDifferentAsync(ReadingProgress cloud, string promptMessage, CancellationToken token)
 	{
-		token.ThrowIfCancellationRequested();
-
-		ReadingProgress? local = await syncService.GetLocalProgressAsync(bookId, token);
-		if (local is not null)
+		ReadingProgress current = CreateCurrentReadingProgressSnapshot();
+		if (HasSameReadingPosition(cloud, current))
 		{
-			return local;
-		}
-
-		if (book.CurrentChapter <= 0 && book.CurrentPage <= 0 && book.MediaOverlayChapter is null)
-		{
-			return null;
-		}
-
-		string fallbackTimestamp = book.LastOpenedDate?.ToString("o") ?? DateTimeOffset.MinValue.ToString("o");
-		return CreateCurrentReadingProgressSnapshot(fallbackTimestamp);
-	}
-
-	async Task<bool> ResolveProgressAsync(ReadingProgress? local, ReadingProgress cloud, string promptMessage, CancellationToken token)
-	{
-		await PrimeLocalMediaOverlayRestoreAsync();
-		ReadingProgress localProgress = local ?? CreateCurrentReadingProgressSnapshot(book.LastOpenedDate?.ToString("o") ?? DateTimeOffset.MinValue.ToString("o"));
-		DateTimeOffset incomingTimestamp = TryParseTimestamp(cloud.LastUpdated);
-		DateTimeOffset localTimestamp = TryParseTimestamp(localProgress.LastUpdated);
-
-		if (HasSameReadingPosition(cloud, localProgress))
-		{
-			TrackResolvedProgress(incomingTimestamp >= localTimestamp ? cloud : localProgress);
-			return false;
-		}
-
-		if (incomingTimestamp <= localTimestamp)
-		{
-			TrackResolvedProgress(localProgress);
-			return false;
-		}
-
-		if (incomingTimestamp <= lastPromptedRemoteProgressTimestamp)
-		{
-			TrackResolvedProgress(localProgress);
+			TrackResolvedProgress(cloud);
 			return false;
 		}
 
@@ -1607,10 +1482,11 @@ public partial class BookPage : ContentPage, IDisposable
 			// Update the book's LastOpenedDate to track recent reads
 			try
 			{
-				book.LastOpenedDate = DateTime.UtcNow;
-				progress.LastOpenedDate = book.LastOpenedDate?.ToString("o");
-				await db.SaveBookData(book, token);
-				System.Diagnostics.Trace.TraceInformation($"Updated book LastOpenedDate to {book.LastOpenedDate:o}");
+				DateTime lastOpenedDate = DateTime.UtcNow;
+				book.LastOpenedDate = lastOpenedDate;
+				progress.LastOpenedDate = lastOpenedDate.ToString("o");
+				await db.UpdateBookLastOpenedDate(book.Id, lastOpenedDate, token);
+				System.Diagnostics.Trace.TraceInformation($"Updated book LastOpenedDate to {lastOpenedDate:o}");
 			}
 			catch (Exception ex)
 			{
@@ -1779,25 +1655,28 @@ public partial class BookPage : ContentPage, IDisposable
 
 		// Persist the corrected page (outside the main try-catch so a DB failure
 		// doesn't look like a scroll failure).
-		try
-		{
-			await db.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, token);
-		}
-		catch (Exception ex)
-		{
-			Trace.TraceWarning($"Failed persisting character-position-derived page: {ex.Message}");
-		}
+		await PersistLocalPositionAsync(book.CurrentChapter, book.CurrentPage, token);
 	}
 
 	async Task PersistAppliedProgressLocallyAsync(ReadingProgress progress, CancellationToken token)
 	{
+		await PersistLocalPositionAsync(progress.CurrentChapter, progress.CurrentPage, token);
+	}
+
+	/// <summary>
+	/// Writes only the chapter/page columns to the local DB, bypassing the sync service.
+	/// Used to fine-tune the locally-displayed page (e.g. after a character-position-based
+	/// restore) without pushing a new position to the cloud.
+	/// </summary>
+	async Task PersistLocalPositionAsync(int currentChapter, int currentPage, CancellationToken token)
+	{
 		try
 		{
-			await db.UpdateBookProgress(book.Id, progress.CurrentChapter, progress.CurrentPage, token);
+			await db.UpdateBookProgress(book.Id, currentChapter, currentPage, token);
 		}
 		catch (Exception ex)
 		{
-			Trace.TraceWarning($"Failed persisting applied progress locally: {ex.Message}");
+			Trace.TraceWarning($"Failed persisting local book position: {ex.Message}");
 		}
 	}
 
@@ -1806,12 +1685,6 @@ public partial class BookPage : ContentPage, IDisposable
 		ArgumentNullException.ThrowIfNull(progress);
 		ArgumentException.ThrowIfNullOrWhiteSpace(promptMessage);
 		token.ThrowIfCancellationRequested();
-
-		DateTimeOffset incomingTimestamp = TryParseTimestamp(progress.LastUpdated);
-		if (incomingTimestamp > lastPromptedRemoteProgressTimestamp)
-		{
-			lastPromptedRemoteProgressTimestamp = incomingTimestamp;
-		}
 
 		Shell? shell = Shell.Current;
 		if (shell is null)
@@ -1858,43 +1731,30 @@ public partial class BookPage : ContentPage, IDisposable
 			}
 
 			string syncId = await BookIdentityService.ComputeSyncIdAsync(book, token);
-			ReadingProgress? local = await GetLocalProgressForComparisonAsync(syncId, token);
 			ReadingProgress? cloud = await syncService.GetCloudProgressAsync(syncId, token);
-			ReadingProgress comparableLocal = local ?? CreateCurrentReadingProgressSnapshot(book.LastOpenedDate?.ToString("o") ?? DateTimeOffset.MinValue.ToString("o"));
-
-			DateTimeOffset remoteTime = TryParseTimestamp(cloud?.LastUpdated);
-			DateTimeOffset localTime = TryParseTimestamp(comparableLocal.LastUpdated);
-
-			if (cloud is not null && remoteTime > localTime)
-			{
-				if (HasSameReadingPosition(cloud, comparableLocal))
-				{
-					TrackResolvedProgress(cloud);
-					await ViewModel.ShowInfoToastAsync("Progress already up to date");
-					return;
-				}
-
-				bool switched = await PromptToSwitchToIncomingProgressAsync(cloud, "Cloud sync found a newer position.", token);
-				if (!switched)
-				{
-					sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
-				}
-				return;
-			}
-
 			ReadingProgress currentProgress = CreateCurrentReadingProgressSnapshot();
 
-			if (local is null || !HasSameReadingPosition(local, currentProgress))
+			if (cloud is null)
 			{
 				await PersistProgressAsync(currentProgress, updateLastOpenedDate: false, token);
 				TrackResolvedProgress(currentProgress);
 				await ViewModel.ShowInfoToastAsync("Progress synced to cloud");
+				sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+				return;
 			}
-			else
+
+			if (HasSameReadingPosition(cloud, currentProgress))
+			{
+				await ViewModel.ShowInfoToastAsync("Progress already up to date");
+				sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
+				return;
+			}
+
+			bool switched = await PromptToSwitchToIncomingProgressAsync(cloud, "Cloud sync found a different position.", token);
+			if (!switched)
 			{
 				await ViewModel.ShowInfoToastAsync("Progress already up to date");
 			}
-
 			sliderPageLabel.Text = pageLabel.Text = await GetCurrentPageInfoAsync();
 		}
 		catch (Exception ex)
@@ -1977,7 +1837,7 @@ public partial class BookPage : ContentPage, IDisposable
 		{
 			UnsubscribeFromSettingsState();
 			UnsubscribeFromReaderBridge();
-			UnsubscribeFromWindowLifecycle();
+			CancelPendingPageSettleSave();
 
 			settingsRefreshCancellationTokenSource?.Cancel();
 			settingsRefreshCancellationTokenSource?.Dispose();
@@ -1993,10 +1853,6 @@ public partial class BookPage : ContentPage, IDisposable
 				mediaOverlayManager.Dispose();
 			}
 			mediaOverlayManager = null;
-#if ANDROID
-		receiver.ScreenUnlocked -= Receiver_ScreenUnlocked;
-		Application.Current?.Handler?.MauiContext?.Context?.UnregisterReceiver(receiver);
-#endif
 		}
 		disposedValue = true;
 	}

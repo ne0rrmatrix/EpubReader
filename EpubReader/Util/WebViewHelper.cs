@@ -11,8 +11,7 @@ namespace EpubReader.Util;
 /// </summary>
 /// <param name="handler"></param>
 /// <param name="db"></param>
-/// <param name="syncService"></param>
-public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncService)
+public partial class WebViewHelper(WebView handler, IDb db)
 {
 	const int defaultReaderFontSize = 16;
 	const int minimumReaderFontSize = 8;
@@ -31,7 +30,6 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 
 	readonly IDispatcher dispatcher = Microsoft.Maui.Controls.Application.Current?.Dispatcher ?? throw new InvalidOperationException();
 	readonly IDb database = db;
-	readonly ISyncService syncServiceInstance = syncService;
 	readonly WebView webView = handler;
 	static readonly ILogger logger = AppLogger.CreateLogger<WebViewHelper>();
 	static readonly JsonSerializerOptions mediaOverlayThemeSerializerOptions = new()
@@ -247,7 +245,6 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		{
 			book.CurrentChapter++;
 			book.CurrentPage = 0;
-			await SaveProgressAsync(book);
 			return await LoadPageAsync(label, book);
 		}
 		return false;
@@ -268,7 +265,6 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 		{
 			book.CurrentChapter--;
 			book.CurrentPage = 0;
-			await SaveProgressAsync(book);
 			return await LoadPageAsync(label, book);
 		}
 		return false;
@@ -600,35 +596,6 @@ public partial class WebViewHelper(WebView handler, IDb db, ISyncService syncSer
 			? Math.Clamp(scalePercent, androidMinimumReaderFontPercent, androidMaximumReaderFontPercent)
 			: Math.Clamp(scalePercent, minimumReaderFontPercent, maximumReaderFontPercent);
 		return $"{clampedScale}%";
-	}
-
-	async Task SaveProgressAsync(Book book)
-	{
-		string syncId = await BookIdentityService.ComputeSyncIdAsync(book, CancellationToken.None);
-		ReadingProgress progress = new()
-		{
-			BookId = syncId,
-			CurrentChapter = book.CurrentChapter,
-			CurrentPage = book.CurrentPage,
-			LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
-			DeviceId = string.Empty,
-			DeviceName = string.Empty,
-			IsSynced = false
-		};
-
-		// Persist the local book position to the local DB so local and cloud positions can be distinguished.
-		try
-		{
-			// Update only progress fields so we don't overwrite cover/image/title accidentally.
-			await database.UpdateBookProgress(book.Id, book.CurrentChapter, book.CurrentPage, CancellationToken.None);
-		}
-		catch (Exception ex)
-		{
-			logger.Error($"Failed to persist local book position: {ex.Message}");
-		}
-
-		// SaveProgressAsync now handles local storage and debouncing internally via Rx
-		await syncServiceInstance.SaveProgressAsync(progress, CancellationToken.None);
 	}
 
 	async Task ApplyMediaOverlayThemeAsync(Settings settings)

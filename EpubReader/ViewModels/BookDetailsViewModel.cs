@@ -85,16 +85,7 @@ public partial class BookDetailsViewModel : BaseViewModel, IQueryAttributable
 		// Backfill from legacy Book fields if no progress record yet
 		if (progress is null && (existingBook.CurrentChapter > 0 || existingBook.CurrentPage > 0))
 		{
-			progress = new ReadingProgress
-			{
-				BookId = syncId,
-				CurrentChapter = existingBook.CurrentChapter,
-				CurrentPage = existingBook.CurrentPage,
-				LastUpdated = DateTimeOffset.UtcNow.ToString("o"),
-				DeviceId = string.Empty,
-				DeviceName = string.Empty,
-				IsSynced = false
-			};
+			progress = ReadingProgress.FromBookPosition(syncId, existingBook.CurrentChapter, existingBook.CurrentPage);
 			await syncService.SaveProgressAsync(progress, token);
 		}
 	}
