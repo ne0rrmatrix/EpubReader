@@ -278,6 +278,14 @@ function applyNativeSafeAreaInsetsToRoot(root) {
     root.style.setProperty('--RS__safeAreaBottom', `${pendingNativeSafeAreaInsets.bottom}px`);
     root.style.setProperty('--RS__safeAreaLeft', `${pendingNativeSafeAreaInsets.left}px`);
 
+    // Mirror the safe area values as scroll-padding variables so that
+    // scroll-mode body padding is also applied (ReadiumCSS-after.css only
+    // uses these on the body element, not the :root element).
+    root.style.setProperty('--RS__scrollPaddingTop', `${pendingNativeSafeAreaInsets.top}px`);
+    root.style.setProperty('--RS__scrollPaddingRight', `${pendingNativeSafeAreaInsets.right}px`);
+    root.style.setProperty('--RS__scrollPaddingBottom', `${pendingNativeSafeAreaInsets.bottom}px`);
+    root.style.setProperty('--RS__scrollPaddingLeft', `${pendingNativeSafeAreaInsets.left}px`);
+
     logReaderSafeArea('applied', {
         pendingInsets: pendingNativeSafeAreaInsets,
         computedInsets: {
@@ -2546,12 +2554,13 @@ function tryHandleCombinedInternalLink(href) {
 /**
  * Goes to a specific page in the iframe content
  * @param {number} page property - The page number to navigate to
+ * @param {boolean} immediate - Scroll immediately when true; otherwise allow layout to settle first.
  * @returns {void}
  */
-function gotoPage(page) {
+function gotoPage(page, immediate = false) {
     console.log("Jumping to page:", page);
-    if (page < 1) {
-        console.warn("Page number must be 1 or greater. Current page:", page);
+    if (page < 0) {
+        console.warn("Page number must be 0 or greater. Current page:", page);
         currentPage = 0;
         return;
     }
@@ -2566,12 +2575,18 @@ function gotoPage(page) {
     const clampedPage = Math.min(page, maxPage);
     currentPage = clampedPage;
 
-    setTimeout(() => {
+    const navigate = () => {
         navigationUtils.scrollToPage(clampedPage);
         // Re-clamp after layout may have settled post-scroll
         currentPage = Math.min(clampedPage, getPageCount());
         updateCharacterPosition();
-    }, 200);
+    };
+
+    if (immediate) {
+        navigate();
+    } else {
+        setTimeout(navigate, 200);
+    }
 }
 
 /**
@@ -2581,6 +2596,78 @@ function scrollToHorizontalEnd() {
     navigationUtils.scrollToHorizontalEnd();
     currentPage = Math.max(0, getPageCount());
     updateCharacterPosition();
+}
+
+/**
+ * Scrolls to a device-independent character position within the current chapter,
+ * then recalculates the page number for the current device layout.
+ * @param {number} characterPosition - The target character position (0-based)
+ * @returns {string} JSON with the resulting page and character position
+ */
+function scrollToCharacterPosition(characterPosition) {
+    const doc = domUtils.getIframeDocument();
+    const win = domUtils.getContentWindow();
+    if (!doc || !win) {
+        console.warn('scrollToCharacterPosition: iframe content not available');
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    const targetPosition = Math.max(0, Number(characterPosition) || 0);
+    if (targetPosition <= 0) {
+        win.scrollTo(0, 0);
+        currentPage = 0;
+        updateCharacterPosition();
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    lastVirtualColumnLayoutKey = null;
+    adjustVirtualColumns({ force: true, reason: 'scroll-to-char-pos' });
+
+    const textContent = extractTextFromDocument(doc, getActiveSectionElement(doc));
+    const totalCharacters = textContent.length;
+
+    if (totalCharacters <= 0) {
+        console.warn('scrollToCharacterPosition: no text content in active section');
+        win.scrollTo(0, 0);
+        currentPage = 0;
+        updateCharacterPosition();
+        return JSON.stringify({ page: 0, characterPosition: 0 });
+    }
+
+    // Calculate the scroll progress as the fraction through the text
+    const scrollProgress = Math.min(1, targetPosition / totalCharacters);
+    const totalScrollWidth = doc.documentElement.scrollWidth;
+    const viewportWidth = win.innerWidth;
+    const maxScrollX = Math.max(0, totalScrollWidth - viewportWidth);
+    const targetScrollX = Math.floor(scrollProgress * maxScrollX);
+
+    console.log(
+        'scrollToCharacterPosition: targetPos=' + targetPosition +
+        ' totalChars=' + totalCharacters +
+        ' scrollProgress=' + scrollProgress.toFixed(4) +
+        ' maxScrollX=' + maxScrollX +
+        ' targetScrollX=' + targetScrollX
+    );
+
+    try {
+        win.scrollTo(targetScrollX, 0);
+    } catch (error) {
+        console.warn('scrollToCharacterPosition: scrollTo failed', error);
+    }
+
+    // Allow layout to settle, then recalculate the page
+    setTimeout(() => {
+        const scrollAmount = navigationUtils.calculateScrollAmount(win) || win.innerWidth;
+        currentPage = Math.max(0, Math.round(win.scrollX / scrollAmount));
+        updateCharacterPosition();
+        console.log('scrollToCharacterPosition: settled at page=' + currentPage);
+    }, 150);
+
+    return JSON.stringify({
+        page: currentPage,
+        characterPosition: targetPosition,
+        totalCharacters: totalCharacters
+    });
 }
 
 /**

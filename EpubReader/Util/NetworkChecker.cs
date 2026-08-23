@@ -34,9 +34,9 @@ public class NetworkChecker
 	{
 		try
 		{
-			using var client = new HttpClient();
+			using HttpClient client = new();
 			client.Timeout = TimeSpan.FromSeconds(10); // Set a timeout for the request
-			var response = await client.GetAsync(url, cancellationToken);
+			HttpResponseMessage response = await client.GetAsync(url, cancellationToken);
 			if (response.IsSuccessStatusCode)
 			{
 				return true;

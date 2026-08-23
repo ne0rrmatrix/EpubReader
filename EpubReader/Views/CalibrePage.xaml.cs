@@ -13,20 +13,13 @@ public partial class CalibrePage : ContentPage
 
 	async void OnSearchBarTextChanged(object? sender, TextChangedEventArgs? e)
 	{
-		if (e is null)
+		if (e is null || string.IsNullOrEmpty(e.NewTextValue))
 		{
 			logger.Warn("TextChangedEventArgs is null, cannot process search.");
 			return;
 		}
 
-		try
-		{
-			await viewModel.SearchBooksAsync(e.NewTextValue);
-		}
-		catch (OperationCanceledException)
-		{
-			logger.Info("Calibre search was cancelled.");
-		}
+		viewModel.SearchBooks(e.NewTextValue);
 	}
 
 	async void OnFeedSelectionChanged(object? sender, EventArgs e)

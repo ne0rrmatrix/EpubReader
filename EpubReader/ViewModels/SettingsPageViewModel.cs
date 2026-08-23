@@ -13,7 +13,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 {
 	const string displayTabKey = "Display";
 	const string generalTabKey = "General";
-	readonly AuthenticationService authenticationService;
+	readonly IAuthentication authenticationService = Application.Current?.Handler?.MauiContext?.Services.GetRequiredService<IAuthentication>() ?? throw new InvalidOperationException();
 	readonly ISyncService syncService;
 	readonly List<EpubFonts> fonts = [
 		new EpubFonts { FontFamily = string.Empty },
@@ -76,9 +76,8 @@ public partial class SettingsPageViewModel : BaseViewModel
 	/// Initializes a new instance of the <see cref="SettingsPageViewModel"/> class.
 	/// Note: long-running async work is NOT started here. Call <see cref="InitializeAsync"/> from the view (OnAppearing/Loaded).
 	/// </summary>
-	public SettingsPageViewModel(AuthenticationService authenticationService, ISyncService syncService)
+	public SettingsPageViewModel(ISyncService syncService)
 	{
-		this.authenticationService = authenticationService;
 		this.syncService = syncService;
 		this.authenticationService.AuthStateChanged += OnAuthStateChanged;
 		InitializeAsync().SafeFireAndForget(onException: ex =>
@@ -116,8 +115,8 @@ public partial class SettingsPageViewModel : BaseViewModel
 
 	public async Task LoadAuthStatusAsync(CancellationToken cancellationToken = default)
 	{
-		var isAuth = await authenticationService.IsAuthenticatedAsync(cancellationToken);
-		var isLocal = await AuthenticationService.IsLocalOnlyModeAsync(cancellationToken);
+		bool isAuth = await authenticationService.IsAuthenticatedAsync(cancellationToken);
+		bool isLocal = await authenticationService.IsLocalOnlyModeAsync(cancellationToken);
 
 		IsAuthenticated = isAuth;
 		IsNotAuthenticated = !isAuth;
@@ -125,7 +124,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 
 		if (isAuth)
 		{
-			var userEmail = await authenticationService.GetCurrentUserEmailAsync(cancellationToken);
+			string userEmail = await authenticationService.GetCurrentUserEmailAsync(cancellationToken);
 			AuthStatusText = string.IsNullOrWhiteSpace(userEmail)
 				? "Signed in - Cloud sync enabled"
 				: $"Signed in as:\n{userEmail}";
@@ -153,20 +152,20 @@ public partial class SettingsPageViewModel : BaseViewModel
 	async Task SignInAsync(CancellationToken cancellationToken = default)
 	{
 		await LoadAuthStatusAsync(cancellationToken);
-		var navigationPage = new LoginPage(new LoginPageViewModel(authenticationService));
+		LoginPage navigationPage = new(new LoginPageViewModel());
 		await Shell.Current.Navigation.PushModalAsync(navigationPage, true);
 	}
 
 	[RelayCommand]
 	async Task SignOutAsync(CancellationToken cancellationToken = default)
 	{
-		var page = Application.Current?.Windows[0]?.Page;
+		Page? page = Application.Current?.Windows[0]?.Page;
 		if (page is null)
 		{
 			return;
 		}
 
-		var result = await page.DisplayAlertAsync(
+		bool result = await page.DisplayAlertAsync(
 			"Sign Out",
 			"Are you sure you want to sign out? This will disable cloud sync and switch to local-only mode.",
 			"Sign Out",
@@ -182,7 +181,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 	[RelayCommand]
 	async Task DeleteCloudDataAsync(CancellationToken cancellationToken = default)
 	{
-		var page = Application.Current?.Windows[0]?.Page;
+		Page? page = Application.Current?.Windows[0]?.Page;
 		if (page is null)
 		{
 			return;
@@ -196,7 +195,7 @@ public partial class SettingsPageViewModel : BaseViewModel
 			return;
 		}
 
-		var confirm = await page.DisplayAlertAsync(
+		bool confirm = await page.DisplayAlertAsync(
 			"Delete Cloud Data",
 			"This will permanently delete your cloud-synced reading progress across all books for your account. This action cannot be undone.\n\nDo you want to continue?",
 			"Delete",

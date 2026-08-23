@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using Android.Graphics;
 using Android.Webkit;
 using AndroidX.Core.View;
@@ -56,52 +57,52 @@ class CustomWebViewClient : WebViewClient
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
 #pragma warning disable CA1422  // Type or member is obsolete
 		platformView.Settings.SetAppCacheEnabled(true);
-		var absolutePath = Platform.AppContext.CacheDir?.AbsolutePath ?? throw new InvalidOperationException();
-        platformView.Settings.SetAppCachePath(absolutePath);
+		string absolutePath = Platform.AppContext.CacheDir?.AbsolutePath ?? throw new InvalidOperationException();
+		platformView.Settings.SetAppCachePath(absolutePath);
 		// Ensure caching is enabled so JS fetch() can populate and use cache for preloaded chapters
 #pragma warning disable CS0618  // Type or member is obsolete
-        platformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
+		platformView.Settings.SetRenderPriority(Android.Webkit.WebSettings.RenderPriority.High);
 		platformView.Settings.CacheMode = CacheModes.Default;
 #pragma warning restore CS0618  // Type or member is obsolete
 #pragma warning restore CA1422  // Type or member is obsolete
-       platformView.Post(() => ApplyReaderSafeAreaInsets());
+		platformView.Post(() => ApplyReaderSafeAreaInsets());
 	}
 
 	void ApplyReaderSafeAreaInsets()
 	{
-		var rootInsets = ViewCompat.GetRootWindowInsets(platformView);
+		WindowInsetsCompat? rootInsets = ViewCompat.GetRootWindowInsets(platformView);
 		if (rootInsets is null)
 		{
 			return;
 		}
 
-		var displayCutoutInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.DisplayCutout());
-		var statusBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.StatusBars());
-		var navigationBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
+		AndroidX.Core.Graphics.Insets? displayCutoutInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.DisplayCutout());
+		AndroidX.Core.Graphics.Insets? statusBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.StatusBars());
+		AndroidX.Core.Graphics.Insets? navigationBarInsets = rootInsets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
 
-		var displayCutoutTop = displayCutoutInsets?.Top ?? 0;
-		var displayCutoutRight = displayCutoutInsets?.Right ?? 0;
-		var displayCutoutBottom = displayCutoutInsets?.Bottom ?? 0;
-		var displayCutoutLeft = displayCutoutInsets?.Left ?? 0;
-		var statusBarTop = statusBarInsets?.Top ?? 0;
-		var navigationBarRight = navigationBarInsets?.Right ?? 0;
-		var navigationBarBottom = navigationBarInsets?.Bottom ?? 0;
-		var navigationBarLeft = navigationBarInsets?.Left ?? 0;
+		int displayCutoutTop = displayCutoutInsets?.Top ?? 0;
+		int displayCutoutRight = displayCutoutInsets?.Right ?? 0;
+		int displayCutoutBottom = displayCutoutInsets?.Bottom ?? 0;
+		int displayCutoutLeft = displayCutoutInsets?.Left ?? 0;
+		int statusBarTop = statusBarInsets?.Top ?? 0;
+		int navigationBarRight = navigationBarInsets?.Right ?? 0;
+		int navigationBarBottom = navigationBarInsets?.Bottom ?? 0;
+		int navigationBarLeft = navigationBarInsets?.Left ?? 0;
 
-		var topInset = Math.Max(displayCutoutTop, statusBarTop);
-		var rightInset = Math.Max(displayCutoutRight, navigationBarRight);
-		var bottomInset = Math.Max(displayCutoutBottom, navigationBarBottom);
-		var leftInset = Math.Max(displayCutoutLeft, navigationBarLeft);
-		var density = platformView.Resources?.DisplayMetrics?.Density ?? 1f;
+		int topInset = Math.Max(displayCutoutTop, statusBarTop);
+		int rightInset = Math.Max(displayCutoutRight, navigationBarRight);
+		int bottomInset = Math.Max(displayCutoutBottom, navigationBarBottom);
+		int leftInset = Math.Max(displayCutoutLeft, navigationBarLeft);
+		float density = platformView.Resources?.DisplayMetrics?.Density ?? 1f;
 		if (density <= 0)
 		{
 			density = 1f;
 		}
 
-		var cssTopInset = (int)Math.Round(topInset / density, MidpointRounding.AwayFromZero);
-		var cssRightInset = (int)Math.Round(rightInset / density, MidpointRounding.AwayFromZero);
-		var cssBottomInset = (int)Math.Round(bottomInset / density, MidpointRounding.AwayFromZero);
-		var cssLeftInset = (int)Math.Round(leftInset / density, MidpointRounding.AwayFromZero);
+		int cssTopInset = (int)Math.Round(topInset / density, MidpointRounding.AwayFromZero);
+		int cssRightInset = (int)Math.Round(rightInset / density, MidpointRounding.AwayFromZero);
+		int cssBottomInset = (int)Math.Round(bottomInset / density, MidpointRounding.AwayFromZero);
+		int cssLeftInset = (int)Math.Round(leftInset / density, MidpointRounding.AwayFromZero);
 
 		platformView.EvaluateJavascript($"setNativeSafeAreaInsets({cssTopInset}, {cssRightInset}, {cssBottomInset}, {cssLeftInset});", null);
 	}
@@ -118,7 +119,7 @@ class CustomWebViewClient : WebViewClient
 	/// allow the default handling of the request.</returns>
 	public override WebResourceResponse? ShouldInterceptRequest(global::Android.Webkit.WebView? view, IWebResourceRequest? request)
 	{
-		var url = request?.Url?.ToString() ?? string.Empty;
+		string url = request?.Url?.ToString() ?? string.Empty;
 
 		// Allow the GitHub Pages site to load normally without interception
 		if (url.StartsWith("https://ne0rrmatrix.github.io/EpubReader/", StringComparison.OrdinalIgnoreCase))
@@ -130,17 +131,17 @@ class CustomWebViewClient : WebViewClient
 			return base.ShouldInterceptRequest(view, request);
 		}
 
-		var filename = System.IO.Path.GetFileName(url);
-		var mimeType = FileService.GetMimeType(filename);
+		string filename = System.IO.Path.GetFileName(url);
+		string mimeType = FileService.GetMimeType(filename);
 
-		var getData = StreamAsync(url, cancellationTokenSource.Token);
+		Task<Stream> getData = StreamAsync(url, cancellationTokenSource.Token);
 
 		if (getData.IsFaulted || getData.IsCanceled)
 		{
 			return base.ShouldInterceptRequest(view, request);
 		}
 		// Ensure caching headers are present in the response so the WebView can store resources
-		var additionalHeaders = new Dictionary<string, string>
+		Dictionary<string, string> additionalHeaders = new()
 		{
 			{ "Cache-Control", "public, max-age=86400" }
 		};
@@ -156,7 +157,7 @@ class CustomWebViewClient : WebViewClient
 	/// URL.</returns>
 	async Task<Stream> StreamAsync(string url, CancellationToken cancellation = default)
 	{
-		var result = await streamExtensions.GetStream(url, cancellation);
+		Stream result = await streamExtensions.GetStream(url, cancellation);
 		return result;
 	}
 
@@ -195,16 +196,16 @@ class CustomWebViewClient : WebViewClient
 			return;
 		}
 		base.OnPageStarted(view, url, favicon);
-		var navigatedEventArgs = new WebNavigatingEventArgs(
+		WebNavigatingEventArgs navigatedEventArgs = new(
 		WebNavigationEvent.NewPage,
 		new HtmlWebViewSource { Html = url }, url);
 
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
-		var navigatingEvent = webView.GetType().GetField(nameof(Microsoft.Maui.Controls.WebView.Navigating), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+		FieldInfo? navigatingEvent = webView.GetType().GetField(nameof(Microsoft.Maui.Controls.WebView.Navigating), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
 #pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
 		if (navigatingEvent?.GetValue(webView) is MulticastDelegate eventDelegate)
 		{
-			foreach (var handler in eventDelegate.GetInvocationList())
+			foreach (Delegate handler in eventDelegate.GetInvocationList())
 			{
 				handler.Method.Invoke(handler.Target, [webView, navigatedEventArgs]);
 			}
@@ -226,7 +227,7 @@ class CustomWebViewClient : WebViewClient
 			return;
 		}
 		base.OnPageFinished(view, url);
-		var navigatedEventArgs = new WebNavigatedEventArgs(
+		WebNavigatedEventArgs navigatedEventArgs = new(
 		WebNavigationEvent.NewPage,
 		url,
 		null,
@@ -234,11 +235,11 @@ class CustomWebViewClient : WebViewClient
 		);
 
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
-		var navigatedEvent = webView.GetType().GetField(nameof(Microsoft.Maui.Controls.WebView.Navigated), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+		FieldInfo? navigatedEvent = webView.GetType().GetField(nameof(Microsoft.Maui.Controls.WebView.Navigated), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
 #pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
 		if (navigatedEvent?.GetValue(webView) is MulticastDelegate eventDelegate)
 		{
-			foreach (var handler in eventDelegate.GetInvocationList())
+			foreach (Delegate handler in eventDelegate.GetInvocationList())
 			{
 				handler.Method.Invoke(handler.Target, [webView, navigatedEventArgs]);
 			}

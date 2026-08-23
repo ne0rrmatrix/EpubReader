@@ -24,7 +24,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 	public async Task RefreshAsync(CancellationToken token = default)
 	{
 		token.ThrowIfCancellationRequested();
-		var books = await db.GetAllBooks(token);
+		List<Book> books = await db.GetAllBooks(token);
 		books.ForEach(book => book.IsInLibrary = true);
 		if (!dispatcher.IsDispatchRequired)
 		{
@@ -44,15 +44,15 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 		await InitializeAsync(token);
 		if (!dispatcher.IsDispatchRequired)
 		{
-			return Books.Any(existing => string.Equals(existing.Title, book.Title, StringComparison.OrdinalIgnoreCase));
+			return Books.Any(existing => MatchesBook(existing, book));
 		}
 
-		var containsCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		TaskCompletionSource<bool> containsCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 		if (!dispatcher.Dispatch(() =>
 		{
 			try
 			{
-				containsCompletionSource.SetResult(Books.Any(existing => string.Equals(existing.Title, book.Title, StringComparison.OrdinalIgnoreCase)));
+				containsCompletionSource.SetResult(Books.Any(existing => MatchesBook(existing, book)));
 			}
 			catch (Exception ex)
 			{
@@ -65,6 +65,15 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 
 		return await containsCompletionSource.Task;
 	}
+
+	/// <summary>
+	/// Matches strictly by SHA-1 file hash (<see cref="Book.SyncId"/>). A candidate with no hash
+	/// computed yet (e.g. a remote catalog entry that hasn't been downloaded) never matches — file
+	/// content is the only signal used for duplicate detection.
+	/// </summary>
+	static bool MatchesBook(Book existing, Book candidate) =>
+		!string.IsNullOrWhiteSpace(candidate.SyncId) &&
+		string.Equals(existing.SyncId, candidate.SyncId, StringComparison.Ordinal);
 
 	public async Task AddBookAsync(Book book, CancellationToken token = default)
 	{
@@ -99,7 +108,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 		}
 		else
 		{
-			var existingCompletionSource = new TaskCompletionSource<Book?>(TaskCreationOptions.RunContinuationsAsynchronously);
+			TaskCompletionSource<Book?> existingCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 			if (!dispatcher.Dispatch(() =>
 			{
 				try
@@ -133,7 +142,7 @@ public sealed class LibraryStateService(IDb db) : ILibraryStateService
 	void ReplaceBooks(IEnumerable<Book> books)
 	{
 		Books.Clear();
-		foreach (var book in books)
+		foreach (Book book in books)
 		{
 			Books.Add(book);
 		}

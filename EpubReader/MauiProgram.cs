@@ -1,9 +1,9 @@
 ﻿using FFImageLoading.Maui;
-using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.LifecycleEvents;
 using Syncfusion.Maui.Toolkit.Hosting;
 using Plugin.Maui.Audio;
+
 
 #if ANDROID
 using Plugin.Firebase.Core.Platforms.Android;
@@ -26,7 +26,7 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
-		var builder = MauiApp.CreateBuilder();
+		MauiAppBuilder builder = MauiApp.CreateBuilder();
 		builder.Logging.ClearProviders();
 		builder.Logging.AddProvider(new TraceLoggerProvider());
 #if DEBUG
@@ -73,6 +73,9 @@ public static class MauiProgram
 		{
 #if IOS || MACCATALYST
 			handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
+			// Backport the secondary toolbar overflow menu fix from
+			// https://github.com/dotnet/maui/pull/30480 (shipped in .NET 10 Preview 7).
+			handlers.AddHandler<Shell, Handlers.CustomShellRenderer>();
 #endif
 		});
 #if ANDROID
@@ -83,10 +86,10 @@ public static class MauiProgram
 	  nameof(Android.Webkit.WebView.WebViewClient),
 	  (handler, view, args) =>
 	  {
-		var services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Android WebView setup.");
-		var streamExtensions = services.GetRequiredService<StreamExtensions>();
-		var dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
-		handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler, streamExtensions, dispatcher));
+		  IServiceProvider services = handler.MauiContext?.Services ?? throw new InvalidOperationException("MauiContext services are unavailable for Android WebView setup.");
+		  StreamExtensions streamExtensions = services.GetRequiredService<StreamExtensions>();
+		  IJavaScriptBridgeDispatcher dispatcher = services.GetRequiredService<IJavaScriptBridgeDispatcher>();
+		  handler.PlatformView.SetWebViewClient(new CustomWebViewClient(handler, streamExtensions, dispatcher));
 	  });
 #elif WINDOWS
 		WebViewHandler.Mapper.ModifyMapping(
@@ -125,17 +128,21 @@ public static class MauiProgram
 			{
 				webView.Inspectable = true;
 			}
+			// Send native safe area insets to the reader JS so it can add proper
+			// bottom padding for the home indicator / notch on modern iOS devices.
+			webView.PostApplyReaderSafeAreaInsets();
 			return webView;
 		};
 #endif
 		// Register services
 		builder.Services.AddSingleton<IDb, Db>();
-		builder.Services.AddSingleton<AuthenticationService>();
+		builder.Services.AddSingleton<IAuthentication, AuthenticationService>();
 		builder.Services.AddSingleton<ILibraryStateService, LibraryStateService>();
 		builder.Services.AddSingleton<IImportStateService, ImportStateService>();
 		builder.Services.AddSingleton<IReaderBridgeCoordinator, ReaderBridgeCoordinator>();
 		builder.Services.AddSingleton<IJavaScriptBridgeDispatcher, JavaScriptBridgeDispatcher>();
 		builder.Services.AddSingleton<IReaderSettingsStateService, ReaderSettingsStateService>();
+		builder.Services.AddSingleton<ICalibreZeroConf, CalibreZeroConf>();
 		builder.Services.AddSingleton<ISyncService, FirebaseSyncService>();
 		builder.Services.AddSingleton<IAudioManager>(_ => AudioManager.Current);
 		builder.Services.AddSingleton<StreamExtensions>();
@@ -183,34 +190,48 @@ public static class MauiProgram
 		// Ensure config loader runs and initialize Firebase programmatically so we never rely on Android resource strings
 		try
 		{
-			// Build FirebaseOptions from loaded configuration
-			var appId = FirebaseConfig.AppId;
-			var apiKey = FirebaseConfig.ApiKey;
-			var projectId = FirebaseConfig.ProjectId;
-			var databaseUrl = FirebaseConfig.DatabaseUrl;
+			var defaultApp = global::Firebase.FirebaseApp.InitializeApp(activity);
 
-			if (!string.IsNullOrWhiteSpace(appId))
+			if (defaultApp is null)
 			{
-				var optionsBuilder = new Firebase.FirebaseOptions.Builder()
-					.SetApplicationId(appId);
+				// Build FirebaseOptions from loaded configuration
+				string appId = FirebaseConfig.AppId;
+				string apiKey = FirebaseConfig.ApiKey;
+				string projectId = FirebaseConfig.ProjectId;
+				string databaseUrl = FirebaseConfig.DatabaseUrl;
 
-				if (!string.IsNullOrWhiteSpace(apiKey))
+				if (!string.IsNullOrWhiteSpace(appId))
 				{
-					optionsBuilder.SetApiKey(apiKey);
-				}
+					var optionsBuilder = new global::Firebase.FirebaseOptions.Builder()
+						.SetApplicationId(appId);
 
-				if (!string.IsNullOrWhiteSpace(projectId))
+					if (!string.IsNullOrWhiteSpace(apiKey))
+					{
+						optionsBuilder.SetApiKey(apiKey);
+					}
+
+					if (!string.IsNullOrWhiteSpace(projectId))
+					{
+						optionsBuilder.SetProjectId(projectId);
+					}
+
+					if (!string.IsNullOrWhiteSpace(databaseUrl))
+					{
+						optionsBuilder.SetDatabaseUrl(databaseUrl);
+					}
+
+					var options = optionsBuilder.Build();
+					global::Firebase.FirebaseApp.InitializeApp(activity, options);
+					System.Diagnostics.Trace.TraceInformation("Firebase startup: initialized default app from runtime configuration");
+				}
+				else
 				{
-					optionsBuilder.SetProjectId(projectId);
+					System.Diagnostics.Trace.TraceWarning("Firebase startup: default app was not available and runtime configuration was incomplete");
 				}
-
-				if (!string.IsNullOrWhiteSpace(databaseUrl))
-				{
-					optionsBuilder.SetDatabaseUrl(databaseUrl);
-				}
-
-				var options = optionsBuilder.Build();
-				Firebase.FirebaseApp.InitializeApp(activity, options);
+			}
+			else
+			{
+				System.Diagnostics.Trace.TraceInformation("Firebase startup: using existing default app");
 			}
 
 			CrossFirebase.Initialize(activity, () => Platform.CurrentActivity ?? activity);

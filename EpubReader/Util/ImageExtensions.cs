@@ -27,7 +27,7 @@ public static class ImageExtensions
 			return string.Empty;
 		}
 
-		using var stream = File.OpenRead(file);
+		using FileStream stream = File.OpenRead(file);
 		return stream.GetFileExtension();
 	}
 

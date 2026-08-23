@@ -25,7 +25,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	{
 
 		int count = 0;
-		foreach (var file in epubFiles)
+		foreach (string file in epubFiles)
 		{
 			if (cancellationToken.IsCancellationRequested)
 			{
@@ -49,7 +49,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	{
 		try
 		{
-			var stream = await FolderPicker.PerformFileOperationOnEpubAsync(filePath, cancellationToken).ConfigureAwait(false);
+			Stream? stream = await FolderPicker.PerformFileOperationOnEpubAsync(filePath, cancellationToken).ConfigureAwait(false);
 			if (stream is null)
 			{
 				logger.Info($"Failed to open stream for file: {filePath}");
@@ -63,22 +63,27 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 					logger.Info("Operation cancelled by user.");
 					return;
 				}
-				var ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
+				Book? ebook = await EbookService.GetListingAsync(stream, filePath).ConfigureAwait(false);
 				if (ebook is null)
 				{
 					await ShowErrorToastAsync($"Error opening book: {Path.GetFileName(filePath)}");
 					return;
 				}
 
+				// Fingerprint the file's contents up front so duplicate detection is accurate
+				// even when the same book was imported under a different file name.
+				await BookIdentityService.ComputeSyncIdFromStreamAsync(ebook, stream, cancellationToken).ConfigureAwait(false);
+
 				if (await IsBookAlreadyInLibrary(ebook))
 				{
 					await ShowInfoToastAsync($"Book already exists in library: {ebook.Title}");
 					return;
 				}
-				importStateService.ReportProgress(ebook.Title, count, maxCount ?? 0);
+				importStateService.ReportProgress($"Preparing {ebook.Title}...", Math.Max(0, count - 1), maxCount ?? 0);
 				logger.Info($"Processing file {Path.GetFileName(filePath)} ({count}/{maxCount})");
 				stream.Seek(0, SeekOrigin.Begin);
 				await SaveBookToLibraryAsync(ebook, stream, filePath, cancellationToken).ConfigureAwait(false);
+				importStateService.ReportProgress(ebook.Title, count, maxCount ?? 0);
 			}
 		}
 		catch (Exception ex)
@@ -101,8 +106,9 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 		try
 		{
 			// Prefer a human-friendly title as the saved filename when available (sanitized inside FileService).
-			var bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
+			string bookName = !string.IsNullOrWhiteSpace(ebook.Title) ? ebook.Title : Path.GetFileName(filePath);
 			ebook.FilePath = await FileService.SaveFileAsync(stream, bookName, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 			ebook.IsInLibrary = true; // Ensure the book is marked as in library
 			ebook.SyncId = await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
@@ -176,7 +182,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	/// <returns>The selected file result, or null if cancelled.</returns>
 	public async Task<FileResult?> PickEpubFileAsync(CancellationToken cancellationToken = default)
 	{
-		var options = new PickOptions
+		PickOptions options = new()
 		{
 			FileTypes = CustomFileType,
 			PickerTitle = "Please select an EPUB book"
@@ -192,7 +198,7 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	/// <returns>True if the book already exists in the library, false otherwise.</returns>
 	public async Task<bool> IsBookAlreadyInLibrary(Book ebook)
 	{
-		return await libraryStateService.ContainsAsync(ebook);
+		return await libraryStateService.ContainsAsync(ebook, importStateService.Token);
 	}
 
 	/// <summary>
@@ -207,11 +213,12 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 		try
 		{
 			// Use ebook.Title when available — it is more stable than FileResult.FileName across platforms.
-			var bookName = !string.IsNullOrWhiteSpace(ebook.Title)
+			string bookName = !string.IsNullOrWhiteSpace(ebook.Title)
 				? ebook.Title
 				: Path.GetFileNameWithoutExtension(fileResult.FileName);
 
 			ebook.FilePath = await FileService.SaveFileAsync(fileResult, bookName, cancellationToken).ConfigureAwait(false);
+			ebook = await PrepareBookForImportAsync(ebook).ConfigureAwait(false);
 			ebook.CoverImagePath = await FileService.SaveImageAsync(bookName, ebook.CoverImage, cancellationToken).ConfigureAwait(false);
 
 			if (ValidateBookFiles(ebook))
@@ -232,6 +239,16 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 		}
 	}
 
+	static async Task<Book> PrepareBookForImportAsync(Book listing)
+	{
+		Guid bookId = listing.Id;
+		Book processedBook = await EbookService.OpenEbookAsync(listing.FilePath).ConfigureAwait(false)
+			?? throw new InvalidOperationException($"Unable to preprocess EPUB '{listing.FilePath}'.");
+		processedBook.Id = bookId;
+		processedBook.IsInLibrary = true;
+		return processedBook;
+	}
+
 	#endregion
 
 	/// <summary>
@@ -247,23 +264,23 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 	/// langword="false"/>.</returns>
 	public async Task<bool> ProcessFileAsync(Book book, CancellationToken cancellationToken)
 	{
-		using var httpClient = new HttpClient();
-		using var memoryStream = new MemoryStream();
+		using HttpClient httpClient = new();
+		using MemoryStream memoryStream = new();
 		try
 		{
-			using var stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
+			using Stream stream = await httpClient.GetStreamAsync(book.DownloadUrl, cancellationToken);
 			await stream.CopyToAsync(memoryStream, cancellationToken);
 			memoryStream.Seek(0, SeekOrigin.Begin);
 
-			var cacheDirectory = FileSystem.Current.CacheDirectory;
-			var invalidPathChars = Path.GetInvalidFileNameChars();
-			var extraInvalidChars = new char[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+' };
-			var emptySpaces = " ";
+			string cacheDirectory = FileSystem.Current.CacheDirectory;
+			char[] invalidPathChars = Path.GetInvalidFileNameChars();
+			char[] extraInvalidChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '(', ')', '#', '!', '@', '$', '%', '^', '-', '=', '_', '+'];
+			string emptySpaces = " ";
 			invalidPathChars = [.. invalidPathChars, .. emptySpaces];
 			invalidPathChars = [.. invalidPathChars, .. extraInvalidChars];
 			book.Title = string.Concat(book.Title.Split(invalidPathChars, StringSplitOptions.RemoveEmptyEntries));
 			book.FilePath = Path.Combine(cacheDirectory, $"{book.Title}.epub");
-			var fileBytes = memoryStream.ToArray();
+			byte[] fileBytes = memoryStream.ToArray();
 			await File.WriteAllBytesAsync(book.FilePath, fileBytes, cancellationToken);
 			logger.Info($"File saved: {book.FilePath}");
 		}
@@ -278,12 +295,15 @@ public partial class ProcessEpubFiles(IFolderPicker folderPicker, IImportStateSe
 		try
 		{
 
-			var ebook = await EbookService.GetListingAsync(book.FilePath);
+			Book? ebook = await EbookService.GetListingAsync(book.FilePath);
 			if (ebook is null)
 			{
 				logger.Error("Error opening book after download.");
 				return false;
 			}
+
+			// The file is already on disk at this point (just downloaded), so hash it directly.
+			await BookIdentityService.ComputeSyncIdAsync(ebook, cancellationToken).ConfigureAwait(false);
 
 			if (await IsBookAlreadyInLibrary(ebook))
 			{

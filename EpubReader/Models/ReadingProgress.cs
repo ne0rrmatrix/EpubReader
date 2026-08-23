@@ -1,60 +1,70 @@
-using SQLite;
-
 namespace EpubReader.Models;
 
 /// <summary>
 /// Represents per-book reading progress used for local persistence and cloud sync.
 /// </summary>
-[Table("ReadingProgress")]
 public class ReadingProgress : Shared
 {
-	[PrimaryKey]
-	[Column("BookId")]
 	public string BookId { get; set; } = string.Empty;
 
-	[Column("CurrentPage")]
 	public int CurrentPage { get; set; }
 
-	[Column("CurrentChapter")]
 	public int CurrentChapter { get; set; }
+
+	/// <summary>
+	/// Device-independent character position within the current chapter, used for
+	/// cross-device position restoration. 0 means no character position is available
+	/// (backwards-compatible fallback to CurrentPage).
+	/// </summary>
+	public int CharacterPosition { get; set; }
 
 	/// <summary>
 	/// ISO 8601 UTC timestamp of the last update.
 	/// </summary>
-	[Column("LastUpdated")]
 	public string LastUpdated { get; set; } = DateTimeOffset.UtcNow.ToString("o");
 
-	[Column("DeviceId")]
 	public string DeviceId { get; set; } = string.Empty;
 
-	[Column("DeviceName")]
 	public string DeviceName { get; set; } = string.Empty;
 
-	[Column("IsSynced")]
 	public bool IsSynced { get; set; }
 
 	// --- Media Overlay playback sync ---
 	// These fields capture the user's current narrated playback position within the current chapter.
 	// They are optional because many books do not ship media overlays.
 
-	[Column("MediaOverlayEnabled")]
 	public bool? MediaOverlayEnabled { get; set; }
 
-	[Column("MediaOverlayChapter")]
 	public int? MediaOverlayChapter { get; set; }
 
 	// Zero-based segment index within the chapter's flattened SMIL parallels.
-	[Column("MediaOverlaySegmentIndex")]
 	public int? MediaOverlaySegmentIndex { get; set; }
 
 	// Absolute position within the chapter in seconds (0..duration).
-	[Column("MediaOverlayPositionSeconds")]
 	public double? MediaOverlayPositionSeconds { get; set; }
 
 	// EPUB fragment id (e.g., element id) used for highlight restoration.
-	[Column("MediaOverlayFragmentId")]
 	public string? MediaOverlayFragmentId { get; set; }
 
 	public override string ToString()
-		=> $"{BookId}: chapter {CurrentChapter}, page {CurrentPage} at {LastUpdated} on {DeviceId} (MO: {MediaOverlayChapter}/{MediaOverlaySegmentIndex}@{MediaOverlayPositionSeconds})";
+		=> $"{BookId}: chapter {CurrentChapter}, page {CurrentPage}, charPos {CharacterPosition} at {LastUpdated} on {DeviceId} (MO: {MediaOverlayChapter}/{MediaOverlaySegmentIndex}@{MediaOverlayPositionSeconds})";
+
+	/// <summary>
+	/// Builds a minimal <see cref="ReadingProgress"/> snapshot from a known chapter/page
+	/// position, for backfilling a progress record for a book that predates progress tracking.
+	/// </summary>
+	public static ReadingProgress FromBookPosition(string bookId, int currentChapter, int currentPage, int characterPosition = 0, string? lastUpdated = null)
+	{
+		return new ReadingProgress
+		{
+			BookId = bookId,
+			CurrentChapter = currentChapter,
+			CurrentPage = currentPage,
+			CharacterPosition = characterPosition,
+			LastUpdated = string.IsNullOrWhiteSpace(lastUpdated) ? DateTimeOffset.UtcNow.ToString("o") : lastUpdated,
+			DeviceId = string.Empty,
+			DeviceName = string.Empty,
+			IsSynced = false
+		};
+	}
 }

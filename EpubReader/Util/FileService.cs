@@ -14,8 +14,8 @@ public static partial class FileService
 	/// and write permissions are granted; otherwise, <see langword="false"/>.</returns>
 	public static async Task<bool> ArePermissionsGranted()
 	{
-		var readPermissionStatus = await Permissions.RequestAsync<Permissions.StorageRead>();
-		var writePermissionStatus = await Permissions.RequestAsync<Permissions.StorageWrite>();
+		PermissionStatus readPermissionStatus = await Permissions.RequestAsync<Permissions.StorageRead>();
+		PermissionStatus writePermissionStatus = await Permissions.RequestAsync<Permissions.StorageWrite>();
 
 		if (readPermissionStatus is PermissionStatus.Granted
 			&& writePermissionStatus is PermissionStatus.Granted)
@@ -128,13 +128,13 @@ public static partial class FileService
 
 		try
 		{
-			var directoryPath = CreateBookDirectoryAsync(bookName);
+			string directoryPath = CreateBookDirectoryAsync(bookName);
 			if (string.IsNullOrEmpty(directoryPath))
 			{
 				return string.Empty;
 			}
 
-			var fileName = GenerateImageFileName(imageBytes, bookName, directoryPath);
+			string fileName = GenerateImageFileName(imageBytes, bookName, directoryPath);
 			if (string.IsNullOrEmpty(fileName))
 			{
 				return string.Empty;
@@ -177,16 +177,16 @@ public static partial class FileService
 
 		try
 		{
-			var directoryPath = CreateBookDirectoryAsync(bookName);
+			string directoryPath = CreateBookDirectoryAsync(bookName);
 			if (string.IsNullOrEmpty(directoryPath))
 			{
 				return string.Empty;
 			}
 
-			var fileName = GenerateEpubFileName(bookName, directoryPath);
+			string fileName = GenerateEpubFileName(bookName, directoryPath);
 
 			// Stream directly to the target file to avoid buffering entire file in memory.
-			using var outStream = File.Create(fileName);
+			using FileStream outStream = File.Create(fileName);
 			if (stream.CanSeek)
 			{
 				stream.Position = 0;
@@ -229,16 +229,16 @@ public static partial class FileService
 
 		try
 		{
-			var directoryPath = CreateBookDirectoryAsync(bookName);
+			string directoryPath = CreateBookDirectoryAsync(bookName);
 			if (string.IsNullOrEmpty(directoryPath))
 			{
 				return string.Empty;
 			}
 
-			var fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
+			string fileName = Path.Combine(directoryPath, ValidateAndFixFileName(result.FileName));
 
-			using var fileStream = await result.OpenReadAsync().ConfigureAwait(false);
-			using var outStream = File.Create(fileName);
+			using Stream fileStream = await result.OpenReadAsync().ConfigureAwait(false);
+			using FileStream outStream = File.Create(fileName);
 			await fileStream.CopyToAsync(outStream, cancellationToken).ConfigureAwait(false);
 
 			logger.Info($"File saved: {fileName}");
@@ -270,19 +270,19 @@ public static partial class FileService
 			return "application/octet-stream";
 		}
 
-		var normalizedPath = fileName.Trim();
-		if (Uri.TryCreate(normalizedPath, UriKind.Absolute, out var absoluteUri))
+		string normalizedPath = fileName.Trim();
+		if (Uri.TryCreate(normalizedPath, UriKind.Absolute, out Uri? absoluteUri))
 		{
 			normalizedPath = absoluteUri.AbsolutePath;
 		}
 
-		var queryIndex = normalizedPath.IndexOfAny(['?', '#']);
+		int queryIndex = normalizedPath.IndexOfAny(['?', '#']);
 		if (queryIndex >= 0)
 		{
 			normalizedPath = normalizedPath[..queryIndex];
 		}
 
-		var extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
+		string extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
 
 		return extension switch
 		{
@@ -319,8 +319,8 @@ public static partial class FileService
 	/// <returns>The full path of the created directory, or empty string if failed.</returns>
 	static string CreateBookDirectoryAsync(string bookName)
 	{
-		var sanitizedBookName = ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName));
-		var directoryPath = Path.Combine(SaveDirectory, sanitizedBookName);
+		string sanitizedBookName = ValidateAndFixDirectoryName(Path.GetFileNameWithoutExtension(bookName));
+		string directoryPath = Path.Combine(SaveDirectory, sanitizedBookName);
 
 		try
 		{
@@ -349,8 +349,8 @@ public static partial class FileService
 	{
 		try
 		{
-			using var memoryStream = new MemoryStream(imageBytes);
-			var fileExtension = ImageExtensions.GetFileExtension(memoryStream);
+			using MemoryStream memoryStream = new(imageBytes);
+			string fileExtension = ImageExtensions.GetFileExtension(memoryStream);
 
 			if (string.IsNullOrEmpty(fileExtension))
 			{
@@ -358,9 +358,9 @@ public static partial class FileService
 				return string.Empty;
 			}
 
-			var baseFileName = Path.GetFileNameWithoutExtension(bookName);
-			var fileName = Path.ChangeExtension(baseFileName, fileExtension.ToLowerInvariant());
-			var sanitizedFileName = ValidateAndFixFileName(fileName);
+			string baseFileName = Path.GetFileNameWithoutExtension(bookName);
+			string fileName = Path.ChangeExtension(baseFileName, fileExtension.ToLowerInvariant());
+			string sanitizedFileName = ValidateAndFixFileName(fileName);
 
 			return Path.Combine(directoryPath, sanitizedFileName);
 		}
@@ -379,9 +379,9 @@ public static partial class FileService
 	/// <returns>The full file path with .epub extension.</returns>
 	static string GenerateEpubFileName(string bookName, string directoryPath)
 	{
-		var baseFileName = Path.GetFileNameWithoutExtension(bookName);
-		var sanitizedFileName = ValidateAndFixFileName(baseFileName);
-		var fileName = Path.ChangeExtension(sanitizedFileName, ".epub");
+		string baseFileName = Path.GetFileNameWithoutExtension(bookName);
+		string sanitizedFileName = ValidateAndFixFileName(baseFileName);
+		string fileName = Path.ChangeExtension(sanitizedFileName, ".epub");
 
 		return Path.Combine(directoryPath, fileName);
 	}
@@ -398,7 +398,7 @@ public static partial class FileService
 			stream.Position = 0;
 		}
 
-		using var memoryStream = new MemoryStream();
+		using MemoryStream memoryStream = new();
 		await stream.CopyToAsync(memoryStream, cancellation).ConfigureAwait(false);
 		return memoryStream.ToArray();
 	}
@@ -416,13 +416,13 @@ public static partial class FileService
 		}
 
 		// Remove invalid path characters
-		foreach (var invalidChar in invalidPathChars)
+		foreach (char invalidChar in invalidPathChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
 		}
 
 		// Remove additional problematic characters
-		foreach (var invalidChar in additionalInvalidChars)
+		foreach (char invalidChar in additionalInvalidChars)
 		{
 			directoryName = directoryName.Replace(invalidChar, '_');
 		}
@@ -452,7 +452,7 @@ public static partial class FileService
 		}
 
 		// Remove invalid file name characters
-		foreach (var invalidChar in invalidFileNameChars)
+		foreach (char invalidChar in invalidFileNameChars)
 		{
 			fileName = fileName.Replace(invalidChar, '_');
 		}

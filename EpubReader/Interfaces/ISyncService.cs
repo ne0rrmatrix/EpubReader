@@ -57,8 +57,8 @@ public interface ISyncService
 	Task<ReadingProgress?> GetLocalProgressAsync(string bookId, CancellationToken token = default);
 
 	/// <summary>
-	/// Saves reading progress locally and syncs to cloud when online.
-	/// Updates are debounced to prevent excessive sync operations.
+	/// Saves reading progress locally, then pushes it to the cloud immediately when
+	/// online or queues it for delivery once connectivity returns.
 	/// </summary>
 	/// <param name="progress">The reading progress to save.</param>
 	/// <param name="token">Cancellation token.</param>

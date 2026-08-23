@@ -1,9 +1,8 @@
-namespace EpubReader.Util;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using EpubReader.Models;
 
+namespace EpubReader.Util;
 /// <summary>
 /// Represents a structured JavaScript message sent from the WebView to the native layer and
 /// provides helpers to parse the bridge payload into a typed C# model.
@@ -35,14 +34,14 @@ public sealed class BookPageJsMessage
 
 		try
 		{
-			using var doc = JsonDocument.Parse(json);
-			var root = doc.RootElement;
-			if (!root.TryGetProperty("action", out var actionElem))
+			using JsonDocument doc = JsonDocument.Parse(json);
+			JsonElement root = doc.RootElement;
+			if (!root.TryGetProperty("action", out JsonElement actionElem))
 			{
 				return false;
 			}
 
-			var href = GetStringProperty(root, "href");
+			string? href = GetStringProperty(root, "href");
 
 			// Convert HTTP to HTTPS if needed
 			if (!string.IsNullOrEmpty(href) && href.StartsWith("http://"))
@@ -50,7 +49,7 @@ public sealed class BookPageJsMessage
 				href = "https://" + href[7..];
 			}
 
-			var actionName = actionElem.GetString() ?? string.Empty;
+			string actionName = actionElem.GetString() ?? string.Empty;
 
 			message = new BookPageJsMessage
 			{
@@ -76,17 +75,17 @@ public sealed class BookPageJsMessage
 	}
 
 	static string? GetStringProperty(JsonElement root, string name) =>
-		root.TryGetProperty(name, out var elem) ? elem.GetString() : null;
+		root.TryGetProperty(name, out JsonElement elem) ? elem.GetString() : null;
 
 	static int? GetInt32Property(JsonElement root, string name) =>
-		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetInt32(out var val)
+		root.TryGetProperty(name, out JsonElement elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetInt32(out int val)
 			? val : null;
 
 	static double? GetDoubleProperty(JsonElement root, string name) =>
-		root.TryGetProperty(name, out var elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetDouble(out var val)
+		root.TryGetProperty(name, out JsonElement elem) && elem.ValueKind == JsonValueKind.Number && elem.TryGetDouble(out double val)
 			? val : null;
 
 	static bool? GetBoolProperty(JsonElement root, string name) =>
-		root.TryGetProperty(name, out var elem) && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
+		root.TryGetProperty(name, out JsonElement elem) && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
 			? elem.GetBoolean() : null;
 }

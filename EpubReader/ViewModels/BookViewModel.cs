@@ -18,7 +18,6 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	const string url = "app://demo/index.html";
 #endif
 #pragma warning restore S1075 // URIs should not be hardcoded
-	readonly AuthenticationService authenticationService;
 	readonly StreamExtensions streamExtensions = Application.Current?.Windows[0].Page?.Handler?.MauiContext?.Services.GetRequiredService<StreamExtensions>() ?? throw new InvalidOperationException();
 
 	/// <summary>
@@ -71,17 +70,13 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// </summary>
 	[ObservableProperty]
 	public partial string ReaderModeToolbarText { get; set; } = "Hide Interface";
-	IFullScreenService FullScreenService { get; set; }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookViewModel"/> class.
 	/// </summary>
 	/// <remarks>This constructor initializes the <see cref="BookViewModel"/> with default values.</remarks>
-	public BookViewModel(AuthenticationService authenticationService, IFullScreenService fullScreenService)
+	public BookViewModel()
 	{
-		this.authenticationService = authenticationService;
-		this.FullScreenService = fullScreenService;
-		Press();
 	}
 
 	/// <summary>
@@ -95,12 +90,12 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	/// image is null.</exception>
 	public void ApplyQueryAttributes(IDictionary<string, object> query)
 	{
-		if (query.TryGetValue("Book", out var bookObj) && bookObj is Book book)
+		if (query.TryGetValue("Book", out object? bookObj) && bookObj is Book book)
 		{
 			Book = book;
 			streamExtensions.SetBook(Book);
 			BookTitle = book.Title;
-			var bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
+			byte[] bytes = book.CoverImage ?? throw new InvalidOperationException("CoverImage is null");
 			CoverImage = ImageSource.FromStream(() => new MemoryStream(bytes));
 		}
 	}
@@ -115,9 +110,9 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 	async Task ShowPopup(CancellationToken cancellation = default)
 	{
 		isPopupActive = true;
-		var services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
-		var syncService = services.GetRequiredService<ISyncService>();
-		var popup = new SettingsPage(new SettingsPageViewModel(authenticationService, syncService));
+		IServiceProvider services = Application.Current?.Handler?.MauiContext?.Services ?? throw new InvalidOperationException();
+		ISyncService syncService = services.GetRequiredService<ISyncService>();
+		SettingsPage popup = new(new SettingsPageViewModel(syncService));
 		PopupOptions options = new()
 		{
 			CanBeDismissedByTappingOutsideOfPopup = true,
@@ -134,35 +129,5 @@ public partial class BookViewModel : BaseViewModel, IQueryAttributable
 			System.Diagnostics.Debug.WriteLine("Popup was closed by other means.");
 			isPopupActive = false;
 		}
-	}
-
-	/// <summary>
-	/// Toggles the navigation menu visibility and optionally updates the fullscreen state.
-	/// </summary>
-	/// <param name="setFullScreen">Indicates whether to update the fullscreen state when toggling the navigation menu.</param>
-	public void Press(bool setFullScreen)
-	{
-		Dispatcher.Dispatch(() =>
-		{
-			FullScreenService.SetFullScreen(setFullScreen);
-			IsNavMenuVisible = !setFullScreen;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, setFullScreen);
-		});
-	}
-
-	/// <summary>
-	/// Toggles the visibility of the navigation menu and updates the status bar visibility accordingly.
-	/// </summary>
-	/// <remarks>On Android, this method also adjusts the status bar visibility to match the navigation menu's
-	/// visibility.</remarks>
-	[RelayCommand]
-	public void Press()
-	{
-		Dispatcher.Dispatch(() =>
-		{
-			FullScreenService.SetFullScreen(IsNavMenuVisible);
-			IsNavMenuVisible = !IsNavMenuVisible;
-			Shell.SetNavBarIsVisible(Application.Current?.Windows[0].Page, IsNavMenuVisible);
-		});
 	}
 }

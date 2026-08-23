@@ -27,10 +27,10 @@ public static class WebResourceResponseHelper
 		string reasonPhrase = "OK",
 		Dictionary<string, string> additionalHeaders = null!)
 	{
-		var reader = new StreamReader(stream, true);
-		var memoryStream = new MemoryStream();
+		StreamReader reader = new(stream, true);
+		MemoryStream memoryStream = new();
 		reader.BaseStream.CopyTo(memoryStream);
-		var contentBytes = memoryStream.ToArray();
+		byte[] contentBytes = memoryStream.ToArray();
 
 		// Create a memory stream from the byte array
 		MemoryStream contentStream = new(contentBytes);

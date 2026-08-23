@@ -149,39 +149,4 @@ public partial class FolderPicker : IFolderPicker
 			tcs.TrySetException(ex);
 		}
 	}
-
-	internal class UIPresentationControllerDelegate : UIAdaptivePresentationControllerDelegate
-	{
-		Action? dismissHandler;
-
-		internal UIPresentationControllerDelegate(Action dismissHandler)
-			=> this.dismissHandler = dismissHandler;
-
-		public override void DidDismiss(UIPresentationController presentationController)
-		{
-			dismissHandler?.Invoke();
-			dismissHandler = null;
-		}
-
-		protected override void Dispose(bool disposing)
-		{
-			dismissHandler?.Invoke();
-			base.Dispose(disposing);
-		}
-	}
-
-	class PickerDelegate : UIDocumentPickerDelegate
-	{
-
-		public Action<NSUrl[]>? PickHandler { get; set; }
-
-		public override void WasCancelled(UIDocumentPickerViewController controller)
-			=> PickHandler?.Invoke(null!);
-
-		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl[] urls)
-			=> PickHandler?.Invoke(urls);
-
-		public override void DidPickDocument(UIDocumentPickerViewController controller, NSUrl url)
-			=> PickHandler?.Invoke([url]);
-	}
 }
